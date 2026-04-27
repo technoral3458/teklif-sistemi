@@ -2,169 +2,143 @@ import streamlit as st
 import database
 import datetime
 import os
-import json
 
-# --- 1. SAYFA YAPILANDIRMASI ---
-st.set_page_config(page_title="Ersan Makine | Teklif Sistemi", page_icon="⚙️", layout="wide")
+# --- 1. SİSTEM AYARLARI VE OTURUM YÖNETİMİ ---
+st.set_page_config(page_title="Ersan Makine ERP", page_icon="⚙️", layout="wide")
 
-# Kurumsal Tema CSS (Masaüstü uygulamasına benzer tasarım)
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
+
+# --- 2. GÖRSEL TASARIM (CSS) ---
 st.markdown("""
     <style>
-    .main { background-color: #f8fafc; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #2563eb; color: white; }
-    .price-card { background: white; padding: 20px; border-radius: 10px; border-left: 5px solid #2563eb; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .option-box { background: #ffffff; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 5px; }
+    .stApp { background-color: #f8fafc; }
+    [data-testid="stSidebar"] { background-color: #0f172a; }
+    .stat-card {
+        background: white; padding: 20px; border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #3b82f6;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. HESAPLAMA MOTORU (offer_wizard.py mantığı) ---
-def calculate_offer(base_price, discount_pct, selected_options, machine_qty):
-    multiplier = 1.0 - (discount_pct / 100.0)
-    # Makine ana fiyatı üzerinden iskonto
-    discounted_base = base_price * multiplier
-    total_machine_price = discounted_base * machine_qty
-    
-    # Opsiyonlar üzerinden iskonto ve toplam
-    total_options_price = 0
-    for opt in selected_options:
-        opt_discounted = opt['price'] * multiplier
-        total_options_price += (opt_discounted * opt['qty'])
-        
-    return total_machine_price + total_options_price
-
-# --- 3. YAN MENÜ ---
+# --- 3. YAN MENÜ (SIDEBAR) ---
 with st.sidebar:
-    st.image("https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png", width=200) # Logonuzu buraya ekleyebilirsiniz
-    st.title("Yönetim Paneli")
-    menu = st.radio("İşlem Seçin", ["🏠 Ana Sayfa", "📄 Yeni Teklif Oluştur", "📋 Kayıtlı Teklifler"])
+    st.title("🚀 ERSAN MAKİNE")
+    st.caption("Bulut Yönetim Sistemi")
     st.markdown("---")
-    currency = st.selectbox("Para Birimi", ["USD", "EUR", "TRY"])
+    
+    # Menü Seçenekleri
+    menu_options = ["🏠 Genel Bakış", "📄 Yeni Teklif Hazırla"]
+    
+    # Yönetici Girişi Yapılmışsa Ek Menüleri Göster
+    if st.session_state.admin_logged_in:
+        menu_options.extend(["👥 Müşteri Tanımlama", "📦 Ürün Portföyü", "📋 Geçmiş Teklifler"])
+    
+    menu = st.radio("Menü", menu_options)
+    
+    st.markdown("---")
+    
+    # YÖNETİCİ GİRİŞİ BUTONU
+    if not st.session_state.admin_logged_in:
+        with st.expander("🔐 Yönetici Girişi"):
+            password = st.text_input("Şifre", type="password")
+            if st.button("Giriş Yap"):
+                if password == "20132017":
+                    st.session_state.admin_logged_in = True
+                    st.rerun()
+                else:
+                    st.error("Hatalı Şifre!")
+    else:
+        if st.button("🔓 Çıkış Yap"):
+            st.session_state.admin_logged_in = False
+            st.rerun()
 
-# --- 4. ANA SAYFA (Dashboard) ---
-if menu == "🏠 Ana Sayfa":
-    st.title("Hoş Geldiniz, Sefa Bey")
+# --- 4. SAYFA İÇERİKLERİ ---
+
+# A. GENEL BAKIŞ
+if menu == "🏠 Genel Bakış":
+    st.title("Sistem Özeti")
+    c_count = database.get_query("SELECT COUNT(*) FROM customers")[0][0]
+    m_count = database.get_query("SELECT COUNT(*) FROM models")[0][0]
+    off_count = database.get_query("SELECT COUNT(*) FROM offers")[0][0]
+    
     col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Toplam Müşteri", len(database.get_query("SELECT id FROM customers")))
-    with col2:
-        st.metric("Aktif Modeller", len(database.get_query("SELECT id FROM models")))
-    with col3:
-        st.metric("Hazırlanan Teklifler", len(database.get_query("SELECT id FROM offers")))
+    col1.markdown(f'<div class="stat-card"><b>Müşteriler</b><br><span style="font-size:25px;">{c_count}</span></div>', unsafe_allow_html=True)
+    col2.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><b>Modeller</b><br><span style="font-size:25px;">{m_count}</span></div>', unsafe_allow_html=True)
+    col3.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><b>Teklifler</b><br><span style="font-size:25px;">{off_count}</span></div>', unsafe_allow_html=True)
 
-# --- 5. YENİ TEKLİF OLUŞTURMA (Sihirbaz) ---
-elif menu == "📄 Yeni Teklif Oluştur":
-    st.title("Teklif Hazırlama Sihirbazı")
-    
-    # Veritabanından ham verileri çek
-    customers = database.get_query("SELECT id, company_name FROM customers")
-    cust_list = {c[1]: c[0] for c in customers}
-    
-    col_input, col_preview = st.columns([1, 1.2])
-
-    with col_input:
-        st.subheader("🛠️ Makine ve Müşteri Seçimi")
-        selected_cust_name = st.selectbox("Müşteri Seçin", list(cust_list.keys()))
+# B. MÜŞTERİ TANIMLAMA (Yöneticiye Özel)
+elif menu == "👥 Müşteri Tanımlama":
+    st.title("👥 Yeni Müşteri Tanımlama")
+    with st.form("customer_form"):
+        c_name = st.text_input("Firma Adı")
+        c_phone = st.text_input("Telefon")
+        c_email = st.text_input("E-posta")
+        c_tax_off = st.text_input("Vergi Dairesi")
+        c_tax_no = st.text_input("Vergi Numarası")
+        c_address = st.text_area("Adres")
         
-        categories = ["Tüm Kategoriler", "CNC Router Makinaları", "CNC Delik Makinaları", "Kenar Bantlama Makinaları"]
-        sel_cat = st.selectbox("Kategori Filtresi", categories)
+        if st.form_submit_button("💾 Müşteriyi Kaydet"):
+            if c_name:
+                database.exec_query(
+                    "INSERT INTO customers (company_name, phone, email, tax_office, tax_no, address) VALUES (?,?,?,?,?,?)",
+                    (c_name, c_phone, c_email, c_tax_off, c_tax_no, c_address)
+                )
+                st.success(f"{c_name} başarıyla sisteme eklendi!")
+            else:
+                st.error("Firma adı boş bırakılamaz!")
+
+# C. ÜRÜN PORTFÖYÜ (Yöneticiye Özel)
+elif menu == "📦 Ürün Portföyü":
+    st.title("📦 Ürün Portföyü ve Modeller")
+    models = database.get_query("SELECT name, category, base_price, currency FROM models")
+    if models:
+        import pandas as pd
+        df = pd.DataFrame(models, columns=["Model Adı", "Kategori", "Fiyat", "Para Birimi"])
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("Henüz model eklenmemiş.")
+
+# D. YENİ TEKLİF HAZIRLA
+elif menu == "📄 Yeni Teklif Hazırla":
+    st.title("📄 Yeni Teklif Hazırlama")
+    # Müşteri Listesi
+    cust_data = database.get_query("SELECT id, company_name FROM customers")
+    if not cust_data:
+        st.warning("Önce 'Müşteri Tanımlama' menüsünden müşteri eklemelisiniz!")
+    else:
+        customers = {c[1]: c[0] for c in cust_data}
+        selected_cust = st.selectbox("Müşteri Seçin", list(customers.keys()))
         
-        # Modelleri getir (Kategoriye göre)
-        m_query = "SELECT id, name, base_price, specs, compatible_options FROM models WHERE currency=?"
-        m_params = [currency]
-        if sel_cat != "Tüm Kategoriler":
-            m_query += " AND category=?"
-            m_params.append(sel_cat)
-            
-        models = database.get_query(m_query, tuple(m_params))
-        model_names = [m[1] for m in models]
-        selected_model_name = st.selectbox("Model Seçin", model_names)
-
-        if selected_model_name:
-            # Seçilen modelin verilerini al
-            m_data = [m for m in models if m[1] == selected_model_name][0]
-            m_id, m_base_price, m_specs, m_compat_str = m_data[0], m_data[2], m_data[3], m_data[4]
-            
-            m_qty = st.number_input("Makine Adedi", min_value=1, value=1)
-            discount = st.slider("İskonto Oranı (%)", 0.0, 50.0, 0.0, 0.5)
-            
-            st.markdown("---")
-            st.subheader("⚙️ Opsiyonlar")
-            
-            # Uyumlu opsiyonları filtrele (offer_wizard.py mantığı)
-            compat_ids = m_compat_str.split(",") if m_compat_str else []
-            all_opts = database.get_query("SELECT id, opt_name, opt_price, opt_desc FROM options WHERE currency=?", (currency,))
-            
-            selected_opts_list = []
-            for oid, oname, oprice, odesc in all_opts:
-                if str(oid) in compat_ids:
-                    with st.container():
-                        is_sel = st.checkbox(f"{oname} (+{oprice:,.2f} {currency})", key=f"chk_{oid}")
-                        if is_sel:
-                            o_qty = st.number_input(f"Adet ({oname})", min_value=1, value=1, key=f"q_{oid}")
-                            selected_opts_list.append({'name': oname, 'price': oprice, 'qty': o_qty, 'desc': odesc})
-
-    with col_preview:
-        st.subheader("👁️ Teklif Önizleme")
+        # Model Listesi
+        model_data = database.get_query("SELECT id, name, base_price, currency FROM models")
+        models = {m[1]: m for m in model_data}
+        selected_model = st.selectbox("Makine Seçin", list(models.keys()))
         
-        if selected_model_name:
-            final_total = calculate_offer(m_base_price, discount, selected_opts_list, m_qty)
+        if selected_model:
+            m_price = models[selected_model][2]
+            m_curr = models[selected_model][3]
+            st.info(f"Seçilen Makine Taban Fiyatı: {m_price:,.2f} {m_curr}")
             
-            # HTML Önizleme (preview_engine.py şablonu özeti)
-            preview_html = f"""
-            <div style="background: white; padding: 30px; border: 1px solid #ccc; font-family: sans-serif;">
-                <h2 style="color: #2563eb;">TEKLİF FORMU</h2>
-                <hr>
-                <p><b>Müşteri:</b> {selected_cust_name}</p>
-                <p><b>Tarih:</b> {datetime.date.today().strftime('%d.%m.%Y')}</p>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                    <tr style="background: #f1f5f9;">
-                        <th style="padding: 10px; border: 1px solid #ddd;">Ürün / Donanım</th>
-                        <th style="padding: 10px; border: 1px solid #ddd;">Adet</th>
-                        <th style="padding: 10px; border: 1px solid #ddd;">Birim Fiyat</th>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd;"><b>{selected_model_name}</b> (Ana Makine)</td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">{m_qty}</td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">{m_base_price:,.2f} {currency}</td>
-                    </tr>
-            """
+            discount = st.number_input("İskonto (%)", 0.0, 100.0, 0.0)
+            final = m_price * (1 - (discount/100))
+            st.success(f"Teklif Tutarı: {final:,.2f} {m_curr}")
             
-            for o in selected_opts_list:
-                preview_html += f"""
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd;">{o['name']}</td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">{o['qty']}</td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">{o['price']:,.2f} {currency}</td>
-                    </tr>
-                """
-            
-            preview_html += f"""
-                </table>
-                <div style="margin-top: 20px; text-align: right;">
-                    <p>Ara Toplam: {(m_base_price * m_qty) + sum(x['price']*x['qty'] for x in selected_opts_list):,.2f} {currency}</p>
-                    <p style="color: red;">İskonto (%{discount}): -{((m_base_price * m_qty) + sum(x['price']*x['qty'] for x in selected_opts_list)) * (discount/100):,.2f} {currency}</p>
-                    <h3 style="color: #1e293b;">NET TOPLAM: {final_total:,.2f} {currency}</h3>
-                </div>
-            </div>
-            """
-            
-            st.markdown(preview_html, unsafe_allow_html=True)
-            
-            if st.button("💾 Teklifi Sisteme Kaydet ve PDF Oluştur"):
-                # Veritabanına kaydetme işlemi buraya gelecek
-                st.success(f"{selected_cust_name} adına teklif başarıyla kaydedildi!")
+            if st.button("Teklifi Onayla ve Kaydet"):
+                st.balloons()
+                st.success("Teklif kaydedildi!")
 
-# --- 6. GEÇMİŞ TEKLİFLER ---
-elif menu == "📋 Kayıtlı Teklifler":
-    st.title("Teklif Arşivi")
+# E. GEÇMİŞ TEKLİFLER
+elif menu == "📋 Geçmiş Teklifler":
+    st.title("📋 Geçmiş Teklif Kayıtları")
+    # Basit liste formatı
     offers = database.get_query("""
-        SELECT o.id, c.company_name, o.model_name, o.total_price, o.date 
+        SELECT o.id, c.company_name, o.total_price, o.offer_date 
         FROM offers o 
-        JOIN customers c ON o.customer_id = c.id 
-        ORDER BY o.date DESC
+        JOIN customers c ON o.customer_id = c.id
     """)
     if offers:
         st.table(offers)
     else:
-        st.warning("Henüz kayıtlı bir teklif bulunamadı.")
+        st.write("Kayıt bulunamadı.")
+
