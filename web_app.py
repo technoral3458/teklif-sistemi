@@ -1,47 +1,39 @@
 import streamlit as st
 import database
 import datetime
-import os
 import pandas as pd
 
 # --- 1. SİSTEM YAPILANDIRMASI ---
 st.set_page_config(page_title="Ersan Makine Bulut ERP", page_icon="⚙️", layout="wide")
 
-# Oturum Durumu (Yönetici girişi kontrolü)
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 
-# --- 2. GELİŞMİŞ GÖRSEL TASARIM (CSS) ---
+# --- 2. MOBİL UYUMLU DOĞAL CSS (Renk çakışmaları giderildi) ---
 st.markdown("""
     <style>
-    /* Ana Arka Plan */
-    .stApp { background-color: #f1f5f9; }
-    
-    /* Yan Menü Tasarımı */
-    [data-testid="stSidebar"] { background-color: #0f172a; border-right: 1px solid #1e293b; }
-    .stRadio > div { gap: 10px; }
-    
-    /* Menü Butonları */
-    div[data-testid="stMarkdownContainer"] p { font-size: 16px; font-weight: 500; }
-    
-    /* İstatistik Kartları */
+    /* İstatistik Kartları - Mobilde harika görünmesi için uyarlandı */
     .stat-card {
         background: white; padding: 20px; border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         border-left: 5px solid #3b82f6; text-align: center;
+        margin-bottom: 15px; border: 1px solid #e2e8f0;
     }
-    .stat-val { font-size: 28px; font-weight: 800; color: #1e293b; display: block; }
-    .stat-title { color: #64748b; text-transform: uppercase; font-size: 12px; font-weight: 700; }
+    .stat-val { font-size: 32px; font-weight: 900; color: #1e293b; display: block; }
+    .stat-title { color: #64748b; text-transform: uppercase; font-size: 13px; font-weight: 700; }
     
-    /* Form ve Kutular */
-    .stTextInput>div>div>input, .stSelectbox>div>div>div { border-radius: 8px; }
+    /* Yan Menü (Sidebar) Seçeneklerini Büyütme (Telefonda kolay tıklansın) */
+    .stRadio p { font-size: 18px !important; font-weight: 600 !important; }
+    
+    /* Gizli Radio Button Başlığını Kaldırma */
+    .stRadio > label { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. YAN MENÜ (NAVIGATION) ---
 with st.sidebar:
-    st.markdown(f"<h1 style='color:white; font-size:24px;'>🚀 ERSAN MAKİNE</h1>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color:#94a3b8; font-size:12px; margin-top:-15px;'>Bulut Yönetim Paneli v2.0</p>", unsafe_allow_html=True)
+    # Logonuz (Varsa internet adresini değiştirebilirsiniz)
+    st.image("https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png", use_container_width=True)
     st.markdown("---")
 
     # Menü Grupları
@@ -58,20 +50,19 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # YÖNETİCİ KONTROL PANELİ (Masaüstü main.py şifreleme mantığı)
+    # YÖNETİCİ KONTROL PANELİ
     if not st.session_state.admin_logged_in:
         with st.expander("🔐 Yönetici Girişi"):
             pwd = st.text_input("Giriş Şifresi", type="password")
-            if st.button("Sistemi Aç"):
+            if st.button("Sistemi Aç", use_container_width=True):
                 if pwd == "20132017":
                     st.session_state.admin_logged_in = True
-                    st.success("Yetki Verildi!")
                     st.rerun()
                 else:
                     st.error("Hatalı Şifre!")
     else:
-        st.info("🟢 Yönetici Modu Aktif")
-        if st.button("🔓 Oturumu Kapat"):
+        st.success("🟢 Yönetici Modu Aktif")
+        if st.button("🔓 Oturumu Kapat", use_container_width=True):
             st.session_state.admin_logged_in = False
             st.rerun()
 
@@ -79,9 +70,8 @@ with st.sidebar:
 
 # A. GENEL BAKIŞ (Dashboard)
 if menu == "🏠 Genel Bakış":
-    st.title("Sistem Genel Durumu")
+    st.header("Sistem Genel Durumu")
     
-    # Veritabanından İstatistikleri Al (main.py'deki refresh_stats mantığı)
     try:
         c_count = database.get_query("SELECT COUNT(*) FROM customers")[0][0]
         m_count = database.get_query("SELECT COUNT(*) FROM models")[0][0]
@@ -101,59 +91,55 @@ if menu == "🏠 Genel Bakış":
     st.subheader("📢 Son Eklenen Modeller")
     latest_models = database.get_query("SELECT name, category FROM models ORDER BY id DESC LIMIT 5")
     if latest_models:
-        st.table(pd.DataFrame(latest_models, columns=["Model Adı", "Kategori"]))
+        st.dataframe(pd.DataFrame(latest_models, columns=["Model Adı", "Kategori"]), use_container_width=True)
 
-# B. YENİ TEKLİF HAZIRLA (offer_wizard.py Web Uyarlaması)
+# B. YENİ TEKLİF HAZIRLA
 elif menu == "📄 Yeni Teklif Hazırla":
-    st.title("📄 Teklif Hazırlama Sihirbazı")
+    st.header("📄 Teklif Hazırlama Sihirbazı")
     
-    # Müşteri ve Model Seçimi
     cust_data = database.get_query("SELECT id, company_name FROM customers")
     if not cust_data:
         st.error("⚠️ Sistemde kayıtlı müşteri bulunamadı. Lütfen önce Müşteri Tanımlama ekranından müşteri ekleyin.")
     else:
-        col_a, col_b = st.columns(2)
-        with col_a:
-            selected_cust = st.selectbox("🎯 Müşteri / Firma Seçin", [c[1] for c in cust_data])
-            model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options FROM models")
-            selected_model_name = st.selectbox("🤖 Makine Modeli Seçin", [m[1] for m in model_data])
+        selected_cust = st.selectbox("🎯 Müşteri / Firma Seçin", [c[1] for c in cust_data])
+        model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options FROM models")
+        selected_model_name = st.selectbox("🤖 Makine Modeli Seçin", [m[1] for m in model_data])
         
-        with col_b:
-            m_info = [m for m in model_data if m[1] == selected_model_name][0]
-            m_qty = st.number_input("Adet", min_value=1, value=1)
-            discount = st.slider("İskonto Oranı (%)", 0.0, 50.0, 0.0)
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            m_qty = st.number_input("Makine Adedi", min_value=1, value=1)
+        with col_m2:
+            discount = st.number_input("İskonto Oranı (%)", min_value=0.0, max_value=100.0, value=0.0)
 
         # Fiyat Hesaplama
+        m_info = [m for m in model_data if m[1] == selected_model_name][0]
         base_price = m_info[2]
         total = (base_price * m_qty) * (1 - (discount / 100))
         
         st.markdown(f"""
-            <div style="background:#0f172a; color:white; padding:20px; border-radius:10px; text-align:center;">
+            <div style="background:#0f172a; color:white; padding:20px; border-radius:10px; text-align:center; margin-top:15px;">
+                <p style="margin:0; opacity:0.8; font-size:14px;">Anlık Hesaplanan Net Tutar</p>
                 <h2 style="margin:0; color:#10b981;">{total:,.2f} {m_info[3]}</h2>
-                <p style="margin:0; opacity:0.7;">Anlık Hesaplanan Teklif Tutarı</p>
             </div>
         """, unsafe_allow_html=True)
         
-        if st.button("✅ Teklifi Taslak Olarak Kaydet"):
+        st.write("")
+        if st.button("✅ Teklifi Taslak Olarak Kaydet", use_container_width=True):
             st.balloons()
             st.success("Teklif başarıyla kaydedildi!")
 
-# C. MÜŞTERİ TANIMLAMA (customer_window.py mantığı)
+# C. MÜŞTERİ TANIMLAMA
 elif menu == "👥 Müşteri Tanımlama":
-    st.title("👥 Yeni Müşteri Tanımlama")
+    st.header("👥 Yeni Müşteri Tanımlama")
     with st.container(border=True):
         c_name = st.text_input("Firma Tam Ünvanı")
-        col1, col2 = st.columns(2)
-        with col1:
-            c_tax_off = st.text_input("Vergi Dairesi")
-            c_phone = st.text_input("Telefon Numarası")
-        with col2:
-            c_tax_no = st.text_input("Vergi Numarası")
-            c_email = st.text_input("E-Posta Adresi")
-        
+        c_tax_off = st.text_input("Vergi Dairesi")
+        c_tax_no = st.text_input("Vergi Numarası")
+        c_phone = st.text_input("Telefon Numarası")
+        c_email = st.text_input("E-Posta Adresi")
         c_addr = st.text_area("Açık Adres")
         
-        if st.button("💾 Müşteriyi Veritabanına Kaydet"):
+        if st.button("💾 Müşteriyi Veritabanına Kaydet", use_container_width=True):
             if c_name:
                 database.exec_query(
                     "INSERT INTO customers (company_name, tax_office, tax_no, phone, email, address) VALUES (?,?,?,?,?,?)",
@@ -163,19 +149,19 @@ elif menu == "👥 Müşteri Tanımlama":
             else:
                 st.warning("Lütfen firma adını girin.")
 
-# D. ÜRÜN PORTFÖYÜ (model_management.py mantığı)
+# D. ÜRÜN PORTFÖYÜ
 elif menu == "📦 Ürün Portföyü":
-    st.title("📦 Ürün Portföyü Yönetimi")
+    st.header("📦 Ürün Portföyü Yönetimi")
     models = database.get_query("SELECT name, category, base_price, currency FROM models")
     if models:
-        df_models = pd.DataFrame(models, columns=["Model Adı", "Kategori", "Taban Fiyat", "Birim"])
+        df_models = pd.DataFrame(models, columns=["Model", "Kategori", "Fiyat", "Birim"])
         st.dataframe(df_models, use_container_width=True)
     else:
         st.info("Sistemde henüz kayıtlı makine modeli bulunmuyor.")
 
-# E. GEÇMİŞ TEKLİFLER (OfferHistoryWindow mantığı)
+# E. GEÇMİŞ TEKLİFLER
 elif menu == "📋 Geçmiş Teklifler":
-    st.title("📋 Geçmiş Teklif Kayıtları")
+    st.header("📋 Geçmiş Teklif Kayıtları")
     query = """
         SELECT o.id, o.offer_date, c.company_name, m.name, o.total_price 
         FROM offers o
@@ -185,7 +171,8 @@ elif menu == "📋 Geçmiş Teklifler":
     """
     history = database.get_query(query)
     if history:
-        df_hist = pd.DataFrame(history, columns=["ID", "Tarih", "Müşteri", "Model", "Toplam Tutar"])
-        st.table(df_hist)
+        df_hist = pd.DataFrame(history, columns=["ID", "Tarih", "Müşteri", "Model", "Tutar"])
+        st.dataframe(df_hist, use_container_width=True)
     else:
         st.write("Henüz bir teklif oluşturulmamış.")
+
