@@ -1,6 +1,6 @@
 import streamlit as st
 import database
-import customer_pages # Müşteri yönetim modülümüzü içeri aldık
+import customer_pages
 import datetime
 import pandas as pd
 import hashlib
@@ -14,9 +14,16 @@ def hash_password(password):
 def init_b2b_system():
     database.exec_query("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer')""")
+        email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0)""")
     
+    # Veritabanına onay (is_approved) sütununu ekliyoruz
     try:
+        cols_users = [c[1] for c in database.get_query("PRAGMA table_info(users)")]
+        if "is_approved" not in cols_users:
+            database.exec_query("ALTER TABLE users ADD COLUMN is_approved INTEGER DEFAULT 0")
+            # Sistemde önceden kayıtlı bayileriniz varsa, mağdur olmamaları için onları otomatik onaylıyoruz
+            database.exec_query("UPDATE users SET is_approved = 1")
+            
         cols_cust = [c[1] for c in database.get_query("PRAGMA table_info(customers)")]
         if "user_id" not in cols_cust:
             database.exec_query("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 0")
@@ -78,14 +85,19 @@ if not st.session_state.logged_in:
                     st.session_state.user_email = "Yönetici (Sefa Bey)"
                     st.rerun()
                 else:
-                    user = database.get_query("SELECT id, role FROM users WHERE email=? AND password=?", 
+                    # YENİLİK: Onay (is_approved) kontrolü yapılıyor
+                    user = database.get_query("SELECT id, role, is_approved FROM users WHERE email=? AND password=?", 
                                              (login_email, hash_password(login_pwd)))
                     if user:
-                        st.session_state.logged_in = True
-                        st.session_state.user_id = user[0][0]
-                        st.session_state.user_role = user[0][1]
-                        st.session_state.user_email = login_email
-                        st.rerun()
+                        is_approved = user[0][2]
+                        if is_approved == 1:
+                            st.session_state.logged_in = True
+                            st.session_state.user_id = user[0][0]
+                            st.session_state.user_role = user[0][1]
+                            st.session_state.user_email = login_email
+                            st.rerun()
+                        else:
+                            st.warning("⏳ Hesabınız henüz onaylanmamış! Sistem yöneticisi onayladıktan sonra giriş yapabilirsiniz.")
                     else:
                         st.error("Hatalı e-posta veya şifre! Lütfen bilgilerinizi kontrol edin.")
 
@@ -97,16 +109,17 @@ if not st.session_state.logged_in:
             new_comp = st.text_input("Bayi / Firma Adı")
             new_pwd_raw = st.text_input("Sistem Şifresi Belirleyin", type="password")
             
-            if st.button("Kayıt Ol ve Hemen Başla", use_container_width=True):
+            if st.button("Kayıt Ol ve Onaya Gönder", use_container_width=True):
                 new_email = new_email_raw.strip().lower()
                 new_pwd = new_pwd_raw.strip()
                 
                 if new_email and new_pwd and new_comp:
                     try:
-                        database.exec_query("INSERT INTO users (email, password, company_name) VALUES (?,?,?)",
+                        # Yeni bayi eklendiğinde varsayılan olarak is_approved=0 (Onaysız) olur
+                        database.exec_query("INSERT INTO users (email, password, company_name, is_approved) VALUES (?,?,?,0)",
                                            (new_email, hash_password(new_pwd), new_comp))
                         st.balloons()
-                        st.success("Kayıt başarılı! Şimdi 'Bayi Girişi' sekmesinden sisteme girebilirsiniz.")
+                        st.success("Kayıt başarıyla oluşturuldu! Yönetici (Ersan Makine) onayından sonra sisteme giriş yapabileceksiniz.")
                     except:
                         st.error("Bu e-posta adresi zaten sistemde kayıtlı!")
                 else:
@@ -146,12 +159,12 @@ if menu == "🏠 Dashboard":
         try:
             c_count = database.get_query("SELECT COUNT(*) FROM customers")[0][0]
             off_count = database.get_query("SELECT COUNT(*) FROM offers")[0][0]
-            u_count = database.get_query("SELECT COUNT(*) FROM users")[0][0]
+            u_count = database.get_query("SELECT COUNT(*) FROM users WHERE role='dealer' AND is_approved=1")[0][0]
         except:
             c_count, off_count, u_count = 0, 0, 0
             
         col1, col2, col3 = st.columns(3)
-        col1.markdown(f'<div class="stat-card"><span class="stat-title">Toplam Bayi</span><span class="stat-val">{u_count}</span></div>', unsafe_allow_html=True)
+        col1.markdown(f'<div class="stat-card"><span class="stat-title">Onaylı Aktif Bayi</span><span class="stat-val">{u_count}</span></div>', unsafe_allow_html=True)
         col2.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Sistemdeki Müşteriler</span><span class="stat-val">{c_count}</span></div>', unsafe_allow_html=True)
         col3.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><span class="stat-title">Kesilen Teklifler</span><span class="stat-val">{off_count}</span></div>', unsafe_allow_html=True)
     else:
@@ -165,10 +178,9 @@ if menu == "🏠 Dashboard":
         col1.markdown(f'<div class="stat-card"><span class="stat-title">Kayıtlı Müşterilerim</span><span class="stat-val">{c_count}</span></div>', unsafe_allow_html=True)
         col2.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Verdiğim Teklifler</span><span class="stat-val">{off_count}</span></div>', unsafe_allow_html=True)
 
-# B. MÜŞTERİ YÖNETİMİ (HARİCİ DOSYAYA BAĞLANDI)
+# B. MÜŞTERİ YÖNETİMİ
 elif menu == "👥 Müşterilerim":
     is_admin = (st.session_state.user_role == "admin")
-    # customer_pages.py dosyasındaki fonksiyonu çağırıyoruz
     customer_pages.show_customer_management(st.session_state.user_id, is_admin)
 
 # C. YENİ TEKLİF HAZIRLA
@@ -199,7 +211,7 @@ elif menu == "📄 Yeni Teklif Hazırla":
             with col_m1:
                 m_qty = st.number_input("Adet", min_value=1, value=1)
             with col_m2:
-                discount = st.number_input("İskonto Oranı (%)", 0.0, 100.0, 0.0)
+                discount = st.number_input("İskonto Oranı (%)", min_value=0.0, max_value=100.0, value=0.0)
                 
             final_price = (price * m_qty) * (1 - (discount/100))
             
@@ -217,7 +229,7 @@ elif menu == "📄 Yeni Teklif Hazırla":
                 st.balloons()
                 st.success("Teklifiniz başarıyla sisteme kaydedildi.")
 
-# D. GEÇMİŞ TEKLİFLERİM (Bayi Kendi Kayıtlarını Görür)
+# D. GEÇMİŞ TEKLİFLERİM
 elif menu == "📋 Geçmiş Tekliflerim":
     st.header("📋 Geçmiş Tekliflerim")
     my_offers = database.get_query("""
@@ -232,14 +244,37 @@ elif menu == "📋 Geçmiş Tekliflerim":
     else:
         st.info("Henüz oluşturduğunuz bir teklif bulunmuyor.")
 
-# E. ADMIN PANELİ (Sadece Yönetici Görür)
+# E. ADMIN PANELİ: BAYİ YÖNETİMİ VE ONAY SİSTEMİ
 elif menu == "🏢 Bayi Yönetimi":
-    st.header("🏢 Bayi Listesi")
-    dealers = database.get_query("SELECT id, company_name, email FROM users WHERE role='dealer'")
+    st.header("🏢 Bayi Yönetimi ve Onay Sistemi")
+    
+    # YENİLİK: ONAY BEKLEYEN BAYİLER BÖLÜMÜ
+    st.subheader("⏳ Onay Bekleyen Yeni Başvurular")
+    pending_dealers = database.get_query("SELECT id, company_name, email FROM users WHERE role='dealer' AND is_approved=0")
+    
+    if pending_dealers:
+        for p_id, p_name, p_email in pending_dealers:
+            with st.container(border=True):
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.markdown(f"**Firma:** {p_name} &nbsp;&nbsp;|&nbsp;&nbsp; **E-Posta:** {p_email}")
+                with col2:
+                    if st.button("✅ Onayla", key=f"approve_{p_id}", use_container_width=True):
+                        database.exec_query("UPDATE users SET is_approved=1 WHERE id=?", (p_id,))
+                        st.success(f"{p_name} başarıyla onaylandı!")
+                        st.rerun()
+    else:
+        st.info("Şu an onay bekleyen yeni bir bayi başvurusu bulunmuyor.")
+        
+    st.markdown("---")
+    
+    # AKTİF BAYİLER BÖLÜMÜ
+    st.subheader("✅ Sistemde Aktif Olan Bayiler")
+    dealers = database.get_query("SELECT id, company_name, email FROM users WHERE role='dealer' AND is_approved=1")
     if dealers:
         st.dataframe(pd.DataFrame(dealers, columns=["ID", "Bayi / Firma Adı", "E-Posta"]), use_container_width=True)
     else:
-        st.info("Henüz kayıtlı bayi yok.")
+        st.write("Henüz onaylanmış bayi yok.")
 
 elif menu == "📋 Tüm Teklifler (Genel)":
     st.header("Tüm Bayilerin Teklifleri")
