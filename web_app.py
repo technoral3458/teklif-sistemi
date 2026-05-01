@@ -2,177 +2,179 @@ import streamlit as st
 import database
 import datetime
 import pandas as pd
+import hashlib
 
 # --- 1. SİSTEM YAPILANDIRMASI ---
-st.set_page_config(page_title="Ersan Makine Bulut ERP", page_icon="⚙️", layout="wide")
+st.set_page_config(page_title="Ersan Makine Bayi Portalı", page_icon="⚙️", layout="wide")
 
-if "admin_logged_in" not in st.session_state:
-    st.session_state.admin_logged_in = False
+# Şifreleri güvenli tutmak için basit hash fonksiyonu
+def hash_password(password):
+    return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- 2. MOBİL UYUMLU DOĞAL CSS (Renk çakışmaları giderildi) ---
-st.markdown("""
-    <style>
-    /* İstatistik Kartları - Mobilde harika görünmesi için uyarlandı */
-    .stat-card {
-        background: white; padding: 20px; border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        border-left: 5px solid #3b82f6; text-align: center;
-        margin-bottom: 15px; border: 1px solid #e2e8f0;
-    }
-    .stat-val { font-size: 32px; font-weight: 900; color: #1e293b; display: block; }
-    .stat-title { color: #64748b; text-transform: uppercase; font-size: 13px; font-weight: 700; }
+# Veritabanı Tablolarını Güncelleme (B2B Hazırlığı)
+def init_b2b_system():
+    # Kullanıcılar tablosu (Bayiler)
+    database.exec_query("""CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer')""")
     
-    /* Yan Menü (Sidebar) Seçeneklerini Büyütme (Telefonda kolay tıklansın) */
-    .stRadio p { font-size: 18px !important; font-weight: 600 !important; }
+    # Mevcut tablolara user_id (Sahiplik) sütunu ekleme
+    cols_cust = [c[1] for c in database.get_query("PRAGMA table_info(customers)")]
+    if "user_id" not in cols_cust:
+        database.exec_query("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 0")
+        
+    cols_off = [c[1] for c in database.get_query("PRAGMA table_info(offers)")]
+    if "user_id" not in cols_off:
+        database.exec_query("ALTER TABLE offers ADD COLUMN user_id INTEGER DEFAULT 0")
+
+init_b2b_system()
+
+# Oturum Durumu
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user_id = None
+    st.session_state.user_role = None
+    st.session_state.user_email = ""
+
+# --- 2. GİRİŞ VE KAYIT EKRANI ---
+if not st.session_state.logged_in:
+    tab1, tab2 = st.tabs(["🔑 Oturum Aç", "📝 Bayi Kaydı Oluştur"])
     
-    /* Gizli Radio Button Başlığını Kaldırma */
-    .stRadio > label { display: none; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 3. YAN MENÜ (NAVIGATION) ---
-with st.sidebar:
-    # Logonuz (Varsa internet adresini değiştirebilirsiniz)
-    st.image("https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png", use_container_width=True)
-    st.markdown("---")
-
-    # Menü Grupları
-    if not st.session_state.admin_logged_in:
-        menu = st.radio("MENÜ", ["🏠 Genel Bakış", "📄 Yeni Teklif Hazırla"])
-    else:
-        menu = st.radio("MENÜ", [
-            "🏠 Genel Bakış", 
-            "📄 Yeni Teklif Hazırla", 
-            "👥 Müşteri Tanımlama", 
-            "📦 Ürün Portföyü", 
-            "📋 Geçmiş Teklifler"
-        ])
-
-    st.markdown("---")
-    
-    # YÖNETİCİ KONTROL PANELİ
-    if not st.session_state.admin_logged_in:
-        with st.expander("🔐 Yönetici Girişi"):
-            pwd = st.text_input("Giriş Şifresi", type="password")
-            if st.button("Sistemi Aç", use_container_width=True):
-                if pwd == "20132017":
-                    st.session_state.admin_logged_in = True
+    with tab1:
+        st.subheader("Bayi Girişi")
+        login_email = st.text_input("E-Posta")
+        login_pwd = st.text_input("Şifre", type="password")
+        if st.button("Giriş Yap", use_container_width=True):
+            # Admin kontrolü (Sizin girişiniz)
+            if login_email == "admin@ersanmakina.com" and login_pwd == "20132017":
+                st.session_state.logged_in = True
+                st.session_state.user_id = 0
+                st.session_state.user_role = "admin"
+                st.rerun()
+            else:
+                user = database.get_query("SELECT id, role FROM users WHERE email=? AND password=?", 
+                                         (login_email, hash_password(login_pwd)))
+                if user:
+                    st.session_state.logged_in = True
+                    st.session_state.user_id = user[0][0]
+                    st.session_state.user_role = user[0][1]
+                    st.session_state.user_email = login_email
                     st.rerun()
                 else:
-                    st.error("Hatalı Şifre!")
+                    st.error("Hatalı e-posta veya şifre!")
+
+    with tab2:
+        st.subheader("Yeni Bayi Başvurusu")
+        new_email = st.text_input("E-Posta Adresi (Oturum açmak için)")
+        new_comp = st.text_input("Firma Adı")
+        new_pwd = st.text_input("Şifre Belirleyin", type="password")
+        if st.button("Kayıt Ol ve Üye Girişi Yap", use_container_width=True):
+            if new_email and new_pwd:
+                try:
+                    database.exec_query("INSERT INTO users (email, password, company_name) VALUES (?,?,?)",
+                                       (new_email, hash_password(new_pwd), new_comp))
+                    st.success("Kaydınız başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.")
+                except:
+                    st.error("Bu e-posta adresi zaten kayıtlı!")
+    st.stop()
+
+# --- 3. ANA PANEL (Giriş Yapıldıktan Sonra) ---
+with st.sidebar:
+    st.image("https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png", use_container_width=True)
+    st.write(f"👤 **Hoş Geldin:** {st.session_state.user_email}")
+    st.markdown("---")
+    
+    menu_items = ["🏠 Dashboard", "📄 Yeni Teklif Hazırla", "👥 Müşterilerim"]
+    if st.session_state.user_role == "admin":
+        menu_items.extend(["🏢 Bayi Yönetimi", "📋 Tüm Teklifler", "📦 Modelleri Yönet"])
     else:
-        st.success("🟢 Yönetici Modu Aktif")
-        if st.button("🔓 Oturumu Kapat", use_container_width=True):
-            st.session_state.admin_logged_in = False
-            st.rerun()
+        menu_items.append("📋 Geçmiş Tekliflerim")
+        
+    menu = st.radio("MENÜ", menu_items)
+    
+    if st.button("🚪 Oturumu Kapat", use_container_width=True):
+        st.session_state.logged_in = False
+        st.rerun()
 
 # --- 4. SAYFA İÇERİKLERİ ---
 
-# A. GENEL BAKIŞ (Dashboard)
-if menu == "🏠 Genel Bakış":
-    st.header("Sistem Genel Durumu")
+# A. DASHBOARD (Bayiye Özel / Adminde Genel)
+if menu == "🏠 Dashboard":
+    st.header("Sistem Özeti")
+    u_id = st.session_state.user_id
     
-    try:
+    if st.session_state.user_role == "admin":
         c_count = database.get_query("SELECT COUNT(*) FROM customers")[0][0]
-        m_count = database.get_query("SELECT COUNT(*) FROM models")[0][0]
         off_count = database.get_query("SELECT COUNT(*) FROM offers")[0][0]
-    except:
-        c_count, m_count, off_count = 0, 0, 0
+        u_count = database.get_query("SELECT COUNT(*) FROM users")[0][0]
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Toplam Bayi", u_count)
+        col2.metric("Toplam Müşteri", c_count)
+        col3.metric("Toplam Teklif", off_count)
+    else:
+        c_count = database.get_query("SELECT COUNT(*) FROM customers WHERE user_id=?", (u_id,))[0][0]
+        off_count = database.get_query("SELECT COUNT(*) FROM offers WHERE user_id=?", (u_id,))[0][0]
+        col1, col2 = st.columns(2)
+        col1.metric("Müşterilerim", c_count)
+        col2.metric("Verdiğim Teklifler", off_count)
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f'<div class="stat-card"><span class="stat-title">Müşteriler</span><span class="stat-val">{c_count}</span></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Modeller</span><span class="stat-val">{m_count}</span></div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><span class="stat-title">Teklifler</span><span class="stat-val">{off_count}</span></div>', unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.subheader("📢 Son Eklenen Modeller")
-    latest_models = database.get_query("SELECT name, category FROM models ORDER BY id DESC LIMIT 5")
-    if latest_models:
-        st.dataframe(pd.DataFrame(latest_models, columns=["Model Adı", "Kategori"]), use_container_width=True)
-
-# B. YENİ TEKLİF HAZIRLA
-elif menu == "📄 Yeni Teklif Hazırla":
-    st.header("📄 Teklif Hazırlama Sihirbazı")
+# B. MÜŞTERİ TANIMLAMA (Bayiye Özel)
+elif menu == "👥 Müşterilerim":
+    st.header("Müşteri Yönetimi")
+    with st.expander("➕ Yeni Müşteri Ekle"):
+        c_name = st.text_input("Firma Adı")
+        if st.button("Kaydet"):
+            database.exec_query("INSERT INTO customers (company_name, user_id) VALUES (?,?)", 
+                               (c_name, st.session_state.user_id))
+            st.success("Müşteri listenize eklendi.")
     
-    cust_data = database.get_query("SELECT id, company_name FROM customers")
-    if not cust_data:
-        st.error("⚠️ Sistemde kayıtlı müşteri bulunamadı. Lütfen önce Müşteri Tanımlama ekranından müşteri ekleyin.")
-    else:
-        selected_cust = st.selectbox("🎯 Müşteri / Firma Seçin", [c[1] for c in cust_data])
-        model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options FROM models")
-        selected_model_name = st.selectbox("🤖 Makine Modeli Seçin", [m[1] for m in model_data])
-        
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            m_qty = st.number_input("Makine Adedi", min_value=1, value=1)
-        with col_m2:
-            discount = st.number_input("İskonto Oranı (%)", min_value=0.0, max_value=100.0, value=0.0)
+    # Sadece kendi müşterilerini gör
+    my_customers = database.get_query("SELECT company_name, phone FROM customers WHERE user_id=?", (st.session_state.user_id,))
+    st.table(pd.DataFrame(my_customers, columns=["Firma Adı", "Telefon"]))
 
-        # Fiyat Hesaplama
-        m_info = [m for m in model_data if m[1] == selected_model_name][0]
-        base_price = m_info[2]
-        total = (base_price * m_qty) * (1 - (discount / 100))
+# C. YENİ TEKLİF HAZIRLA (Masaüstü Mantığı)
+elif menu == "📄 Yeni Teklif Hazırla":
+    st.header("Teklif Hazırlama")
+    my_custs = database.get_query("SELECT id, company_name FROM customers WHERE user_id=?", (st.session_state.user_id,))
+    if not my_custs:
+        st.warning("Teklif hazırlamak için önce müşteri eklemelisiniz.")
+    else:
+        selected_cust = st.selectbox("Müşteri Seçin", [c[1] for c in my_custs])
+        model_data = database.get_query("SELECT id, name, base_price, currency FROM models")
+        selected_model = st.selectbox("Makine Seçin", [m[1] for m in model_data])
         
-        st.markdown(f"""
-            <div style="background:#0f172a; color:white; padding:20px; border-radius:10px; text-align:center; margin-top:15px;">
-                <p style="margin:0; opacity:0.8; font-size:14px;">Anlık Hesaplanan Net Tutar</p>
-                <h2 style="margin:0; color:#10b981;">{total:,.2f} {m_info[3]}</h2>
-            </div>
-        """, unsafe_allow_html=True)
+        m_info = [m for m in model_data if m[1] == selected_model][0]
+        price = m_info[2]
+        st.metric("Birim Fiyat", f"{price:,.2f} {m_info[3]}")
         
-        st.write("")
-        if st.button("✅ Teklifi Taslak Olarak Kaydet", use_container_width=True):
+        if st.button("Teklifi Kaydet"):
+            # Teklif kaydetme (Bayi ID'si ile)
+            database.exec_query("INSERT INTO offers (customer_id, total_price, user_id, offer_date) VALUES (?,?,?,?)",
+                               (my_custs[0][0], price, st.session_state.user_id, datetime.date.today().isoformat()))
             st.balloons()
-            st.success("Teklif başarıyla kaydedildi!")
+            st.success("Teklifiniz başarıyla kaydedildi.")
 
-# C. MÜŞTERİ TANIMLAMA
-elif menu == "👥 Müşteri Tanımlama":
-    st.header("👥 Yeni Müşteri Tanımlama")
-    with st.container(border=True):
-        c_name = st.text_input("Firma Tam Ünvanı")
-        c_tax_off = st.text_input("Vergi Dairesi")
-        c_tax_no = st.text_input("Vergi Numarası")
-        c_phone = st.text_input("Telefon Numarası")
-        c_email = st.text_input("E-Posta Adresi")
-        c_addr = st.text_area("Açık Adres")
-        
-        if st.button("💾 Müşteriyi Veritabanına Kaydet", use_container_width=True):
-            if c_name:
-                database.exec_query(
-                    "INSERT INTO customers (company_name, tax_office, tax_no, phone, email, address) VALUES (?,?,?,?,?,?)",
-                    (c_name, c_tax_off, c_tax_no, c_phone, c_email, c_addr)
-                )
-                st.success(f"'{c_name}' başarıyla kaydedildi.")
-            else:
-                st.warning("Lütfen firma adını girin.")
+# D. GEÇMİŞ TEKLİFLERİM (Bayi Kendi Kayıtlarını Görür - Şifresiz)
+elif menu == "📋 Geçmiş Tekliflerim":
+    st.header("Geçmiş Tekliflerim")
+    my_offers = database.get_query("""
+        SELECT o.offer_date, c.company_name, o.total_price 
+        FROM offers o 
+        JOIN customers c ON o.customer_id = c.id 
+        WHERE o.user_id = ?""", (st.session_state.user_id,))
+    st.dataframe(pd.DataFrame(my_offers, columns=["Tarih", "Müşteri", "Tutar"]), use_container_width=True)
 
-# D. ÜRÜN PORTFÖYÜ
-elif menu == "📦 Ürün Portföyü":
-    st.header("📦 Ürün Portföyü Yönetimi")
-    models = database.get_query("SELECT name, category, base_price, currency FROM models")
-    if models:
-        df_models = pd.DataFrame(models, columns=["Model", "Kategori", "Fiyat", "Birim"])
-        st.dataframe(df_models, use_container_width=True)
-    else:
-        st.info("Sistemde henüz kayıtlı makine modeli bulunmuyor.")
+# E. ADMIN PANELİ (Sadece Sefa Bey Görür)
+elif menu == "🏢 Bayi Yönetimi":
+    st.header("Bayi Listesi ve Performans")
+    dealers = database.get_query("SELECT id, company_name, email FROM users WHERE role='dealer'")
+    st.table(pd.DataFrame(dealers, columns=["ID", "Bayi Adı", "E-Posta"]))
 
-# E. GEÇMİŞ TEKLİFLER
-elif menu == "📋 Geçmiş Teklifler":
-    st.header("📋 Geçmiş Teklif Kayıtları")
-    query = """
-        SELECT o.id, o.offer_date, c.company_name, m.name, o.total_price 
-        FROM offers o
-        JOIN customers c ON o.customer_id = c.id
-        JOIN models m ON o.model_id = m.id
-        ORDER BY o.id DESC
-    """
-    history = database.get_query(query)
-    if history:
-        df_hist = pd.DataFrame(history, columns=["ID", "Tarih", "Müşteri", "Model", "Tutar"])
-        st.dataframe(df_hist, use_container_width=True)
-    else:
-        st.write("Henüz bir teklif oluşturulmamış.")
-
+elif menu == "📋 Tüm Teklifler":
+    st.header("Tüm Bayilerin Teklifleri")
+    all_offers = database.get_query("""
+        SELECT u.company_name as Dealer, c.company_name as Customer, o.total_price, o.offer_date 
+        FROM offers o 
+        JOIN users u ON o.user_id = u.id 
+        JOIN customers c ON o.customer_id = c.id""")
+    st.dataframe(pd.DataFrame(all_offers, columns=["Bayi", "Müşteri", "Tutar", "Tarih"]), use_container_width=True)
