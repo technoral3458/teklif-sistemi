@@ -7,18 +7,14 @@ import hashlib
 # --- 1. SİSTEM YAPILANDIRMASI ---
 st.set_page_config(page_title="Ersan Makine Bayi Portalı", page_icon="⚙️", layout="wide")
 
-# Şifreleri güvenli tutmak için basit hash fonksiyonu
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# Veritabanı Tablolarını Güncelleme (B2B Hazırlığı)
 def init_b2b_system():
-    # Kullanıcılar tablosu (Bayiler)
     database.exec_query("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer')""")
     
-    # Mevcut tablolara user_id (Sahiplik) sütunu ekleme
     cols_cust = [c[1] for c in database.get_query("PRAGMA table_info(customers)")]
     if "user_id" not in cols_cust:
         database.exec_query("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 0")
@@ -29,7 +25,6 @@ def init_b2b_system():
 
 init_b2b_system()
 
-# Oturum Durumu
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user_id = None
@@ -48,11 +43,15 @@ if not st.session_state.logged_in:
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
             st.info("Yönetici veya Bayi hesabınızla giriş yapın.")
-            login_email = st.text_input("E-Posta Adresiniz")
-            login_pwd = st.text_input("Şifreniz", type="password")
+            
+            # YENİLİK: Boşlukları silen ve küçük harfe çeviren sistem (.strip().lower())
+            login_email_raw = st.text_input("E-Posta Adresiniz")
+            login_pwd_raw = st.text_input("Şifreniz", type="password")
             
             if st.button("Sisteme Giriş Yap", use_container_width=True):
-                # YÖNETİCİ GİRİŞİ (Sizin girişiniz - Güncellendi!)
+                login_email = login_email_raw.strip().lower()
+                login_pwd = login_pwd_raw.strip()
+                
                 if login_email == "admin@ersanmakina.net" and login_pwd == "20132017":
                     st.session_state.logged_in = True
                     st.session_state.user_id = 0
@@ -60,7 +59,6 @@ if not st.session_state.logged_in:
                     st.session_state.user_email = "Yönetici (Sefa Bey)"
                     st.rerun()
                 else:
-                    # BAYİ GİRİŞİ KONTROLÜ
                     user = database.get_query("SELECT id, role FROM users WHERE email=? AND password=?", 
                                              (login_email, hash_password(login_pwd)))
                     if user:
@@ -70,17 +68,20 @@ if not st.session_state.logged_in:
                         st.session_state.user_email = login_email
                         st.rerun()
                     else:
-                        st.error("Hatalı e-posta veya şifre!")
+                        st.error("Hatalı e-posta veya şifre! Lütfen bilgilerinizi kontrol edin.")
 
     with tab2:
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
-            st.success("Sistemimizde kendi müşterilerinizi yönetmek ve teklif hazırlamak için kayıt olun.")
-            new_email = st.text_input("Kurumsal E-Posta Adresi")
+            st.success("Kendi müşterilerinizi yönetmek ve teklif hazırlamak için kayıt olun.")
+            new_email_raw = st.text_input("Kurumsal E-Posta Adresi")
             new_comp = st.text_input("Bayi / Firma Adı")
-            new_pwd = st.text_input("Sistem Şifresi Belirleyin", type="password")
+            new_pwd_raw = st.text_input("Sistem Şifresi Belirleyin", type="password")
             
             if st.button("Kayıt Ol ve Hemen Başla", use_container_width=True):
+                new_email = new_email_raw.strip().lower()
+                new_pwd = new_pwd_raw.strip()
+                
                 if new_email and new_pwd and new_comp:
                     try:
                         database.exec_query("INSERT INTO users (email, password, company_name) VALUES (?,?,?)",
@@ -93,31 +94,29 @@ if not st.session_state.logged_in:
                     st.warning("Lütfen tüm alanları doldurun.")
     st.stop()
 
-# --- 3. ANA PANEL (Giriş Yapıldıktan Sonra) ---
+# --- 3. ANA PANEL ---
 with st.sidebar:
-    # Sitenizden orijinal logoyu çekiyoruz
     st.image("https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png", use_container_width=True)
     st.markdown(f"<div style='text-align:center; padding:10px; background:#1e293b; color:white; border-radius:5px; margin-bottom:15px;'>👤 {st.session_state.user_email}</div>", unsafe_allow_html=True)
     
     menu_items = ["🏠 Dashboard", "📄 Yeni Teklif Hazırla", "👥 Müşterilerim"]
     
-    # Yönetici (Admin) Ekstra Menüleri
     if st.session_state.user_role == "admin":
         menu_items.extend(["🏢 Bayi Yönetimi", "📋 Tüm Teklifler (Genel)", "📦 Modelleri Yönet"])
     else:
-        # Bayi Ekstra Menüsü
         menu_items.append("📋 Geçmiş Tekliflerim")
         
     menu = st.radio("MENÜ", menu_items)
-    
     st.markdown("---")
+    
     if st.button("🚪 Oturumu Kapat", use_container_width=True):
         st.session_state.logged_in = False
+        st.session_state.user_id = None
+        st.session_state.user_role = None
+        st.session_state.user_email = ""
         st.rerun()
 
 # --- 4. SAYFA İÇERİKLERİ ---
-
-# A. DASHBOARD
 if menu == "🏠 Dashboard":
     st.header("Sistem Özeti")
     u_id = st.session_state.user_id
@@ -137,7 +136,6 @@ if menu == "🏠 Dashboard":
         col1.metric("Kayıtlı Müşterilerim", c_count)
         col2.metric("Verdiğim Teklifler", off_count)
 
-# B. MÜŞTERİ TANIMLAMA
 elif menu == "👥 Müşterilerim":
     st.header("Müşteri Yönetimi")
     with st.expander("➕ Yeni Müşteri Ekle", expanded=True):
@@ -163,7 +161,6 @@ elif menu == "👥 Müşterilerim":
     else:
         st.info("Henüz müşteri kaydınız bulunmuyor.")
 
-# C. YENİ TEKLİF HAZIRLA
 elif menu == "📄 Yeni Teklif Hazırla":
     st.header("📄 Teklif Hazırlama Sihirbazı")
     my_custs = database.get_query("SELECT id, company_name FROM customers WHERE user_id=?", (st.session_state.user_id,))
@@ -200,7 +197,6 @@ elif menu == "📄 Yeni Teklif Hazırla":
                 st.balloons()
                 st.success("Teklifiniz başarıyla sisteme kaydedildi.")
 
-# D. GEÇMİŞ TEKLİFLERİM (Bayi Kendi Kayıtlarını Görür)
 elif menu == "📋 Geçmiş Tekliflerim":
     st.header("📋 Geçmiş Tekliflerim")
     my_offers = database.get_query("""
@@ -215,7 +211,6 @@ elif menu == "📋 Geçmiş Tekliflerim":
     else:
         st.info("Henüz oluşturduğunuz bir teklif bulunmuyor.")
 
-# E. ADMIN PANELİ (Sadece Sefa Bey Görür)
 elif menu == "🏢 Bayi Yönetimi":
     st.header("🏢 Bayi Listesi")
     dealers = database.get_query("SELECT id, company_name, email FROM users WHERE role='dealer'")
