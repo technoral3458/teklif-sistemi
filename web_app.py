@@ -6,6 +6,9 @@ import datetime
 import pandas as pd
 import hashlib
 import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # --- 1. SİSTEM YAPILANDIRMASI ---
 st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon="⚙️", layout="wide")
@@ -18,10 +21,46 @@ def hash_password(password):
 def generate_code():
     return str(random.randint(100000, 999999))
 
-# E-posta Gönderme Simülasyonu
-def send_email(to_email, code, subject="Doğrulama Kodu"):
-    st.info(f"📧 **[SİSTEM MESAJI]** Normalde '{to_email}' adresine gidecek olan {subject}: **{code}**")
-    return True
+# GERÇEK E-POSTA GÖNDERME MOTORU
+def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
+    SMTP_SERVER = "mail.ersanmakina.net"
+    SMTP_PORT = 587
+    SENDER_EMAIL = "sefa@ersanmakina.net"
+    SENDER_PASSWORD = "Sev32881-"
+
+    msg = MIMEMultipart()
+    msg['From'] = f"Ersan Makine B2B <{SENDER_EMAIL}>"
+    msg['To'] = to_email
+    msg['Subject'] = subject
+
+    body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
+        <h2 style="color: #0f172a;">Ersan Makine B2B Portalı</h2>
+        <p>Merhaba,</p>
+        <p>Sistem üzerinden yapılan işlem için gereken 6 haneli güvenlik kodunuz aşağıdadır:</p>
+        <div style="background-color: #f1f5f9; padding: 15px; border-left: 5px solid #3b82f6; font-size: 24px; font-weight: bold; letter-spacing: 5px;">
+            {code}
+        </div>
+        <br>
+        <p>Bu kodu kimseyle paylaşmayınız. İyi çalışmalar dileriz.</p>
+        <hr style="border: 0; border-top: 1px solid #eee;">
+        <small style="color: #999;">Ersan Makine San. ve Tic. Ltd. Şti.</small>
+    </body>
+    </html>
+    """
+    msg.attach(MIMEText(body, 'html', 'utf-8'))
+
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Mail gönderilemedi. Hata: {e}")
+        return False
 
 # Veritabanı Tabloları ve Yeni Sütunlar
 def init_advanced_b2b():
@@ -122,10 +161,11 @@ if not st.session_state.logged_in:
                                 "INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved) VALUES (?,?,?,?,?,?,0,0)",
                                 (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code)
                             )
-                            send_email(reg_email, ver_code, "Üyelik Doğrulama Kodu")
-                            st.session_state.temp_email = reg_email
-                            st.session_state.reg_step = 2
-                            st.rerun()
+                            # Mail gönderme tetikleniyor
+                            if send_email(reg_email, ver_code, "Üyelik Doğrulama Kodu"):
+                                st.session_state.temp_email = reg_email
+                                st.session_state.reg_step = 2
+                                st.rerun()
                     else:
                         st.warning("Lütfen (*) ile işaretli tüm zorunlu alanları doldurun.")
             
@@ -154,10 +194,10 @@ if not st.session_state.logged_in:
                         if user_exists:
                             reset_code = generate_code()
                             database.exec_query("UPDATE users SET auth_code=? WHERE email=?", (reset_code, f_email))
-                            send_email(f_email, reset_code, "Şifre Sıfırlama Kodu")
-                            st.session_state.temp_email = f_email
-                            st.session_state.forgot_step = 2
-                            st.rerun()
+                            if send_email(f_email, reset_code, "Şifre Sıfırlama Kodu"):
+                                st.session_state.temp_email = f_email
+                                st.session_state.forgot_step = 2
+                                st.rerun()
                         else:
                             st.error("Sistemde böyle bir e-posta bulunamadı.")
             
@@ -232,7 +272,6 @@ elif menu == "👥 Müşterilerim":
     customer_pages.show_customer_management(st.session_state.user_id, is_admin)
 
 elif menu == "📦 Tüm Modelleri Yönet":
-    # MASAÜSTÜ Orijinali ile eşleştirdiğimiz model yönetim modülü çağrılıyor
     model_management.show_product_management()
 
 elif menu == "📄 Yeni Teklif Hazırla":
