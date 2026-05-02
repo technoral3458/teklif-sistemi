@@ -2,26 +2,28 @@ import streamlit as st
 import database
 import customer_pages
 import model_management
+import offer_wizard
 import datetime
 import pandas as pd
 import hashlib
 import random
 import smtplib
+import sqlite3
+import uuid
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # --- 1. SİSTEM YAPILANDIRMASI ---
 st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon="⚙️", layout="wide")
 
-# Şifreleme Fonksiyonu (SHA-256)
+# Şifreleme Fonksiyonu
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# Rastgele 6 Haneli Kod Üretici
 def generate_code():
     return str(random.randint(100000, 999999))
 
-# GERÇEK E-POSTA GÖNDERME MOTORU
+# Gerçek E-Posta Motoru
 def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
     SMTP_SERVER = "mail.ersanmakina.net"
     SMTP_PORT = 587
@@ -38,12 +40,10 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
     <body style="font-family: Arial, sans-serif; color: #333;">
         <h2 style="color: #0f172a;">Ersan Makine B2B Portalı</h2>
         <p>Merhaba,</p>
-        <p>Sistem üzerinden yapılan işlem için gereken 6 haneli güvenlik kodunuz aşağıdadır:</p>
+        <p>Sistem üzerinden yapılan işlem için gereken güvenlik kodunuz aşağıdadır:</p>
         <div style="background-color: #f1f5f9; padding: 15px; border-left: 5px solid #3b82f6; font-size: 24px; font-weight: bold; letter-spacing: 5px;">
             {code}
         </div>
-        <br>
-        <p>Bu kodu kimseyle paylaşmayınız. İyi çalışmalar dileriz.</p>
         <hr style="border: 0; border-top: 1px solid #eee;">
         <small style="color: #999;">Ersan Makine San. ve Tic. Ltd. Şti.</small>
     </body>
@@ -62,27 +62,47 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
         st.error(f"Mail gönderilemedi. Hata: {e}")
         return False
 
-# Veritabanı Tabloları ve Yeni Sütunlar
+# =====================================================================
+# YENİ ÖZELLİK: BAĞIMSIZ "users.db" VERİTABANI YÖNETİMİ
+# =====================================================================
+def exec_user_query(query, params=()):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute(query, params)
+    conn.commit()
+    conn.close()
+
+def get_user_query(query, params=()):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute(query, params)
+    res = c.fetchall()
+    conn.close()
+    return res
+
 def init_advanced_b2b():
-    database.exec_query("""CREATE TABLE IF NOT EXISTS users (
+    # 1. Tamamen Bağımsız Kullanıcı Veritabanı Kurulumu (users.db)
+    exec_user_query("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         email TEXT UNIQUE, password TEXT, company_name TEXT, 
-        role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0)""")
-    
-    try:
-        cols = [c[1] for c in database.get_query("PRAGMA table_info(users)")]
-        if "user_type" not in cols: database.exec_query("ALTER TABLE users ADD COLUMN user_type TEXT DEFAULT 'Satıcı'")
-        if "phone" not in cols: database.exec_query("ALTER TABLE users ADD COLUMN phone TEXT")
-        if "is_verified" not in cols: database.exec_query("ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0")
-        if "auth_code" not in cols: database.exec_query("ALTER TABLE users ADD COLUMN auth_code TEXT")
+        role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0,
+        user_type TEXT DEFAULT 'Satıcı', phone TEXT, 
+        is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT)""")
         
-        # Admin hesabını garantile
-        database.exec_query("UPDATE users SET is_approved=1, is_verified=1 WHERE role='admin'")
-    except: pass
+    # Yönetici (Sefa Bey) hesabını users.db içine kalıcı olarak yazıyoruz
+    admin_check = get_user_query("SELECT id FROM users WHERE email='admin@ersanmakina.net'")
+    if not admin_check:
+        exec_user_query("""INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type) 
+                           VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici')""", 
+                        ("admin@ersanmakina.net", hash_password("20132017")))
+
+    # 2. Mevcut Ana Veritabanı (database.db) Eksik Sütun Kontrolleri
+    database.exec_query("""CREATE TABLE IF NOT EXISTS offer_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, offer_id INTEGER, option_id INTEGER, quantity INTEGER DEFAULT 1)""")
 
 init_advanced_b2b()
 
-# --- 2. OTURUM DURUM YÖNETİMİ ---
+# --- 2. OTURUM DURUM YÖNETİMİ VE "SAYFAYI YENİLE" (F5) KORUMASI ---
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if "user_id" not in st.session_state: st.session_state.user_id = None
 if "user_role" not in st.session_state: st.session_state.user_role = None
@@ -91,6 +111,18 @@ if "user_email" not in st.session_state: st.session_state.user_email = ""
 if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
 if "temp_email" not in st.session_state: st.session_state.temp_email = ""
+
+# Sayfa yenilendiğinde (F5) URL'deki Token'ı kontrol edip otomatik giriş yapma sistemi
+if not st.session_state.logged_in:
+    current_token = st.query_params.get("session_token")
+    if current_token:
+        valid_user = get_user_query("SELECT id, user_type, is_approved, is_verified, role, email FROM users WHERE session_token=?", (current_token,))
+        if valid_user:
+            u_id, u_type, is_approved, is_verified, u_role, u_email = valid_user[0]
+            st.session_state.logged_in = True
+            st.session_state.user_id = u_id
+            st.session_state.user_role = u_role if u_role == 'admin' else ("manufacturer" if u_type == "Üretici" else "dealer")
+            st.session_state.user_email = u_email
 
 # --- 3. CSS TASARIMI ---
 st.markdown("""
@@ -108,7 +140,6 @@ if not st.session_state.logged_in:
     
     tab_login, tab_register, tab_forgot = st.tabs(["🔑 Sisteme Giriş", "📝 Yeni Üyelik", "❓ Şifremi Unuttum"])
     
-    # --- GİRİŞ YAP ---
     with tab_login:
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
@@ -116,29 +147,29 @@ if not st.session_state.logged_in:
             login_pwd = st.text_input("Şifre", type="password").strip()
             
             if st.button("Giriş Yap", use_container_width=True):
-                if login_email == "admin@ersanmakina.net" and login_pwd == "20132017":
-                    st.session_state.logged_in, st.session_state.user_id, st.session_state.user_role = True, 0, "admin"
-                    st.session_state.user_email = "Yönetici (Sefa Bey)"
-                    st.rerun()
-                else:
-                    user = database.get_query("SELECT id, user_type, is_approved, is_verified FROM users WHERE email=? AND password=?", 
-                                             (login_email, hash_password(login_pwd)))
-                    if user:
-                        u_id, u_type, is_approved, is_verified = user[0]
-                        if is_verified == 0:
-                            st.warning("⚠️ E-posta adresiniz doğrulanmamış! Lütfen önce kaydınızı tamamlayın.")
-                        elif is_approved == 0:
-                            st.warning("⏳ Hesabınız sistem yöneticisinin onayını bekliyor.")
-                        else:
-                            st.session_state.logged_in = True
-                            st.session_state.user_id = u_id
-                            st.session_state.user_role = "manufacturer" if u_type == "Üretici" else "dealer"
-                            st.session_state.user_email = login_email
-                            st.rerun()
+                # Artık Admin dahil herkes users.db'den doğrulanıyor
+                user = get_user_query("SELECT id, user_type, is_approved, is_verified, role FROM users WHERE email=? AND password=?", 
+                                         (login_email, hash_password(login_pwd)))
+                if user:
+                    u_id, u_type, is_approved, is_verified, u_role = user[0]
+                    if is_verified == 0:
+                        st.warning("⚠️ E-posta adresiniz doğrulanmamış! Lütfen önce kaydınızı tamamlayın.")
+                    elif is_approved == 0:
+                        st.warning("⏳ Hesabınız sistem yöneticisinin onayını bekliyor.")
                     else:
-                        st.error("Hatalı e-posta veya şifre!")
+                        # Oturum Başarılı -> F5 Koruması İçin Token Oluştur
+                        new_token = str(uuid.uuid4())
+                        exec_user_query("UPDATE users SET session_token=? WHERE id=?", (new_token, u_id))
+                        st.query_params["session_token"] = new_token # Tarayıcı URL'ine kaydet
+                        
+                        st.session_state.logged_in = True
+                        st.session_state.user_id = u_id
+                        st.session_state.user_role = u_role if u_role == 'admin' else ("manufacturer" if u_type == "Üretici" else "dealer")
+                        st.session_state.user_email = login_email
+                        st.rerun()
+                else:
+                    st.error("Hatalı e-posta veya şifre!")
 
-    # --- YENİ ÜYELİK ---
     with tab_register:
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
@@ -152,16 +183,16 @@ if not st.session_state.logged_in:
                 
                 if st.button("Kayıt Ol ve E-Posta Doğrula", use_container_width=True):
                     if all([reg_comp, reg_phone, reg_email, reg_pwd]):
-                        check_mail = database.get_query("SELECT id FROM users WHERE email=?", (reg_email,))
+                        check_mail = get_user_query("SELECT id FROM users WHERE email=?", (reg_email,))
                         if check_mail:
                             st.error("Bu e-posta adresi zaten kayıtlı!")
                         else:
                             ver_code = generate_code()
-                            database.exec_query(
+                            # YENİ: Artık kayıtlar users.db dosyasına yapılıyor!
+                            exec_user_query(
                                 "INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved) VALUES (?,?,?,?,?,?,0,0)",
                                 (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code)
                             )
-                            # Mail gönderme tetikleniyor
                             if send_email(reg_email, ver_code, "Üyelik Doğrulama Kodu"):
                                 st.session_state.temp_email = reg_email
                                 st.session_state.reg_step = 2
@@ -173,16 +204,15 @@ if not st.session_state.logged_in:
                 st.success(f"{st.session_state.temp_email} adresine 6 haneli bir kod gönderdik.")
                 entered_code = st.text_input("Doğrulama Kodunu Giriniz", max_chars=6)
                 if st.button("Kodu Onayla", use_container_width=True):
-                    db_code = database.get_query("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,))
+                    db_code = get_user_query("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,))
                     if db_code and db_code[0][0] == entered_code:
-                        database.exec_query("UPDATE users SET is_verified=1, auth_code=NULL WHERE email=?", (st.session_state.temp_email,))
+                        exec_user_query("UPDATE users SET is_verified=1, auth_code=NULL WHERE email=?", (st.session_state.temp_email,))
                         st.session_state.reg_step = 1
                         st.balloons()
                         st.success("Tebrikler! E-postanız doğrulandı. Yöneticinin onayından sonra giriş yapabilirsiniz.")
                     else:
                         st.error("Hatalı kod girdiniz.")
 
-    # --- ŞİFREMİ UNUTTUM ---
     with tab_forgot:
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
@@ -190,10 +220,10 @@ if not st.session_state.logged_in:
                 f_email = st.text_input("Sisteme kayıtlı E-Posta Adresiniz").strip().lower()
                 if st.button("Şifre Sıfırlama Kodu Gönder", use_container_width=True):
                     if f_email:
-                        user_exists = database.get_query("SELECT id FROM users WHERE email=?", (f_email,))
+                        user_exists = get_user_query("SELECT id FROM users WHERE email=?", (f_email,))
                         if user_exists:
                             reset_code = generate_code()
-                            database.exec_query("UPDATE users SET auth_code=? WHERE email=?", (reset_code, f_email))
+                            exec_user_query("UPDATE users SET auth_code=? WHERE email=?", (reset_code, f_email))
                             if send_email(f_email, reset_code, "Şifre Sıfırlama Kodu"):
                                 st.session_state.temp_email = f_email
                                 st.session_state.forgot_step = 2
@@ -207,9 +237,9 @@ if not st.session_state.logged_in:
                 new_pwd = st.text_input("Yeni Şifreniz", type="password")
                 
                 if st.button("Şifremi Değiştir", use_container_width=True):
-                    valid_code = database.get_query("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,))
+                    valid_code = get_user_query("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,))
                     if valid_code and valid_code[0][0] == f_code and len(new_pwd) > 0:
-                        database.exec_query("UPDATE users SET password=?, auth_code=NULL WHERE email=?", (hash_password(new_pwd), st.session_state.temp_email))
+                        exec_user_query("UPDATE users SET password=?, auth_code=NULL WHERE email=?", (hash_password(new_pwd), st.session_state.temp_email))
                         st.session_state.forgot_step = 1
                         st.success("Şifreniz başarıyla değiştirildi! Giriş sekmesinden hesabınıza erişebilirsiniz.")
                     else:
@@ -217,7 +247,7 @@ if not st.session_state.logged_in:
 
     st.stop()
 
-# --- 5. ANA PANEL VE YAN MENÜ (ROLA GÖRE) ---
+# --- 5. ANA PANEL VE YAN MENÜ ---
 with st.sidebar:
     st.image("https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png")
     
@@ -237,17 +267,20 @@ with st.sidebar:
     st.markdown("---")
     
     if st.button("🚪 Oturumu Kapat", use_container_width=True):
+        # Çıkış yapıldığında veritabanından ve URL'den token'ı sil
+        if st.session_state.user_id:
+            exec_user_query("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
+        st.query_params.clear()
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
 
-# --- 6. SAYFA İÇERİKLERİ VE YÖNLENDİRMELER ---
+# --- 6. SAYFA İÇERİKLERİ ---
 
 if menu == "🏠 Dashboard":
     st.header("Sistem Özeti")
-    
     if st.session_state.user_role == "admin":
-        u_count = database.get_query("SELECT COUNT(*) FROM users WHERE is_approved=1")[0][0]
+        u_count = get_user_query("SELECT COUNT(*) FROM users WHERE is_approved=1 AND role!='admin'")[0][0]
         c_count = database.get_query("SELECT COUNT(*) FROM customers")[0][0]
         o_count = database.get_query("SELECT COUNT(*) FROM offers")[0][0]
         col1, col2, col3 = st.columns(3)
@@ -275,43 +308,8 @@ elif menu == "📦 Tüm Modelleri Yönet":
     model_management.show_product_management()
 
 elif menu == "📄 Yeni Teklif Hazırla":
-    st.header("📄 Teklif Hazırlama Sihirbazı")
-    my_custs = database.get_query("SELECT id, company_name FROM customers WHERE user_id=?", (st.session_state.user_id,))
-    
-    if not my_custs:
-        st.warning("Teklif hazırlamak için önce 'Müşterilerim' sekmesinden bir müşteri eklemelisiniz.")
-    else:
-        selected_cust_name = st.selectbox("Müşteri Seçin", [c[1] for c in my_custs])
-        selected_cust_id = [c[0] for c in my_custs if c[1] == selected_cust_name][0]
-        
-        model_data = database.get_query("SELECT id, name, base_price, currency FROM models")
-        if not model_data:
-            st.error("Sistemde henüz makine modeli bulunmuyor.")
-        else:
-            selected_model = st.selectbox("Makine Seçin", [m[1] for m in model_data])
-            m_info = [m for m in model_data if m[1] == selected_model][0]
-            price, currency = m_info[2], m_info[3]
-            
-            col_m1, col_m2 = st.columns(2)
-            with col_m1:
-                m_qty = st.number_input("Adet", min_value=1, value=1)
-            with col_m2:
-                discount = st.number_input("İskonto Oranı (%)", 0.0, 100.0, 0.0)
-            
-            final_price = (price * m_qty) * (1 - (discount/100))
-            
-            st.markdown(f"""
-                <div style="background:#0f172a; color:white; padding:20px; border-radius:10px; text-align:center; margin-top:15px;">
-                    <p style="margin:0; opacity:0.8;">Hesaplanan Net Tutar</p>
-                    <h2 style="margin:0; color:#10b981;">{final_price:,.2f} {currency}</h2>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button("💾 Teklifi Kaydet", use_container_width=True):
-                database.exec_query("INSERT INTO offers (customer_id, model_id, total_price, user_id, offer_date) VALUES (?,?,?,?,?)",
-                                   (selected_cust_id, m_info[0], final_price, st.session_state.user_id, datetime.date.today().isoformat()))
-                st.balloons()
-                st.success("Teklif kaydedildi.")
+    is_admin = (st.session_state.user_role == "admin")
+    offer_wizard.show_offer_wizard(st.session_state.user_id, is_admin)
 
 elif menu == "📋 Geçmiş Tekliflerim":
     st.header("📋 Geçmiş Tekliflerim")
@@ -337,7 +335,8 @@ elif menu == "🏢 Bayi / Üretici Yönetimi":
     st.header("🏢 Üyelik Onay ve Yönetim Sistemi")
     
     st.subheader("⏳ E-Postasını Doğrulamış, Onay Bekleyenler")
-    pending = database.get_query("SELECT id, company_name, user_type, email, phone FROM users WHERE is_approved=0 AND is_verified=1")
+    # Artık users.db'den okuyor
+    pending = get_user_query("SELECT id, company_name, user_type, email, phone FROM users WHERE is_approved=0 AND is_verified=1 AND role!='admin'")
     if pending:
         for p_id, p_name, p_type, p_email, p_phone in pending:
             with st.container(border=True):
@@ -346,23 +345,33 @@ elif menu == "🏢 Bayi / Üretici Yönetimi":
                     st.markdown(f"**Firma:** {p_name} ({p_type}) | **Tel:** {p_phone} | **E-Posta:** {p_email}")
                 with col2:
                     if st.button("✅ Sistemi Aç", key=f"app_{p_id}", use_container_width=True):
-                        database.exec_query("UPDATE users SET is_approved=1 WHERE id=?", (p_id,))
+                        exec_user_query("UPDATE users SET is_approved=1 WHERE id=?", (p_id,))
                         st.rerun()
     else:
         st.info("Şu an onay bekleyen başvuru yok.")
         
     st.markdown("---")
     st.subheader("✅ Aktif Sistem Üyeleri")
-    active = database.get_query("SELECT company_name, user_type, email, phone FROM users WHERE is_approved=1 AND role!='admin'")
+    active = get_user_query("SELECT company_name, user_type, email, phone FROM users WHERE is_approved=1 AND role!='admin'")
     if active:
         st.dataframe(pd.DataFrame(active, columns=["Firma Adı", "Tür", "E-Posta", "Telefon"]), use_container_width=True)
 
 elif menu == "📋 Tüm Teklifler":
     st.header("Sistemdeki Tüm Teklifler")
+    
+    # Raporlama için database.db (teklifler) ve users.db'yi (bayi adları) eşleştiriyoruz
     all_offers = database.get_query("""
-        SELECT u.company_name, c.company_name, o.total_price, o.offer_date 
-        FROM offers o JOIN users u ON o.user_id = u.id JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC""")
+        SELECT o.user_id, c.company_name, o.total_price, o.offer_date 
+        FROM offers o JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC""")
+        
     if all_offers: 
-        st.dataframe(pd.DataFrame(all_offers, columns=["Bayi", "Müşteri", "Tutar", "Tarih"]), use_container_width=True)
+        # Bayi isimlerini users.db'den çek
+        final_list = []
+        for o_user_id, c_name, t_price, o_date in all_offers:
+            u_info = get_user_query("SELECT company_name FROM users WHERE id=?", (o_user_id,))
+            dealer_name = u_info[0][0] if u_info else "Bilinmeyen Bayi"
+            final_list.append([dealer_name, c_name, t_price, o_date])
+            
+        st.dataframe(pd.DataFrame(final_list, columns=["Bayi", "Müşteri", "Tutar", "Tarih"]), use_container_width=True)
     else:
         st.info("Sistemde hiç teklif bulunmuyor.")
