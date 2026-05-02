@@ -1,30 +1,28 @@
 import os
-import sys
-import json
 import datetime
-from PyQt6.QtWidgets import *
-from PyQt6.QtGui import *
-from PyQt6.QtCore import *
-from PyQt6.QtPrintSupport import QPrinter
-
-import language as lang
+import base64
 import database
+
+# Dil modülü eksikse hata vermemesi için basit bir köprü
+class lang:
+    @staticmethod
+    def tr(text):
+        return text
 
 class PreviewEngine:
     @staticmethod
-    def get_real_path(img_name):
-        if not img_name: 
-            return None
-        base_dir = os.getcwd() 
-        candidates = [
-            img_name, 
-            os.path.join(base_dir, img_name), 
-            os.path.join(base_dir, "images", os.path.basename(img_name)),
-            os.path.join(os.path.dirname(__file__), "images", os.path.basename(img_name))
-        ]
-        for path in candidates:
-            if os.path.exists(path): return os.path.abspath(path).replace("\\", "/")
-        return None
+    def get_image_base64(img_path):
+        """Web tarayıcısında yerel resimleri gösterebilmek için Base64 formatına çevirir."""
+        if not img_path or not os.path.exists(img_path):
+            return ""
+        try:
+            with open(img_path, "rb") as img_file:
+                encoded_string = base64.b64encode(img_file.read()).decode()
+            ext = os.path.splitext(img_path)[1].lower().replace('.', '')
+            if ext == 'jpg': ext = 'jpeg'
+            return f"data:image/{ext};base64,{encoded_string}"
+        except Exception:
+            return ""
 
     @staticmethod
     def generate_html(customer, model, base_price, machine_img, specs, selected_options, conditions=None, delivery_type="Gümrük İşlemleri Yapılmış Antrepo Teslim", gallery_images=""):
@@ -33,21 +31,15 @@ class PreviewEngine:
         m_symbol = "$"
         try:
             res_m = database.get_query("SELECT currency FROM models WHERE name=?", (model.strip(),))
-            if res_m and res_m[0][0]: m_symbol = lang.get_symbol_by_code(res_m[0][0])
+            if res_m and res_m[0][0]: m_symbol = res_m[0][0]
         except: pass
 
-        try:
-            res = database.get_query("SELECT company_name, logo_path, website, footer_text FROM company_profile WHERE id=1")
-            if res: comp_name, comp_logo, comp_web, comp_footer = res[0]
-            else: comp_name, comp_logo, comp_web, comp_footer = "ERSAN MAKİNE", "", "www.ersanmakine.com", "Ersan Makine San. ve Tic. Ltd. Şti."
-        except:
-            comp_name, comp_logo, comp_web, comp_footer = "ERSAN MAKİNE", "", "www.ersanmakine.com", "Ersan Makine San. ve Tic. Ltd. Şti."
+        comp_name, comp_logo, comp_web, comp_footer = "ERSAN MAKİNE", "", "www.ersanmakina.net", "Ersan Makine San. ve Tic. Ltd. Şti."
 
         machine_qty = conditions.get("machine_qty", 1) if conditions else 1
         hide_specs = conditions.get("hide_specs", False) if conditions else False
 
-        real_logo = PreviewEngine.get_real_path(comp_logo)
-        header_logo_html = f'<img src="file:///{real_logo}" style="max-height:60px;">' if real_logo else f'<div style="font-size:24px; font-weight:900; color:#2c3e50;">{comp_name}</div>'
+        header_logo_html = f'<div style="font-size:24px; font-weight:900; color:#2c3e50;">{comp_name}</div>'
 
         # HER SAYFANIN BAŞINDAKİ ANTET VE LOGO
         page_header = f"""
@@ -63,8 +55,8 @@ class PreviewEngine:
         </table>
         """
         
-        real_m_img = PreviewEngine.get_real_path(machine_img)
-        m_img_html = f'<img src="file:///{real_m_img}" style="max-width:100%; max-height:350px; object-fit:contain; margin: 10px 0;">' if real_m_img else f'<div style="padding:40px; text-align:center; color:#94a3b8; border:1px dashed #cbd5e1; margin:10px 0;">{lang.tr("Makine Görseli Yok")}</div>'
+        m_img_b64 = PreviewEngine.get_image_base64(machine_img)
+        m_img_html = f'<img src="{m_img_b64}" style="max-width:100%; max-height:350px; object-fit:contain; margin: 10px 0;">' if m_img_b64 else f'<div style="padding:40px; text-align:center; color:#94a3b8; border:1px dashed #cbd5e1; margin:10px 0;">{lang.tr("Makine Görseli Yok")}</div>'
 
         css = """
             body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #ffffff; margin: 0; padding: 0; color: #1e293b; font-size: 13px; }
@@ -73,23 +65,7 @@ class PreviewEngine:
             .price-box { border-left: 8px solid #e67e22; background-color: #f8fafc; padding: 25px; text-align: right; margin-top: 20px; border-radius: 8px; }
         """
 
-        # ORAN SÜTUNU TAMAMEN KALDIRILDI
-        payment_html = ""
-        payment_plan = conditions.get('payment_plan', []) if conditions else []
-        if payment_plan:
-            payment_html = f"""
-            <table style="width: 100%; border-collapse: collapse; margin: 0; padding: 0;">
-                <tr>
-                    <th width="60%" style="border-bottom: 1px solid #e2e8f0; padding: 8px 0; text-align: left; color: #475569;">{lang.tr("Açıklama / Vade")}</th>
-                    <th width="40%" align="right" style="border-bottom: 1px solid #e2e8f0; padding: 8px 0; text-align: right; color: #475569;">{lang.tr("Tutar")}</th>
-                </tr>
-            """
-            for row in payment_plan:
-                amt_display = f"{row[2]} {m_symbol}" if len(row) > 2 and str(row[2]).strip() else "-"
-                payment_html += f"<tr><td style='padding:8px 0; border-bottom:1px dashed #f1f5f9;'>{row[0]}</td><td align='right' style='padding:8px 0; border-bottom:1px dashed #f1f5f9; text-align: right;'><b>{amt_display}</b></td></tr>"
-            payment_html += '</table>'
-        else:
-            payment_html = f"<i>{lang.tr('Belirtilmedi')}</i>"
+        payment_html = f"<i>{lang.tr('Belirtilmedi')}</i>"
 
         subtotal_calculated = conditions.get('subtotal_calculated', float(base_price) * machine_qty) if conditions else (float(base_price) * machine_qty)
         discount_pct = conditions.get('discount_pct', 0.0) if conditions else 0.0
@@ -117,46 +93,22 @@ class PreviewEngine:
             </div>
             """
 
-        cond_html = ""
-        if conditions:
-            bank_info = conditions.get('bank', '').replace('\n', '<br>')
-            notes_info = conditions.get('notes', '').replace('\n', '<br>')
-            cond_html = f"""
-            <div style="margin-top: 30px;">
-                <h4 style="margin-top: 0; color: #0f172a; border-bottom: 2px solid #e67e22; padding-bottom: 10px; margin-bottom: 10px; font-size: 16px;">📝 {lang.tr("SATIŞ VE TESLİMAT ŞARTLARI")}</h4>
-                <table width="100%" style="border-collapse: collapse;">
-                    <tr>
-                        <td width="200" style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; font-size: 14px;"><b>{lang.tr("Teslimat Şekli:")}</b></td>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; color:#e67e22; font-weight:bold; font-size: 14px;">{delivery_type}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; font-size: 14px;"><b>{lang.tr("Teslim Süresi:")}</b></td>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; font-size: 14px;">{conditions.get('delivery_time', '')}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; font-size: 14px;"><b>{lang.tr("Nakliye / Lojistik:")}</b></td>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; font-size: 14px;">{conditions.get('shipping', '')}</td>
-                    </tr>
-                    <tr>
-                        <td valign="top" style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; font-size: 14px;"><b>{lang.tr("Ödeme Planı:")}</b></td>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #cbd5e1;">{payment_html}</td>
-                    </tr>
-                    <tr>
-                        <td valign="top" style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; font-size: 14px;"><b>{lang.tr("Banka Bilgileri:")}</b></td>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; font-size: 14px;">{bank_info}</td>
-                    </tr>
-                </table>
-            """
-            if notes_info.strip():
-                cond_html += f'<div style="margin-top:15px; padding-top:15px; font-size:13px; color:#475569;"><b>{lang.tr("Özel Notlar:")}</b><br>{notes_info}</div>'
-            cond_html += "</div>"
+        cond_html = f"""
+        <div style="margin-top: 30px;">
+            <h4 style="margin-top: 0; color: #0f172a; border-bottom: 2px solid #e67e22; padding-bottom: 10px; margin-bottom: 10px; font-size: 16px;">📝 {lang.tr("SATIŞ VE TESLİMAT ŞARTLARI")}</h4>
+            <table width="100%" style="border-collapse: collapse;">
+                <tr>
+                    <td width="200" style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; font-size: 14px;"><b>{lang.tr("Teslimat Şekli:")}</b></td>
+                    <td style="padding: 12px 0; border-bottom: 1px solid #cbd5e1; color:#e67e22; font-weight:bold; font-size: 14px;">{delivery_type}</td>
+                </tr>
+            </table>
+        </div>
+        """
 
         pages = []
         qty_title_addon = f' <span style="color:#e67e22;">(x{machine_qty} {lang.tr("Adet")})</span>' if machine_qty > 1 else ""
 
-        # =========================================================
         # SAYFA 1: KAPAK
-        # =========================================================
         page1 = f"""
         <div>
             {page_header}
@@ -173,9 +125,7 @@ class PreviewEngine:
         """
         pages.append(page1)
 
-        # =========================================================
-        # SAYFA 2+: STANDART ÖZELLİKLER (Tam 5 Adet)
-        # =========================================================
+        # SAYFA 2+: STANDART ÖZELLİKLER
         if not hide_specs and specs:
             specs_list = [item for item in specs.split("||") if item.strip()]
             chunk_size = 5 
@@ -190,20 +140,13 @@ class PreviewEngine:
                 """
                 for item in chunk:
                     parts = item.split("|")
-                    title = parts[0].strip()
-                    if len(parts) >= 3:
-                        img_name = parts[-1].strip()
-                        desc = "|".join(parts[1:-1]).strip()
-                    elif len(parts) == 2:
-                        img_name = ""
-                        desc = parts[1].strip()
-                    else:
-                        img_name = ""
-                        desc = ""
+                    title = parts[0].strip() if len(parts) > 0 else ""
+                    desc = parts[1].strip() if len(parts) > 1 else ""
+                    img_name = parts[2].strip() if len(parts) > 2 else ""
                     
                     desc = desc.replace("\n", "<br>")
-                    img_path = PreviewEngine.get_real_path(img_name)
-                    img_t = f'<img src="file:///{img_path}" class="thumb">' if img_path else ''
+                    img_b64 = PreviewEngine.get_image_base64(img_name)
+                    img_t = f'<img src="{img_b64}" class="thumb">' if img_b64 else ''
                     
                     spec_page += f"""
                     <table width="100%" style="border-collapse: collapse; page-break-inside: avoid; margin-bottom: 0;">
@@ -219,9 +162,7 @@ class PreviewEngine:
                 spec_page += "</div>"
                 pages.append(spec_page)
 
-        # =========================================================
-        # SAYFA X+: OPSİYONLAR (Tam 5 Adet)
-        # =========================================================
+        # SAYFA X+: OPSİYONLAR
         if selected_options:
             chunk_size = 5
             for i in range(0, len(selected_options), chunk_size):
@@ -241,7 +182,8 @@ class PreviewEngine:
                     </table>
                 """
                 for opt in chunk:
-                    img_t = f'<img src="file:///{PreviewEngine.get_real_path(opt["i"])}" class="thumb">' if opt["i"] else ''
+                    img_b64 = PreviewEngine.get_image_base64(opt.get("i", ""))
+                    img_t = f'<img src="{img_b64}" class="thumb">' if img_b64 else ''
                     qty = int(opt.get('q', 1))
                     unit_p = float(opt['p'])
                     sym = opt.get('s', '$')
@@ -252,7 +194,7 @@ class PreviewEngine:
                     else: 
                         price_display = f"{unit_p * qty:,.2f} {sym}"
                     
-                    desc = opt['d'].replace('\n', '<br>')
+                    desc = opt.get('d', '').replace('\n', '<br>')
                     
                     opt_page += f"""
                     <table width="100%" style="border-collapse: collapse; page-break-inside: avoid; margin-bottom: 0;">
@@ -271,25 +213,22 @@ class PreviewEngine:
                 opt_page += "</div>"
                 pages.append(opt_page)
 
-        # =========================================================
-        # SON SAYFA: FİNAL VE ŞARTLAR (A4'e Sığan Sabit Yükseklik)
-        # =========================================================
+        # SON SAYFA
         final_page = f"""
-        <div style="position: relative; height: 260mm;">
+        <div style="position: relative; padding-bottom: 50px;">
             {page_header}
             {price_summary_html}
             {cond_html}
-            <div style="position:absolute; bottom:0; width:100%; text-align:center; color:#94a3b8; font-size:12px; padding-top:15px; border-top: 1px solid #f1f5f9;">
+            <div style="margin-top:40px; width:100%; text-align:center; color:#94a3b8; font-size:12px; padding-top:15px; border-top: 1px solid #f1f5f9;">
                 * Bu teklif {tarih} tarihinde oluşturulmuştur.
             </div>
         </div>
         """
         pages.append(final_page)
 
-        # TÜM SAYFALARI BİRLEŞTİR 
-        page_separator = '<div style="page-break-before: always; height: 1px; margin: 0; padding: 0;"></div>'
+        page_separator = '<div style="page-break-before: always; border-top: 2px dashed #cbd5e1; margin: 40px 0;"></div>'
         full_html_content = page_separator.join(pages)
 
-        final_html = f"<!DOCTYPE html><html><head><meta charset='UTF-8'><style>{css}</style></head><body>{full_html_content}</body></html>"
+        final_html = f"<!DOCTYPE html><html><head><meta charset='UTF-8'><style>{css}</style></head><body style='padding:20px; background:#f8fafc;'><div style='background:white; padding:40px; border-radius:10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>{full_html_content}</div></body></html>"
         
         return final_html
