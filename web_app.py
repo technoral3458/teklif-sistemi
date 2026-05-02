@@ -63,7 +63,7 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
         return False
 
 # =====================================================================
-# YENİ ÖZELLİK: BAĞIMSIZ "users.db" VERİTABANI YÖNETİMİ
+# BAĞIMSIZ "users.db" VERİTABANI YÖNETİMİ
 # =====================================================================
 def exec_user_query(query, params=()):
     conn = sqlite3.connect('users.db')
@@ -89,7 +89,7 @@ def init_advanced_b2b():
         user_type TEXT DEFAULT 'Satıcı', phone TEXT, 
         is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT)""")
         
-    # Yönetici (Sefa Bey) hesabını users.db içine kalıcı olarak yazıyoruz
+    # Yönetici hesabını users.db içine kalıcı olarak yazıyoruz
     admin_check = get_user_query("SELECT id FROM users WHERE email='admin@ersanmakina.net'")
     if not admin_check:
         exec_user_query("""INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type) 
@@ -147,7 +147,6 @@ if not st.session_state.logged_in:
             login_pwd = st.text_input("Şifre", type="password").strip()
             
             if st.button("Giriş Yap", use_container_width=True):
-                # Artık Admin dahil herkes users.db'den doğrulanıyor
                 user = get_user_query("SELECT id, user_type, is_approved, is_verified, role FROM users WHERE email=? AND password=?", 
                                          (login_email, hash_password(login_pwd)))
                 if user:
@@ -157,10 +156,9 @@ if not st.session_state.logged_in:
                     elif is_approved == 0:
                         st.warning("⏳ Hesabınız sistem yöneticisinin onayını bekliyor.")
                     else:
-                        # Oturum Başarılı -> F5 Koruması İçin Token Oluştur
                         new_token = str(uuid.uuid4())
                         exec_user_query("UPDATE users SET session_token=? WHERE id=?", (new_token, u_id))
-                        st.query_params["session_token"] = new_token # Tarayıcı URL'ine kaydet
+                        st.query_params["session_token"] = new_token
                         
                         st.session_state.logged_in = True
                         st.session_state.user_id = u_id
@@ -188,7 +186,6 @@ if not st.session_state.logged_in:
                             st.error("Bu e-posta adresi zaten kayıtlı!")
                         else:
                             ver_code = generate_code()
-                            # YENİ: Artık kayıtlar users.db dosyasına yapılıyor!
                             exec_user_query(
                                 "INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved) VALUES (?,?,?,?,?,?,0,0)",
                                 (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code)
@@ -256,8 +253,9 @@ with st.sidebar:
     
     menu_items = ["🏠 Dashboard"]
     
+    # HATA BURADAYDI: Yönetici menüsüne "Yeni Teklif Hazırla" eklendi!
     if st.session_state.user_role == "admin":
-        menu_items.extend(["🏢 Bayi / Üretici Yönetimi", "📋 Tüm Teklifler", "📦 Tüm Modelleri Yönet", "👥 Müşterilerim"])
+        menu_items.extend(["📄 Yeni Teklif Hazırla", "🏢 Bayi / Üretici Yönetimi", "📋 Tüm Teklifler", "📦 Tüm Modelleri Yönet", "👥 Müşterilerim"])
     elif st.session_state.user_role == "dealer":
         menu_items.extend(["📄 Yeni Teklif Hazırla", "👥 Müşterilerim", "📋 Geçmiş Tekliflerim"])
     elif st.session_state.user_role == "manufacturer":
@@ -267,7 +265,6 @@ with st.sidebar:
     st.markdown("---")
     
     if st.button("🚪 Oturumu Kapat", use_container_width=True):
-        # Çıkış yapıldığında veritabanından ve URL'den token'ı sil
         if st.session_state.user_id:
             exec_user_query("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
         st.query_params.clear()
@@ -335,7 +332,6 @@ elif menu == "🏢 Bayi / Üretici Yönetimi":
     st.header("🏢 Üyelik Onay ve Yönetim Sistemi")
     
     st.subheader("⏳ E-Postasını Doğrulamış, Onay Bekleyenler")
-    # Artık users.db'den okuyor
     pending = get_user_query("SELECT id, company_name, user_type, email, phone FROM users WHERE is_approved=0 AND is_verified=1 AND role!='admin'")
     if pending:
         for p_id, p_name, p_type, p_email, p_phone in pending:
@@ -358,14 +354,11 @@ elif menu == "🏢 Bayi / Üretici Yönetimi":
 
 elif menu == "📋 Tüm Teklifler":
     st.header("Sistemdeki Tüm Teklifler")
-    
-    # Raporlama için database.db (teklifler) ve users.db'yi (bayi adları) eşleştiriyoruz
     all_offers = database.get_query("""
         SELECT o.user_id, c.company_name, o.total_price, o.offer_date 
         FROM offers o JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC""")
         
     if all_offers: 
-        # Bayi isimlerini users.db'den çek
         final_list = []
         for o_user_id, c_name, t_price, o_date in all_offers:
             u_info = get_user_query("SELECT company_name FROM users WHERE id=?", (o_user_id,))
