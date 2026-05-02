@@ -11,7 +11,6 @@ def save_uploaded_file(uploaded_file, folder_name="images"):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     
-    # Dosya ismini güvenli ve benzersiz hale getir
     ext = os.path.splitext(uploaded_file.name)[1]
     safe_name = f"{uuid.uuid4().hex[:8]}{ext}"
     file_path = os.path.join(folder_name, safe_name)
@@ -95,19 +94,38 @@ def show_product_management():
             with st.form("machine_form"):
                 mn = st.text_input("Makine Adı *", value=m_info[0] if m_info else "")
                 
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     m_cat = st.selectbox("Kategori", cat_list, index=cat_list.index(m_info[1]) if m_info and m_info[1] in cat_list else 0)
                 with col2:
                     mp = st.number_input("Yurtiçi Fiyat", min_value=0.0, value=float(m_info[2]) if m_info else 0.0)
                 with col3:
                     m_curr = st.selectbox("Para Birimi", ["USD", "EUR", "RMB", "TRY"], index=["USD", "EUR", "RMB", "TRY"].index(m_info[3]) if m_info and m_info[3] in ["USD", "EUR", "RMB", "TRY"] else 0)
-                
-                col4, col5 = st.columns(2)
                 with col4:
-                    m_disc = st.number_input("Liman Teslim İskontosu (%)", min_value=0.0, value=float(m_info[4]) if m_info else 0.0)
-                with col5:
-                    m_opts = st.text_input("Uyumlu Donanım ID'leri (Örn: 1,4,7)", value=m_info[5] if m_info else "")
+                    m_disc = st.number_input("Liman İskontosu (%)", min_value=0.0, value=float(m_info[4]) if m_info else 0.0)
+                
+                # --- YENİ EKLENEN AKILLI DONANIM SEÇİCİ ---
+                st.markdown("#### ⚙️ Uyumlu Donanımları Seçin")
+                
+                all_opts = database.get_query("SELECT id, opt_name, category, opt_price, currency FROM options ORDER BY category, opt_name")
+                opt_display_list = []
+                opt_map = {}
+                id_to_display = {}
+
+                if all_opts:
+                    for oid, oname, ocat, oprice, ocurr in all_opts:
+                        disp = f"{oname} [{ocat}] (+{oprice} {ocurr})"
+                        opt_display_list.append(disp)
+                        opt_map[disp] = str(oid) # Ekranda görünen isim -> Veritabanı ID'si
+                        id_to_display[str(oid)] = disp # Veritabanı ID'si -> Ekranda Görünen İsim
+
+                default_opts = []
+                if m_info and m_info[5]:
+                    saved_ids = [x.strip() for x in str(m_info[5]).split(",") if x.strip()]
+                    default_opts = [id_to_display[sid] for sid in saved_ids if sid in id_to_display]
+
+                selected_opt_names = st.multiselect("Bu makineyle satılabilecek donanımları listeden seçin:", options=opt_display_list, default=default_opts)
+                # ----------------------------------------
                 
                 m_specs = st.text_area("Teknik Özellikler (Katalog Görünümü, || ve | ile ayırarak)", value=m_info[6] if m_info else "")
                 
@@ -116,14 +134,16 @@ def show_product_management():
                     st.write(f"Mevcut Ana Resim: `{m_info[7]}`")
                 uploaded_main_img = st.file_uploader("Ana Makine Resmi Yükle (Değiştirmek veya eklemek için)", type=['png', 'jpg', 'jpeg'])
                 
-                uploaded_gal_img = st.file_uploader("Galeri Resimleri Yükle (Çoklu Seçim Yapabilirsiniz)", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
-                uploaded_gal_vid = st.file_uploader("Galeri Videoları Yükle (Çoklu Seçim Yapabilirsiniz)", type=['mp4', 'avi', 'mov'], accept_multiple_files=True)
+                uploaded_gal_img = st.file_uploader("Galeri Resimleri Yükle (Çoklu Seçim)", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+                uploaded_gal_vid = st.file_uploader("Galeri Videoları Yükle (Çoklu Seçim)", type=['mp4', 'avi', 'mov'], accept_multiple_files=True)
                 
                 submit_m = st.form_submit_button("💾 BİLGİLERİ KAYDET", use_container_width=True)
                 
             if submit_m:
                 if mn:
-                    # Dosya Kaydetme İşlemleri
+                    # Seçilen isimleri tekrar virgüllü ID listesine çeviriyoruz (Örn: "1,4,7")
+                    final_opts_str = ",".join([opt_map[name] for name in selected_opt_names])
+
                     m_img_path = save_uploaded_file(uploaded_main_img, "images") if uploaded_main_img else (m_info[7] if m_info else "")
                     
                     gal_imgs = [save_uploaded_file(img, "images") for img in uploaded_gal_img] if uploaded_gal_img else []
@@ -136,17 +156,16 @@ def show_product_management():
 
                     if selected_m_id:
                         database.exec_query("UPDATE models SET name=?, category=?, base_price=?, currency=?, port_discount=?, compatible_options=?, specs=?, image_path=?, gallery_images=?, gallery_videos=? WHERE id=?", 
-                                            (mn, m_cat, mp, m_curr, m_disc, m_opts, m_specs, m_img_path, final_gal_imgs, final_gal_vids, selected_m_id))
+                                            (mn, m_cat, mp, m_curr, m_disc, final_opts_str, m_specs, m_img_path, final_gal_imgs, final_gal_vids, selected_m_id))
                         st.success("Makine güncellendi!")
                     else:
                         database.exec_query("INSERT INTO models (name, category, base_price, currency, port_discount, compatible_options, specs, image_path, gallery_images, gallery_videos) VALUES (?,?,?,?,?,?,?,?,?,?)", 
-                                            (mn, m_cat, mp, m_curr, m_disc, m_opts, m_specs, m_img_path, final_gal_imgs, final_gal_vids))
+                                            (mn, m_cat, mp, m_curr, m_disc, final_opts_str, m_specs, m_img_path, final_gal_imgs, final_gal_vids))
                         st.success("Yeni makine eklendi!")
                     st.rerun()
                 else:
                     st.error("Makine adı zorunludur.")
             
-            # Silme ve Kopyalama Butonları
             if m_info:
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
