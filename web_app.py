@@ -81,7 +81,6 @@ def get_user_query(query, params=()):
     return res
 
 def init_advanced_b2b():
-    # 1. Tamamen Bağımsız Kullanıcı Veritabanı Kurulumu (users.db)
     exec_user_query("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         email TEXT UNIQUE, password TEXT, company_name TEXT, 
@@ -89,14 +88,12 @@ def init_advanced_b2b():
         user_type TEXT DEFAULT 'Satıcı', phone TEXT, 
         is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT)""")
         
-    # Yönetici hesabını users.db içine kalıcı olarak yazıyoruz
     admin_check = get_user_query("SELECT id FROM users WHERE email='admin@ersanmakina.net'")
     if not admin_check:
         exec_user_query("""INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type) 
                            VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici')""", 
                         ("admin@ersanmakina.net", hash_password("20132017")))
 
-    # 2. Mevcut Ana Veritabanı (database.db) Eksik Sütun Kontrolleri
     database.exec_query("""CREATE TABLE IF NOT EXISTS offer_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT, offer_id INTEGER, option_id INTEGER, quantity INTEGER DEFAULT 1)""")
 
@@ -112,7 +109,6 @@ if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
 if "temp_email" not in st.session_state: st.session_state.temp_email = ""
 
-# Sayfa yenilendiğinde (F5) URL'deki Token'ı kontrol edip otomatik giriş yapma sistemi
 if not st.session_state.logged_in:
     current_token = st.query_params.get("session_token")
     if current_token:
@@ -253,7 +249,6 @@ with st.sidebar:
     
     menu_items = ["🏠 Dashboard"]
     
-    # HATA BURADAYDI: Yönetici menüsüne "Yeni Teklif Hazırla" eklendi!
     if st.session_state.user_role == "admin":
         menu_items.extend(["📄 Yeni Teklif Hazırla", "🏢 Bayi / Üretici Yönetimi", "📋 Tüm Teklifler", "📦 Tüm Modelleri Yönet", "👥 Müşterilerim"])
     elif st.session_state.user_role == "dealer":
@@ -331,6 +326,7 @@ elif menu == "📖 Ürün Kataloğu (Teknik)":
 elif menu == "🏢 Bayi / Üretici Yönetimi":
     st.header("🏢 Üyelik Onay ve Yönetim Sistemi")
     
+    # 1. Onay Bekleyenler Bölümü
     st.subheader("⏳ E-Postasını Doğrulamış, Onay Bekleyenler")
     pending = get_user_query("SELECT id, company_name, user_type, email, phone FROM users WHERE is_approved=0 AND is_verified=1 AND role!='admin'")
     if pending:
@@ -347,10 +343,56 @@ elif menu == "🏢 Bayi / Üretici Yönetimi":
         st.info("Şu an onay bekleyen başvuru yok.")
         
     st.markdown("---")
-    st.subheader("✅ Aktif Sistem Üyeleri")
-    active = get_user_query("SELECT company_name, user_type, email, phone FROM users WHERE is_approved=1 AND role!='admin'")
+    
+    # 2. Aktif Üyeler ve Düzenleme Bölümü
+    st.subheader("✅ Aktif Sistem Üyeleri ve Düzenleme Paneli")
+    active = get_user_query("SELECT id, company_name, user_type, email, phone FROM users WHERE is_approved=1 AND role!='admin' ORDER BY id DESC")
+    
     if active:
-        st.dataframe(pd.DataFrame(active, columns=["Firma Adı", "Tür", "E-Posta", "Telefon"]), use_container_width=True)
+        # Sadece görünüm amaçlı ID'siz tablo
+        df_active = pd.DataFrame(active, columns=["ID", "Firma Adı", "Hesap Türü", "E-Posta", "Telefon"])
+        st.dataframe(df_active.drop(columns=["ID"]), use_container_width=True)
+        
+        st.markdown("#### 📝 Bayi / Üretici Düzenle veya Sil")
+        user_options = [f"{row[0]} - {row[1]} ({row[2]})" for row in active]
+        selected_user_str = st.selectbox("İşlem yapılacak üyeyi seçin:", ["Seçiniz..."] + user_options)
+        
+        if selected_user_str != "Seçiniz...":
+            selected_u_id = int(selected_user_str.split(" - ")[0])
+            u_info = [u for u in active if u[0] == selected_u_id][0]
+            
+            with st.form("edit_user_form"):
+                e_comp = st.text_input("Firma Adı", value=u_info[1])
+                
+                # Türü ayarlarken veritabanındaki duruma bakıyoruz
+                type_index = 0 if "Satıcı" in str(u_info[2]) else 1
+                e_type = st.selectbox("Hesap Türü", ["Satıcı (Bayi)", "Üretici"], index=type_index)
+                
+                e_email = st.text_input("E-Posta", value=u_info[3])
+                e_phone = st.text_input("Telefon", value=u_info[4])
+                
+                submit_u = st.form_submit_button("🔄 BİLGİLERİ GÜNCELLE", use_container_width=True)
+                
+            if submit_u:
+                exec_user_query("UPDATE users SET company_name=?, user_type=?, email=?, phone=? WHERE id=?", (e_comp, e_type, e_email, e_phone, selected_u_id))
+                st.success("Üye bilgileri başarıyla güncellendi!")
+                st.rerun()
+            
+            # Form dışında Askıya Alma ve Silme butonları
+            st.write("")
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("🚫 Onayı İptal Et (Askıya Al)", use_container_width=True):
+                    exec_user_query("UPDATE users SET is_approved=0, session_token=NULL WHERE id=?", (selected_u_id,))
+                    st.warning("Kullanıcı askıya alındı. Onay bekleyenler listesine geri döndü ve sistemden atıldı.")
+                    st.rerun()
+            with col_b2:
+                if st.button("🗑️ Üyeyi Sistemden Tamamen Sil", use_container_width=True):
+                    exec_user_query("DELETE FROM users WHERE id=?", (selected_u_id,))
+                    st.error("Üye sistemden tamamen silindi!")
+                    st.rerun()
+    else:
+        st.info("Sistemde henüz aktif bayi veya üretici bulunmuyor.")
 
 elif menu == "📋 Tüm Teklifler":
     st.header("Sistemdeki Tüm Teklifler")
