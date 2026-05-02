@@ -9,16 +9,19 @@ def save_uploaded_file(uploaded_file, folder_name="images"):
     if uploaded_file is None:
         return ""
     if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
+        os.makedirs(folder_name, exist_ok=True)
     
     # Dosya ismini güvenli ve benzersiz hale getir
     ext = os.path.splitext(uploaded_file.name)[1]
     safe_name = f"{uuid.uuid4().hex[:8]}{ext}"
     file_path = os.path.join(folder_name, safe_name)
     
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    return file_path
+    try:
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        return file_path
+    except Exception:
+        return ""
 
 def init_management_tables():
     database.exec_query("CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, image_path TEXT DEFAULT '')")
@@ -183,14 +186,20 @@ def show_product_management():
                             with col_inp2:
                                 spec['val'] = st.text_input("Değer / Açıklama (Örn: 9kW HSD)", value=spec['val'], key=f"inp_val_{unique_key}")
                             
-                            # HATA DÜZELTİLDİ: Resim dosyası gerçekten var mı diye kontrol ediyoruz
+                            # --------- HATA ÇÖZÜMÜ BURADA ---------
                             if spec['icon']:
-                                if os.path.exists(spec['icon']):
+                                if os.path.isfile(spec['icon']):
                                     try:
-                                        st.image(spec['icon'], width=50)
-                                    except:
-                                        pass # Bozuk dosya formatıysa çökmeyi engeller
+                                        # Dosyayı byte olarak okuyoruz (Streamlit MediaFileStorageError çökmesini önler)
+                                        with open(spec['icon'], "rb") as f:
+                                            img_bytes = f.read()
+                                        st.image(img_bytes, width=50)
+                                    except Exception as e:
+                                        st.caption(f"⚠️ Dosya okunamadı: {e}")
+                                else:
+                                    st.caption("⚠️ Resim sunucuda bulunamadı (Sunucu sıfırlanmış veya dosya silinmiş olabilir).")
                                 st.write(f"Mevcut İkon Dosyası: `{spec['icon']}`")
+                            # --------------------------------------
                             
                             st.file_uploader("Bu özellik için Resim/İkon Yükle", type=['png','jpg','jpeg'], key=f"uplo_{unique_key}")
 
