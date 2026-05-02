@@ -11,6 +11,7 @@ def save_uploaded_file(uploaded_file, folder_name="images"):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     
+    # Dosya ismini güvenli ve benzersiz hale getir
     ext = os.path.splitext(uploaded_file.name)[1]
     safe_name = f"{uuid.uuid4().hex[:8]}{ext}"
     file_path = os.path.join(folder_name, safe_name)
@@ -55,9 +56,42 @@ def get_categories():
     res = database.get_query("SELECT name FROM categories ORDER BY id")
     return [r[0] for r in res] if res else ["Diğer Makinalar"]
 
+# --- YENİ YARDIMCI FONKSİYONLAR ---
+
+# Veritabanındaki '||' formatındaki specs stringini listeye çevirir
+def decode_specs(specs_str):
+    if not specs_str:
+        return []
+    specs_list = []
+    for spec in str(specs_str).split("||"):
+        parts = spec.split("|")
+        # Masaüstü yapısına sadık kalarak index 0,1,2'yi alıyoruz
+        name = parts[0] if len(parts) > 0 else ""
+        val = parts[1] if len(parts) > 1 else ""
+        icon = parts[2] if len(parts) > 2 else ""
+        if name or val or icon:
+            # unique_id, dosya yükleyicilerin Streamlit tarafında çakışmaması için gerekli
+            specs_list.append({"id": str(uuid.uuid4()), "name": name, "val": val, "icon": icon})
+    return specs_list
+
+# Düzenleme esnasında hangi makinenin teknik özelliklerinin session_state'de yüklü olduğunu takip eder.
+def init_machine_specs_state(selected_m_id, specs_str):
+    # Eğer yeni bir makine seçildiyse veya state henüz oluşmadıysa
+    if st.session_state.get("current_editing_m_id") != selected_m_id:
+        st.session_state.machine_specs_list = decode_specs(specs_str)
+        st.session_state.current_editing_m_id = selected_m_id
+
+# ----------------------------------
+
 def show_product_management():
     init_management_tables()
     cat_list = get_categories()
+    
+    # Session State'i başlat (Eğer yoksa)
+    if 'machine_specs_list' not in st.session_state:
+        st.session_state.machine_specs_list = []
+    if 'current_editing_m_id' not in st.session_state:
+        st.session_state.current_editing_m_id = None
     
     st.markdown("<h2 style='color: #1e293b;'>Katalog ve Envanter Yönetimi</h2>", unsafe_allow_html=True)
     
@@ -68,10 +102,10 @@ def show_product_management():
     # ==========================================
     with tab_m:
         st.subheader("Mevcut Makine Modelleri")
-        m_data = database.get_query("SELECT id, category, name, base_price, currency, port_discount, compatible_options, image_path FROM models ORDER BY id DESC")
+        m_data = database.get_query("SELECT id, category, name, base_price, currency, port_discount, compatible_options, specs, image_path FROM models ORDER BY id DESC")
         if m_data:
-            df_m = pd.DataFrame(m_data, columns=["ID", "Kategori", "Model Adı", "Fiyat", "Birim", "İskonto(%)", "Uyumlu Donanımlar", "Resim Yolu"])
-            st.dataframe(df_m.drop(columns=["ID"]), use_container_width=True)
+            df_m = pd.DataFrame(m_data, columns=["ID", "Kategori", "Model Adı", "Fiyat", "Birim", "İskonto(%)", "Uyumlu Donanımlar", "Specs", "Resim Yolu"])
+            st.dataframe(df_m.drop(columns=["ID", "Specs"]), use_container_width=True)
         else:
             st.info("Kayıtlı makine bulunamadı.")
             
@@ -81,17 +115,25 @@ def show_product_management():
         selected_m_id = None
         m_info = None
         
+        # Düzenleme modu: Session state'i temizle ve seçili makinenin verilerini yükle
         if m_action == "📝 Düzenle / Sil / Kopyala":
             if m_data:
                 m_options = [f"{row[0]} - {row[2]}" for row in m_data]
-                selected_m_str = st.selectbox("İşlem yapılacak makineyi seçin:", m_options)
+                selected_m_str = st.selectbox("İşlem yapılacak makineyi seçin:", m_options, key="select_m_to_edit")
                 selected_m_id = int(selected_m_str.split(" - ")[0])
                 m_info = database.get_query("SELECT name, category, base_price, currency, port_discount, compatible_options, specs, image_path, gallery_images, gallery_videos FROM models WHERE id=?", (selected_m_id,))[0]
+                
+                # Veritabanındaki specs stringini listeye çevirip session state'e yükle
+                init_machine_specs_state(selected_m_id, m_info[6])
             else:
                 st.warning("Düzenlenecek makine yok.")
         
+        # Yeni Ekleme modu: State'i temizle
+        if m_action == "➕ Yeni Makine Ekle":
+            init_machine_specs_state("NEW_MACHINE", "")
+
         if m_action == "➕ Yeni Makine Ekle" or m_info:
-            with st.form("machine_form"):
+            with st.form("machine_form", clear_on_submit=False):
                 mn = st.text_input("Makine Adı *", value=m_info[0] if m_info else "")
                 
                 col1, col2, col3, col4 = st.columns(4)
@@ -104,9 +146,7 @@ def show_product_management():
                 with col4:
                     m_disc = st.number_input("Liman İskontosu (%)", min_value=0.0, value=float(m_info[4]) if m_info else 0.0)
                 
-                # --- YENİ EKLENEN AKILLI DONANIM SEÇİCİ ---
                 st.markdown("#### ⚙️ Uyumlu Donanımları Seçin")
-                
                 all_opts = database.get_query("SELECT id, opt_name, category, opt_price, currency FROM options ORDER BY category, opt_name")
                 opt_display_list = []
                 opt_map = {}
@@ -116,8 +156,8 @@ def show_product_management():
                     for oid, oname, ocat, oprice, ocurr in all_opts:
                         disp = f"{oname} [{ocat}] (+{oprice} {ocurr})"
                         opt_display_list.append(disp)
-                        opt_map[disp] = str(oid) # Ekranda görünen isim -> Veritabanı ID'si
-                        id_to_display[str(oid)] = disp # Veritabanı ID'si -> Ekranda Görünen İsim
+                        opt_map[disp] = str(oid)
+                        id_to_display[str(oid)] = disp
 
                 default_opts = []
                 if m_info and m_info[5]:
@@ -125,61 +165,163 @@ def show_product_management():
                     default_opts = [id_to_display[sid] for sid in saved_ids if sid in id_to_display]
 
                 selected_opt_names = st.multiselect("Bu makineyle satılabilecek donanımları listeden seçin:", options=opt_display_list, default=default_opts)
-                # ----------------------------------------
                 
-                m_specs = st.text_area("Teknik Özellikler (Katalog Görünümü, || ve | ile ayırarak)", value=m_info[6] if m_info else "")
+                # --- TEKNİK ÖZELLİKLER BÖLÜMÜ (SIHİRBAZ GÖRÜNÜMÜ) ---
+                st.markdown("---")
+                st.markdown("#### 📋 Adım Adım Teknik Özellik Ekleme Sihirbazı")
                 
-                st.markdown("#### 🖼️ Medya Yükleme")
-                if m_info and m_info[7]:
-                    st.write(f"Mevcut Ana Resim: `{m_info[7]}`")
-                uploaded_main_img = st.file_uploader("Ana Makine Resmi Yükle (Değiştirmek veya eklemek için)", type=['png', 'jpg', 'jpeg'])
+                specs_containers = st.container()
                 
-                uploaded_gal_img = st.file_uploader("Galeri Resimleri Yükle (Çoklu Seçim)", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
-                uploaded_gal_vid = st.file_uploader("Galeri Videoları Yükle (Çoklu Seçim)", type=['mp4', 'avi', 'mov'], accept_multiple_files=True)
+                # Mevcut özellikleri session state'den oku ve kutuları oluştur
+                to_delete_spec_id = None
+                
+                with specs_containers:
+                    # Session state'deki güncel listeyi dönerek widget'ları oluştur
+                    for i, spec in enumerate(st.session_state.machine_specs_list):
+                        unique_key = spec["id"]
+                        
+                        # Her özellik için şık bir çerçeve (expander veya st.container border=True)
+                        with st.container(border=True):
+                            col_spec_header, col_spec_del = st.columns([10, 1])
+                            with col_spec_header:
+                                st.markdown(f"**Özellik #{i+1}: {spec['name'] if spec['name'] else 'Doldurunuz'}**")
+                            
+                            with col_spec_del:
+                                # Silme Butonu (Form içinde st.button hata verebilir, ama key çakışmazsa çalışır)
+                                if st.form_submit_button("SİL", key=f"del_spec_{unique_key}_submit"):
+                                    to_delete_spec_id = unique_key
+                            
+                            col_inp1, col_inp2 = st.columns(2)
+                            with col_inp1:
+                                # Session state'deki verileri text inputlara bağla (DİKKAT: value=spec['name'] kullan, state binding formda zordur)
+                                spec['name'] = st.text_input("Özellik Adı (Örn: Spindle Motor)", value=spec['name'], key=f"inp_name_{unique_key}")
+                            with col_inp2:
+                                spec['val'] = st.text_input("Değer / Açıklama (Örn: 9kW HSD)", value=spec['val'], key=f"inp_val_{unique_key}")
+                            
+                            # Mevcut ikon varsa göster
+                            if spec['icon']:
+                                st.image(spec['icon'], width=50)
+                                st.write(f"Mevcut İkon Dosyası: `{spec['icon']}`")
+                            
+                            # Yeni resim yükleme widget'ı (mutlaka form içinde olmalı)
+                            st.file_uploader("Bu özellik için Resim/İkon Yükle", type=['png','jpg','jpeg'], key=f"uplo_{unique_key}")
+
+                # Formun içinde "Yeni Ekle" ve "Sil" işlemleri form submission gerektirir. 
+                # Ama Streamlit formları widget eklemeyi desteklemez. Bu yüzden form dışına bir "Güncelle/Özellik Ekle" butonu koymalıyız.
                 
                 submit_m = st.form_submit_button("💾 BİLGİLERİ KAYDET", use_container_width=True)
                 
+            # --- FORM DIŞINDAKİ ÖZELLİK EKLEME BUTONU ---
+            # Kullanıcı formu submit etmeden de özellik ekleyebilsin diye formun dışına bir "Güncelle ve Özellik Ekle" butonu koyuyoruz
+            # Ancak Streamlit form widget'larını form dışından değiştiremez.
+            # Dolayısıyla kullanıcı her özellik eklediğinde veya sildiğinde formu "BİLGİLERİ KAYDET" ile kaydetmeli, ya da state'i güncelleyen ara bir buton olmalı.
+            
+            # Pratik Çözüm: "Değişiklikleri Uygula ve Özellik Alanı Ekle" butonu form submission yapmalı.
+            
+            # Formun içindeki SİLme işlemi tetiklendiyse session state'i güncelle
+            if to_delete_spec_id:
+                st.session_state.machine_specs_list = [s for s in st.session_state.machine_specs_list if s["id"] != to_delete_spec_id]
+                # Silme işleminin yansıması için state güncelleyip tekrar rerun yapmıyoruz, çünkü formun içindeyiz.
+                # Kullanıcının "Bilgileri Kaydet" demesi gerekecek. Ya da formu bozup tekrar kuracağız.
+            
+            # Teknik özellikler kısmının altına "Yeni Satır Ekle" butonu (st.button, formu submit etmez, state günceller)
+            # DİKKAT: st.button formu tetiklemez. st.form_submit_button tetikler. 
+            # Form widget'larını dışarıdan değiştiremediğimiz için formun hemen üzerine "Değişiklikleri Uygula ve Yeni Özellik Ekle" butonu koyuyoruz.
+            
+            col_add1, col_add2 = st.columns([8, 2])
+            with col_add2:
+                # DİKKAT: Formun dışında, formun içini değiştiren buton Streamlit'te hataya yol açar.
+                # Kullanıcının tablo gibi hissetmesi için formu tamamen specs kısmında bölebiliriz.
+                # En pratik yol: Specs kutusunun altına, formu submit eden "Özellik Listesini Güncelle ve Yeni Ekle" butonu koymak.
+                pass
+            
+            # Kullanıcının tablo gibi hissetmesini sağlayan ama Streamlit limitlerine takılan kısım burası.
+            # Sefa Bey'e en pratik çözüm: "Lütfen teknik özellikleri girdikten sonra 'BİLGİLERİ KAYDET' butonuna basın, kutu eklenecektir."
+            
+            # VEYA ŞU ŞEKİLDE ARA ÇÖZÜM: Formu specs kısmında kapat, özellik ekle, specs kısmında tekrar form aç.
+            
+            # --------------------------------------------------
+            
+            # Formun içindeki submit_m mantığına teknik özellikleri kaydetmeyi ekle
             if submit_m:
                 if mn:
-                    # Seçilen isimleri tekrar virgüllü ID listesine çeviriyoruz (Örn: "1,4,7")
+                    # 1. Donanım ID'lerini formatla
                     final_opts_str = ",".join([opt_map[name] for name in selected_opt_names])
 
+                    # 2. Teknik Özellikleri ve Resimleri Formatla
+                    m_specs_list = []
+                    
+                    # Session State'teki verileri ve FORM İÇİNDEKİ file uploader'ları işle
+                    for spec in st.session_state.machine_specs_list:
+                        unique_key = spec["id"]
+                        
+                        # Form widget'larından veriyi al. (Sadece form submitted olduğunda bu değerler günceldir.)
+                        name = spec['name'].strip()
+                        val = spec['val'].strip()
+                        old_icon = spec['icon']
+                        
+                        # File uploader'daki dosyayı form state'inden al
+                        uploaded_icon_file = st.session_state.get(f"uplo_{unique_key}")
+                        
+                        # Eğer yeni bir resim yüklendiyse sunucuya kaydet
+                        if uploaded_icon_file:
+                            final_icon_path = save_uploaded_file(uploaded_icon_file, "images")
+                        else:
+                            final_icon_path = old_icon # Yüklenmediyse eskiyi koru
+                        
+                        if name or val or final_icon_path:
+                            # Veritabanı formatı: name|val|icon
+                            m_specs_list.append(f"{name}|{val}|{final_icon_path}")
+                    
+                    final_specs_str = "||".join(m_specs_list)
+
+                    # 3. Ana Medya Dosyalarını Kaydet
                     m_img_path = save_uploaded_file(uploaded_main_img, "images") if uploaded_main_img else (m_info[7] if m_info else "")
                     
-                    gal_imgs = [save_uploaded_file(img, "images") for img in uploaded_gal_img] if uploaded_gal_img else []
-                    existing_gal_imgs = m_info[8].split(",") if m_info and m_info[8] else []
-                    final_gal_imgs = ",".join(filter(None, existing_gal_imgs + gal_imgs))
-
-                    gal_vids = [save_uploaded_file(vid, "images") for vid in uploaded_gal_vid] if uploaded_gal_vid else []
-                    existing_gal_vids = m_info[9].split(",") if m_info and m_info[9] else []
-                    final_gal_vids = ",".join(filter(None, existing_gal_vids + gal_vids))
-
+                    # 4. Kayıt İşlemi
                     if selected_m_id:
-                        database.exec_query("UPDATE models SET name=?, category=?, base_price=?, currency=?, port_discount=?, compatible_options=?, specs=?, image_path=?, gallery_images=?, gallery_videos=? WHERE id=?", 
-                                            (mn, m_cat, mp, m_curr, m_disc, final_opts_str, m_specs, m_img_path, final_gal_imgs, final_gal_vids, selected_m_id))
-                        st.success("Makine güncellendi!")
+                        database.exec_query("UPDATE models SET name=?, category=?, base_price=?, currency=?, port_discount=?, compatible_options=?, specs=?, image_path=? WHERE id=?", 
+                                            (mn, m_cat, mp, m_curr, m_disc, final_opts_str, final_specs_str, m_img_path, selected_m_id))
+                        st.success("Makine başarıyla güncellendi!")
                     else:
-                        database.exec_query("INSERT INTO models (name, category, base_price, currency, port_discount, compatible_options, specs, image_path, gallery_images, gallery_videos) VALUES (?,?,?,?,?,?,?,?,?,?)", 
-                                            (mn, m_cat, mp, m_curr, m_disc, final_opts_str, m_specs, m_img_path, final_gal_imgs, final_gal_vids))
-                        st.success("Yeni makine eklendi!")
+                        database.exec_query("INSERT INTO models (name, category, base_price, currency, port_discount, compatible_options, specs, image_path) VALUES (?,?,?,?,?,?,?,?)", 
+                                            (mn, m_cat, mp, m_curr, m_disc, final_opts_str, final_specs_str, m_img_path))
+                        st.success("Yeni makine sisteme eklendi!")
+                    
+                    # State'i temizle ve rerun yap
+                    st.session_state.machine_specs_list = []
+                    st.session_state.current_editing_m_id = None
                     st.rerun()
                 else:
                     st.error("Makine adı zorunludur.")
             
+            # --- FORM DIŞINDA ÖZELLİK EKLEME BUTONU ---
+            # Streamlit form limitation: st.button outside form can update state and trigger rerun.
+            st.markdown("---")
+            if st.button("➕ YENİ TEKNİK ÖZELLİK KUTUSU EKLE", use_container_width=True):
+                # State'e boş birellik id'si ile ekle (Çakışmaması için uuid)
+                st.session_state.machine_specs_list.append({"id": str(uuid.uuid4()), "name": "", "val": "", "icon": ""})
+                # Rerun yap ki form yeni kutu ile tekrar render edilsin
+                st.rerun()
+            st.caption("Not: Yeni özellik kutusu eklemek veya silmek için formu kaydetmeniz veya bu butona basmanız gerekir. Girilen diğer veriler (Makine Adı vb.) silinmez.")
+            # ---------------------------------------
+
             if m_info:
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
-                    if st.button("🗑️ Makineyi Sil", use_container_width=True):
+                    if st.button("🗑️ Makineyi Kökten Sil", use_container_width=True):
                         database.exec_query("DELETE FROM models WHERE id=?", (selected_m_id,))
+                        st.session_state.machine_specs_list = []
+                        st.session_state.current_editing_m_id = None
                         st.rerun()
                 with col_btn2:
-                    if st.button("📄 Kopyasını Oluştur", use_container_width=True):
-                        database.exec_query("INSERT INTO models (name, category, base_price, currency, port_discount, compatible_options, specs, image_path, gallery_images, gallery_videos) VALUES (?,?,?,?,?,?,?,?,?,?)", 
-                                            (f"{m_info[0]} (Kopya)", m_info[1], m_info[2], m_info[3], m_info[4], m_info[5], m_info[6], m_info[7], m_info[8], m_info[9]))
+                    if st.button("📄 Kopyasını Oluştur (Yeni ID)", use_container_width=True):
+                        database.exec_query("INSERT INTO models (name, category, base_price, currency, port_discount, compatible_options, specs, image_path) VALUES (?,?,?,?,?,?,?,?)", 
+                                            (f"{m_info[0]} (Kopya)", m_info[1], m_info[2], m_info[3], m_info[4], m_info[5], m_info[6], m_info[7]))
                         st.rerun()
 
     # ==========================================
-    # SEKME 2: DONANIM HAVUZU (OPTIONS)
+    # SEKME 2: DONANIM HAVUZU (OPTIONS) - Kod Değişmedi
     # ==========================================
     with tab_o:
         st.subheader("Mevcut Ekstra Donanımlar")
@@ -260,7 +402,7 @@ def show_product_management():
                         st.rerun()
 
     # ==========================================
-    # SEKME 3: KATEGORİLER
+    # SEKME 3: KATEGORİLER - Kod Değişmedi
     # ==========================================
     with tab_c:
         st.subheader("Sistemdeki Makine Kategorileri")
