@@ -20,6 +20,27 @@ def init_wizard_tables():
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
+    # MASAÜSTÜ SIKI TASARIMI İÇİN ÖZEL CSS (Puf görünümleri ezer)
+    st.markdown("""
+    <style>
+    /* Ana ekranın üst boşluğunu daralt */
+    .block-container { padding-top: 1.5rem; max-width: 98%; }
+    
+    /* Konteynerlerin (Kartların) iç boşluklarını tıraşla */
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        padding: 10px !important;
+        gap: 0.3rem !important;
+    }
+    
+    /* Checkbox'ı sağa daya ve ortala */
+    .stCheckbox {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 5px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     if is_admin:
         my_custs = database.get_query("SELECT id, company_name FROM customers ORDER BY company_name")
     else:
@@ -30,24 +51,19 @@ def show_offer_wizard(user_id, is_admin=False):
         return
 
     # ==========================================================
-    # MASAÜSTÜ BİREBİR: 3 KOLONLU YERLEŞİM
+    # MASAÜSTÜ BİREBİR: 3 KOLONLU KOMPAKT YERLEŞİM
     # ==========================================================
-    # Sol: Ayarlar (1.2) | Orta: Donanımlar (1.5) | Sağ: Önizleme (2.3)
-    col_left, col_mid, col_right = st.columns([1.2, 1.5, 2.3], gap="medium")
+    col_left, col_mid, col_right = st.columns([1.2, 1.6, 2.2], gap="small")
 
-    # Değişkenleri baştan tanımlayalım (Hata almamak için)
     selected_options_total = 0.0
     selected_options_list = []
     engine_options_list = []
-    sub_total = 0.0
-    agreed_price = 0.0
 
     # ----------------------------------------------------------
-    # SOL KOLON - ÜST KISIM (FİLTRELER VE AYARLAR)
+    # SOL KOLON - TEKLİF AYARLARI
     # ----------------------------------------------------------
     with col_left:
-        st.markdown("<h4 style='color:#0f172a; margin-bottom:-10px;'>⚙️ TEKLİF AYARLARI</h4>", unsafe_allow_html=True)
-        st.write("")
+        st.markdown("<h5 style='color:#0f172a; margin-bottom:-5px; font-weight:800;'>⚙️ TEKLİF AYARLARI</h5>", unsafe_allow_html=True)
         
         with st.container(border=True):
             f_currency = st.selectbox("Para Birimi", ["USD", "EUR", "RMB", "TRY"])
@@ -59,7 +75,6 @@ def show_offer_wizard(user_id, is_admin=False):
             selected_cust_name = st.selectbox("Müşteri", [c[1] for c in my_custs])
             selected_cust_id = [c[0] for c in my_custs if c[1] == selected_cust_name][0]
 
-            # Modele göre çekim (Artık specs de var)
             if f_category == "Tüm Kategoriler":
                 model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=?", (f_currency,))
             else:
@@ -81,14 +96,12 @@ def show_offer_wizard(user_id, is_admin=False):
             multiplier = 1.0 - (float(m_port_disc) / 100.0)
 
     # ----------------------------------------------------------
-    # ORTA KOLON (DONANIM KARTLARI)
+    # ORTA KOLON - DONANIM KARTLARI (SIKIŞTIRILMIŞ TASARIM)
     # ----------------------------------------------------------
     with col_mid:
-        st.markdown("<h4 style='color:#1d4ed8; margin-bottom:-10px;'>🔌 UYUMLU EKSTRA DONANIMLAR</h4>", unsafe_allow_html=True)
-        st.write("")
+        st.markdown("<h5 style='color:#1d4ed8; margin-bottom:-5px; font-weight:800;'>🔌 UYUMLU DONANIMLAR</h5>", unsafe_allow_html=True)
         hide_specs = st.checkbox("Standart Özellikleri Gizle", value=False)
         
-        # Donanımları kaydırılabilir (scrollable) bir alan içine alıyoruz
         with st.container(height=650):
             if comp_opts_str:
                 comp_opt_ids = [opt.strip() for opt in str(comp_opts_str).split(",") if opt.strip()]
@@ -102,9 +115,9 @@ def show_offer_wizard(user_id, is_admin=False):
                             o_id, o_name, o_price, o_curr, o_desc, o_img = opt
                             discounted_o_price = float(o_price) * multiplier
                             
-                            # Fotoğraftaki kart tasarımının Streamlit uyarlaması
+                            # YENİ KOMPAKT KART TASARIMI (Dikeyde Ortalı)
                             with st.container(border=True):
-                                c_img, c_info, c_act = st.columns([1.5, 3, 2])
+                                c_img, c_info, c_act = st.columns([1.5, 4.5, 2.5], vertical_alignment="center")
                                 
                                 with c_img:
                                     if o_img and os.path.isfile(o_img):
@@ -112,24 +125,21 @@ def show_offer_wizard(user_id, is_admin=False):
                                             with open(o_img, "rb") as f:
                                                 st.image(f.read(), use_container_width=True)
                                         except:
-                                            st.write("📷")
+                                            st.markdown("📷")
                                     else:
-                                        st.write("📷")
+                                        st.markdown("📷")
                                         
                                 with c_info:
-                                    st.markdown(f"<b style='font-size:13px; color:#1e293b;'>{o_name}</b>", unsafe_allow_html=True)
-                                    if o_desc:
-                                        st.markdown(f"<span style='font-size:11px; color:#64748b;'>{o_desc[:50]}...</span>", unsafe_allow_html=True)
+                                    desc_short = (o_desc[:60] + '...') if o_desc and len(o_desc) > 60 else (o_desc if o_desc else "")
+                                    st.markdown(f"<div style='line-height:1.2;'><b style='font-size:13px; color:#1e293b;'>{o_name}</b><br><span style='font-size:11px; color:#64748b;'>{desc_short}</span></div>", unsafe_allow_html=True)
                                 
                                 with c_act:
-                                    # Fiyat (Turuncu)
-                                    st.markdown(f"<div style='text-align:right; color:#e67e22; font-weight:bold; font-size:13px; margin-bottom:5px;'>+ {discounted_o_price:,.2f} {o_curr}</div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='text-align:right; color:#d97706; font-weight:800; font-size:13px; margin-bottom:2px;'>+ {discounted_o_price:,.2f} {o_curr}</div>", unsafe_allow_html=True)
                                     
-                                    # Checkbox ve Adet (Yan yana)
-                                    ca1, ca2 = st.columns([2, 1])
-                                    with ca2:
+                                    cq, cc = st.columns([1.5, 1], vertical_alignment="center")
+                                    with cc:
                                         is_selected = st.checkbox("", key=f"chk_{o_id}")
-                                    with ca1:
+                                    with cq:
                                         if is_selected:
                                             o_qty = st.number_input("Adet", min_value=1, value=1, label_visibility="collapsed", key=f"qty_{o_id}")
                                             selected_options_total += (discounted_o_price * o_qty)
@@ -140,22 +150,22 @@ def show_offer_wizard(user_id, is_admin=False):
                                                 'i': o_img, 'd': o_desc, 's': o_curr
                                             })
                     else:
-                        st.info("Bu makine için tanımlanmış donanım bulunmuyor.")
+                        st.info("Donanım bulunmuyor.")
                 else:
-                    st.info("Bu makine için tanımlanmış donanım bulunmuyor.")
+                    st.info("Donanım bulunmuyor.")
 
     # ----------------------------------------------------------
-    # SOL KOLON - ALT KISIM (FİYAT HESAPLAMA VE KAYIT)
+    # SOL KOLON - ALT KISIM (HESAPLAMA VE KAYIT)
     # ----------------------------------------------------------
     with col_left:
         base_machine_total = (float(m_price) * multiplier) * m_qty
         sub_total = base_machine_total + selected_options_total
 
         with st.container(border=True):
-            st.markdown("<b style='color:#64748b;'>Müşteri İskontosu / Anlaşılan Fiyat</b>", unsafe_allow_html=True)
+            st.markdown("<b style='color:#64748b; font-size:13px;'>İskonto ve Fiyat</b>", unsafe_allow_html=True)
             
             st.text_input("Sistem Toplamı", value=f"{sub_total:,.2f} {m_currency}", disabled=True)
-            discount_pct = st.number_input("Özel İskonto Oranı (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5)
+            discount_pct = st.number_input("İskonto Oranı (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5)
             
             discounted_price = sub_total * (1 - (discount_pct / 100.0))
             agreed_price = st.number_input("Anlaşılan Net Fiyat", min_value=0.0, value=discounted_price, step=100.0)
@@ -170,7 +180,7 @@ def show_offer_wizard(user_id, is_admin=False):
         }
         
         st.write("")
-        if st.button("💾 TEKLİFİ SİSTEME KAYDET", use_container_width=True, type="primary"):
+        if st.button("💾 SİSTEME KAYDET", use_container_width=True, type="primary"):
             cond_str = json.dumps(conditions_data)
             tarih = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
             
@@ -185,7 +195,7 @@ def show_offer_wizard(user_id, is_admin=False):
                         database.exec_query("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", (offer_id, s_opt["id"], s_opt["qty"]))
                 
                 st.balloons()
-                st.success("Tebrikler! Teklif başarıyla arşivlendi.")
+                st.success("Teklif arşivlendi.")
             except Exception as e:
                 st.error(f"Kayıt Hatası: {e}")
 
@@ -193,10 +203,8 @@ def show_offer_wizard(user_id, is_admin=False):
     # SAĞ KOLON (CANLI HTML/PDF ÖNİZLEME)
     # ----------------------------------------------------------
     with col_right:
-        st.markdown("<h4 style='color:#0f172a; margin-bottom:-10px;'>📄 CANLI TEKLİF ÖNİZLEMESİ</h4>", unsafe_allow_html=True)
-        st.write("")
+        st.markdown("<h5 style='color:#0f172a; margin-bottom:-5px; font-weight:800;'>📄 CANLI ÖNİZLEME</h5>", unsafe_allow_html=True)
         
-        # Orijinal PyQt Preview Engine'den HTML'i canlı alıp ekrana iframe olarak basıyoruz
         try:
             final_preview_html = preview_engine.PreviewEngine.generate_html(
                 customer=selected_cust_name,
@@ -209,9 +217,8 @@ def show_offer_wizard(user_id, is_admin=False):
                 delivery_type=delivery_type
             )
             
-            # Sağ tarafta 800px yüksekliğinde, içine scroll yapılabilen PDF/Web görünümü
             with st.container(border=True):
-                components.html(final_preview_html, height=800, scrolling=True)
+                components.html(final_preview_html, height=850, scrolling=True)
                 
         except Exception as e:
             st.error(f"Önizleme oluşturulurken bir hata meydana geldi: {e}")
