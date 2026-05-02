@@ -4,23 +4,24 @@ import pandas as pd
 import os
 import uuid
 
-# Sunucuya Dosya Kaydetme Motoru
+# Sunucuya Dosya Kaydetme Motoru (Hata Korumalı)
 def save_uploaded_file(uploaded_file, folder_name="images"):
     if uploaded_file is None:
         return ""
     if not os.path.exists(folder_name):
         os.makedirs(folder_name, exist_ok=True)
     
-    # Dosya ismini güvenli ve benzersiz hale getir
+    # Dosya ismini güvenli ve benzersiz hale getir (Windows/Linux yol çakışmasını önler)
     ext = os.path.splitext(uploaded_file.name)[1]
     safe_name = f"{uuid.uuid4().hex[:8]}{ext}"
-    file_path = os.path.join(folder_name, safe_name)
+    file_path = f"{folder_name}/{safe_name}"
     
     try:
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         return file_path
-    except Exception:
+    except Exception as e:
+        st.error(f"⚠️ Dosya sunucuya kaydedilemedi! Klasör izinlerini kontrol edin: {e}")
         return ""
 
 def init_management_tables():
@@ -177,6 +178,7 @@ def show_product_management():
                                 st.markdown(f"**Özellik #{i+1}: {spec['name'] if spec['name'] else 'Doldurunuz'}**")
                             
                             with col_spec_del:
+                                # Silme butonu formu tetikler, resimler güvende kalır
                                 if st.form_submit_button("SİL", key=f"del_spec_{unique_key}_submit"):
                                     to_delete_spec_id = unique_key
                             
@@ -186,27 +188,45 @@ def show_product_management():
                             with col_inp2:
                                 spec['val'] = st.text_input("Değer / Açıklama (Örn: 9kW HSD)", value=spec['val'], key=f"inp_val_{unique_key}")
                             
-                            # --------- HATA ÇÖZÜMÜ BURADA ---------
+                            # HATA DÜZELTİLDİ: Resim dosyası byte olarak okunur, çökmeyi engeller
                             if spec['icon']:
                                 if os.path.isfile(spec['icon']):
                                     try:
-                                        # Dosyayı byte olarak okuyoruz (Streamlit MediaFileStorageError çökmesini önler)
                                         with open(spec['icon'], "rb") as f:
-                                            img_bytes = f.read()
-                                        st.image(img_bytes, width=50)
-                                    except Exception as e:
-                                        st.caption(f"⚠️ Dosya okunamadı: {e}")
+                                            st.image(f.read(), width=50)
+                                    except Exception: pass
                                 else:
-                                    st.caption("⚠️ Resim sunucuda bulunamadı (Sunucu sıfırlanmış veya dosya silinmiş olabilir).")
+                                    st.caption("⚠️ Eski resim sunucuda bulunamadı.")
                                 st.write(f"Mevcut İkon Dosyası: `{spec['icon']}`")
-                            # --------------------------------------
                             
                             st.file_uploader("Bu özellik için Resim/İkon Yükle", type=['png','jpg','jpeg'], key=f"uplo_{unique_key}")
 
-                submit_m = st.form_submit_button("💾 BİLGİLERİ KAYDET", use_container_width=True)
+                st.markdown("---")
+                st.markdown("#### 🖼️ Medya Yükleme (Ana Resim ve Galeri)")
+                if m_info and m_info[7]:
+                    st.write(f"Mevcut Ana Resim: `{m_info[7]}`")
+                uploaded_main_img = st.file_uploader("Ana Makine Resmi Yükle", type=['png', 'jpg', 'jpeg'], key="up_main")
                 
+                uploaded_gal_img = st.file_uploader("Galeri Resimleri Yükle (Çoklu Seçim)", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True, key="up_gal_i")
+                uploaded_gal_vid = st.file_uploader("Galeri Videoları Yükle (Çoklu Seçim)", type=['mp4', 'avi', 'mov'], accept_multiple_files=True, key="up_gal_v")
+                
+                # --- HAYAT KURTARAN DÜZELTME BURADA ---
+                # İki buton da formun içinde. Böylece "Özellik Ekle" dendiğinde resimler hafızada kalır!
+                col_btn_save, col_btn_add = st.columns(2)
+                with col_btn_add:
+                    add_spec_btn = st.form_submit_button("➕ YENİ TEKNİK ÖZELLİK KUTUSU EKLE", use_container_width=True)
+                with col_btn_save:
+                    submit_m = st.form_submit_button("💾 BİLGİLERİ VE RESİMLERİ KAYDET", type="primary", use_container_width=True)
+                
+            # Silme işlemi tetiklendiyse listeyi güncelle
             if to_delete_spec_id:
                 st.session_state.machine_specs_list = [s for s in st.session_state.machine_specs_list if s["id"] != to_delete_spec_id]
+                st.rerun()
+                
+            # Yeni özellik ekleme butonu tetiklendiyse kutu ekle
+            if add_spec_btn:
+                st.session_state.machine_specs_list.append({"id": str(uuid.uuid4()), "name": "", "val": "", "icon": ""})
+                st.rerun()
             
             if submit_m:
                 if mn:
@@ -243,11 +263,11 @@ def show_product_management():
                     if selected_m_id:
                         database.exec_query("UPDATE models SET name=?, category=?, base_price=?, currency=?, port_discount=?, compatible_options=?, specs=?, image_path=?, gallery_images=?, gallery_videos=? WHERE id=?", 
                                             (mn, m_cat, mp, m_curr, m_disc, final_opts_str, final_specs_str, m_img_path, final_gal_imgs, final_gal_vids, selected_m_id))
-                        st.success("Makine başarıyla güncellendi!")
+                        st.success("Makine ve resimler başarıyla güncellendi!")
                     else:
                         database.exec_query("INSERT INTO models (name, category, base_price, currency, port_discount, compatible_options, specs, image_path, gallery_images, gallery_videos) VALUES (?,?,?,?,?,?,?,?,?,?)", 
                                             (mn, m_cat, mp, m_curr, m_disc, final_opts_str, final_specs_str, m_img_path, final_gal_imgs, final_gal_vids))
-                        st.success("Yeni makine sisteme eklendi!")
+                        st.success("Yeni makine ve resimler sisteme eklendi!")
                     
                     st.session_state.machine_specs_list = []
                     st.session_state.current_editing_m_id = None
@@ -255,13 +275,8 @@ def show_product_management():
                 else:
                     st.error("Makine adı zorunludur.")
             
-            st.markdown("---")
-            if st.button("➕ YENİ TEKNİK ÖZELLİK KUTUSU EKLE", use_container_width=True):
-                st.session_state.machine_specs_list.append({"id": str(uuid.uuid4()), "name": "", "val": "", "icon": ""})
-                st.rerun()
-            st.caption("Not: Yeni özellik kutusu eklemek veya silmek için formu kaydetmeniz veya bu butona basmanız gerekir.")
-
             if m_info:
+                st.markdown("---")
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
                     if st.button("🗑️ Makineyi Kökten Sil", use_container_width=True):
@@ -320,10 +335,10 @@ def show_product_management():
                 col_o1, col_o2 = st.columns(2)
                 with col_o1:
                     if o_info and o_info[7]: st.write(f"Mevcut Resim: `{o_info[7]}`")
-                    opt_img_upload = st.file_uploader("Donanım Resmi Yükle", type=['png', 'jpg', 'jpeg'])
+                    opt_img_upload = st.file_uploader("Donanım Resmi Yükle", type=['png', 'jpg', 'jpeg'], key="o_img")
                 with col_o2:
                     if o_info and o_info[8]: st.write(f"Mevcut Video: `{o_info[8]}`")
-                    opt_vid_upload = st.file_uploader("Donanım Videosu Yükle", type=['mp4', 'avi', 'mov'])
+                    opt_vid_upload = st.file_uploader("Donanım Videosu Yükle", type=['mp4', 'avi', 'mov'], key="o_vid")
                 
                 submit_o = st.form_submit_button("💾 DONANIMI KAYDET", use_container_width=True)
                 
@@ -383,7 +398,7 @@ def show_product_management():
                     cn = st.text_input("Kategori Adı *", value=c_info[0] if c_info else "")
                     
                     if c_info and c_info[1]: st.write(f"Mevcut Kategori Resmi: `{c_info[1]}`")
-                    cat_img_upload = st.file_uploader("Kategori Resmi Yükle", type=['png', 'jpg', 'jpeg'])
+                    cat_img_upload = st.file_uploader("Kategori Resmi Yükle", type=['png', 'jpg', 'jpeg'], key="c_img")
 
                     submit_c = st.form_submit_button("💾 KATEGORİYİ KAYDET", use_container_width=True)
                     
