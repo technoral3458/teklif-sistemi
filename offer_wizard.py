@@ -20,24 +20,16 @@ def init_wizard_tables():
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
-    # MASAÜSTÜ SIKI TASARIMI İÇİN ÖZEL CSS (Puf görünümleri ezer)
+    # --- JİLET GİBİ SIKI TASARIM İÇİN CSS ---
     st.markdown("""
     <style>
-    /* Ana ekranın üst boşluğunu daralt */
-    .block-container { padding-top: 1.5rem; max-width: 98%; }
-    
-    /* Konteynerlerin (Kartların) iç boşluklarını tıraşla */
-    div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        padding: 10px !important;
-        gap: 0.3rem !important;
-    }
-    
-    /* Checkbox'ı sağa daya ve ortala */
-    .stCheckbox {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: 5px;
-    }
+    .block-container { padding-top: 1rem; padding-bottom: 0rem; max-width: 99%; }
+    [data-testid="stVerticalBlockBorderWrapper"] > div { padding: 5px !important; gap: 0.1rem !important; }
+    .stCheckbox { margin-bottom: -15px; }
+    /* Donanım kartı yazılarını küçült */
+    .opt-title { font-size: 12px !important; line-height: 1.1; font-weight: 700; color: #1e293b; }
+    .opt-price { font-size: 12px !important; font-weight: 800; color: #d97706; text-align: right; }
+    .stNumberInput input { padding: 2px 5px !important; font-size: 12px !important; }
     </style>
     """, unsafe_allow_html=True)
     
@@ -47,62 +39,62 @@ def show_offer_wizard(user_id, is_admin=False):
         my_custs = database.get_query("SELECT id, company_name FROM customers WHERE user_id=? ORDER BY company_name", (user_id,))
     
     if not my_custs:
-        st.warning("⚠️ Teklif hazırlamak için önce 'Müşterilerim' sekmesinden bir müşteri eklemelisiniz.")
+        st.warning("⚠️ Önce müşteri eklemelisiniz.")
         return
 
-    # ==========================================================
-    # MASAÜSTÜ BİREBİR: 3 KOLONLU KOMPAKT YERLEŞİM
-    # ==========================================================
-    col_left, col_mid, col_right = st.columns([1.2, 1.6, 2.2], gap="small")
+    # KOLON ORANLARI: Sol (1.1) | Orta (1.2 - Daralttık) | Sağ (2.7 - Genişlettik)
+    col_left, col_mid, col_right = st.columns([1.1, 1.2, 2.7], gap="small")
 
-    selected_options_total = 0.0
-    selected_options_list = []
     engine_options_list = []
+    selected_options_for_db = []
+    selected_options_total = 0.0
 
     # ----------------------------------------------------------
-    # SOL KOLON - TEKLİF AYARLARI
+    # SOL KOLON: AYARLAR
     # ----------------------------------------------------------
     with col_left:
-        st.markdown("<h5 style='color:#0f172a; margin-bottom:-5px; font-weight:800;'>⚙️ TEKLİF AYARLARI</h5>", unsafe_allow_html=True)
-        
+        st.markdown("<h6 style='margin-bottom:0px;'>⚙️ AYARLAR</h6>", unsafe_allow_html=True)
         with st.container(border=True):
-            f_currency = st.selectbox("Para Birimi", ["USD", "EUR", "RMB", "TRY"])
+            f_currency = st.selectbox("Birim", ["USD", "EUR", "RMB", "TRY"], label_visibility="collapsed")
             
             cats = database.get_query("SELECT name FROM categories ORDER BY id")
             cat_list = ["Tüm Kategoriler"] + [c[0] for c in cats] if cats else ["Tüm Kategoriler"]
-            f_category = st.selectbox("Kategori", cat_list)
+            f_category = st.selectbox("Kategori", cat_list, label_visibility="collapsed")
             
             selected_cust_name = st.selectbox("Müşteri", [c[1] for c in my_custs])
             selected_cust_id = [c[0] for c in my_custs if c[1] == selected_cust_name][0]
 
-            if f_category == "Tüm Kategoriler":
-                model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=?", (f_currency,))
-            else:
-                model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=? AND category=?", (f_currency, f_category))
+            model_data = database.get_query(
+                "SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=?", 
+                (f_currency,)
+            ) if f_category == "Tüm Kategoriler" else database.get_query(
+                "SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=? AND category=?", 
+                (f_currency, f_category)
+            )
 
             if not model_data:
-                st.error("Bu filtrelere uygun makine bulunamadı.")
+                st.error("Model yok.")
                 return
 
-            selected_model = st.selectbox("Model", [m[1] for m in model_data])
+            selected_model = st.selectbox("Makine Seçin", [m[1] for m in model_data])
             m_info = [m for m in model_data if m[1] == selected_model][0]
             m_id, m_price, m_currency, comp_opts_str, m_port_disc, m_img_path, m_specs = m_info[0], m_info[2], m_info[3], m_info[4], m_info[5], m_info[6], m_info[7]
 
-            m_qty = st.number_input("Makine Adedi", min_value=1, value=1)
+            m_qty = st.number_input("Adet", min_value=1, value=1)
             delivery_type = st.selectbox("Teslimat", ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Gümrük İşlemleri Yapılmadan Limandan Devir"])
 
         multiplier = 1.0
-        if delivery_type == "Gümrük İşlemleri Yapılmadan Limandan Devir" and m_port_disc:
+        if "Liman" in delivery_type and m_port_disc:
             multiplier = 1.0 - (float(m_port_disc) / 100.0)
 
     # ----------------------------------------------------------
-    # ORTA KOLON - DONANIM KARTLARI (SIKIŞTIRILMIŞ TASARIM)
+    # ORTA KOLON: DONANIMLAR (DARALTILMIŞ)
     # ----------------------------------------------------------
     with col_mid:
-        st.markdown("<h5 style='color:#1d4ed8; margin-bottom:-5px; font-weight:800;'>🔌 UYUMLU DONANIMLAR</h5>", unsafe_allow_html=True)
-        hide_specs = st.checkbox("Standart Özellikleri Gizle", value=False)
+        st.markdown("<h6 style='color:#1d4ed8; margin-bottom:0px;'>🔌 DONANIMLAR</h6>", unsafe_allow_html=True)
+        hide_specs = st.checkbox("Özellikleri Gizle", value=False)
         
-        with st.container(height=650):
+        with st.container(height=600):
             if comp_opts_str:
                 comp_opt_ids = [opt.strip() for opt in str(comp_opts_str).split(",") if opt.strip()]
                 if comp_opt_ids:
@@ -110,115 +102,84 @@ def show_offer_wizard(user_id, is_admin=False):
                     opts_query = f"SELECT id, opt_name, opt_price, currency, opt_desc, opt_image FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC"
                     compatible_options = database.get_query(opts_query, tuple(comp_opt_ids))
                     
-                    if compatible_options:
-                        for opt in compatible_options:
-                            o_id, o_name, o_price, o_curr, o_desc, o_img = opt
-                            discounted_o_price = float(o_price) * multiplier
+                    for opt in compatible_options:
+                        o_id, o_name, o_price, o_curr, o_desc, o_img = opt
+                        d_o_price = float(o_price) * multiplier
+                        
+                        with st.container(border=True):
+                            c_img, c_main = st.columns([1, 4], vertical_alignment="center")
+                            with c_img:
+                                if o_img and os.path.isfile(o_img):
+                                    with open(o_img, "rb") as f: st.image(f.read(), use_container_width=True)
+                                else: st.markdown("📷")
                             
-                            # YENİ KOMPAKT KART TASARIMI (Dikeyde Ortalı)
-                            with st.container(border=True):
-                                c_img, c_info, c_act = st.columns([1.5, 4.5, 2.5], vertical_alignment="center")
+                            with c_main:
+                                st.markdown(f"<div class='opt-title'>{o_name}</div>", unsafe_allow_html=True)
+                                st.markdown(f"<div class='opt-price'>+ {d_o_price:,.0f} {o_curr}</div>", unsafe_allow_html=True)
                                 
-                                with c_img:
-                                    if o_img and os.path.isfile(o_img):
-                                        try:
-                                            with open(o_img, "rb") as f:
-                                                st.image(f.read(), use_container_width=True)
-                                        except:
-                                            st.markdown("📷")
-                                    else:
-                                        st.markdown("📷")
-                                        
-                                with c_info:
-                                    desc_short = (o_desc[:60] + '...') if o_desc and len(o_desc) > 60 else (o_desc if o_desc else "")
-                                    st.markdown(f"<div style='line-height:1.2;'><b style='font-size:13px; color:#1e293b;'>{o_name}</b><br><span style='font-size:11px; color:#64748b;'>{desc_short}</span></div>", unsafe_allow_html=True)
-                                
-                                with c_act:
-                                    st.markdown(f"<div style='text-align:right; color:#d97706; font-weight:800; font-size:13px; margin-bottom:2px;'>+ {discounted_o_price:,.2f} {o_curr}</div>", unsafe_allow_html=True)
-                                    
-                                    cq, cc = st.columns([1.5, 1], vertical_alignment="center")
-                                    with cc:
-                                        is_selected = st.checkbox("", key=f"chk_{o_id}")
-                                    with cq:
-                                        if is_selected:
-                                            o_qty = st.number_input("Adet", min_value=1, value=1, label_visibility="collapsed", key=f"qty_{o_id}")
-                                            selected_options_total += (discounted_o_price * o_qty)
-                                            
-                                            selected_options_list.append({"id": o_id, "qty": o_qty})
-                                            engine_options_list.append({
-                                                'n': o_name, 'p': discounted_o_price, 'q': o_qty, 
-                                                'i': o_img, 'd': o_desc, 's': o_curr
-                                            })
-                    else:
-                        st.info("Donanım bulunmuyor.")
-                else:
-                    st.info("Donanım bulunmuyor.")
+                                c_qty, c_chk = st.columns([2, 1])
+                                with c_chk:
+                                    is_sel = st.checkbox("", key=f"c_{o_id}")
+                                with c_qty:
+                                    if is_sel:
+                                        o_qty = st.number_input("Adet", min_value=1, value=1, key=f"q_{o_id}", label_visibility="collapsed")
+                                        selected_options_total += (d_o_price * o_qty)
+                                        selected_options_for_db.append({"id": o_id, "qty": o_qty})
+                                        engine_options_list.append({'n': o_name, 'p': d_o_price, 'q': o_qty, 'i': o_img, 'd': o_desc, 's': o_curr})
 
     # ----------------------------------------------------------
-    # SOL KOLON - ALT KISIM (HESAPLAMA VE KAYIT)
+    # SOL KOLON ALT: FİYAT VE KAYIT
     # ----------------------------------------------------------
     with col_left:
-        base_machine_total = (float(m_price) * multiplier) * m_qty
-        sub_total = base_machine_total + selected_options_total
-
+        sub_total = ((float(m_price) * multiplier) * m_qty) + selected_options_total
         with st.container(border=True):
-            st.markdown("<b style='color:#64748b; font-size:13px;'>İskonto ve Fiyat</b>", unsafe_allow_html=True)
-            
-            st.text_input("Sistem Toplamı", value=f"{sub_total:,.2f} {m_currency}", disabled=True)
-            discount_pct = st.number_input("İskonto Oranı (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5)
-            
-            discounted_price = sub_total * (1 - (discount_pct / 100.0))
-            agreed_price = st.number_input("Anlaşılan Net Fiyat", min_value=0.0, value=discounted_price, step=100.0)
+            st.caption(f"Liste: {sub_total:,.2f} {m_currency}")
+            discount_pct = st.number_input("İskonto %", min_value=0.0, max_value=100.0, value=0.0, step=0.5)
+            final_price = sub_total * (1 - (discount_pct / 100.0))
+            agreed_price = st.number_input("Net Fiyat", min_value=0.0, value=final_price, step=100.0)
 
         conditions_data = {
-            "machine_qty": m_qty,
-            "discount_pct": discount_pct,
-            "subtotal_calculated": sub_total,
-            "agreed_price": agreed_price,
-            "hide_specs": hide_specs,
-            "delivery_type": delivery_type
+            "machine_qty": m_qty, "discount_pct": discount_pct, "subtotal_calculated": sub_total,
+            "agreed_price": agreed_price, "hide_specs": hide_specs, "delivery_type": delivery_type
         }
         
-        st.write("")
-        if st.button("💾 SİSTEME KAYDET", use_container_width=True, type="primary"):
-            cond_str = json.dumps(conditions_data)
-            tarih = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
-            
+        # KAYIT BUTONU (FORM DIŞINDA - DAHA GÜVENLİ)
+        if st.button("💾 TEKLİFİ KAYDET", use_container_width=True, type="primary"):
             try:
-                database.exec_query("INSERT INTO offers (customer_id, model_id, total_price, user_id, offer_date, conditions) VALUES (?,?,?,?,?,?)",
-                                   (selected_cust_id, m_id, agreed_price, user_id, tarih, cond_str))
+                tarih = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+                cond_str = json.dumps(conditions_data)
                 
-                last_offer = database.get_query("SELECT id FROM offers WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
-                if last_offer and selected_options_list:
-                    offer_id = last_offer[0][0]
-                    for s_opt in selected_options_list:
-                        database.exec_query("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", (offer_id, s_opt["id"], s_opt["qty"]))
+                # 1. Ana Kayıt
+                database.exec_query(
+                    "INSERT INTO offers (customer_id, model_id, total_price, user_id, offer_date, conditions) VALUES (?,?,?,?,?,?)",
+                    (selected_cust_id, m_id, agreed_price, user_id, tarih, cond_str)
+                )
                 
+                # 2. Son ID'yi al ve Opsiyonları ekle
+                res_id = database.get_query("SELECT id FROM offers WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
+                if res_id and selected_options_for_db:
+                    new_offer_id = res_id[0][0]
+                    for item in selected_options_for_db:
+                        database.exec_query("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", 
+                                           (new_offer_id, item["id"], item["qty"]))
+                
+                st.success("Kaydedildi!")
                 st.balloons()
-                st.success("Teklif arşivlendi.")
             except Exception as e:
-                st.error(f"Kayıt Hatası: {e}")
+                st.error(f"Hata: {e}")
 
     # ----------------------------------------------------------
-    # SAĞ KOLON (CANLI HTML/PDF ÖNİZLEME)
+    # SAĞ KOLON: GENİŞLETİLMİŞ CANLI ÖNİZLEME
     # ----------------------------------------------------------
     with col_right:
-        st.markdown("<h5 style='color:#0f172a; margin-bottom:-5px; font-weight:800;'>📄 CANLI ÖNİZLEME</h5>", unsafe_allow_html=True)
-        
+        st.markdown("<h6 style='margin-bottom:0px;'>📄 CANLI ÖNİZLEME</h6>", unsafe_allow_html=True)
         try:
-            final_preview_html = preview_engine.PreviewEngine.generate_html(
-                customer=selected_cust_name,
-                model=selected_model,
-                base_price=float(m_price) * multiplier,
-                machine_img=m_img_path,
-                specs=m_specs,
-                selected_options=engine_options_list,
-                conditions=conditions_data,
-                delivery_type=delivery_type
+            html = preview_engine.PreviewEngine.generate_html(
+                customer=selected_cust_name, model=selected_model, 
+                base_price=float(m_price) * multiplier, machine_img=m_img_path,
+                specs=m_specs, selected_options=engine_options_list, 
+                conditions=conditions_data, delivery_type=delivery_type
             )
-            
-            with st.container(border=True):
-                components.html(final_preview_html, height=850, scrolling=True)
-                
+            components.html(html, height=850, scrolling=True)
         except Exception as e:
-            st.error(f"Önizleme oluşturulurken bir hata meydana geldi: {e}")
+            st.error(f"Önizleme Hatası: {e}")
