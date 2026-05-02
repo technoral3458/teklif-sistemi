@@ -6,8 +6,6 @@ import pandas as pd
 import json
 import os
 import preview_engine
-from io import BytesIO
-from xhtml2pdf import pisa
 
 def init_wizard_tables():
     database.exec_query("""CREATE TABLE IF NOT EXISTS offer_items (
@@ -18,14 +16,6 @@ def init_wizard_tables():
         if "conditions" not in of_cols: database.exec_query("ALTER TABLE offers ADD COLUMN conditions TEXT DEFAULT ''")
     except: pass
 
-def create_pdf(html_content):
-    """HTML içeriğini PDF byte verisine dönüştürür."""
-    result = BytesIO()
-    pdf = pisa.pisaDocument(BytesIO(html_content.encode("UTF-8")), result)
-    if not pdf.err:
-        return result.getvalue()
-    return None
-
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
@@ -33,7 +23,7 @@ def show_offer_wizard(user_id, is_admin=False):
     st.markdown("""
     <style>
     .block-container { padding-top: 1rem; max-width: 99%; }
-    .opt-title { font-size: 12px !important; font-weight: 700; color: #1e293b; }
+    .opt-title { font-size: 12px !important; font-weight: 700; color: #1e293b; line-height: 1.2; }
     .opt-price { font-size: 12px !important; font-weight: 800; color: #d97706; text-align: right; }
     </style>
     """, unsafe_allow_html=True)
@@ -58,7 +48,7 @@ def show_offer_wizard(user_id, is_admin=False):
     # SOL KOLON: AYARLAR
     # ----------------------------------------------------------
     with col_left:
-        st.markdown("<h6 style='font-weight:800;'>⚙️ AYARLAR</h6>", unsafe_allow_html=True)
+        st.markdown("<h6 style='font-weight:800; margin-bottom:0px;'>⚙️ AYARLAR</h6>", unsafe_allow_html=True)
         with st.container(border=True):
             f_currency = st.selectbox("Birim", ["USD", "EUR", "RMB", "TRY"], label_visibility="collapsed")
             cats = database.get_query("SELECT name FROM categories ORDER BY id")
@@ -87,7 +77,7 @@ def show_offer_wizard(user_id, is_admin=False):
     # ORTA KOLON: DONANIMLAR
     # ----------------------------------------------------------
     with col_mid:
-        st.markdown("<h6 style='color:#1d4ed8; font-weight:800;'>🔌 DONANIMLAR</h6>", unsafe_allow_html=True)
+        st.markdown("<h6 style='color:#1d4ed8; font-weight:800; margin-bottom:0px;'>🔌 DONANIMLAR</h6>", unsafe_allow_html=True)
         hide_specs = st.checkbox("Özellikleri Gizle", value=False)
         with st.container(height=550):
             if comp_opts_str:
@@ -100,10 +90,12 @@ def show_offer_wizard(user_id, is_admin=False):
                         o_id, o_name, o_price, o_curr, o_desc, o_img = opt
                         d_o_price = float(o_price) * multiplier
                         with st.container(border=True):
-                            c_img, c_main = st.columns([1, 4], vertical_alignment="center")
+                            c_img, c_main = st.columns([1.2, 4], vertical_alignment="center")
                             with c_img:
                                 if o_img and os.path.isfile(o_img):
-                                    with open(o_img, "rb") as f: st.image(f.read(), use_container_width=True)
+                                    try:
+                                        with open(o_img, "rb") as f: st.image(f.read(), use_container_width=True)
+                                    except: st.markdown("📷")
                                 else: st.markdown("📷")
                             with c_main:
                                 st.markdown(f"<div class='opt-title'>{o_name}</div>", unsafe_allow_html=True)
@@ -118,7 +110,7 @@ def show_offer_wizard(user_id, is_admin=False):
                                         engine_options_list.append({'n': o_name, 'p': d_o_price, 'q': o_qty, 'i': o_img, 'd': o_desc, 's': o_curr})
 
     # ----------------------------------------------------------
-    # HESAPLAMALAR VE ÖNİZLEME HAZIRLIĞI
+    # HESAPLAMALAR VE ÖNİZLEME
     # ----------------------------------------------------------
     sub_total = ((float(m_price) * multiplier) * m_qty) + selected_options_total
     
@@ -134,7 +126,6 @@ def show_offer_wizard(user_id, is_admin=False):
             "agreed_price": agreed_price, "hide_specs": hide_specs, "delivery_type": delivery_type
         }
 
-        # ÖNİZLEME HTML OLUŞTURMA
         html_preview = preview_engine.PreviewEngine.generate_html(
             customer=selected_cust_name, model=selected_model, 
             base_price=float(m_price) * multiplier, machine_img=m_img_path,
@@ -142,7 +133,6 @@ def show_offer_wizard(user_id, is_admin=False):
             conditions=conditions_data, delivery_type=delivery_type
         )
 
-        # KAYIT VE PDF BUTONLARI
         st.write("")
         if st.button("💾 TEKLİFİ KAYDET", use_container_width=True, type="primary"):
             try:
@@ -158,19 +148,10 @@ def show_offer_wizard(user_id, is_admin=False):
                 st.success("Sisteme Kaydedildi!")
                 st.balloons()
             except Exception as e: st.error(f"Kayıt Hatası: {e}")
-
-        # PDF İNDİRME BUTONU
-        pdf_data = create_pdf(html_preview)
-        if pdf_data:
-            st.download_button(
-                label="📄 PDF OLARAK İNDİR",
-                data=pdf_data,
-                file_name=f"Ersan_Makine_Teklif_{selected_cust_name.replace(' ', '_')}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
+            
+        st.info("💡 **PDF Almak İçin:** Sağdaki teklif raporunun herhangi bir yerine tıklayıp **CTRL+P** (Mac'te CMD+P) kısayoluna basarak 'PDF Olarak Kaydet' diyebilirsiniz. Sayfa düzeni bozulmadan kusursuz şekilde inecektir.")
 
     # SAĞ KOLON: ÖNİZLEME
     with col_right:
-        st.markdown("<h6 style='font-weight:800;'>📄 CANLI ÖNİZLEME</h6>", unsafe_allow_html=True)
+        st.markdown("<h6 style='font-weight:800; margin-bottom:0px;'>📄 CANLI ÖNİZLEME</h6>", unsafe_allow_html=True)
         components.html(html_preview, height=800, scrolling=True)
