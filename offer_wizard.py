@@ -3,6 +3,7 @@ import database
 import datetime
 import pandas as pd
 import json
+import os
 
 def init_wizard_tables():
     # Teklifler ve detayları için gerekli tabloları kontrol et
@@ -46,11 +47,11 @@ def show_offer_wizard(user_id, is_admin=False):
             cat_list = ["Tüm Kategoriler"] + [c[0] for c in cats] if cats else ["Tüm Kategoriler"]
             f_category = st.selectbox("🗂️ Kategori Filtresi", cat_list)
 
-        # Filtrelere göre makineleri çek
+        # Filtrelere göre makineleri çek (image_path sütunu eklendi)
         if f_category == "Tüm Kategoriler":
-            model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount FROM models WHERE currency=?", (f_currency,))
+            model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path FROM models WHERE currency=?", (f_currency,))
         else:
-            model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount FROM models WHERE currency=? AND category=?", (f_currency, f_category))
+            model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path FROM models WHERE currency=? AND category=?", (f_currency, f_category))
 
         if not model_data:
             st.error("Bu filtrelere uygun makine modeli bulunamadı.")
@@ -58,12 +59,28 @@ def show_offer_wizard(user_id, is_admin=False):
 
         selected_model = st.selectbox("🤖 Makine Modeli", [m[1] for m in model_data])
         m_info = [m for m in model_data if m[1] == selected_model][0]
-        m_id, m_price, m_currency, comp_opts_str, m_port_disc = m_info[0], m_info[2], m_info[3], m_info[4], m_info[5]
+        m_id, m_price, m_currency, comp_opts_str, m_port_disc, m_img_path = m_info[0], m_info[2], m_info[3], m_info[4], m_info[5], m_info[6]
 
-        col_q1, col_q2 = st.columns(2)
-        with col_q1:
+        st.markdown("---")
+        
+        # MAKİNE RESMİ VE SİPARİŞ DETAYLARI
+        col_m_img, col_m_det = st.columns([1, 2])
+        with col_m_img:
+            if m_img_path and os.path.isfile(m_img_path):
+                try:
+                    with open(m_img_path, "rb") as f:
+                        st.image(f.read(), use_container_width=True)
+                except Exception:
+                    st.info("Resim formatı desteklenmiyor veya dosya bozuk.")
+            else:
+                st.markdown("""
+                <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; height: 150px; display: flex; align-items: center; justify-content: center; color: #94a3b8;">
+                    📷 Makine Görseli Yok
+                </div>
+                """, unsafe_allow_html=True)
+
+        with col_m_det:
             m_qty = st.number_input("Makine Adedi", min_value=1, value=1)
-        with col_q2:
             delivery_type = st.selectbox("Teslimat Şekli", ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Gümrük İşlemleri Yapılmadan Limandan Devir"])
 
     # Teslimat Şekline Göre Baz Fiyat Çarpanı
@@ -83,22 +100,45 @@ def show_offer_wizard(user_id, is_admin=False):
             comp_opt_ids = [opt.strip() for opt in str(comp_opts_str).split(",") if opt.strip()]
             if comp_opt_ids:
                 placeholders = ",".join("?" * len(comp_opt_ids))
-                opts_query = f"SELECT id, opt_name, opt_price, currency, opt_desc FROM options WHERE id IN ({placeholders})"
+                # opt_image sütunu da çekiliyor
+                opts_query = f"SELECT id, opt_name, opt_price, currency, opt_desc, opt_image FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC"
                 compatible_options = database.get_query(opts_query, tuple(comp_opt_ids))
                 
                 if compatible_options:
                     for opt in compatible_options:
-                        o_id, o_name, o_price, o_curr, o_desc = opt
+                        o_id, o_name, o_price, o_curr, o_desc, o_img = opt
                         discounted_o_price = float(o_price) * multiplier
                         
-                        col_opt1, col_opt2 = st.columns([4, 1])
-                        with col_opt1:
-                            is_selected = st.checkbox(f"**{o_name}** (+{discounted_o_price:,.2f} {o_curr}) \n\n _{o_desc}_", key=f"opt_{o_id}")
-                        with col_opt2:
-                            if is_selected:
-                                o_qty = st.number_input("Adet", min_value=1, value=1, key=f"qty_{o_id}")
-                                selected_options_total += (discounted_o_price * o_qty)
-                                selected_options_list.append({"id": o_id, "qty": o_qty, "name": o_name, "price": discounted_o_price, "total": discounted_o_price * o_qty})
+                        with st.container(border=True):
+                            col_img, col_opt_info, col_opt_qty = st.columns([1, 5, 2])
+                            
+                            # DONANIM RESMİ KISMI
+                            with col_img:
+                                if o_img and os.path.isfile(o_img):
+                                    try:
+                                        with open(o_img, "rb") as f:
+                                            st.image(f.read(), width=80)
+                                    except:
+                                        st.write("📷")
+                                else:
+                                    st.markdown("""
+                                    <div style="background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #94a3b8;">
+                                        📷
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                            # DONANIM BİLGİSİ VE SEÇİM KISMI
+                            with col_opt_info:
+                                is_selected = st.checkbox(f"**{o_name}** (+{discounted_o_price:,.2f} {o_curr})", key=f"opt_{o_id}")
+                                if o_desc:
+                                    st.caption(f"_{o_desc}_")
+                            
+                            # DONANIM ADEDİ KISMI
+                            with col_opt_qty:
+                                if is_selected:
+                                    o_qty = st.number_input("Adet", min_value=1, value=1, key=f"qty_{o_id}")
+                                    selected_options_total += (discounted_o_price * o_qty)
+                                    selected_options_list.append({"id": o_id, "qty": o_qty, "name": o_name, "price": discounted_o_price, "total": discounted_o_price * o_qty})
                 else:
                     st.info("Bu makine için tanımlanmış donanım bulunmuyor.")
             else:
