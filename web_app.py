@@ -3,7 +3,7 @@ import database
 import customer_pages
 import model_management
 import offer_wizard
-import dealer_management  # <-- YENİ EKLENEN DOSYAMIZ
+import dealer_management
 import datetime
 import pandas as pd
 import hashlib
@@ -12,6 +12,7 @@ import smtplib
 import sqlite3
 import uuid
 import os
+import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -24,6 +25,24 @@ def hash_password(password):
 def generate_code():
     return str(random.randint(100000, 999999))
 
+# Görseli Base64 formatına çeviren yardımcı (HTML içinde yerel dosya göstermek için)
+def get_base64_image(path):
+    if path and os.path.exists(path):
+        with open(path, "rb") as f:
+            return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+    return "https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png"
+
+# Sistem Giriş Logosunu Getir
+def get_system_logo():
+    try:
+        res = database.get_query("SELECT logo_path FROM company_profile WHERE id=1")
+        if res and res[0][0]:
+            path = res[0][0]
+            if path.startswith("http"): return path
+            return get_base64_image(path)
+    except: pass
+    return "https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png"
+
 def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
     SMTP_SERVER = "mail.ersanmakina.net"
     SMTP_PORT = 587
@@ -33,20 +52,8 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
     msg['From'] = f"Ersan Makine B2B <{SENDER_EMAIL}>"
     msg['To'] = to_email
     msg['Subject'] = subject
-    
-    body = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; color: #333;">
-        <h2 style="color: #0f172a;">Ersan Makine B2B Portalı</h2>
-        <p>Merhaba,</p>
-        <p>Sistem üzerinden yapılan işlem için gereken güvenlik kodunuz aşağıdadır:</p>
-        <div style="background-color: #f1f5f9; padding: 15px; border-left: 5px solid #3b82f6; font-size: 24px; font-weight: bold; letter-spacing: 5px;">
-            {code}
-        </div>
-    </body>
-    </html>
-    """
-    msg.attach(MIMEText(body, 'html', 'utf-8'))
+    body = f"Doğrulama Kodunuz: {code}"
+    msg.attach(MIMEText(body, 'plain'))
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
@@ -57,7 +64,7 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
     except: return False
 
 # =====================================================================
-# BAĞIMSIZ "users.db" VERİTABANI YÖNETİMİ
+# VERİTABANI İNŞASI VE KULLANICI YÖNETİMİ
 # =====================================================================
 def exec_user_query(query, params=()):
     conn = sqlite3.connect('users.db')
@@ -75,6 +82,7 @@ def get_user_query(query, params=()):
     return res
 
 def init_advanced_b2b():
+    # Kullanıcılar Tablosu
     exec_user_query("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         email TEXT UNIQUE, password TEXT, company_name TEXT, 
@@ -91,6 +99,14 @@ def init_advanced_b2b():
     if "address_full" not in cols: cursor.execute("ALTER TABLE users ADD COLUMN address_full TEXT")
     conn.commit()
     conn.close()
+
+    # Sistem Genel Ayarları (Logo vb.)
+    database.exec_query("""CREATE TABLE IF NOT EXISTS company_profile (
+        id INTEGER PRIMARY KEY CHECK (id = 1), company_name TEXT, logo_path TEXT)""")
+    
+    check = database.get_query("SELECT id FROM company_profile WHERE id=1")
+    if not check:
+        database.exec_query("INSERT INTO company_profile (id, logo_path) VALUES (1, 'https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png')")
 
     admin_check = get_user_query("SELECT id FROM users WHERE email='admin@ersanmakina.net'")
     if not admin_check:
@@ -132,16 +148,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# HARİKA GİRİŞ EKRANI (LOGIN UI)
+# GİRİŞ EKRANI (DİNAMİK SİSTEM LOGOLU)
 # =====================================================================
 if not st.session_state.logged_in:
     
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
     
     with col_main:
-        st.markdown("""
+        sys_logo = get_system_logo()
+        st.markdown(f"""
             <div style='text-align: center; padding: 20px 0 10px 0;'>
-                <img src="https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png" style="max-width: 220px; margin-bottom: 15px;">
+                <img src="{sys_logo}" style="max-height: 80px; margin-bottom: 15px; object-fit: contain;">
                 <h2 style='color: #0f172a; font-weight: 800; font-size: 24px; margin:0;'>B2B Bayi Portalı</h2>
                 <p style='color: #64748b; font-size: 14px;'>Sisteme erişmek için bilgilerinizi giriniz.</p>
             </div>
@@ -245,7 +262,12 @@ if not st.session_state.logged_in:
 # TEMİZ VE TEKİL YAN MENÜ
 # =====================================================================
 with st.sidebar:
-    st.image("https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png", use_container_width=True)
+    # Yan menüdeki logoyu da dinamik yapıyoruz
+    st.markdown(f"""
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <img src="{get_system_logo()}" style="max-height: 60px; object-fit: contain;">
+        </div>
+    """, unsafe_allow_html=True)
     
     role_map = {"admin": "Yönetici", "dealer": "Satıcı Bayi", "manufacturer": "Üretici"}
     r_text = role_map.get(st.session_state.user_role, "Kullanıcı")
@@ -300,11 +322,15 @@ if menu == ":house: Dashboard":
                 df_dash["Tarih"] = pd.to_datetime(df_dash["Tarih"], dayfirst=True, errors='coerce')
                 chart_data = df_dash.dropna(subset=['Tarih']).groupby(df_dash["Tarih"].dt.date)["Tutar"].sum()
                 st.line_chart(chart_data)
+            else:
+                st.info("Trend grafiği için henüz yeterli veri yok.")
         
         with col_status:
             st.subheader(":clipboard: Durum Dağılımı")
             if not df_dash.empty:
                 st.bar_chart(df_dash["Durum"].value_counts())
+            else:
+                st.info("Dağılım için henüz veri yok.")
 
         st.subheader(":arrows_counterclockwise: Son Tekliflerin Durumunu Yönet")
         recent_offers = database.get_query("""
@@ -312,37 +338,67 @@ if menu == ":house: Dashboard":
             FROM offers o JOIN customers c ON o.customer_id = c.id JOIN models m ON o.model_id = m.id 
             ORDER BY o.id DESC LIMIT 10""")
         
-        for oid, cust, mod, price, stat in recent_offers:
-            with st.container(border=True):
-                ca, cb, cc = st.columns([3, 1, 1])
-                ca.markdown(f"**{cust}**<br><small>{mod} | {price:,.2f}</small>", unsafe_allow_html=True)
-                new_stat = cb.selectbox("Durum", ["Beklemede", "Onaylandı", "Reddedildi"], index=["Beklemede", "Onaylandı", "Reddedildi"].index(stat if stat in ["Beklemede", "Onaylandı", "Reddedildi"] else "Beklemede"), key=f"stat_{oid}", label_visibility="collapsed")
-                if cc.button("Güncelle", key=f"btn_{oid}", use_container_width=True):
-                    database.exec_query("UPDATE offers SET status=? WHERE id=?", (new_stat, oid))
-                    st.toast(f"Teklif #{oid} güncellendi!")
-                    st.rerun()
+        if recent_offers:
+            for oid, cust, mod, price, stat in recent_offers:
+                with st.container(border=True):
+                    ca, cb, cc = st.columns([3, 1, 1])
+                    ca.markdown(f"**{cust}**<br><small>{mod} | {price:,.2f}</small>", unsafe_allow_html=True)
+                    new_stat = cb.selectbox("Durum", ["Beklemede", "Onaylandı", "Reddedildi"], index=["Beklemede", "Onaylandı", "Reddedildi"].index(stat if stat in ["Beklemede", "Onaylandı", "Reddedildi"] else "Beklemede"), key=f"stat_{oid}", label_visibility="collapsed")
+                    if cc.button("Güncelle", key=f"btn_{oid}", use_container_width=True):
+                        database.exec_query("UPDATE offers SET status=? WHERE id=?", (new_stat, oid))
+                        st.toast(f"Teklif #{oid} güncellendi!")
+                        st.rerun()
+        else:
+            st.info("Sistemde henüz oluşturulmuş bir teklif bulunmuyor.")
     else:
         st.info("Bayi portalına hoş geldiniz. Sol menüden işlemlere başlayabilirsiniz.")
 
 elif menu == ":gear: Profil Ayarlarım":
     st.header(":gear: Kurumsal Profil Ayarları")
     u_data = get_user_query("SELECT company_name, email, phone, website, address_full, logo_path FROM users WHERE id=?", (st.session_state.user_id,))[0]
-    with st.form("p_form"):
-        c1, c2 = st.columns(2)
-        p_name = c1.text_input("Firma Adı", value=u_data[0])
-        p_web = c2.text_input("Web Sitesi", value=u_data[3] if u_data[3] else "")
-        p_phone = c1.text_input("Telefon", value=u_data[2] if u_data[2] else "")
-        p_adr = st.text_area("Açık Adres", value=u_data[4] if u_data[4] else "")
-        up_logo = st.file_uploader("Kurumsal Logo (PNG/JPG)", type=['png','jpg','jpeg'])
-        if st.form_submit_button(":white_check_mark: GÜNCELLE", type="primary"):
-            f_logo = u_data[5]
-            if up_logo:
-                if not os.path.exists("images"): os.makedirs("images")
-                f_logo = f"images/logo_{st.session_state.user_id}.png"
-                with open(f_logo, "wb") as f: f.write(up_logo.getbuffer())
-            exec_user_query("UPDATE users SET company_name=?, website=?, phone=?, address_full=?, logo_path=? WHERE id=?", (p_name, p_web, p_phone, p_adr, f_logo, st.session_state.user_id))
-            st.success("Profil güncellendi!")
-            st.rerun()
+    
+    with st.expander("👤 Bayi / Kişisel Bilgilerim", expanded=True):
+        st.info("Buraya gireceğiniz bilgiler tekliflerinizdeki kendi antetiniz olacaktır.")
+        with st.form("p_form"):
+            c1, c2 = st.columns(2)
+            p_name = c1.text_input("Firma Adı", value=u_data[0])
+            p_web = c2.text_input("Web Sitesi", value=u_data[3] if u_data[3] else "")
+            p_phone = c1.text_input("Telefon", value=u_data[2] if u_data[2] else "")
+            p_adr = st.text_area("Açık Adres", value=u_data[4] if u_data[4] else "")
+            up_logo = st.file_uploader("Tekliflerde Görünecek Logonuz", type=['png','jpg','jpeg'])
+            if st.form_submit_button(":white_check_mark: PROFİLİ GÜNCELLE", type="primary"):
+                f_logo = u_data[5]
+                if up_logo:
+                    if not os.path.exists("images"): os.makedirs("images")
+                    f_logo = f"images/logo_user_{st.session_state.user_id}.png"
+                    with open(f_logo, "wb") as f: f.write(up_logo.getbuffer())
+                exec_user_query("UPDATE users SET company_name=?, website=?, phone=?, address_full=?, logo_path=? WHERE id=?", (p_name, p_web, p_phone, p_adr, f_logo, st.session_state.user_id))
+                st.success("Profiliniz başarıyla güncellendi!")
+                st.rerun()
+
+    # --- SADECE YÖNETİCİYE ÖZEL ALAN ---
+    if st.session_state.user_role == "admin":
+        st.write("")
+        with st.expander("🚀 SİSTEM GENEL AYARLARI (Sadece Yönetici)", expanded=True):
+            st.info("Buradan yükleyeceğiniz logo, hem giriş sayfasındaki hem de yan menüdeki ana logoyu değiştirecektir.")
+            with st.form("sys_form"):
+                try:
+                    current_sys_logo = database.get_query("SELECT logo_path FROM company_profile WHERE id=1")[0][0]
+                    st.write(f"Mevcut Logo Yolu: `{current_sys_logo}`")
+                except: pass
+                
+                new_sys_logo = st.file_uploader("Yeni Sistem Logosu Seçin", type=['png','jpg','jpeg'])
+                
+                if st.form_submit_button(":rocket: SİSTEM LOGOSUNU DEĞİŞTİR"):
+                    if new_sys_logo:
+                        if not os.path.exists("images"): os.makedirs("images")
+                        sys_path = f"images/system_logo_main.png"
+                        with open(sys_path, "wb") as f: f.write(new_sys_logo.getbuffer())
+                        database.exec_query("UPDATE company_profile SET logo_path=? WHERE id=1", (sys_path,))
+                        st.success("Sistem logosu başarıyla değiştirildi!")
+                        st.rerun()
+                    else:
+                        st.warning("Lütfen bir görsel seçin.")
 
 elif menu == ":page_facing_up: Yeni Teklif Hazırla":
     offer_wizard.show_offer_wizard(st.session_state.user_id, st.session_state.user_role == "admin")
@@ -354,10 +410,10 @@ elif menu == ":clipboard: Geçmiş Tekliflerim":
     st.header(":clipboard: Geçmiş Tekliflerim")
     offers = database.get_query("SELECT offer_date, total_price, status FROM offers WHERE user_id=? ORDER BY id DESC", (st.session_state.user_id,))
     if offers: st.dataframe(pd.DataFrame(offers, columns=["Tarih", "Tutar", "Durum"]), use_container_width=True)
+    else: st.info("Henüz geçmiş bir teklifiniz bulunmuyor.")
 
 elif menu == ":package: Tüm Modelleri Yönet":
     model_management.show_product_management()
 
-# --- YENİ EKLENEN BAĞIMSIZ DOSYA YÖNLENDİRMESİ ---
 elif menu == ":office: Bayi Yönetimi":
     dealer_management.show_dealer_management()
