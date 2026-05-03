@@ -18,9 +18,6 @@ def init_wizard_tables():
         if "status" not in of_cols: database.exec_query("ALTER TABLE offers ADD COLUMN status TEXT DEFAULT 'Beklemede'")
     except: pass
 
-# =====================================================================
-# GÖMÜLÜ ÖNİZLEME MOTORU (BAYİ ANTETLİ VE SAYFALI)
-# =====================================================================
 def get_image_base64(img_path):
     if not img_path or not os.path.exists(img_path): return ""
     try:
@@ -34,7 +31,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     m_qty = conditions.get("machine_qty", 1)
     agreed_price = conditions.get("agreed_price", 0)
 
-    # --- BAYİ BİLGİLERİNİ ÇEK (ANTET İÇİN) ---
     try:
         conn = sqlite3.connect('users.db')
         u_info = conn.execute("SELECT company_name, logo_path, website, address_full, phone FROM users WHERE id=?", (user_id,)).fetchone()
@@ -63,12 +59,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         .elegant-conditions { margin-top: 40px; background: #f8fafc; padding: 25px; border-radius: 8px; border-left: 5px solid #3b82f6; page-break-inside: avoid; }
         .elegant-conditions td { border: none; padding: 6px 0; font-size: 13px; color: #475569; }
         .print-btn { background: #10b981; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 20px; font-weight: bold; text-transform: uppercase; }
-        @media print { 
-            .no-print { display: none !important; } 
-            .paper { box-shadow: none; padding: 0; margin: 0; } 
-            body { background: #fff; padding: 0; }
-            .page-break { page-break-before: always; }
-        }
+        @media print { .no-print { display: none !important; } .paper { box-shadow: none; padding: 0; margin: 0; } body { background: #fff; padding: 0; } .page-break { page-break-before: always; } }
     """
 
     html = f"""
@@ -77,11 +68,8 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         <div class="paper">
             <div class="header">
                 <div>{header_logo_html}</div>
-                <div style="text-align:right; font-size: 12px; color: #64748b;">
-                    <b>{comp_web}</b><br>Tarih: {tarih}<br>Teklif No: TR-{datetime.datetime.now().strftime("%y%m%d")}
-                </div>
+                <div style="text-align:right; font-size: 12px; color: #64748b;"><b>{comp_web}</b><br>Tarih: {tarih}<br>Teklif No: TR-{datetime.datetime.now().strftime("%y%m%d")}</div>
             </div>
-            
             <div style="text-align:center; padding: 15px 0;">
                 <img src="{get_image_base64(machine_img)}" style="max-height:280px; object-fit:contain;"><br>
                 <h2 style="color:#0f172a; margin:10px 0;">MODEL: {model}</h2>
@@ -91,53 +79,28 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             </div>
     """
 
-    # --- MAKİNE STANDART ÖZELLİKLERİ ---
     if specs and str(specs).strip():
         html += '<div class="section-title">🔍 MAKİNE STANDART ÖZELLİKLERİ</div><table>'
-        specs_list = [item for item in str(specs).split("||") if item.strip()]
-        for item in specs_list:
+        for item in [x for x in str(specs).split("||") if x.strip()]:
             parts = item.split("|")
             t_spec = parts[0].strip() if len(parts) > 0 else ""
             d_spec = parts[1].strip() if len(parts) > 1 else ""
-            i_spec = parts[2].strip() if len(parts) > 2 else ""
-            img_s_b64 = get_image_base64(i_spec)
-            img_tag = f'<img src="{img_s_b64}" style="max-width:60px; max-height:40px; border-radius:4px;">' if img_s_b64 else ""
-            html += f"""
-                <tr>
-                    <td width="10%" style="text-align:center;">{img_tag}</td>
-                    <td width="90%"><b>{t_spec}</b><br><small style="color:#64748b;">{d_spec}</small></td>
-                </tr>"""
+            img_tag = f'<img src="{get_image_base64(parts[2].strip() if len(parts)>2 else "")}" style="max-width:60px; max-height:40px; border-radius:4px;">' if (len(parts)>2 and parts[2].strip()) else ""
+            html += f'<tr><td width="10%" style="text-align:center;">{img_tag}</td><td width="90%"><b>{t_spec}</b><br><small style="color:#64748b;">{d_spec}</small></td></tr>'
         html += "</table>"
 
-    # --- SEÇİLEN OPSİYONLAR ---
     html += f"""
         <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
-        <table>
-            <tr style="background:#f8fafc;"><th>Açıklama</th><th style="text-align:center;">Adet</th><th style="text-align:right;">Tutar</th></tr>
-            <tr>
-                <td><b>{model} (Standart Donanım)</b></td>
-                <td style="text-align:center;">{m_qty}</td>
-                <td style="text-align:right;">{base_price*m_qty:,.2f} {m_currency}</td>
-            </tr>
-    """
+        <table><tr style="background:#f8fafc;"><th>Açıklama</th><th style="text-align:center;">Adet</th><th style="text-align:right;">Tutar</th></tr>
+        <tr><td><b>{model} (Standart Donanım)</b></td><td style="text-align:center;">{m_qty}</td><td style="text-align:right;">{base_price*m_qty:,.2f} {m_currency}</td></tr>"""
     for opt in selected_options:
-        html += f"""
-            <tr>
-                <td><b style="color:#2563eb;">+ {opt['n']}</b><br><small>{opt['d']}</small></td>
-                <td style="text-align:center;">{opt['q']}</td>
-                <td style="text-align:right; font-weight:bold;">{(opt['p']*opt['q']):,.2f} {m_currency}</td>
-            </tr>"""
+        html += f"<tr><td><b style='color:#2563eb;'>+ {opt['n']}</b><br><small>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
     html += "</table>"
 
-    # --- KİBAR TİCARİ ŞARTLAR ---
     html += f"""
         <div class="elegant-conditions">
-            <div style="font-size: 15px; font-weight: bold; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 12px;">
-                📌 Ticari ve Teknik Şartlar
-            </div>
-            <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">
-                Değerli müşterimiz, sizlere sunmuş olduğumuz bu teklif kapsamındaki teslimat ve ödeme detayları aşağıdadır:
-            </p>
+            <div style="font-size: 15px; font-weight: bold; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 12px;">📌 Ticari ve Teknik Şartlar</div>
+            <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">Değerli müşterimiz, sizlere sunmuş olduğumuz bu teklif kapsamındaki teslimat ve ödeme detayları aşağıdadır:</p>
             <table>
                 <tr><td width="30%"><b>Teslimat Şekli:</b></td><td style="color:#ea580c; font-weight:bold;">{conditions.get('delivery_type','')}</td></tr>
                 <tr><td><b>Teslim Süresi:</b></td><td>{conditions.get('delivery_time','')}</td></tr>
@@ -150,14 +113,12 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             <div style="font-size:15px; font-weight:bold; color:#ea580c; text-transform:uppercase;">Genel Toplam (KDV Hariç)</div>
             <div class="total-price">{agreed_price:,.2f} {m_currency}</div>
         </div>
-        <div style="margin-top:40px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px;">
-            {comp_adr} | {comp_tel}
-        </div>
+        <div style="margin-top:40px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px;">{comp_adr} | {comp_tel}</div>
     </div></body></html>"""
     return html
 
 # =====================================================================
-# ANA UI YÖNETİMİ
+# ANA SİHİRBAZ YÖNETİCİSİ
 # =====================================================================
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
@@ -167,31 +128,28 @@ def show_offer_wizard(user_id, is_admin=False):
         st.session_state.wizard_data = {}
 
     my_custs = database.get_query("SELECT id, company_name FROM customers WHERE user_id=?", (user_id,)) if not is_admin else database.get_query("SELECT id, company_name FROM customers")
-    
     if not my_custs:
         st.warning(":warning: Lütfen önce 'Müşterilerim' menüsünden bir müşteri ekleyiniz.")
         return
 
-    # -----------------------------------------------------------------
-    # ADIM 1: MÜŞTERİ VE MAKİNE SEÇİMİ
-    # -----------------------------------------------------------------
+    # ADIM 1
     if st.session_state.wizard_step == 1:
+        # Eğer geçmiş teklif düzenlemesinden dönüldüyse hafızayı temizle
+        if 'edit_offer_id' in st.session_state: del st.session_state.edit_offer_id
+        for key in list(st.session_state.keys()):
+            if key.startswith("o_") or key.startswith("q_") or key == "temp_del_type": del st.session_state[key]
+
         st.markdown("### :sparkles: Yeni Teklif Başlat")
         with st.container(border=True):
             sc_name = st.selectbox("Müşteri Seçimi", [c[1] for c in my_custs])
             f_curr = st.selectbox("Para Birimi", ["USD", "EUR", "TRY"])
-            
             cats = database.get_query("SELECT name FROM categories")
-            cat_list = ["Tüm Kategoriler"] + [c[0] for c in cats]
-            f_cat = st.selectbox("Kategori", cat_list)
+            f_cat = st.selectbox("Kategori", ["Tüm Kategoriler"] + [c[0] for c in cats])
             
             m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount FROM models WHERE currency=?"
-            m_params = (f_curr,)
-            if f_cat != "Tüm Kategoriler":
-                m_query += " AND category=?"
-                m_params = (f_curr, f_cat)
-            
-            model_data = database.get_query(m_query, m_params)
+            m_params = [f_curr]
+            if f_cat != "Tüm Kategoriler": m_query += " AND category=?"; m_params.append(f_cat)
+            model_data = database.get_query(m_query, tuple(m_params))
 
             if model_data:
                 sel_m_name = st.selectbox("Makine Modeli", [m[1] for m in model_data])
@@ -200,49 +158,44 @@ def show_offer_wizard(user_id, is_admin=False):
                 if st.button("Sonraki Adım: Donanım ve Şartlar", type="primary", use_container_width=True):
                     m_info = [m for m in model_data if m[1] == sel_m_name][0]
                     st.session_state.wizard_data = {
-                        "cust_id": [c[0] for c in my_custs if c[1] == sc_name][0],
-                        "cust_name": sc_name, "m_id": m_info[0], "m_name": sel_m_name,
-                        "m_price": m_info[2], "m_curr": f_curr, "m_opts": m_info[3],
-                        "m_img": m_info[4], "m_specs": m_info[5], "m_disc": m_info[6], "qty": m_qty
+                        "cust_id": [c[0] for c in my_custs if c[1] == sc_name][0], "cust_name": sc_name, 
+                        "m_id": m_info[0], "m_name": sel_m_name, "m_price": m_info[2], "m_curr": f_curr, 
+                        "m_opts": m_info[3], "m_img": m_info[4], "m_specs": m_info[5], "m_disc": m_info[6], "qty": m_qty
                     }
-                    st.session_state.wizard_step = 2
-                    st.rerun()
+                    st.session_state.wizard_step = 2; st.rerun()
             else: st.error("Bu kriterlerde makine bulunamadı.")
 
-    # -----------------------------------------------------------------
-    # ADIM 2: DİNAMİK ÇALIŞMA ALANI (2 KOLON)
-    # -----------------------------------------------------------------
+    # ADIM 2 (DÜZENLEME DESTEKLİ)
     elif st.session_state.wizard_step == 2:
         wd = st.session_state.wizard_data
         col_opt, col_prev = st.columns([1.5, 2.5], gap="large")
         
         with col_opt:
-            if st.button("Makine Değiştir"): st.session_state.wizard_step = 1; st.rerun()
+            if 'edit_offer_id' in st.session_state:
+                st.info("✏️ **DÜZENLEME MODU:** Şu an geçmiş bir teklifi güncelliyorsunuz.")
+                if st.button("❌ İptal Et ve Sıfırdan Başla"): st.session_state.wizard_step = 1; st.rerun()
+            else:
+                if st.button("Makine Değiştir"): st.session_state.wizard_step = 1; st.rerun()
             
-            # 1. ŞARTLAR PANELİ
             with st.expander("SATIŞ ŞARTLARINI DÜZENLE", expanded=False):
-                d_type = st.selectbox("Teslimat Şekli", ["Antrepo Teslim", "Limandan Devir"], key="temp_del_type")
-                d_time = st.text_input("Teslim Süresi", "Sipariş onayından itibaren 90 iş günü")
-                ship = st.text_input("Nakliye / Lojistik", "Alıcıya Aittir")
-                pay = st.text_area("Ödeme Planı", "%30 Peşin, Kalanı Yükleme Öncesi")
-                bnk = st.text_area("Banka Bilgileri")
-                nts = st.text_area("Özel Notlar")
+                d_type = st.selectbox("Teslimat Şekli", ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Limandan Devir"], key="temp_del_type")
+                d_time = st.text_input("Teslim Süresi", wd.get("d_time", "Sipariş onayından itibaren 90 iş günü"))
+                ship = st.text_input("Nakliye / Lojistik", wd.get("ship", "Alıcıya Aittir"))
+                pay = st.text_area("Ödeme Planı", wd.get("pay", "%30 Peşin, Kalanı Yükleme Öncesi"))
+                bnk = st.text_area("Banka Bilgileri", wd.get("bnk", ""))
+                nts = st.text_area("Özel Notlar", wd.get("nts", ""))
 
-            # 2. DONANIMLAR PANELİ
             st.markdown("🔌 **UYUMLU DONANIMLAR**")
             multiplier = 1.0
             if "Liman" in d_type and wd["m_disc"]: multiplier = 1.0 - (float(wd["m_disc"]) / 100.0)
             
-            selected_options_for_db = []
-            engine_options_list = []
-            opts_total = 0.0
+            selected_options_for_db, engine_options_list, opts_total = [], [], 0.0
             
             with st.container(height=400):
                 if wd["m_opts"]:
                     ids = [x.strip() for x in str(wd["m_opts"]).split(",") if x.strip()]
                     placeholders = ",".join("?" * len(ids))
-                    compatible = database.get_query(f"SELECT id, opt_name, opt_price, opt_desc, opt_image FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC", tuple(ids))
-                    for o in compatible:
+                    for o in database.get_query(f"SELECT id, opt_name, opt_price, opt_desc, opt_image FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC", tuple(ids)):
                         d_o_p = o[2] * multiplier
                         with st.container(border=True):
                             c_chk, c_qty = st.columns([3, 1])
@@ -253,39 +206,35 @@ def show_offer_wizard(user_id, is_admin=False):
                                 selected_options_for_db.append({"id": o[0], "qty": q_o})
                                 engine_options_list.append({'n': o[1], 'p': d_o_p, 'q': q_o, 'i': o[4], 'd': o[3]})
 
-            # 3. FİYAT VE KAYIT
             st.markdown("---")
             sub = ((wd["m_price"] * multiplier) * wd["qty"]) + opts_total
-            disc_p = st.number_input("Özel İskonto Oranı (%)", 0.0, 100.0, 0.0, step=0.5)
+            disc_p = st.number_input("Özel İskonto Oranı (%)", 0.0, 100.0, float(wd.get("disc_p", 0.0)), step=0.5)
             agreed = sub * (1 - (disc_p/100.0))
             st.info(f"Sistem Toplamı: {agreed:,.2f} {wd['m_curr']}")
             
-            conds = {
-                "machine_qty": wd["qty"], "agreed_price": agreed, "subtotal_calculated": sub,
-                "delivery_type": d_type, "delivery_time": d_time, "shipping": ship, 
-                "payment_plan_text": pay, "bank": bnk, "notes": nts
-            }
+            conds = {"machine_qty": wd["qty"], "agreed_price": agreed, "subtotal_calculated": sub, "delivery_type": d_type, "delivery_time": d_time, "shipping": ship, "payment_plan_text": pay, "bank": bnk, "notes": nts, "discount_pct": disc_p}
 
-            if st.button("TEKLİFİ ARŞİVE KAYDET", type="primary", use_container_width=True):
+            # KAYDET VEYA GÜNCELLE BUTONU
+            btn_txt = "💾 TEKLİFİ GÜNCELLE (ÜZERİNE YAZ)" if 'edit_offer_id' in st.session_state else "💾 TEKLİFİ ARŞİVE KAYDET"
+            if st.button(btn_txt, type="primary", use_container_width=True):
                 try:
                     tarih = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
-                    database.exec_query("INSERT INTO offers (customer_id, model_id, total_price, user_id, offer_date, status, conditions) VALUES (?,?,?,?,?,?,?)",
-                                       (wd["cust_id"], wd["m_id"], agreed, user_id, tarih, "Beklemede", json.dumps(conds)))
-                    # Opsiyonları offer_items'a kaydet
-                    res_id = database.get_query("SELECT id FROM offers WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
-                    if res_id and selected_options_for_db:
-                        new_oid = res_id[0][0]
-                        for item in selected_options_for_db:
-                            database.exec_query("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", (new_oid, item["id"], item["qty"]))
-                    st.success("Başarıyla Arşivlendi!")
+                    if 'edit_offer_id' in st.session_state:
+                        database.exec_query("UPDATE offers SET total_price=?, conditions=? WHERE id=?", (agreed, json.dumps(conds), st.session_state.edit_offer_id))
+                        database.exec_query("DELETE FROM offer_items WHERE offer_id=?", (st.session_state.edit_offer_id,))
+                        for item in selected_options_for_db: database.exec_query("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", (st.session_state.edit_offer_id, item["id"], item["qty"]))
+                        st.success("Teklif Başarıyla Güncellendi!"); del st.session_state.edit_offer_id
+                    else:
+                        database.exec_query("INSERT INTO offers (customer_id, model_id, total_price, user_id, offer_date, status, conditions) VALUES (?,?,?,?,?,?,?)", (wd["cust_id"], wd["m_id"], agreed, user_id, tarih, "Beklemede", json.dumps(conds)))
+                        res_id = database.get_query("SELECT id FROM offers WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
+                        if res_id and selected_options_for_db:
+                            for item in selected_options_for_db: database.exec_query("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", (res_id[0][0], item["id"], item["qty"]))
+                        st.success("Başarıyla Arşivlendi!")
                     st.balloons()
                 except Exception as e: st.error(f"Kayıt Hatası: {e}")
 
-        # -----------------------------------------------------------------
-        # SAĞ KOLON: DEVASA CANLI ÖNİZLEME
-        # -----------------------------------------------------------------
+        # CANLI ÖNİZLEME
         with col_prev:
             st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 CANLI RAPOR VE PDF</div>", unsafe_allow_html=True)
             html = generate_embedded_html(wd["cust_name"], wd["m_name"], wd["m_price"]*multiplier, wd["m_img"], wd["m_specs"], engine_options_list, conds, wd["m_curr"], user_id)
-            with st.container(border=True):
-                components.html(html, height=900, scrolling=True)
+            with st.container(border=True): components.html(html, height=900, scrolling=True)
