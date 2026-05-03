@@ -261,7 +261,7 @@ with st.sidebar:
     
     menu_items = ["🏠 Dashboard", "📄 Yeni Teklif Hazırla", "👥 Müşterilerim", "📋 Geçmiş Tekliflerim", "👤 Profil Ayarlarım"]
     if st.session_state.user_role == "admin":
-        menu_items.extend(["🏢 Bayi Yönetimi", "📦 Tüm Modelleri Yönet"])
+        menu_items.extend(["🏢 Bayi Yönetimi", "📦 Tüm Modelleri Yönetttttt"])
         
     menu = st.radio("SİSTEM MENÜSÜ", menu_items, label_visibility="collapsed")
     
