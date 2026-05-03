@@ -43,13 +43,12 @@ def init_wizard_tables():
     except: pass
 
 # =====================================================================
-# GELİŞMİŞ VE AKILLI RESİM OKUMA MOTORU (ONARILDI)
+# GELİŞMİŞ VE AKILLI RESİM OKUMA MOTORU
 # =====================================================================
 def get_image_base64(path):
     if not path: return ""
     if str(path).startswith("http"): return path
     
-    # Windows yollarını çözer ve sadece dosya adını bulur
     base_name = posixpath.basename(ntpath.basename(path))
     paths_to_try = [path, f"images/{path}", f"../images/{path}", base_name, f"images/{base_name}"]
     
@@ -67,6 +66,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     tarih = datetime.datetime.now().strftime("%d.%m.%Y")
     m_qty = conditions.get("machine_qty", 1)
     agreed_price = conditions.get("agreed_price", 0)
+    teklif_no = f"TR-{datetime.datetime.now().strftime('%y%m%d')}"
 
     try: u_info = get_user_query("SELECT company_name, logo_path, website, address_full, phone FROM users WHERE id=?", (user_id,))[0]
     except: u_info = None
@@ -87,7 +87,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; font-size: 14px; color: #1e293b; background: #cbd5e1; margin:0; padding:15px; display: flex; flex-direction: column; align-items: center; }
-        .paper { background: #fff; width: 100%; max-width: 850px; min-height: 1120px; padding: 6%; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; }
+        .paper { background: #fff; width: 100%; max-width: 850px; min-height: 1120px; padding: 6%; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; margin-bottom: 40px; }
         .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .section-title { background: #f8fafc; color: #0f172a; padding: 10px 15px; font-weight: 800; font-size: 14px; margin-top: 30px; border-left: 5px solid #2563eb; text-transform: uppercase; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; word-wrap: break-word; }
@@ -97,26 +97,39 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         .elegant-conditions { margin-top: 35px; background: #f8fafc; padding: 20px; border-left: 5px solid #eab308; }
         .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; max-width: 850px; margin-bottom: 20px; font-weight: bold; }
         
+        .footer-info { margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px; }
+        
         @media (max-width: 650px) { 
             body { padding: 10px 5px; }
-            .paper { padding: 15px; min-height: auto; border-top-width: 5px; }
+            .paper { padding: 15px; min-height: auto; border-top-width: 5px; margin-bottom: 20px; }
             .header { flex-direction: column; text-align: center; }
             .header div { text-align: center !important; margin-bottom: 5px; }
             th, td { font-size: 12px; padding: 8px 4px; }
             .total-price { font-size: 24px; }
             .section-title { font-size: 13px; padding: 8px 10px; }
         }
-        @media print { .no-print { display: none !important; } .paper { box-shadow: none; border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; min-height: auto; } body { background: #fff; padding: 0; } }
+        @media print { 
+            .no-print { display: none !important; } 
+            .paper { box-shadow: none; border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; min-height: auto; } 
+            body { background: #fff; padding: 0; } 
+            .page-break { page-break-before: always; }
+        }
+    """
+
+    # Tekrar eden antet (Üst Başlık) HTML'i
+    page_header_html = f"""
+        <div class="header">
+            <div>{header_logo_html}</div>
+            <div style="text-align:right; font-size: 12px; color: #64748b;"><b>{comp_web}</b><br>Tarih: {tarih}<br>Teklif No: {teklif_no}</div>
+        </div>
     """
 
     html = f"""
     <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><body>
         <div class="no-print"><button class="print-btn" onclick="window.print()">🖨️ PDF OLARAK KAYDET / YAZDIR</button></div>
+        
         <div class="paper">
-            <div class="header">
-                <div>{header_logo_html}</div>
-                <div style="text-align:right; font-size: 12px; color: #64748b;"><b>{comp_web}</b><br>Tarih: {tarih}<br>Teklif No: TR-{datetime.datetime.now().strftime("%y%m%d")}</div>
-            </div>
+            {page_header_html}
             <div style="text-align:center; padding: 15px 0;">
                 <img src="{get_image_base64(machine_img)}" style="height:350px; max-width:100%; object-fit:contain;"><br>
                 <h2 style="color:#0f172a; margin:15px 0; font-size:24px; font-weight:900;">MODEL: {model}</h2>
@@ -134,7 +147,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             d_spec = parts[1].strip() if len(parts) > 1 else ""
             img_b64 = get_image_base64(parts[2].strip() if len(parts)>2 else "")
             
-            # GÖRSELLER BÜYÜTÜLDÜ VE ŞIKLAŞTIRILDI
             img_tag = f'<img src="{img_b64}" style="width:100%; max-width:120px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if img_b64 else "<span style='color:#cbd5e1;'>-</span>"
             html += f'<tr><td style="width:20%; text-align:center;">{img_tag}</td><td style="width:80%;"><b>{t_spec}</b><br><small style="color:#64748b; font-size:13px;">{d_spec}</small></td></tr>'
         html += "</table>"
@@ -149,6 +161,14 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         opt_img_tag = f'<img src="{opt_img_b64}" style="width:100%; max-width:120px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
         html += f"<tr><td style='text-align:center;'>{opt_img_tag}</td><td><b style='color:#2563eb; font-size:14px;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.3; margin-top:4px; color:#475569;'>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold; font-size:15px;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
     html += "</table>"
+
+    # --- BİRİNCİ SAYFAYI KAPAT, İKİNCİ SAYFAYI AÇ (SAYFA ATLATMA) ---
+    html += f"""
+        </div> 
+        
+        <div class="paper page-break">
+            {page_header_html}
+    """
 
     html += f"""
         <div class="elegant-conditions">
@@ -166,8 +186,9 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             <div style="font-size:14px; font-weight:bold; color:#ea580c; text-transform:uppercase;">Genel Toplam (KDV Hariç)</div>
             <div class="total-price">{agreed_price:,.2f} {m_currency}</div>
         </div>
-        <div style="margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px;">{comp_adr} | {comp_tel}</div>
+        <div class="footer-info">{comp_adr} | {comp_tel}</div>
         </div></body></html>"""
+    
     return html
 
 # =====================================================================
@@ -185,7 +206,6 @@ def show_offer_wizard(user_id, is_admin=False):
         st.warning(":warning: Lütfen önce 'Müşterilerim' menüsünden bir müşteri ekleyiniz.")
         return
 
-    # ADIM 1: TEMEL BİLGİLER
     if st.session_state.wizard_step == 1:
         if 'edit_offer_id' in st.session_state: del st.session_state.edit_offer_id
         for key in list(st.session_state.keys()):
@@ -217,11 +237,8 @@ def show_offer_wizard(user_id, is_admin=False):
                     st.session_state.wizard_step = 2; st.rerun()
             else: st.error("Bu kriterlerde makine bulunamadı.")
 
-    # ADIM 2: DÜZENLEME VE MANUEL FİYAT
     elif st.session_state.wizard_step == 2:
         wd = st.session_state.wizard_data
-        
-        # Sütun oranları sol panelin daha net görünmesi için 1.3 / 2.7 yapıldı
         col_opt, col_prev = st.columns([1.3, 2.7], gap="large")
         
         with col_opt:
@@ -263,7 +280,6 @@ def show_offer_wizard(user_id, is_admin=False):
                         for o in get_factory(f"SELECT id, opt_name, opt_price, opt_desc, opt_image FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC", tuple(ids)):
                             d_o_p = o[2] * multiplier
                             with st.container(border=True):
-                                # SOL MENÜDEKİ KÜÇÜK RESİMLER BÜYÜTÜLDÜ
                                 c_img, c_chk, c_qty = st.columns([1.5, 3, 1], vertical_alignment="center")
                                 
                                 img_b64 = get_image_base64(o[4])
@@ -280,9 +296,6 @@ def show_offer_wizard(user_id, is_admin=False):
                                     selected_options_for_db.append({"id": o[0], "qty": q_o})
                                     engine_options_list.append({'n': o[1], 'p': d_o_p, 'q': q_o, 'i': o[4], 'd': o[3]})
 
-            # -------------------------------------------------------------
-            # MANUEL FİYAT VE İSKONTO MOTORU
-            # -------------------------------------------------------------
             st.markdown("---")
             sub = ((wd["m_price"] * multiplier) * wd["qty"]) + opts_total
             
@@ -326,7 +339,6 @@ def show_offer_wizard(user_id, is_admin=False):
                     st.balloons()
                 except Exception as e: st.error(f"Kayıt Hatası: {e}")
 
-        # CANLI ÖNİZLEME BÖLÜMÜ
         with col_prev:
             st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 A4 RAPOR ÖNİZLEMESİ</div>", unsafe_allow_html=True)
             html = generate_embedded_html(wd["cust_name"], wd["m_name"], wd["m_price"]*multiplier, wd["m_img"], wd["m_specs"], engine_options_list, conds, wd["m_curr"], user_id)
