@@ -25,7 +25,7 @@ def hash_password(password):
 def generate_code():
     return str(random.randint(100000, 999999))
 
-# Görseli Base64 formatına çeviren yardımcı (HTML içinde yerel dosya göstermek için)
+# Görseli Base64 formatına çeviren yardımcı
 def get_base64_image(path):
     if path and os.path.exists(path):
         with open(path, "rb") as f:
@@ -82,7 +82,6 @@ def get_user_query(query, params=()):
     return res
 
 def init_advanced_b2b():
-    # Kullanıcılar Tablosu
     exec_user_query("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         email TEXT UNIQUE, password TEXT, company_name TEXT, 
@@ -100,7 +99,6 @@ def init_advanced_b2b():
     conn.commit()
     conn.close()
 
-    # Sistem Genel Ayarları (Logo vb.)
     database.exec_query("""CREATE TABLE IF NOT EXISTS company_profile (
         id INTEGER PRIMARY KEY CHECK (id = 1), company_name TEXT, logo_path TEXT)""")
     
@@ -135,20 +133,26 @@ if not st.session_state.logged_in:
             st.session_state.user_role = u_role if u_role == 'admin' else ("manufacturer" if u_type == "Üretici" else "dealer")
             st.session_state.user_email = u_email
 
-# --- GÜÇLÜ VE MODERN CSS ---
+# --- GÜÇLÜ, MODERN VE MOBİL UYUMLU CSS ---
 st.markdown("""
     <style>
     .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 8px; margin-bottom: 20px;}
-    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 20px; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; }
+    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 20px; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap; }
     .stTabs [aria-selected="true"] { background-color: #2563eb !important; color: white !important; border: 1px solid #2563eb; }
     .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; text-align: center; margin-bottom: 15px;}
     .stat-val { font-size: 28px; font-weight: 900; color: #1e293b; display: block; }
     .stat-title { color: #64748b; text-transform: uppercase; font-size: 11px; font-weight: 700; }
+    
+    /* MOBİL EKRAN (TELEFON) İÇİN ÖZEL SIKIŞTIRMA */
+    @media (max-width: 768px) {
+        .stTabs [data-baseweb="tab"] { padding: 8px 12px; font-size: 13px; }
+        .stTabs [data-baseweb="tab-list"] { gap: 4px; }
+    }
     </style>
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ EKRANI (DİNAMİK SİSTEM LOGOLU)
+# GİRİŞ EKRANI (DİNAMİK LOGOLU VE MOBİL OPTİMİZE)
 # =====================================================================
 if not st.session_state.logged_in:
     
@@ -156,15 +160,15 @@ if not st.session_state.logged_in:
     
     with col_main:
         sys_logo = get_system_logo()
-        # "B2B Bayi Portalı" yazısı buradan kaldırıldı. Sadece Logo ve alt bilgi metni var.
         st.markdown(f"""
             <div style='text-align: center; padding: 20px 0 10px 0;'>
-                <img src="{sys_logo}" style="max-height: 80px; margin-bottom: 15px; object-fit: contain;">
+                <img src="{sys_logo}" style="max-width: 100%; height: auto; max-height: 80px; margin-bottom: 15px; object-fit: contain;">
                 <p style='color: #64748b; font-size: 14px;'>Sisteme erişmek için bilgilerinizi giriniz.</p>
             </div>
         """, unsafe_allow_html=True)
 
-        tab_login, tab_register, tab_forgot = st.tabs([":key: Giriş Yap", ":memo: Yeni Kayıt", ":question: Şifremi Unuttum"])
+        # Sekme isimleri mobilde taşmaması için kısaltıldı
+        tab_login, tab_register, tab_forgot = st.tabs([":key: Giriş", ":memo: Kayıt", ":question: Şifre"])
         
         with tab_login:
             with st.container(border=True):
@@ -262,7 +266,6 @@ if not st.session_state.logged_in:
 # TEMİZ VE TEKİL YAN MENÜ
 # =====================================================================
 with st.sidebar:
-    # Yan menüdeki logoyu da dinamik yapıyoruz
     st.markdown(f"""
         <div style='text-align: center; margin-bottom: 20px;'>
             <img src="{get_system_logo()}" style="max-height: 60px; object-fit: contain;">
@@ -376,7 +379,6 @@ elif menu == ":gear: Profil Ayarlarım":
                 st.success("Profiliniz başarıyla güncellendi!")
                 st.rerun()
 
-    # --- SADECE YÖNETİCİYE ÖZEL ALAN ---
     if st.session_state.user_role == "admin":
         st.write("")
         with st.expander("🚀 SİSTEM GENEL AYARLARI (Sadece Yönetici)", expanded=True):
