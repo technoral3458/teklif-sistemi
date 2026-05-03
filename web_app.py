@@ -86,7 +86,9 @@ for key in ["user_id", "user_role", "user_email"]:
     if key not in st.session_state: st.session_state[key] = None
 if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
-if "main_menu" not in st.session_state: st.session_state.main_menu = ":house: Dashboard"
+
+# HATA ÇÖZÜMÜ: Ana Menü Değişkeni Değiştirildi
+if "active_tab" not in st.session_state: st.session_state.active_tab = ":house: Dashboard"
 
 if not st.session_state.logged_in:
     current_token = st.query_params.get("session_token")
@@ -185,7 +187,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# YAN MENÜ
+# GÜVENLİ YAN MENÜ (HATA ÇÖZÜMÜ)
 # =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 20px;'><img src='{get_system_logo()}' style='max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
@@ -195,10 +197,16 @@ with st.sidebar:
     menu_items = [":house: Dashboard", ":page_facing_up: Yeni Teklif Hazırla", ":busts_in_silhouette: Müşterilerim", ":clipboard: Geçmiş Tekliflerim", ":gear: Profil Ayarlarım"]
     if st.session_state.user_role == "admin": menu_items.extend([":office: Bayi Yönetimi", ":package: Tüm Modelleri Yönet"])
     
-    # Dinamik Menü Yönlendirmesi
-    menu = st.radio("SİSTEM MENÜSÜ", menu_items, label_visibility="collapsed", key="main_menu")
+    # HATA ÇÖZÜMÜ: Yönlendirme güvenli hale getirildi
+    try: m_idx = menu_items.index(st.session_state.active_tab)
+    except: m_idx = 0
+        
+    def _on_menu_change():
+        st.session_state.active_tab = st.session_state._menu_radio
+        
+    menu = st.radio("SİSTEM MENÜSÜ", menu_items, index=m_idx, key="_menu_radio", on_change=_on_menu_change, label_visibility="collapsed")
     
-    # Mobilde tıklanınca menüyü gizleyen kod
+    # Mobilde menü gizleme kodu
     components.html("""<script>const doc=window.parent.document;doc.querySelectorAll('div[data-testid="stSidebar"] .stRadio label').forEach(r=>{r.addEventListener('click',()=>{if(window.parent.innerWidth<=768){setTimeout(()=>{let b=doc.querySelector('div[data-testid="stSidebar"] + div');if(b)b.click();doc.dispatchEvent(new KeyboardEvent('keydown',{'key':'Escape'}));},100);}});});</script>""", height=0, width=0)
     
     st.markdown("---")
@@ -207,9 +215,9 @@ with st.sidebar:
         st.query_params.clear(); st.session_state.clear(); st.rerun()
 
 # =====================================================================
-# SAYFA İÇERİKLERİ
+# SAYFA İÇERİKLERİ VE YÖNLENDİRMELER
 # =====================================================================
-if st.session_state.main_menu == ":house: Dashboard":
+if st.session_state.active_tab == ":house: Dashboard":
     st.header(":bar_chart: Analiz Paneli")
     if st.session_state.user_role == "admin":
         offers_raw = database.get_query("SELECT total_price, status, offer_date FROM offers")
@@ -233,7 +241,7 @@ if st.session_state.main_menu == ":house: Dashboard":
                         st.toast(f"Teklif #{oid} güncellendi!"); st.rerun()
 
 # ---------------- TEKLİF DÜZENLEME MOTORU ----------------
-elif st.session_state.main_menu == ":clipboard: Geçmiş Tekliflerim":
+elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
     st.header(":clipboard: Geçmiş Tekliflerim")
     offers = database.get_query("""SELECT o.id, c.company_name, m.name, o.offer_date, o.total_price, o.status FROM offers o JOIN customers c ON o.customer_id = c.id JOIN models m ON o.model_id = m.id WHERE o.user_id=? ORDER BY o.id DESC""", (st.session_state.user_id,))
     
@@ -280,8 +288,10 @@ elif st.session_state.main_menu == ":clipboard: Geçmiş Tekliflerim":
                 st.session_state.edit_offer_id = off_id
                 st.session_state.wizard_step = 2
                 
-                # Sihirbaza Yönlendir
-                st.session_state.main_menu = ":page_facing_up: Yeni Teklif Hazırla"
+                # 5. SİHİRBAZA GÜVENLİ YÖNLENDİR (Hata veren yer burasıydı)
+                st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
+                if "_menu_radio" in st.session_state:
+                    del st.session_state["_menu_radio"]
                 st.rerun()
                 
             if c2.button(":wastebasket: Teklifi Sistemden Sil", use_container_width=True):
@@ -291,7 +301,7 @@ elif st.session_state.main_menu == ":clipboard: Geçmiş Tekliflerim":
     else:
         st.info("Henüz geçmiş bir teklifiniz bulunmuyor.")
 
-elif st.session_state.main_menu == ":gear: Profil Ayarlarım":
+elif st.session_state.active_tab == ":gear: Profil Ayarlarım":
     st.header(":gear: Kurumsal Profil Ayarları")
     u_data = get_user_query("SELECT company_name, email, phone, website, address_full, logo_path FROM users WHERE id=?", (st.session_state.user_id,))[0]
     with st.expander("👤 Bayi / Kişisel Bilgilerim", expanded=True):
@@ -322,11 +332,11 @@ elif st.session_state.main_menu == ":gear: Profil Ayarlarım":
                         database.exec_query("UPDATE company_profile SET logo_path=? WHERE id=1", (sys_path,))
                         st.success("Sistem logosu başarıyla değiştirildi!"); st.rerun()
 
-elif st.session_state.main_menu == ":page_facing_up: Yeni Teklif Hazırla":
+elif st.session_state.active_tab == ":page_facing_up: Yeni Teklif Hazırla":
     offer_wizard.show_offer_wizard(st.session_state.user_id, st.session_state.user_role == "admin")
-elif st.session_state.main_menu == ":busts_in_silhouette: Müşterilerim":
+elif st.session_state.active_tab == ":busts_in_silhouette: Müşterilerim":
     customer_pages.show_customer_management(st.session_state.user_id, st.session_state.user_role == "admin")
-elif st.session_state.main_menu == ":package: Tüm Modelleri Yönet":
+elif st.session_state.active_tab == ":package: Tüm Modelleri Yönet":
     model_management.show_product_management()
-elif st.session_state.main_menu == ":office: Bayi Yönetimi":
+elif st.session_state.active_tab == ":office: Bayi Yönetimi":
     dealer_management.show_dealer_management()
