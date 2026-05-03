@@ -164,7 +164,7 @@ if not st.session_state.logged_in:
             </div>
         """, unsafe_allow_html=True)
 
-        tab_login, tab_register, tab_forgot = st.tabs([":key: Giriş Yap", ":memo: Yeni Kayıt", ":question: Şifremi Unuttum"])
+        tab_login, tab_register, tab_forgot = st.tabs([":key: Giriş Yap", ":memo: Yeni Kayıt", ":question: Şifremi Unnnuttum"])
         
         with tab_login:
             with st.container(border=True):
