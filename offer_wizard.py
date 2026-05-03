@@ -186,7 +186,7 @@ def show_offer_wizard(user_id, is_admin=False):
             .stSelectbox label, .stTextInput label, .stNumberInput label, .stTextArea label {
                 font-size: 12px !important; font-weight: 600 !important; color: #475569 !important;
             }
-            .stCheckbox label { font-size: 14px !important; font-weight: 800 !important; }
+            .stToggle label { font-size: 13px !important; font-weight: 800 !important; color: #2563eb !important; }
             </style>
         """, unsafe_allow_html=True)
 
@@ -196,7 +196,7 @@ def show_offer_wizard(user_id, is_admin=False):
                 del st.session_state.edit_offer_id
                 st.session_state.wizard_data = {}
                 for key in list(st.session_state.keys()):
-                    if key.startswith("o_") or key.startswith("q_") or key == "temp_del_type":
+                    if key.startswith("o_") or key.startswith("q_") or key.startswith("tgl_") or key == "temp_del_type":
                         del st.session_state[key]
                 st.rerun()
 
@@ -250,7 +250,7 @@ def show_offer_wizard(user_id, is_admin=False):
 
         selected_options_for_db, engine_options_list, opts_total = [], [], 0.0
 
-        with st.container(border=True):
+        with st.container(height=450, border=True):
             if m_opts_str:
                 ids = [x.strip() for x in str(m_opts_str).split(",") if x.strip()]
                 if ids:
@@ -262,28 +262,32 @@ def show_offer_wizard(user_id, is_admin=False):
                         allow_qty = bool(o[5]) if len(o) > 5 and o[5] is not None else True
                         d_o_p = o_price * multiplier
 
-                        st.markdown("<div style='padding:15px 0; border-bottom:1px solid #e2e8f0;'>", unsafe_allow_html=True)
-                        
-                        img_b64 = get_image_base64(o_img)
-                        if img_b64:
-                            st.markdown(f'<img src="{img_b64}" style="width:100%; max-height:350px; object-fit:contain; border-radius:6px; border:2px solid #cbd5e1; margin-bottom:10px;">', unsafe_allow_html=True)
-                        else:
-                            st.markdown("<div style='width:100%; height:150px; background:#f1f5f9; border-radius:6px; border:2px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; margin-bottom:10px;'>Görsel Yok</div>", unsafe_allow_html=True)
-
-                        c_chk, c_qty = st.columns([3, 1], vertical_alignment="center")
-                        is_sel = c_chk.checkbox(f"{o_name}\n\n(+{d_o_p:,.0f} {m_curr})", key=f"o_{o_id}")
-
-                        if is_sel:
-                            if allow_qty:
-                                q_o = c_qty.number_input("Adet", 1, 100, 1, key=f"q_{o_id}", label_visibility="collapsed")
+                        # YENİ DİNAMİK "SEPETE EKLE" (TOGGLE) TASARIMI
+                        with st.container(border=True):
+                            c_img, c_info, c_act = st.columns([1.5, 3, 1.5], vertical_alignment="center")
+                            
+                            img_b64 = get_image_base64(o_img)
+                            if img_b64:
+                                c_img.markdown(f'<img src="{img_b64}" style="width:100%; max-height:80px; object-fit:contain; border-radius:6px; border:1px solid #e2e8f0; padding:2px;">', unsafe_allow_html=True)
                             else:
-                                q_o = 1
-                                c_qty.markdown("<div style='text-align:center; padding-top:8px; font-weight:bold; color:#64748b;'>1 Adet</div>", unsafe_allow_html=True)
-                                
-                            opts_total += (d_o_p * q_o)
-                            selected_options_for_db.append({"id": o_id, "qty": q_o})
-                            engine_options_list.append({'n': o_name, 'p': d_o_p, 'q': q_o, 'i': o_img, 'd': o_desc})
-                        st.markdown("</div>", unsafe_allow_html=True)
+                                c_img.markdown("<div style='width:100%; height:80px; background:#f8fafc; border-radius:6px; border:1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:11px;'>Görsel Yok</div>", unsafe_allow_html=True)
+
+                            c_info.markdown(f"<div style='font-size:14px; font-weight:800; color:#1e293b; line-height:1.2;'>{o_name}</div>", unsafe_allow_html=True)
+                            c_info.markdown(f"<div style='font-size:15px; font-weight:900; color:#ea580c; margin-top:5px;'>+{d_o_p:,.0f} {m_curr}</div>", unsafe_allow_html=True)
+
+                            # Sepete Ekle Switch'i (Toggle)
+                            is_sel = c_act.toggle("Sepete Ekle", key=f"tgl_{o_id}")
+
+                            if is_sel:
+                                if allow_qty:
+                                    q_o = c_act.number_input("Adet", 1, 100, 1, key=f"q_{o_id}", label_visibility="collapsed")
+                                else:
+                                    q_o = 1
+                                    c_act.markdown("<div style='text-align:center; padding:6px; margin-top:8px; background:#ecfdf5; color:#10b981; border:1px solid #a7f3d0; border-radius:4px; font-weight:bold; font-size:12px;'>Sabit 1 Adet</div>", unsafe_allow_html=True)
+                                    
+                                opts_total += (d_o_p * q_o)
+                                selected_options_for_db.append({"id": o_id, "qty": q_o})
+                                engine_options_list.append({'n': o_name, 'p': d_o_p, 'q': q_o, 'i': o_img, 'd': o_desc})
                 else:
                     st.info("Bu makineye tanımlı donanım bulunmuyor.")
 
