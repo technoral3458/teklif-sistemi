@@ -3,6 +3,7 @@ import database
 import customer_pages
 import model_management
 import offer_wizard
+import dealer_management  # <-- YENİ EKLENEN DOSYAMIZ
 import datetime
 import pandas as pd
 import hashlib
@@ -146,7 +147,6 @@ if not st.session_state.logged_in:
             </div>
         """, unsafe_allow_html=True)
 
-        # İkonlar metin koduyla çağırıldı, Türkçe karakterler eklendi
         tab_login, tab_register, tab_forgot = st.tabs([":key: Giriş Yap", ":memo: Yeni Kayıt", ":question: Şifremi Unuttum"])
         
         with tab_login:
@@ -271,7 +271,7 @@ with st.sidebar:
         st.rerun()
 
 # =====================================================================
-# SAYFA İÇERİKLERİ
+# SAYFA İÇERİKLERİ VE YÖNLENDİRMELER
 # =====================================================================
 if menu == ":house: Dashboard":
     st.header(":bar_chart: Analiz Paneli")
@@ -358,22 +358,6 @@ elif menu == ":clipboard: Geçmiş Tekliflerim":
 elif menu == ":package: Tüm Modelleri Yönet":
     model_management.show_product_management()
 
+# --- YENİ EKLENEN BAĞIMSIZ DOSYA YÖNLENDİRMESİ ---
 elif menu == ":office: Bayi Yönetimi":
-    st.header(":office: Üyelik Onay ve Yönetim Sistemi")
-    st.subheader(":hourglass_flowing_sand: Onay Bekleyenler")
-    pending = get_user_query("SELECT id, company_name, user_type, email, phone FROM users WHERE is_approved=0 AND is_verified=1 AND role!='admin'")
-    if pending:
-        for p_id, p_name, p_type, p_email, p_phone in pending:
-            with st.container(border=True):
-                col1, col2 = st.columns([4, 1])
-                col1.markdown(f"**Firma:** {p_name} ({p_type}) | **Tel:** {p_phone} | **E-Posta:** {p_email}")
-                if col2.button(":white_check_mark: Sistemi Aç", key=f"app_{p_id}", use_container_width=True):
-                    exec_user_query("UPDATE users SET is_approved=1 WHERE id=?", (p_id,))
-                    st.rerun()
-    else: st.info("Onay bekleyen başvuru yok.")
-    
-    st.markdown("---")
-    st.subheader(":white_check_mark: Aktif Bayiler")
-    active = get_user_query("SELECT id, company_name, email, phone FROM users WHERE is_approved=1 AND role!='admin' ORDER BY id DESC")
-    if active:
-        st.dataframe(pd.DataFrame(active, columns=["ID", "Firma", "E-Posta", "Telefon"]).drop(columns=["ID"]), use_container_width=True)
+    dealer_management.show_dealer_management()
