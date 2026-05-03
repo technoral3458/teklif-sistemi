@@ -88,6 +88,59 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         .paper { background: #fff; width: 100%; max-width: 850px; min-height: 1120px; padding: 6%; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; margin-bottom: 40px; }
         .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .section-title { background: #f8fafc; color: #0f172a; padding: 10px 15px; font-weight: 800; font-size: 14px; margin-top: 30px; border-left: 5px solid #2563eb; text-transform: uppercase; }
+
+        /* --- YENİ ÖZELLİKLER GRIDI (KART STİLİ) --- */
+        .specs-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* Otomatik 3 sütun */
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .spec-card {
+            background: #fff;
+            border: 1px solid #f1f5f9;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .spec-icon {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+        }
+        /* İkon yoksa yer tutucu */
+        .spec-icon-placeholder {
+            width: 40px;
+            height: 40px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content:center;
+            color:#94a3b8;
+            font-size:12px;
+        }
+        .spec-content {
+            display: flex;
+            flex-direction: column;
+        }
+        .spec-title {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+        .spec-detail {
+            font-size: 14px;
+            color: #1e293b;
+            font-weight: 800;
+            margin-top: 2px;
+        }
+        /* --- YENİ GRID STİLİ SONU --- */
+
         table { width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; word-wrap: break-word; }
         th, td { border-bottom: 1px solid #f1f5f9; padding: 12px; text-align: left; vertical-align: middle; }
         .price-box { background: #fffbeb; border: 1px solid #fde68a; padding: 20px; text-align: right; margin-top: 35px; border-radius: 6px; }
@@ -95,7 +148,13 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         .elegant-conditions { margin-top: 35px; background: #f8fafc; padding: 20px; border-left: 5px solid #eab308; }
         .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; max-width: 850px; margin-bottom: 20px; font-weight: bold; }
         .footer-info { margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px; }
-        @media print { .no-print { display: none !important; } .paper { box-shadow: none; border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; min-height: auto; } body { background: #fff; padding: 0; } .page-break { page-break-before: always; } }
+        
+        @media print { 
+            .no-print { display: none !important; } 
+            .paper { box-shadow: none; border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; min-height: auto; } 
+            body { background: #fff; padding: 0; } 
+            .page-break { page-break-before: always; }
+        }
     """
 
     page_header_html = f"""
@@ -120,28 +179,47 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             </div>
     """
 
+    # --- ÖZELLİKLER BÖLÜMÜNÜN YENİ GRID YAPISI ---
     if specs and str(specs).strip():
-        html += '<div class="section-title">🔍 MAKİNE STANDART ÖZELLİKLERİ</div><table>'
+        html += '<div class="section-title">🔍 MAKİNE STANDART ÖZELLİKLERİ</div><div class="specs-grid">'
+        # Veritabanındaki Tripletleri (Başlık|Detay|İkon||...) parçala
         for item in [x for x in str(specs).split("||") if x.strip()]:
             parts = item.split("|")
             t_spec = parts[0].strip() if len(parts) > 0 else ""
             d_spec = parts[1].strip() if len(parts) > 1 else ""
             img_b64 = get_image_base64(parts[2].strip() if len(parts)>2 else "")
-            
-            img_tag = f'<img src="{img_b64}" style="max-width:140px; max-height:80px; width:auto; height:auto; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if img_b64 else "<span style='color:#cbd5e1;'>-</span>"
-            html += f'<tr><td style="width:25%; text-align:center; vertical-align:middle;">{img_tag}</td><td style="width:75%; vertical-align:middle;"><b>{t_spec}</b><br><small style="color:#64748b; font-size:13px;">{d_spec}</small></td></tr>'
-        html += "</table>"
+
+            # İkon varsa resmi ekle, yoksa yer tutucuyu ekle
+            if img_b64:
+                img_tag = f'<img src="{img_b64}" class="spec-icon">'
+            else:
+                img_tag = '<div class="spec-icon-placeholder">-</div>'
+
+            # Her bir özellik için bir kart oluştur
+            html += f"""
+                <div class="spec-card">
+                    {img_tag}
+                    <div class="spec-content">
+                        <div class="spec-title">{t_spec}</div>
+                        <div class="spec-detail">{d_spec}</div>
+                    </div>
+                </div>
+            """
+        html += "</div>" # specs-grid sonu
 
     if selected_options:
+        # Donanımlar tablosu aynı kalıyor
         html += f"""
             <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
             <table><tr style="background:#f8fafc;"><th style="width:25%; text-align:center;">Görsel</th><th style="width:40%;">Açıklama</th><th style="width:10%; text-align:center;">Adet</th><th style="width:25%; text-align:right;">Tutar</th></tr>"""
+        
         for opt in selected_options:
             opt_img_b64 = get_image_base64(opt["i"])
             opt_img_tag = f'<img src="{opt_img_b64}" style="max-width:140px; max-height:80px; width:auto; height:auto; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
             html += f"<tr><td style='text-align:center; vertical-align:middle;'>{opt_img_tag}</td><td style='vertical-align:middle;'><b style='color:#2563eb; font-size:14px;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.3; margin-top:4px; color:#475569;'>{opt['d']}</small></td><td style='text-align:center; vertical-align:middle;'>{opt['q']}</td><td style='text-align:right; font-weight:bold; font-size:15px; vertical-align:middle;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
         html += "</table>"
 
+    # --- İKİNCİ SAYFAYA ATLA ---
     html += f"""
         </div> 
         <div class="paper page-break">
@@ -166,9 +244,15 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     
     return html
 
+# =====================================================================
+# YARDIMCI FONKSİYON
+# =====================================================================
 def get_index(lst, item, default=0):
     return lst.index(item) if item in lst else default
 
+# =====================================================================
+# ANA SİHİRBAZ YÖNETİCİSİ
+# =====================================================================
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
@@ -180,15 +264,18 @@ def show_offer_wizard(user_id, is_admin=False):
     is_edit = 'edit_offer_id' in st.session_state
     wd = st.session_state.get('wizard_data', {})
 
-    col_opt, col_prev = st.columns([1.6, 2.4], gap="large")
+    col_opt, col_prev = st.columns([1.3, 2.7], gap="large")
 
     with col_opt:
+        # Daha Kibar ve Kompakt Arayüz CSS'i
         st.markdown("""
             <style>
             .stSelectbox label, .stTextInput label, .stNumberInput label, .stTextArea label {
-                font-size: 12px !important; font-weight: 600 !important; color: #475569 !important;
+                font-size: 12px !important;
+                font-weight: 600 !important;
+                color: #475569 !important;
             }
-            .stCheckbox label { font-size: 14px !important; font-weight: 800 !important; }
+            .stCheckbox label { font-size: 13px !important; font-weight: 600 !important; }
             </style>
         """, unsafe_allow_html=True)
 
@@ -202,6 +289,7 @@ def show_offer_wizard(user_id, is_admin=False):
                         del st.session_state[key]
                 st.rerun()
 
+        # --- 1. MÜŞTERİ VE MAKİNE SEÇİMİ ---
         st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-bottom:8px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
         with st.container(border=True):
             c_names = [c[1] for c in my_custs]
@@ -230,8 +318,10 @@ def show_offer_wizard(user_id, is_admin=False):
 
             m_info = next(m for m in machines if m[1] == sel_m)
             m_id, m_name, m_price, m_opts_str, m_img, m_specs, m_disc, m_curr = m_info
+
             m_qty = st.number_input("Makine Adedi", 1, 100, wd.get("qty", 1))
 
+        # --- 2. SATIŞ ŞARTLARI ---
         st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-top:15px; margin-bottom:8px;'>2. SATIŞ ŞARTLARI</div>", unsafe_allow_html=True)
         with st.expander("Şartları Görüntüle / Düzenle", expanded=False):
             del_types = ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Limandan Devir", "Yurtiçi Teslim (Standart)"]
@@ -245,6 +335,7 @@ def show_offer_wizard(user_id, is_admin=False):
             bnk = st.text_area("Banka Bilgileri", wd.get("bnk", ""))
             nts = st.text_area("Özel Notlar", wd.get("nts", ""))
 
+        # --- 3. EKSTRA DONANIMLAR ---
         st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-top:15px; margin-bottom:8px;'>3. EKSTRA DONANIMLAR</div>", unsafe_allow_html=True)
         multiplier = 1.0
         if "Liman" in d_type and m_disc:
@@ -252,37 +343,29 @@ def show_offer_wizard(user_id, is_admin=False):
 
         selected_options_for_db, engine_options_list, opts_total = [], [], 0.0
 
-        with st.container(border=True):
+        with st.container(height=350, border=True):
             if m_opts_str:
                 ids = [x.strip() for x in str(m_opts_str).split(",") if x.strip()]
                 if ids:
                     placeholders = ",".join("?" * len(ids))
-                    opts = get_factory(f"SELECT id, opt_name, opt_price, opt_desc, opt_image, allow_qty FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC", tuple(ids))
-                    
+                    opts = get_factory(f"SELECT id, opt_name, opt_price, opt_desc, opt_image FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC", tuple(ids))
                     for o in opts:
-                        o_id = o[0]; o_name = o[1]; o_price = o[2]; o_desc = o[3]; o_img = o[4]
-                        allow_qty = bool(o[5]) if len(o) > 5 and o[5] is not None else True
+                        o_id, o_name, o_price, o_desc, o_img = o
                         d_o_p = o_price * multiplier
 
-                        st.markdown("<div style='padding:15px 0; border-bottom:1px solid #e2e8f0;'>", unsafe_allow_html=True)
-                        
+                        st.markdown("<div style='padding:5px 0; border-bottom:1px solid #f1f5f9;'>", unsafe_allow_html=True)
+                        c_img, c_chk, c_qty = st.columns([1.2, 3.5, 1.2], vertical_alignment="center")
+
                         img_b64 = get_image_base64(o_img)
                         if img_b64:
-                            # 350px YERİNE 200px OLARAK GÜNCELLENDİ
-                            st.markdown(f'<img src="{img_b64}" style="width:100%; max-height:200px; object-fit:contain; border-radius:6px; border:2px solid #cbd5e1; margin-bottom:10px;">', unsafe_allow_html=True)
+                            c_img.markdown(f'<img src="{img_b64}" style="width:100%; max-height:40px; object-fit:contain; border-radius:4px; border:1px solid #e2e8f0;">', unsafe_allow_html=True)
                         else:
-                            st.markdown("<div style='width:100%; height:150px; background:#f1f5f9; border-radius:6px; border:2px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; margin-bottom:10px;'>Görsel Yok</div>", unsafe_allow_html=True)
+                            c_img.markdown("<div style='text-align:center; color:#94a3b8; font-size:10px;'>-</div>", unsafe_allow_html=True)
 
-                        c_chk, c_qty = st.columns([3, 1], vertical_alignment="center")
-                        is_sel = c_chk.checkbox(f"{o_name}\n\n(+{d_o_p:,.0f} {m_curr})", key=f"o_{o_id}")
+                        is_sel = c_chk.checkbox(f"{o_name}\n(+{d_o_p:,.0f} {m_curr})", key=f"o_{o_id}")
 
                         if is_sel:
-                            if allow_qty:
-                                q_o = c_qty.number_input("Adet", 1, 100, 1, key=f"q_{o_id}", label_visibility="collapsed")
-                            else:
-                                q_o = 1
-                                c_qty.markdown("<div style='text-align:center; padding-top:8px; font-weight:bold; color:#64748b;'>1 Adet</div>", unsafe_allow_html=True)
-                                
+                            q_o = c_qty.number_input("Adet", 1, 100, 1, key=f"q_{o_id}", label_visibility="collapsed")
                             opts_total += (d_o_p * q_o)
                             selected_options_for_db.append({"id": o_id, "qty": q_o})
                             engine_options_list.append({'n': o_name, 'p': d_o_p, 'q': q_o, 'i': o_img, 'd': o_desc})
@@ -290,6 +373,7 @@ def show_offer_wizard(user_id, is_admin=False):
                 else:
                     st.info("Bu makineye tanımlı donanım bulunmuyor.")
 
+        # --- 4. FİYATLANDIRMA ---
         st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-top:15px; margin-bottom:8px;'>4. FİYATLANDIRMA VE KAYIT</div>", unsafe_allow_html=True)
         with st.container(border=True):
             sub = ((m_price * multiplier) * m_qty) + opts_total
@@ -340,6 +424,7 @@ def show_offer_wizard(user_id, is_admin=False):
                     st.balloons()
                 except Exception as e: st.error(f"Kayıt Hatası: {e}")
 
+    # SAĞ SÜTUN (CANLI ÖNİZLEME)
     with col_prev:
         st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 A4 RAPOR ÖNİZLEMESİ</div>", unsafe_allow_html=True)
         html = generate_embedded_html(sel_cust, m_name, m_price*multiplier, m_img, m_specs, engine_options_list, conds, m_curr, user_id)
