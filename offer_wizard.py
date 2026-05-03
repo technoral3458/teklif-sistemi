@@ -82,7 +82,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         except: pass
 
     logo_b64 = get_image_base64(comp_logo)
-    header_logo_html = f'<img src="{logo_b64}" style="max-height:70px;">' if logo_b64 else f'<div style="font-size:22px; font-weight:900; color:#1e293b;">{comp_name}</div>'
+    header_logo_html = f'<img src="{logo_b64}" style="max-height:70px; width:auto; object-fit:contain;">' if logo_b64 else f'<div style="font-size:22px; font-weight:900; color:#1e293b;">{comp_name}</div>'
 
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -129,7 +129,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         <div class="paper">
             {page_header_html}
             <div style="text-align:center; padding: 15px 0;">
-                <img src="{get_image_base64(machine_img)}" style="height:350px; max-width:100%; object-fit:contain;"><br>
+                <img src="{get_image_base64(machine_img)}" style="max-width:100%; max-height:350px; width:auto; height:auto; object-fit:contain; display:block; margin:0 auto;"><br>
                 <h2 style="color:#0f172a; margin:15px 0; font-size:24px; font-weight:900;">MODEL: {model}</h2>
                 <div style="display:inline-block; background:#f1f5f9; padding: 8px 20px; border-radius: 20px; font-size:15px; color:#475569;">
                     Sayın Yetkili: <b style="color:#0f172a;">{customer}</b>
@@ -145,12 +145,11 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             d_spec = parts[1].strip() if len(parts) > 1 else ""
             img_b64 = get_image_base64(parts[2].strip() if len(parts)>2 else "")
             
-            # GÖRSELLER BÜYÜTÜLDÜ (Kağıda sığacak en ideal maksimum genişlik)
-            img_tag = f'<img src="{img_b64}" style="width:100%; max-width:140px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if img_b64 else "<span style='color:#cbd5e1;'>-</span>"
-            html += f'<tr><td style="width:25%; text-align:center;">{img_tag}</td><td style="width:75%;"><b>{t_spec}</b><br><small style="color:#64748b; font-size:13px;">{d_spec}</small></td></tr>'
+            # ORANTI KORUYUCU (width:auto; height:auto; max-height/max-width sınırlaması)
+            img_tag = f'<img src="{img_b64}" style="max-width:140px; max-height:80px; width:auto; height:auto; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if img_b64 else "<span style='color:#cbd5e1;'>-</span>"
+            html += f'<tr><td style="width:25%; text-align:center; vertical-align:middle;">{img_tag}</td><td style="width:75%; vertical-align:middle;"><b>{t_spec}</b><br><small style="color:#64748b; font-size:13px;">{d_spec}</small></td></tr>'
         html += "</table>"
 
-    # EĞER EKSTRA DONANIM SEÇİLDİYSE BU BÖLÜMÜ GÖSTER
     if selected_options:
         html += f"""
             <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
@@ -158,11 +157,10 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         
         for opt in selected_options:
             opt_img_b64 = get_image_base64(opt["i"])
-            opt_img_tag = f'<img src="{opt_img_b64}" style="width:100%; max-width:140px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
-            html += f"<tr><td style='text-align:center;'>{opt_img_tag}</td><td><b style='color:#2563eb; font-size:14px;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.3; margin-top:4px; color:#475569;'>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold; font-size:15px;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
+            opt_img_tag = f'<img src="{opt_img_b64}" style="max-width:140px; max-height:80px; width:auto; height:auto; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
+            html += f"<tr><td style='text-align:center; vertical-align:middle;'>{opt_img_tag}</td><td style='vertical-align:middle;'><b style='color:#2563eb; font-size:14px;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.3; margin-top:4px; color:#475569;'>{opt['d']}</small></td><td style='text-align:center; vertical-align:middle;'>{opt['q']}</td><td style='text-align:right; font-weight:bold; font-size:15px; vertical-align:middle;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
         html += "</table>"
 
-    # --- İKİNCİ SAYFAYA ATLA ---
     html += f"""
         </div> 
         <div class="paper page-break">
@@ -197,7 +195,7 @@ def get_index(lst, item, default=0):
     return lst.index(item) if item in lst else default
 
 # =====================================================================
-# ANA SİHİRBAZ YÖNETİCİSİ (TEK SAYFA & KOMPAKT TASARIM)
+# ANA SİHİRBAZ YÖNETİCİSİ
 # =====================================================================
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
@@ -213,7 +211,6 @@ def show_offer_wizard(user_id, is_admin=False):
     col_opt, col_prev = st.columns([1.3, 2.7], gap="large")
 
     with col_opt:
-        # Daha Kibar ve Kompakt Arayüz CSS'i
         st.markdown("""
             <style>
             .stSelectbox label, .stTextInput label, .stNumberInput label, .stTextArea label {
@@ -304,7 +301,7 @@ def show_offer_wizard(user_id, is_admin=False):
 
                         img_b64 = get_image_base64(o_img)
                         if img_b64:
-                            c_img.markdown(f'<img src="{img_b64}" style="width:100%; max-height:40px; object-fit:contain; border-radius:4px; border:1px solid #e2e8f0;">', unsafe_allow_html=True)
+                            c_img.markdown(f'<img src="{img_b64}" style="max-width:100%; max-height:50px; width:auto; height:auto; object-fit:contain; border-radius:4px; border:1px solid #e2e8f0;">', unsafe_allow_html=True)
                         else:
                             c_img.markdown("<div style='text-align:center; color:#94a3b8; font-size:10px;'>-</div>", unsafe_allow_html=True)
 
