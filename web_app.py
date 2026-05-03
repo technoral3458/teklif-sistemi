@@ -6,16 +6,35 @@ from email.mime.multipart import MIMEMultipart
 
 st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon=":gear:", layout="wide", initial_sidebar_state="expanded")
 
+# --- GÜVENLİK VE MAİL FONKSİYONLARI ---
 def hash_password(password): return hashlib.sha256(str.encode(password)).hexdigest()
 def generate_code(): return str(random.randint(100000, 999999))
 
+def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
+    SMTP_SERVER = "mail.ersanmakina.net"; SMTP_PORT = 587
+    SENDER_EMAIL = "sefa@ersanmakina.net"; SENDER_PASSWORD = "Sev32881-"
+    msg = MIMEMultipart(); msg['From'] = f"Ersan Makine B2B <{SENDER_EMAIL}>"; msg['To'] = to_email; msg['Subject'] = subject
+    msg.attach(MIMEText(f"Sistem Doğrulama Kodunuz: {code}", 'plain'))
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls(); server.login(SENDER_EMAIL, SENDER_PASSWORD); server.send_message(msg); server.quit()
+        return True
+    except: return False
+
+# --- LOGO OKUMA MOTORU (ONARILDI) ---
 def get_base64_image(path):
     if not path: return ""
-    if os.path.exists(path) and os.path.isfile(path):
-        with open(path, "rb") as f: return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+    if path.startswith("http"): return path
+    
+    paths_to_try = [path, f"images/{path}", f"../images/{path}"]
+    for p in paths_to_try:
+        if os.path.exists(p) and os.path.isfile(p):
+            with open(p, "rb") as f: 
+                return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
     return ""
 
 def get_system_logo():
+    fallback_url = "https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png"
     try:
         conn = sqlite3.connect('factory_data.db', check_same_thread=False)
         res = conn.execute("SELECT logo_path FROM company_profile WHERE id=1").fetchall()
@@ -23,11 +42,12 @@ def get_system_logo():
         if res and res[0][0]:
             path = res[0][0]
             if path.startswith("http"): return path
-            return get_base64_image(path)
+            b64 = get_base64_image(path)
+            if b64: return b64
     except: pass
-    return "https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png"
+    return fallback_url
 
-# --- VERİTABANI TAMİRCİSİ (user_id ve status hatalarını otomatik çözer) ---
+# --- VERİTABANI TAMİRCİSİ ---
 def repair_databases():
     # Users DB
     conn = sqlite3.connect('users.db')
@@ -36,7 +56,7 @@ def repair_databases():
         conn.execute("""INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici')""", ("admin@ersanmakina.net", hash_password("20132017")))
     conn.commit(); conn.close()
 
-    # Sales DB (Eksik sütunları ekler)
+    # Sales DB
     conn = sqlite3.connect('sales_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS offers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, model_id INTEGER)""")
     cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
@@ -81,35 +101,112 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- GİRİŞ EKRANI ---
+# =====================================================================
+# GİRİŞ EKRANI (TAMAMEN ONARILDI)
+# =====================================================================
 if not st.session_state.logged_in:
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
     with col_main:
         sys_logo = get_system_logo()
         st.markdown(f"""<div style='text-align: center; padding: 20px 0 10px 0;'><img src="{sys_logo}" style="max-height: 80px; margin-bottom: 15px; object-fit: contain;"></div>""", unsafe_allow_html=True)
-        t_login, t_reg = st.tabs([":key: Giriş", ":memo: Kayıt"])
+        
+        # 3 SEKMELİ YAPI GERİ GELDİ
+        t_login, t_reg, t_forg = st.tabs([":key: Giriş", ":memo: Kayıt", ":question: Şifremi Unuttum"])
+        
         with t_login:
-            le = st.text_input("E-Posta Adresi").strip().lower()
-            lp = st.text_input("Şifre", type="password")
-            if st.button("SİSTEME GİRİŞ YAP", type="primary", use_container_width=True):
-                conn = sqlite3.connect('users.db')
-                user = conn.execute("SELECT id, user_type, is_approved, is_verified, role FROM users WHERE email=? AND password=?", (le, hash_password(lp))).fetchall()
-                if user:
-                    if user[0][3] == 0: st.warning("E-posta doğrulanmamış!")
-                    elif user[0][2] == 0: st.warning("Hesap onayı bekleniyor.")
-                    else:
-                        tok = str(uuid.uuid4())
-                        conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0][0]))
-                        conn.commit()
-                        st.query_params["session_token"] = tok
-                        st.session_state.logged_in, st.session_state.user_id, st.session_state.user_email = True, user[0][0], le
-                        st.session_state.user_role = user[0][4] if user[0][4] == 'admin' else ("manufacturer" if user[0][1] == "Üretici" else "dealer")
-                        st.rerun()
-                else: st.error("Hatalı e-posta veya şifre!")
-                conn.close()
+            with st.container(border=True):
+                le = st.text_input("E-Posta Adresi").strip().lower()
+                lp = st.text_input("Şifre", type="password")
+                rem = st.checkbox("Beni Hatırla", value=True) # BENİ HATIRLA GERİ GELDİ
+                
+                if st.button("SİSTEME GİRİŞ YAP", type="primary", use_container_width=True):
+                    conn = sqlite3.connect('users.db')
+                    user = conn.execute("SELECT id, user_type, is_approved, is_verified, role FROM users WHERE email=? AND password=?", (le, hash_password(lp))).fetchall()
+                    if user:
+                        if user[0][3] == 0: st.warning("E-posta doğrulanmamış!")
+                        elif user[0][2] == 0: st.warning("Hesap onayı bekleniyor.")
+                        else:
+                            tok = str(uuid.uuid4())
+                            conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0][0]))
+                            conn.commit()
+                            if rem: st.query_params["session_token"] = tok
+                            
+                            st.session_state.logged_in, st.session_state.user_id, st.session_state.user_email = True, user[0][0], le
+                            st.session_state.user_role = user[0][4] if user[0][4] == 'admin' else ("manufacturer" if user[0][1] == "Üretici" else "dealer")
+                            st.rerun()
+                    else: st.error("Hatalı e-posta veya şifre!")
+                    conn.close()
+
+        with t_reg:
+            with st.container(border=True):
+                if st.session_state.reg_step == 1:
+                    reg_type = st.selectbox("Faaliyet Türü", ["Satıcı (Bayi)", "Üretici"])
+                    reg_comp = st.text_input("Firma Tam Ünvanı *")
+                    reg_phone = st.text_input("Telefon *")
+                    reg_email = st.text_input("Kayıt E-Posta *").strip().lower()
+                    reg_pwd = st.text_input("Kayıt Şifre *", type="password")
+                    if st.button("Kayıt Ol", use_container_width=True):
+                        if all([reg_comp, reg_phone, reg_email, reg_pwd]):
+                            conn = sqlite3.connect('users.db')
+                            if conn.execute("SELECT id FROM users WHERE email=?", (reg_email,)).fetchall(): 
+                                st.error("E-posta kullanımda!")
+                            else:
+                                ver_code = generate_code()
+                                conn.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved) VALUES (?,?,?,?,?,?,0,0)", (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code))
+                                conn.commit()
+                                if send_email(reg_email, ver_code, "Kayıt Doğrulama Kodu"):
+                                    st.session_state.temp_email, st.session_state.reg_step = reg_email, 2; st.rerun()
+                                else: st.error("E-posta gönderilemedi.")
+                            conn.close()
+                        else: st.warning("(*) alanlar zorunludur.")
+                elif st.session_state.reg_step == 2:
+                    entered_code = st.text_input("Mailinize Gelen Kodu Girin", max_chars=6)
+                    if st.button("Onayla", type="primary", use_container_width=True):
+                        conn = sqlite3.connect('users.db')
+                        db_code = conn.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,)).fetchall()
+                        if db_code and db_code[0][0] == entered_code:
+                            conn.execute("UPDATE users SET is_verified=1, auth_code=NULL WHERE email=?", (st.session_state.temp_email,))
+                            conn.commit()
+                            st.session_state.reg_step = 1; st.success("Doğrulandı! Yönetici onayı sonrası giriş yapabilirsiniz.")
+                        else: st.error("Hatalı kod!")
+                        conn.close()
+
+        with t_forg:
+            with st.container(border=True):
+                if st.session_state.forgot_step == 1:
+                    f_email = st.text_input("Kayıtlı E-Posta Adresiniz").strip().lower()
+                    if st.button("Sıfırlama Kodu Gönder", use_container_width=True):
+                        conn = sqlite3.connect('users.db')
+                        user_exists = conn.execute("SELECT id FROM users WHERE email=?", (f_email,)).fetchone()
+                        if user_exists:
+                            reset_code = generate_code()
+                            conn.execute("UPDATE users SET auth_code=? WHERE email=?", (reset_code, f_email))
+                            conn.commit()
+                            if send_email(f_email, reset_code, "Ersan Makine - Şifre Sıfırlama"):
+                                st.session_state.temp_email = f_email
+                                st.session_state.forgot_step = 2
+                                st.rerun()
+                            else: st.error("E-posta sunucusu yanıt vermedi.")
+                        else: st.error("Sistemde böyle bir e-posta bulunamadı.")
+                        conn.close()
+                elif st.session_state.forgot_step == 2:
+                    f_code = st.text_input("Mailinize Gelen 6 Haneli Kod", max_chars=6)
+                    new_pwd = st.text_input("Yeni Şifre Belirleyin", type="password")
+                    if st.button("Şifremi Değiştir", type="primary", use_container_width=True):
+                        conn = sqlite3.connect('users.db')
+                        valid_code = conn.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,)).fetchone()
+                        if valid_code and valid_code[0] == f_code and len(new_pwd) > 3:
+                            conn.execute("UPDATE users SET password=?, auth_code=NULL WHERE email=?", (hash_password(new_pwd), st.session_state.temp_email))
+                            conn.commit()
+                            st.session_state.forgot_step = 1
+                            st.success("Şifreniz başarıyla değiştirildi! Giriş sekmesinden giriş yapabilirsiniz.")
+                        else: st.error("Hatalı kod veya çok kısa şifre!")
+                        conn.close()
     st.stop()
 
-# --- SIDEBAR VE NAVİGASYON ---
+# =====================================================================
+# SIDEBAR VE SAYFA YÖNLENDİRİCİ MOTORU
+# =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 20px;'><img src='{get_system_logo()}' style='max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
     r_text = {"admin": "Yönetici", "dealer": "Satıcı Bayi", "manufacturer": "Üretici"}.get(st.session_state.user_role, "Kullanıcı")
@@ -129,7 +226,6 @@ with st.sidebar:
         conn.commit(); conn.close()
         st.query_params.clear(); st.session_state.clear(); st.rerun()
 
-# --- SAYFA YÖNLENDİRİCİ ---
 if st.session_state.active_tab == "PROFORMA":
     proforma_invoice.show_proforma(st.session_state.proforma_id, st.session_state.user_id)
 elif st.session_state.active_tab == ":busts_in_silhouette: Müşterilerim":
