@@ -29,7 +29,6 @@ def exec_factory(query, params=()):
     except Exception as e:
         st.error(f"Veritabanı Yazma Hatası: {e}")
 
-# Görseli Base64'e Çevir (Küçük Resimler İçin)
 def get_image_base64(img_path):
     if not img_path: return ""
     paths_to_try = [img_path, f"images/{img_path}", f"../images/{img_path}"]
@@ -73,11 +72,11 @@ def show_list_view():
         col_title, col_add = st.columns([3, 1])
         col_title.subheader("Kayıtlı Makineler")
         if col_add.button("➕ YENİ MAKİNE EKLE", type="primary", use_container_width=True):
+            st.session_state.form_loaded = False # Yeni forma girerken hafızayı temizle
             st.session_state.mod_view_mode = "add"
             st.rerun()
 
         st.markdown("---")
-        
         mods = get_factory("SELECT id, name, category, base_price, currency, image_path FROM models ORDER BY category ASC, name ASC")
         if mods:
             df_mods = pd.DataFrame(mods, columns=["id", "name", "category", "price", "currency", "image"])
@@ -86,51 +85,39 @@ def show_list_view():
             for cat in categories:
                 with st.expander(f"📁 {cat}", expanded=True):
                     cat_mods = df_mods[df_mods['category'] == cat].reset_index(drop=True)
-                    
-                    # 3'LÜ GRID (IZGARA) SİSTEMİ MANTIĞI
                     for i in range(0, len(cat_mods), 3):
                         cols = st.columns(3, gap="medium")
                         for j in range(3):
                             if i + j < len(cat_mods):
                                 row = cat_mods.iloc[i + j]
-                                # HATA ÇÖZÜMÜ: Pandas ID'si saf rakama çevrildi.
                                 safe_mod_id = int(row['id']) 
                                 
                                 with cols[j].container(border=True):
-                                    # Yüksek ve Net Görsel Alanı
                                     img_b64 = get_image_base64(row['image'])
-                                    if img_b64:
-                                        st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:180px; object-fit:contain; margin-bottom:15px;"></div>', unsafe_allow_html=True)
-                                    else:
-                                        st.markdown("<div style='height:180px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>Görsel Yok</div>", unsafe_allow_html=True)
+                                    if img_b64: st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:180px; object-fit:contain; margin-bottom:15px;"></div>', unsafe_allow_html=True)
+                                    else: st.markdown("<div style='height:180px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>Görsel Yok</div>", unsafe_allow_html=True)
                                     
-                                    # Başlık ve Fiyat Alanı
                                     st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{row['name']}'>{row['name']}</h4>", unsafe_allow_html=True)
                                     st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:18px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
                                     
-                                    # Yan Yana 3 Aksiyon Butonu
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
-                                    
-                                    # 1. DÜZENLEME
                                     if btn_c1.button("✏️", key=f"e_{safe_mod_id}", help="Düzenle", use_container_width=True):
                                         st.session_state.edit_mod_id = safe_mod_id
+                                        st.session_state.form_loaded = False
                                         st.session_state.mod_view_mode = "edit"
                                         st.rerun()
                                         
-                                    # 2. ÇOĞALTMA / KOPYALAMA
                                     if btn_c2.button("📄", key=f"c_{safe_mod_id}", help="Kopyala", use_container_width=True):
                                         m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos FROM models WHERE id=?", (safe_mod_id,))[0]
                                         exec_factory("""INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos) 
                                                         VALUES (?,?,?,?,?,?,?,?,?,?)""", 
                                                      (m_data[0] + " (Kopya)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9]))
-                                        st.success("Makine başarıyla çoğaltıldı!"); st.rerun()
+                                        st.success("Makine kopyalandı!"); st.rerun()
                                         
-                                    # 3. SİLME
                                     if btn_c3.button("🗑️", key=f"d_{safe_mod_id}", help="Sil", use_container_width=True):
                                         exec_factory("DELETE FROM models WHERE id=?", (safe_mod_id,))
                                         st.error("Makine silindi!"); st.rerun()
-        else:
-            st.info("Sistemde henüz bir makine bulunmuyor.")
+        else: st.info("Sistemde henüz bir makine bulunmuyor.")
 
     with tab_opt:
         st.subheader("Kayıtlı Donanım Listesi")
@@ -143,7 +130,6 @@ def show_list_view():
                 exec_factory("DELETE FROM options WHERE id=?", (del_opt_id.split(" - ")[0],))
                 st.success("Silindi!"); st.rerun()
         else: st.info("Sistemde kayıtlı donanım bulunamadı.")
-        
         with st.expander("➕ Yeni Donanım Ekle"):
             with st.form("new_opt"):
                 o_name = st.text_input("Donanım Adı")
@@ -171,77 +157,157 @@ def show_list_view():
             with st.form("new_cat"):
                 n_cat = st.text_input("Kategori Adı")
                 if st.form_submit_button("Ekle") and n_cat:
-                    try:
-                        exec_factory("INSERT INTO categories (name) VALUES (?)", (n_cat,))
-                        st.rerun()
+                    try: exec_factory("INSERT INTO categories (name) VALUES (?)", (n_cat,)); st.rerun()
                     except: st.error("Bu kategori zaten var!")
 
 # =====================================================================
-# GÖRÜNÜM 2: TAM SAYFA EKLEME / DÜZENLEME FORMU
+# GÖRÜNÜM 2: GELİŞMİŞ VE DİNAMİK TAM SAYFA FORM
 # =====================================================================
 def show_form_view(mode="add", mod_id=None):
+    # Üst Bar ve Geri Dönüş
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
     if col_back.button("🔙 Listeye Dön", use_container_width=True):
         st.session_state.mod_view_mode = "list"
         st.rerun()
     
     is_edit = (mode == "edit" and mod_id is not None)
-    col_title.header("✏️ Makineyi Düzenle" if is_edit else "✨ Yeni Makine Ekle")
+    col_title.header("✏️ Makine Kartı Düzenleyici" if is_edit else "✨ Yeni Makine Kartı Oluştur")
     st.markdown("---")
 
-    existing_data = {}
-    if is_edit:
-        # mod_id'nin tam olarak eşleştiğine emin olmak için integer kontrolü
-        res = get_factory("SELECT name, base_price, currency, category, port_discount, image_path, specs, compatible_options FROM models WHERE id=?", (int(mod_id),))
-        if res:
+    # --- 1. HAFIZA (STATE) YÖNETİMİ ---
+    # Form ilk kez açıldığında veritabanından verileri çekip hafızaya alıyoruz.
+    if not st.session_state.get("form_loaded", False):
+        st.session_state.form_loaded = True
+        
+        cats_list = [c[1] for c in get_factory("SELECT id, name FROM categories")]
+        st.session_state.f_cats_list = cats_list if cats_list else ["Diğer Makinalar"]
+        
+        if is_edit:
+            res = get_factory("SELECT name, base_price, currency, category, port_discount, image_path, specs, compatible_options FROM models WHERE id=?", (int(mod_id),))
             r = res[0]
-            existing_data = {"name": r[0], "price": r[1], "curr": r[2], "cat": r[3], "disc": r[4], "img": r[5], "specs": r[6], "opts": str(r[7]).split(",") if r[7] else []}
+            st.session_state.f_name = r[0]
+            st.session_state.f_price = float(r[1])
+            st.session_state.f_curr = r[2]
+            st.session_state.f_cat = r[3]
+            st.session_state.f_disc = float(r[4])
+            st.session_state.f_img = r[5]
+            
+            # Specs'i parçalayıp dinamik satırlar için listeye çeviriyoruz
+            s_list = []
+            if r[6]:
+                for item in str(r[6]).split("||"):
+                    if item.strip():
+                        parts = item.split("|")
+                        s_list.append({
+                            "title": parts[0].strip() if len(parts) > 0 else "",
+                            "detail": parts[1].strip() if len(parts) > 1 else "",
+                            "img": parts[2].strip() if len(parts) > 2 else ""
+                        })
+            st.session_state.f_specs = s_list if s_list else [{"title": "", "detail": "", "img": ""}]
+            
+            # Donanımları parse et
+            st.session_state.f_opts = [x.strip() for x in str(r[7]).split(",") if x.strip()]
+        else:
+            st.session_state.f_name = ""
+            st.session_state.f_price = 0.0
+            st.session_state.f_curr = "USD"
+            st.session_state.f_cat = st.session_state.f_cats_list[0]
+            st.session_state.f_disc = 0.0
+            st.session_state.f_img = ""
+            st.session_state.f_specs = [{"title": "", "detail": "", "img": ""}]
+            st.session_state.f_opts = []
 
-    opts_avail = get_factory("SELECT id, opt_name FROM options")
-    opt_list_full = [f"{o[0]} - {o[1]}" for o in opts_avail]
+    # --- 2. PROFESYONEL SEKME (TAB) YAPISI ---
+    tab_genel, tab_teknik, tab_donanim = st.tabs(["📄 Genel Bilgiler", "⚙️ Teknik Özellikler", "🔌 Uyumlu Ekstra Donanımlar"])
     
-    pre_selected_opts = []
-    if is_edit and existing_data.get("opts"):
-        saved_ids = [x.strip() for x in existing_data["opts"] if x.strip()]
-        pre_selected_opts = [opt for opt in opt_list_full if opt.split(" - ")[0] in saved_ids]
+    # 2.A - GENEL BİLGİLER SEKME
+    with tab_genel:
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.session_state.f_name = st.text_input("Makine Adı *", value=st.session_state.f_name)
+            idx_cat = st.session_state.f_cats_list.index(st.session_state.f_cat) if st.session_state.f_cat in st.session_state.f_cats_list else 0
+            st.session_state.f_cat = st.selectbox("Kategori", st.session_state.f_cats_list, index=idx_cat)
+            
+            col_p, col_c = st.columns([3, 1])
+            st.session_state.f_price = col_p.number_input("Yurtiçi Fiyat *", min_value=0.0, value=st.session_state.f_price, step=100.0)
+            idx_curr = ["USD", "EUR", "TRY"].index(st.session_state.f_curr) if st.session_state.f_curr in ["USD", "EUR", "TRY"] else 0
+            st.session_state.f_curr = col_c.selectbox("Para Birimi", ["USD", "EUR", "TRY"], index=idx_curr)
+            
+            st.session_state.f_disc = st.number_input("Liman Teslim İskontosu (%)", min_value=0.0, max_value=100.0, value=st.session_state.f_disc)
+            st.session_state.f_img = st.text_input("Ana Resim Yolu (Örn: makine_resmi.png)", value=st.session_state.f_img)
+        
+        with c2:
+            st.markdown("**Görsel Önizleme**")
+            prev_img = get_image_base64(st.session_state.f_img)
+            if prev_img: st.markdown(f'<img src="{prev_img}" style="width:100%; border-radius:8px; border:1px solid #e2e8f0;">', unsafe_allow_html=True)
+            else: st.markdown("<div style='height:200px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border:2px dashed #cbd5e1; border-radius:8px; color:#94a3b8;'>Görsel Yok</div>", unsafe_allow_html=True)
 
-    cats_list = [c[1] for c in get_factory("SELECT id, name FROM categories")]
-    if not cats_list: cats_list = ["Diğer Makinalar"]
-
-    with st.container(border=True):
-        m_name = st.text_input("Makine Modeli Adı *", value=existing_data.get("name", ""))
+    # 2.B - DİNAMİK TEKNİK ÖZELLİKLER (Masaüstü Programı Mantığı)
+    with tab_teknik:
+        st.info("💡 Özellikleri alt alta ekleyin. İşlemi bitirdiğinizde kaydet butonuna basmayı unutmayın.")
         
-        c1, c2, c3 = st.columns(3)
-        m_cat = c1.selectbox("Kategori", cats_list, index=cats_list.index(existing_data.get("cat")) if existing_data.get("cat") in cats_list else 0)
-        m_price = c2.number_input("Baz Fiyat *", min_value=0.0, value=float(existing_data.get("price", 0.0)), step=100.0)
-        m_curr = c3.selectbox("Para Birimi", ["USD", "EUR", "TRY"], index=["USD", "EUR", "TRY"].index(existing_data.get("curr", "USD")))
-        
-        c4, c5 = st.columns(2)
-        m_disc = c4.number_input("İskonto (%)", min_value=0.0, max_value=100.0, value=float(existing_data.get("disc", 0.0)))
-        
-        st.markdown("<small style='color:#64748b;'>*Makinenin ana görsel adını girin (Örn: machine_na2136.png). Görseller klasörde bulunmalıdır.*</small>", unsafe_allow_html=True)
-        m_img = c5.text_input("Ana Görsel Dosya Adı", value=existing_data.get("img", ""))
-
-        m_specs = st.text_area("Standart Özellikler", value=existing_data.get("specs", ""), height=150, help="Format: Özellik|Açıklama|resim_adi.png ||")
-        
-        sel_opts = st.multiselect("Uyumlu Ekstra Donanımlar", options=opt_list_full, default=pre_selected_opts)
-
-        st.write("")
-        btn_col_a, btn_col_b, btn_col_c = st.columns([1, 1, 1])
-        
-        if btn_col_b.button("💾 " + ("DEĞİŞİKLİKLERİ KAYDET" if is_edit else "MAKİNEYİ SİSTEME EKLE"), type="primary", use_container_width=True):
-            if not m_name or m_price <= 0:
-                st.error("Lütfen makine adı ve geçerli bir fiyat girin!")
-            else:
-                opt_ids = ",".join([s.split(" - ")[0] for s in sel_opts])
-                if is_edit:
-                    exec_factory("""UPDATE models SET name=?, category=?, base_price=?, currency=?, specs=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?""", 
-                                 (m_name, m_cat, m_price, m_curr, m_specs, opt_ids, m_disc, m_img, int(mod_id)))
-                    st.success("Makine başarıyla güncellendi!")
-                else:
-                    exec_factory("""INSERT INTO models (name, category, base_price, currency, specs, compatible_options, port_discount, image_path) 
-                                    VALUES (?,?,?,?,?,?,?,?)""", 
-                                 (m_name, m_cat, m_price, m_curr, m_specs, opt_ids, m_disc, m_img))
-                    st.success("Yeni makine başarıyla eklendi!")
-                st.session_state.mod_view_mode = "list"
+        # Dinamik satırların oluşturulması
+        for i in range(len(st.session_state.f_specs)):
+            col_t, col_d, col_i, col_x = st.columns([3, 4, 2, 0.5], vertical_alignment="center")
+            
+            st.session_state.f_specs[i]["title"] = col_t.text_input("Başlık", value=st.session_state.f_specs[i]["title"], key=f"t_{i}", label_visibility="collapsed", placeholder="Başlık (Örn: Cnc Kontrol Sistemi)")
+            st.session_state.f_specs[i]["detail"] = col_d.text_input("Detay", value=st.session_state.f_specs[i]["detail"], key=f"d_{i}", label_visibility="collapsed", placeholder="Teknik Detay (Örn: Delta NC50E)")
+            st.session_state.f_specs[i]["img"] = col_i.text_input("Resim", value=st.session_state.f_specs[i]["img"], key=f"i_{i}", label_visibility="collapsed", placeholder="İkon (Örn: delta.png)")
+            
+            if col_x.button("❌", key=f"del_spec_{i}", help="Satırı Sil"):
+                st.session_state.f_specs.pop(i)
                 st.rerun()
+
+        if st.button("➕ YENİ ÖZELLİK SATIRI EKLE", use_container_width=True):
+            st.session_state.f_specs.append({"title": "", "detail": "", "img": ""})
+            st.rerun()
+
+    # 2.C - İŞARETLEMELİ (CHECKBOX) UYUMLU DONANIMLAR
+    with tab_donanim:
+        st.write("Makine ile uyumlu olan opsiyonel donanımları işaretleyiniz:")
+        opts_avail = get_factory("SELECT id, opt_name, opt_price FROM options ORDER BY opt_price DESC")
+        
+        new_opts = [] # İşaretlenenleri toplayacağımız liste
+        
+        # Seçenekleri 3 sütunlu ızgaraya dizelim
+        chk_cols = st.columns(3)
+        for idx, opt in enumerate(opts_avail):
+            o_id, o_name, o_price = opt
+            is_checked = str(o_id) in st.session_state.f_opts
+            
+            with chk_cols[idx % 3]:
+                if st.checkbox(f"{o_name} (+{o_price:,.0f})", value=is_checked, key=f"chk_{o_id}"):
+                    new_opts.append(str(o_id))
+                    
+        st.session_state.f_opts = new_opts
+
+    st.markdown("---")
+    
+    # --- 3. KAYDETME MOTORU ---
+    if st.button("💾 " + ("DEĞİŞİKLİKLERİ KAYDET" if is_edit else "MAKİNEYİ SİSTEME EKLE"), type="primary", use_container_width=True):
+        if not st.session_state.f_name or st.session_state.f_price <= 0:
+            st.error("Lütfen makine adı ve geçerli bir fiyat girin!")
+        else:
+            # Dinamik tabloyu veritabanının anladığı formata (||) dönüştür
+            spec_strs = []
+            for sp in st.session_state.f_specs:
+                if sp["title"].strip() or sp["detail"].strip():
+                    spec_strs.append(f"{sp['title']}|{sp['detail']}|{sp['img']}")
+            
+            final_specs_str = " || ".join(spec_strs) + (" || " if spec_strs else "")
+            final_opts_str = ",".join(st.session_state.f_opts)
+            
+            if is_edit:
+                exec_factory("""UPDATE models SET name=?, category=?, base_price=?, currency=?, specs=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?""", 
+                             (st.session_state.f_name, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, 
+                              final_specs_str, final_opts_str, st.session_state.f_disc, st.session_state.f_img, int(mod_id)))
+                st.success("Makine başarıyla güncellendi!")
+            else:
+                exec_factory("""INSERT INTO models (name, category, base_price, currency, specs, compatible_options, port_discount, image_path) 
+                                VALUES (?,?,?,?,?,?,?,?)""", 
+                             (st.session_state.f_name, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, 
+                              final_specs_str, final_opts_str, st.session_state.f_disc, st.session_state.f_img))
+                st.success("Yeni makine başarıyla eklendi!")
+            
+            st.session_state.mod_view_mode = "list"
+            st.rerun()
