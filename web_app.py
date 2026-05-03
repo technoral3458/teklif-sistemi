@@ -25,16 +25,13 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
     except: return False
 
 # =====================================================================
-# GELİŞMİŞ LOGO OKUMA MOTORU (Windows Yollarını Otomatik Çözer)
+# GELİŞMİŞ LOGO OKUMA MOTORU 
 # =====================================================================
 def get_base64_image(path):
     if not path: return ""
     if str(path).startswith("http"): return path
-    
-    # Eski Windows yollarını (C:/...) temizleyip sadece dosya adını alır
     base_name = posixpath.basename(ntpath.basename(path))
     paths_to_try = [path, f"images/{path}", f"../images/{path}", base_name, f"images/{base_name}"]
-    
     for p in paths_to_try:
         if os.path.exists(p) and os.path.isfile(p):
             try:
@@ -58,7 +55,7 @@ def get_system_logo():
     return fallback_url
 
 # =====================================================================
-# VERİTABANI TAMİRCİSİ VE KURULUMU
+# VERİTABANI TAMİRCİSİ
 # =====================================================================
 def repair_databases():
     conn = sqlite3.connect('users.db')
@@ -80,7 +77,7 @@ def repair_databases():
 repair_databases()
 
 # =====================================================================
-# OTURUM VE STATE YÖNETİMİ
+# OTURUM YÖNETİMİ
 # =====================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 for key in ["user_id", "user_role", "user_email"]:
@@ -114,7 +111,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ, KAYIT VE ŞİFRE EKRANLARI (EKSİKSİZ)
+# GİRİŞ, KAYIT VE ŞİFRE EKRANLARI
 # =====================================================================
 if not st.session_state.logged_in:
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
@@ -210,7 +207,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ YAN MENÜ VE SAYFA YÖNLENDİRİCİ
+# GÜVENLİ YAN MENÜ
 # =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 20px;'><img src='{get_system_logo()}' style='max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
@@ -232,7 +229,7 @@ with st.sidebar:
         st.query_params.clear(); st.session_state.clear(); st.rerun()
 
 # =====================================================================
-# MODÜLLER ARASI BAĞLANTILAR
+# SAYFA YÖNLENDİRİCİ MOTORU
 # =====================================================================
 if st.session_state.active_tab == "PROFORMA":
     proforma_invoice.show_proforma(st.session_state.proforma_id, st.session_state.user_id)
@@ -244,6 +241,119 @@ elif st.session_state.active_tab == ":package: Tüm Modelleri Yönet":
     model_management.show_product_management()
 elif st.session_state.active_tab == ":office: Bayi Yönetimi":
     dealer_management.show_dealer_management()
+
+# =====================================================================
+# GELİŞMİŞ DASHBOARD (ANALİZ PANELİ VE BAYİ TAKİBİ)
+# =====================================================================
+elif st.session_state.active_tab == ":house: Dashboard":
+    st.header(":bar_chart: Analiz ve Bayi Takip Paneli")
+    
+    if st.session_state.user_role == "admin":
+        conn_u = sqlite3.connect('users.db')
+        users_raw = conn_u.execute("SELECT id, company_name FROM users").fetchall()
+        user_dict = {u[0]: u[1] for u in users_raw}
+        d_count = conn_u.execute("SELECT COUNT(*) FROM users WHERE role='dealer'").fetchone()[0]
+        conn_u.close()
+
+        conn_s = sqlite3.connect('sales_data.db')
+        offers_raw = conn_s.execute("SELECT id, customer_id, model_id, total_price, status, user_id, offer_date FROM offers").fetchall()
+        conn_s.close()
+
+        if offers_raw:
+            df_offers = pd.DataFrame(offers_raw, columns=["id", "customer_id", "model_id", "total_price", "status", "user_id", "offer_date"])
+            df_offers['Bayi'] = df_offers['user_id'].map(user_dict).fillna("Bilinmeyen Bayi")
+            
+            # --- 1. KPI KARTLARI ---
+            c1, c2, c3, c4 = st.columns(4)
+            c1.markdown(f'<div class="stat-card"><span class="stat-title">Toplam Teklif Hacmi</span><span class="stat-val">{df_offers["total_price"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+            c2.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><span class="stat-title">Bekleyen Hacim</span><span class="stat-val">{df_offers[df_offers["status"]=="Beklemede"]["total_price"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+            c3.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Satışa Dönen (Sipariş)</span><span class="stat-val">{df_offers[df_offers["status"].isin(["Onaylandı", "Siparişe Çevir"])]["total_price"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+            c4.markdown(f'<div class="stat-card" style="border-left-color:#6366f1;"><span class="stat-title">Kayıtlı Bayiler</span><span class="stat-val">{d_count}</span></div>', unsafe_allow_html=True)
+            st.markdown("---")
+
+            # --- 2. GRAFİK VE LİDERLİK TABLOSU ---
+            col_chart, col_leader = st.columns([2, 1])
+            
+            with col_chart:
+                st.subheader("📊 Bayi Bazlı Satış Performansı")
+                df_sales = df_offers[df_offers["status"].isin(["Onaylandı", "Siparişe Çevir"])]
+                if not df_sales.empty:
+                    sales_by_dealer = df_sales.groupby('Bayi')['total_price'].sum().reset_index()
+                    st.bar_chart(sales_by_dealer.set_index('Bayi'), color="#10b981")
+                else:
+                    st.info("Henüz 'Siparişe Çevir' durumunda olan bir satış bulunmuyor.")
+
+            with col_leader:
+                st.subheader("🏆 Bayi Liderlik Tablosu")
+                leaderboard = df_offers.groupby('Bayi').agg(Toplam_Teklif=('id', 'count'), Toplam_Hacim=('total_price', 'sum')).reset_index().sort_values(by='Toplam_Hacim', ascending=False)
+                # Tablo formatını güzelleştir
+                leaderboard['Toplam_Hacim'] = leaderboard['Toplam_Hacim'].apply(lambda x: f"{x:,.2f}")
+                st.dataframe(leaderboard, use_container_width=True, hide_index=True)
+
+            st.markdown("---")
+
+            # --- 3. FİLTRELENEBİLİR SON TEKLİFLER LİSTESİ ---
+            st.subheader("🔄 Teklif Listesi ve Durum Yönetimi")
+            
+            f_col1, f_col2 = st.columns(2)
+            bayi_filtresi = f_col1.selectbox("Bayiye Göre Filtrele", ["Tümü"] + list(df_offers['Bayi'].unique()))
+            durum_filtresi = f_col2.selectbox("Duruma Göre Filtrele", ["Tümü", "Beklemede", "Siparişe Çevir", "Reddedildi"])
+
+            filtered_df = df_offers.copy()
+            if bayi_filtresi != "Tümü": filtered_df = filtered_df[filtered_df['Bayi'] == bayi_filtresi]
+            if durum_filtresi != "Tümü": filtered_df = filtered_df[filtered_df['status'] == durum_filtresi]
+            filtered_df = filtered_df.sort_values(by='id', ascending=False)
+
+            if filtered_df.empty:
+                st.warning("Bu kriterlere uygun teklif bulunamadı.")
+            else:
+                for _, row in filtered_df.iterrows():
+                    oid = row['id']
+                    stat = row['status']
+                    
+                    try:
+                        conn_s = sqlite3.connect('sales_data.db')
+                        cust_name = conn_s.execute("SELECT company_name FROM customers WHERE id=?", (row['customer_id'],)).fetchone()[0]
+                        conn_s.close()
+                    except: cust_name = "Bilinmeyen Müşteri"
+
+                    try:
+                        conn_f = sqlite3.connect('factory_data.db')
+                        m_name = conn_f.execute("SELECT name FROM models WHERE id=?", (row['model_id'],)).fetchone()[0]
+                        conn_f.close()
+                    except: m_name = "Bilinmeyen Model"
+
+                    with st.container(border=True):
+                        ca, cb, cc = st.columns([3, 1, 1], vertical_alignment="center")
+                        ca.markdown(f"**{cust_name}** (Bayi: <span style='color:#2563eb;'>{row['Bayi']}</span>)<br><small>{m_name} | {row['total_price']:,.2f}</small>", unsafe_allow_html=True)
+                        
+                        new_stat = cb.selectbox("Durum", ["Beklemede", "Siparişe Çevir", "Reddedildi"], index=["Beklemede", "Siparişe Çevir", "Reddedildi"].index(stat if stat in ["Beklemede", "Siparişe Çevir", "Reddedildi"] else "Beklemede"), key=f"stat_{oid}", label_visibility="collapsed")
+                        
+                        if cc.button("Güncelle", key=f"btn_{oid}", use_container_width=True):
+                            conn = sqlite3.connect('sales_data.db')
+                            conn.execute("UPDATE offers SET status=? WHERE id=?", (new_stat, oid))
+                            conn.commit(); conn.close()
+                            st.toast(f"Teklif #{oid} başarıyla güncellendi!"); st.rerun()
+        else:
+            st.info("Sistemde henüz kayıtlı bir teklif bulunmuyor.")
+
+    else:
+        # --- BAYİ ÖZEL DASHBOARD ---
+        conn = sqlite3.connect('sales_data.db')
+        offers_raw = conn.execute("SELECT total_price, status FROM offers WHERE user_id=?", (st.session_state.user_id,)).fetchall()
+        conn.close()
+        df_dash = pd.DataFrame(offers_raw, columns=["Tutar", "Durum"])
+        
+        c1, c2, c3 = st.columns(3)
+        c1.markdown(f'<div class="stat-card"><span class="stat-title">Toplam Hacmim</span><span class="stat-val">{df_dash["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><span class="stat-title">Bekleyen Tekliflerim</span><span class="stat-val">{df_dash[df_dash["Durum"]=="Beklemede"]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Satışa Dönen (Siparişler)</span><span class="stat-val">{df_dash[df_dash["Durum"].isin(["Onaylandı", "Siparişe Çevir"])]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+        
+        st.info("💡 Sol menüden 'Yeni Teklif Hazırla' diyerek müşterilerinize teklif sunmaya başlayabilirsiniz.")
+
+# =====================================================================
+# GEÇMİŞ TEKLİFLER VE PROFİL AYARLARI
+# =====================================================================
 elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
     st.header(":clipboard: Geçmiş Tekliflerim")
     conn = sqlite3.connect('sales_data.db')
@@ -319,65 +429,3 @@ elif st.session_state.active_tab == ":gear: Profil Ayarlarım":
                         conn.execute("UPDATE company_profile SET logo_path=? WHERE id=1", (sys_path,))
                         conn.commit(); conn.close()
                         st.success("Sistem logosu güncellendi!"); st.rerun()
-
-# =====================================================================
-# DASHBOARD (TAM TEŞEKKÜLLÜ ANALİZ PANELİ)
-# =====================================================================
-elif st.session_state.active_tab == ":house: Dashboard":
-    st.header(":bar_chart: Analiz Paneli")
-    
-    if st.session_state.user_role == "admin":
-        conn = sqlite3.connect('sales_data.db')
-        offers_raw = conn.execute("SELECT total_price, status FROM offers").fetchall()
-        conn.close()
-        df_dash = pd.DataFrame(offers_raw, columns=["Tutar", "Durum"])
-        c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(f'<div class="stat-card"><span class="stat-title">Toplam Hacim</span><span class="stat-val">{df_dash["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
-        c2.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><span class="stat-title">Bekleyen</span><span class="stat-val">{df_dash[df_dash["Durum"]=="Beklemede"]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
-        c3.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Satışa Dönen</span><span class="stat-val">{df_dash[df_dash["Durum"].isin(["Onaylandı", "Siparişe Çevir"])]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
-        
-        conn_u = sqlite3.connect('users.db')
-        d_count = conn_u.execute("SELECT COUNT(*) FROM users WHERE role='dealer'").fetchone()[0]
-        users_raw = conn_u.execute("SELECT id, company_name FROM users").fetchall()
-        user_dict = {u[0]: u[1] for u in users_raw}
-        conn_u.close()
-        c4.markdown(f'<div class="stat-card" style="border-left-color:#6366f1;"><span class="stat-title">Kayıtlı Bayiler</span><span class="stat-val">{d_count}</span></div>', unsafe_allow_html=True)
-
-        st.subheader("🔄 Bayilerin Son Teklifleri")
-        conn = sqlite3.connect('sales_data.db')
-        recent = conn.execute("SELECT o.id, c.company_name, o.model_id, o.total_price, o.status, o.user_id FROM offers o JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC LIMIT 15").fetchall()
-        conn.close()
-        
-        if recent:
-            for oid, cust, mid, price, stat, uid in recent:
-                try:
-                    conn_f = sqlite3.connect('factory_data.db')
-                    m_name = conn_f.execute("SELECT name FROM models WHERE id=?", (mid,)).fetchone()[0]
-                    conn_f.close()
-                except: m_name = "Bilinmeyen Model"
-                
-                bayi_ismi = user_dict.get(uid, "Bilinmeyen Bayi")
-                with st.container(border=True):
-                    ca, cb, cc = st.columns([3, 1, 1])
-                    ca.markdown(f"**{cust}** (Bayi: <span style='color:#2563eb;'>{bayi_ismi}</span>)<br><small>{m_name} | {price:,.2f}</small>", unsafe_allow_html=True)
-                    new_stat = cb.selectbox("Durum", ["Beklemede", "Siparişe Çevir", "Reddedildi"], index=["Beklemede", "Siparişe Çevir", "Reddedildi"].index(stat if stat in ["Beklemede", "Siparişe Çevir", "Reddedildi"] else "Beklemede"), key=f"stat_{oid}", label_visibility="collapsed")
-                    if cc.button("Güncelle", key=f"btn_{oid}", use_container_width=True):
-                        conn = sqlite3.connect('sales_data.db')
-                        conn.execute("UPDATE offers SET status=? WHERE id=?", (new_stat, oid))
-                        conn.commit(); conn.close()
-                        st.toast(f"Teklif #{oid} güncellendi!"); st.rerun()
-        else: st.info("Sistemde henüz teklif bulunmuyor.")
-
-    else:
-        # BAYİ DASHBOARD GÖRÜNÜMÜ
-        conn = sqlite3.connect('sales_data.db')
-        offers_raw = conn.execute("SELECT total_price, status FROM offers WHERE user_id=?", (st.session_state.user_id,)).fetchall()
-        conn.close()
-        df_dash = pd.DataFrame(offers_raw, columns=["Tutar", "Durum"])
-        
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(f'<div class="stat-card"><span class="stat-title">Toplam Hacmim</span><span class="stat-val">{df_dash["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
-        c2.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><span class="stat-title">Bekleyen Tekliflerim</span><span class="stat-val">{df_dash[df_dash["Durum"]=="Beklemede"]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
-        c3.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Satışa Dönen (Siparişler)</span><span class="stat-val">{df_dash[df_dash["Durum"].isin(["Onaylandı", "Siparişe Çevir"])]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
-        
-        st.info("Müşterilerinizle ilgili işlemlere sol menüden ulaşabilirsiniz.")
