@@ -116,7 +116,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         }
     """
 
-    # Tekrar eden antet (Üst Başlık) HTML'i
     page_header_html = f"""
         <div class="header">
             <div>{header_logo_html}</div>
@@ -151,16 +150,17 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             html += f'<tr><td style="width:20%; text-align:center;">{img_tag}</td><td style="width:80%;"><b>{t_spec}</b><br><small style="color:#64748b; font-size:13px;">{d_spec}</small></td></tr>'
         html += "</table>"
 
-    html += f"""
-        <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
-        <table><tr style="background:#f8fafc;"><th style="width:20%; text-align:center;">Görsel</th><th style="width:45%;">Açıklama</th><th style="width:10%; text-align:center;">Adet</th><th style="width:25%; text-align:right;">Tutar</th></tr>
-        <tr><td style="text-align:center; color:#94a3b8;">-</td><td><b>{model} (Standart Donanım)</b></td><td style="text-align:center;">{m_qty}</td><td style="text-align:right; font-size:15px;">{base_price*m_qty:,.2f} {m_currency}</td></tr>"""
-    
-    for opt in selected_options:
-        opt_img_b64 = get_image_base64(opt["i"])
-        opt_img_tag = f'<img src="{opt_img_b64}" style="width:100%; max-width:120px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
-        html += f"<tr><td style='text-align:center;'>{opt_img_tag}</td><td><b style='color:#2563eb; font-size:14px;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.3; margin-top:4px; color:#475569;'>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold; font-size:15px;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
-    html += "</table>"
+    # EĞER EKSTRA DONANIM SEÇİLDİYSE BU BÖLÜMÜ GÖSTER
+    if selected_options:
+        html += f"""
+            <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
+            <table><tr style="background:#f8fafc;"><th style="width:20%; text-align:center;">Görsel</th><th style="width:45%;">Açıklama</th><th style="width:10%; text-align:center;">Adet</th><th style="width:25%; text-align:right;">Tutar</th></tr>"""
+        
+        for opt in selected_options:
+            opt_img_b64 = get_image_base64(opt["i"])
+            opt_img_tag = f'<img src="{opt_img_b64}" style="width:100%; max-width:120px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
+            html += f"<tr><td style='text-align:center;'>{opt_img_tag}</td><td><b style='color:#2563eb; font-size:14px;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.3; margin-top:4px; color:#475569;'>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold; font-size:15px;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
+        html += "</table>"
 
     # --- BİRİNCİ SAYFAYI KAPAT, İKİNCİ SAYFAYI AÇ (SAYFA ATLATMA) ---
     html += f"""
