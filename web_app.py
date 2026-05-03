@@ -1,6 +1,6 @@
 import streamlit as st
-import customer_pages, model_management, offer_wizard, dealer_management, proforma_invoice
-import sqlite3, pandas as pd, hashlib, random, smtplib, uuid, os, base64
+import customer_pages, model_management, offer_wizard, dealer_management, proforma_invoice, orders_page
+import sqlite3, pandas as pd, hashlib, random, smtplib, uuid, os, base64, datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import ntpath, posixpath
@@ -24,9 +24,6 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
         return True
     except: return False
 
-# =====================================================================
-# GELİŞMİŞ LOGO OKUMA MOTORU 
-# =====================================================================
 def get_base64_image(path):
     if not path: return ""
     if str(path).startswith("http"): return path
@@ -55,7 +52,7 @@ def get_system_logo():
     return fallback_url
 
 # =====================================================================
-# VERİTABANI TAMİRCİSİ
+# VERİTABANI TAMİRCİSİ (ZAMAN DAMGASI EKLENDİ)
 # =====================================================================
 def repair_databases():
     conn = sqlite3.connect('users.db')
@@ -72,6 +69,8 @@ def repair_databases():
     if "status" not in cols: conn.execute("ALTER TABLE offers ADD COLUMN status TEXT DEFAULT 'Beklemede'")
     if "user_id" not in cols: conn.execute("ALTER TABLE offers ADD COLUMN user_id INTEGER DEFAULT 1")
     if "offer_date" not in cols: conn.execute("ALTER TABLE offers ADD COLUMN offer_date TEXT DEFAULT ''")
+    # YENİ EKLENEN SİPARİŞE DÖNÜŞME TARİHİ SÜTUNU
+    if "order_date" not in cols: conn.execute("ALTER TABLE offers ADD COLUMN order_date TEXT DEFAULT ''")
     conn.commit(); conn.close()
 
 repair_databases()
@@ -97,18 +96,15 @@ if not st.session_state.logged_in:
             st.session_state.logged_in, st.session_state.user_id, st.session_state.user_email = True, u_id, u_email
             st.session_state.user_role = u_role if u_role == 'admin' else ("manufacturer" if u_type == "Üretici" else "dealer")
 
-# --- GELİŞMİŞ ARAYÜZ VE MODERN MENÜ CSS ---
+# --- GELİŞMİŞ ARAYÜZ CSS ---
 st.markdown("""
     <style>
     .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 8px; margin-bottom: 20px;}
     .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 20px; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap;}
     .stTabs [aria-selected="true"] { background-color: #2563eb !important; color: white !important; border: 1px solid #2563eb; }
-    
     .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; text-align: center; margin-bottom: 15px;}
     .stat-val { font-size: 20px; font-weight: 900; color: #1e293b; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
     .stat-title { color: #64748b; text-transform: uppercase; font-size: 11px; font-weight: 700; margin-bottom:5px; display:block;}
-    
-    /* MODERN YAN MENÜ SİHİRBAZLIĞI (CSS) */
     [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] { gap: 6px !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label { padding: 12px 15px; margin-bottom: 0px; border-radius: 8px; background-color: transparent; transition: all 0.2s ease-in-out; cursor: pointer; width: 100%; color: #475569; }
@@ -120,14 +116,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ, KAYIT VE ŞİFRE EKRANLARI
+# GİRİŞ EKRANLARI
 # =====================================================================
 if not st.session_state.logged_in:
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
     with col_main:
         sys_logo = get_system_logo()
         st.markdown(f"""<div style='text-align: center; padding: 20px 0 10px 0;'><img src="{sys_logo}" style="max-height: 80px; margin-bottom: 15px; object-fit: contain;"></div>""", unsafe_allow_html=True)
-        
         t_login, t_reg, t_forg = st.tabs([":key: Giriş", ":memo: Kayıt", ":question: Şifremi Unuttum"])
         
         with t_login:
@@ -216,12 +211,10 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ VE MODERN YAN MENÜ
+# GÜVENLİ YAN MENÜ
 # =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 25px; margin-top: 10px;'><img src='{get_system_logo()}' style='max-height: 65px; object-fit: contain;'></div>", unsafe_allow_html=True)
-    
-    # Modern Profil Kartı
     r_text = {"admin": "Sistem Yöneticisi", "dealer": "Satıcı Bayi", "manufacturer": "Üretici"}.get(st.session_state.user_role, "Kullanıcı")
     st.markdown(f"""
         <div style='background-color:#f8fafc; padding:15px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:25px; display:flex; align-items:center; gap:10px;'>
@@ -235,26 +228,22 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    # Menü Öğeleri
     menu_items = [
         "📊 Dashboard", 
         "📝 Yeni Teklif Hazırla", 
         "👥 Müşterilerim", 
         "📋 Geçmiş Tekliflerim", 
+        "📦 Siparişler",  # YENİ MENÜ EKLENDİ
         "⚙️ Profil Ayarlarım"
     ]
     if st.session_state.user_role == "admin": 
         menu_items.extend(["🏢 Bayi Yönetimi", "📦 Tüm Modelleri Yönet"])
     
     idx = menu_items.index(st.session_state.active_tab) if st.session_state.active_tab in menu_items else 0
-    
-    def sync_menu(): 
-        st.session_state.active_tab = st.session_state.m_radio
-
+    def sync_menu(): st.session_state.active_tab = st.session_state.m_radio
     st.radio("MENÜ", menu_items, index=idx, key="m_radio", on_change=sync_menu, label_visibility="collapsed")
 
     st.markdown("<hr style='margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-    
     if st.button("🚪 Sistemi Kapat", use_container_width=True):
         conn = sqlite3.connect('users.db')
         conn.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
@@ -275,9 +264,10 @@ elif st.session_state.active_tab == "📦 Tüm Modelleri Yönet":
 elif st.session_state.active_tab == "🏢 Bayi Yönetimi":
     dealer_management.show_dealer_management()
 
-# =====================================================================
-# GELİŞMİŞ DASHBOARD (PERFORMANS VE SLIDER)
-# =====================================================================
+# --- YENİ EKLENEN SİPARİŞ SAYFASI YÖNLENDİRMESİ ---
+elif st.session_state.active_tab == "📦 Siparişler":
+    orders_page.show_orders(st.session_state.user_id, st.session_state.user_role == "admin")
+
 elif st.session_state.active_tab == "📊 Dashboard":
     st.header("📊 Performans Özeti ve Vitrin")
     
@@ -288,27 +278,21 @@ elif st.session_state.active_tab == "📊 Dashboard":
         conn_u.close()
 
         conn_s = sqlite3.connect('sales_data.db')
-        
-        # Müşteri tablosunda city/country var mı diye güvenli kontrol
         c_cols = [c[1] for c in conn_s.execute("PRAGMA table_info(customers)").fetchall()]
         has_country = 'country' in c_cols
         has_city = 'city' in c_cols
         
-        # 1. En Çok Teklif Veren Bayi
         top_dealer_row = conn_s.execute("SELECT user_id, COUNT(*) as cnt FROM offers GROUP BY user_id ORDER BY cnt DESC LIMIT 1").fetchone()
         top_dealer = user_dict.get(top_dealer_row[0], "Kayıt Yok") if top_dealer_row else "Kayıt Yok"
         
-        # 2. Son Teklif Veren Bayi
         last_dealer_row = conn_s.execute("SELECT user_id FROM offers ORDER BY id DESC LIMIT 1").fetchone()
         last_dealer = user_dict.get(last_dealer_row[0], "Kayıt Yok") if last_dealer_row else "Kayıt Yok"
         
-        # 3. En Çok Teklif Yapılan Ülke
         top_country = "Bilinmiyor"
         if has_country:
             tc = conn_s.execute("SELECT c.country, COUNT(o.id) as cnt FROM offers o JOIN customers c ON o.customer_id = c.id WHERE c.country IS NOT NULL AND c.country != '' GROUP BY c.country ORDER BY cnt DESC LIMIT 1").fetchone()
             if tc: top_country = tc[0]
             
-        # 4. En Çok Teklif Yapılan Şehir
         top_city = "Bilinmiyor"
         if has_city:
             tci = conn_s.execute("SELECT c.city, COUNT(o.id) as cnt FROM offers o JOIN customers c ON o.customer_id = c.id WHERE c.city IS NOT NULL AND c.city != '' GROUP BY c.city ORDER BY cnt DESC LIMIT 1").fetchone()
@@ -323,7 +307,6 @@ elif st.session_state.active_tab == "📊 Dashboard":
         c4.markdown(f'<div class="stat-card" style="border-left-color:#8b5cf6;"><span class="stat-title">En Popüler Şehir</span><span class="stat-val" title="{top_city}">{top_city}</span></div>', unsafe_allow_html=True)
 
     else:
-        # --- BAYİ ÖZEL DASHBOARD ---
         conn = sqlite3.connect('sales_data.db')
         dealer_stats = conn.execute("SELECT status FROM offers WHERE user_id=?", (st.session_state.user_id,)).fetchall()
         last_offer = conn.execute("SELECT offer_date FROM offers WHERE user_id=? ORDER BY id DESC LIMIT 1", (st.session_state.user_id,)).fetchone()
@@ -341,10 +324,8 @@ elif st.session_state.active_tab == "📊 Dashboard":
         c3.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Satışa Dönen</span><span class="stat-val">{approved_count}</span></div>', unsafe_allow_html=True)
         c4.markdown(f'<div class="stat-card" style="border-left-color:#6366f1;"><span class="stat-title">Son İşlem Tarihi</span><span class="stat-val" style="font-size:16px; line-height:35px;">{l_date}</span></div>', unsafe_allow_html=True)
 
-    # --- ANİMASYONLU MAKİNE SLIDER (CAROUSEL) ---
     st.markdown("---")
     st.subheader("🌟 Makine Vitrini")
-    
     conn_f = sqlite3.connect('factory_data.db')
     models_for_slider = conn_f.execute("SELECT name, image_path FROM models WHERE image_path IS NOT NULL AND image_path != ''").fetchall()
     conn_f.close()
@@ -353,18 +334,11 @@ elif st.session_state.active_tab == "📊 Dashboard":
     for m_name, m_img in models_for_slider:
         b64 = get_base64_image(m_img)
         if b64:
-            slides_html += f"""
-            <div class="mySlides fade">
-                <div class="text">{m_name}</div>
-                <img src="{b64}">
-            </div>
-            """
+            slides_html += f"""<div class="mySlides fade"><div class="text">{m_name}</div><img src="{b64}"></div>"""
             
     if slides_html:
         carousel_code = f"""
-        <html>
-        <head>
-        <style>
+        <html><head><style>
           body {{ margin: 0; font-family: sans-serif; background: transparent; display:flex; justify-content:center; align-items:center; height: 100vh; overflow:hidden;}}
           .slideshow-container {{ width: 100%; max-width: 900px; position: relative; margin: auto; border-radius: 12px; border: 1px solid #e2e8f0; background: #fff; height: 450px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05);}}
           .mySlides {{ display: none; text-align: center; width: 100%; height: 100%; position: relative; }}
@@ -372,41 +346,25 @@ elif st.session_state.active_tab == "📊 Dashboard":
           .text {{ color: #0f172a; font-size: 18px; font-weight: 800; padding: 10px 20px; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); border-radius: 20px; border: 1px solid #cbd5e1; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 10; white-space:nowrap;}}
           .fade {{ animation-name: fade; animation-duration: 2s; }}
           @keyframes fade {{ from {{opacity: .2}} to {{opacity: 1}} }}
-        </style>
-        </head>
-        <body>
-        <div class="slideshow-container">
-          {slides_html}
-        </div>
+        </style></head><body>
+        <div class="slideshow-container">{slides_html}</div>
         <script>
-        let slideIndex = 0;
-        showSlides();
+        let slideIndex = 0; showSlides();
         function showSlides() {{
-          let i;
-          let slides = document.getElementsByClassName("mySlides");
+          let i; let slides = document.getElementsByClassName("mySlides");
           if(slides.length === 0) return;
           for (i = 0; i < slides.length; i++) {{ slides[i].style.display = "none"; }}
-          slideIndex++;
-          if (slideIndex > slides.length) {{slideIndex = 1}}
-          slides[slideIndex-1].style.display = "block";
-          setTimeout(showSlides, 3500); 
+          slideIndex++; if (slideIndex > slides.length) {{slideIndex = 1}}
+          slides[slideIndex-1].style.display = "block"; setTimeout(showSlides, 3500); 
         }}
-        </script>
-        </body>
-        </html>
-        """
+        </script></body></html>"""
         import streamlit.components.v1 as components
-        # HTML dosyasını 480px yüksekliğinde ekrana gömüyoruz
         components.html(carousel_code, height=480)
     else:
-        st.info("Sistemde gösterilecek vitrin resmi bulunmuyor. Makine kartlarına resim eklediğinizde burada otomatik görünecektir.")
+        st.info("Sistemde gösterilecek vitrin resmi bulunmuyor. Makine eklediğinizde burada otomatik görünecektir.")
 
-# =====================================================================
-# GELİŞMİŞ GEÇMİŞ TEKLİFLER VE DURUM YÖNETİMİ
-# =====================================================================
 elif st.session_state.active_tab == "📋 Geçmiş Tekliflerim":
     st.header("📋 Teklif Listesi ve Durum Yönetimi")
-    
     conn_s = sqlite3.connect('sales_data.db')
     offers_raw = conn_s.execute("SELECT id, customer_id, model_id, total_price, status, user_id, offer_date FROM offers ORDER BY id DESC").fetchall()
     conn_s.close()
@@ -414,13 +372,11 @@ elif st.session_state.active_tab == "📋 Geçmiş Tekliflerim":
     if offers_raw:
         df_offers = pd.DataFrame(offers_raw, columns=["id", "customer_id", "model_id", "total_price", "status", "user_id", "offer_date"])
         
-        # Bayi İsimlerini Eşleştir
         conn_u = sqlite3.connect('users.db')
         user_dict = {u[0]: u[1] for u in conn_u.execute("SELECT id, company_name FROM users").fetchall()}
         conn_u.close()
         df_offers['Bayi'] = df_offers['user_id'].map(user_dict).fillna("Bilinmeyen Bayi")
 
-        # Müşteri ve Makine İsimlerini Eşleştir
         conn_s = sqlite3.connect('sales_data.db')
         cust_dict = {c[0]: c[1] for c in conn_s.execute("SELECT id, company_name FROM customers").fetchall()}
         conn_s.close()
@@ -432,16 +388,12 @@ elif st.session_state.active_tab == "📋 Geçmiş Tekliflerim":
         df_offers['Müşteri'] = df_offers['customer_id'].map(cust_dict).fillna("Bilinmeyen Müşteri")
         df_offers['Model'] = df_offers['model_id'].map(mod_dict).fillna("Bilinmeyen Model")
 
-        # Admin değilse sadece kendi tekliflerini görsün
         if st.session_state.user_role != 'admin':
             df_offers = df_offers[df_offers['user_id'] == st.session_state.user_id]
 
-        # --- FİLTRELEME ARAÇLARI ---
         f_col1, f_col2 = st.columns(2)
-        if st.session_state.user_role == 'admin':
-            bayi_filtresi = f_col1.selectbox("Bayiye Göre Filtrele", ["Tümü"] + list(df_offers['Bayi'].unique()))
-        else:
-            bayi_filtresi = "Tümü"
+        if st.session_state.user_role == 'admin': bayi_filtresi = f_col1.selectbox("Bayiye Göre Filtrele", ["Tümü"] + list(df_offers['Bayi'].unique()))
+        else: bayi_filtresi = "Tümü"
             
         durum_filtresi = f_col2.selectbox("Duruma Göre Filtrele", ["Tümü", "Beklemede", "Siparişe Çevir", "Reddedildi"])
 
@@ -451,8 +403,7 @@ elif st.session_state.active_tab == "📋 Geçmiş Tekliflerim":
 
         st.markdown("---")
 
-        if filtered_df.empty:
-            st.warning("Bu kriterlere uygun teklif bulunamadı.")
+        if filtered_df.empty: st.warning("Bu kriterlere uygun teklif bulunamadı.")
         else:
             for _, row in filtered_df.iterrows():
                 off_id = row['id']
@@ -460,7 +411,6 @@ elif st.session_state.active_tab == "📋 Geçmiş Tekliflerim":
                 status_color = "#10b981" if o_status in ["Onaylandı", "Siparişe Çevir"] else ("#ef4444" if o_status == "Reddedildi" else "#f59e0b")
                 
                 with st.container(border=True):
-                    # Üst Kısım: Başlıklar
                     c_info, c_stat = st.columns([3, 1.5], vertical_alignment="center")
                     
                     if st.session_state.user_role == 'admin':
@@ -470,13 +420,18 @@ elif st.session_state.active_tab == "📋 Geçmiş Tekliflerim":
                     
                     c_info.markdown(f"**Model:** {row['Model']} | **Tutar:** <span style='color:#ea580c; font-weight:bold;'>{row['total_price']:,.2f}</span>", unsafe_allow_html=True)
 
-                    # Admin için Durum Güncelleme, Bayi için salt okunur durum
                     if st.session_state.user_role == 'admin':
                         st_col1, st_col2 = c_stat.columns([2, 1])
                         new_stat = st_col1.selectbox("Durum", ["Beklemede", "Siparişe Çevir", "Reddedildi"], index=["Beklemede", "Siparişe Çevir", "Reddedildi"].index(o_status if o_status in ["Beklemede", "Siparişe Çevir", "Reddedildi"] else "Beklemede"), key=f"stat_{off_id}", label_visibility="collapsed")
+                        
+                        # --- YENİ: ZAMAN DAMGASI (ORDER_DATE) GÜNCELLEMESİ ---
                         if st_col2.button("✔️", key=f"btn_{off_id}", help="Durumu Güncelle"):
                             conn = sqlite3.connect('sales_data.db')
-                            conn.execute("UPDATE offers SET status=? WHERE id=?", (new_stat, off_id))
+                            if new_stat == "Siparişe Çevir":
+                                o_time = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+                                conn.execute("UPDATE offers SET status=?, order_date=? WHERE id=?", (new_stat, o_time, off_id))
+                            else:
+                                conn.execute("UPDATE offers SET status=? WHERE id=?", (new_stat, off_id))
                             conn.commit(); conn.close()
                             st.toast(f"Teklif #{off_id} güncellendi!"); st.rerun()
                     else:
@@ -484,7 +439,6 @@ elif st.session_state.active_tab == "📋 Geçmiş Tekliflerim":
 
                     st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
                     
-                    # Alt Kısım: Butonlar
                     btn_col1, btn_col2, btn_col3 = st.columns(3)
                     if btn_col1.button("✏️ Düzenle", key=f"ed_{off_id}", use_container_width=True):
                         st.session_state.edit_offer_id = off_id
@@ -503,9 +457,6 @@ elif st.session_state.active_tab == "📋 Geçmiş Tekliflerim":
     else: 
         st.info("Geçmiş teklif bulunmuyor.")
 
-# =====================================================================
-# PROFİL AYARLARI
-# =====================================================================
 elif st.session_state.active_tab == "⚙️ Profil Ayarlarım":
     st.header("⚙️ Kurumsal Profil Ayarları")
     conn = sqlite3.connect('users.db')
