@@ -8,7 +8,7 @@ import base64
 import sqlite3
 
 # =====================================================================
-# VERİTABANI BAĞLANTI MOTORLARI
+# VERİTABANI BAĞLANTI MOTORLARI (Kullanıcının DB Yapısına Özel)
 # =====================================================================
 def get_factory(query, params=()):
     conn = sqlite3.connect('factory_data.db', check_same_thread=False)
@@ -30,6 +30,7 @@ def get_user_query(query, params=()):
     return res
 
 def init_wizard_tables():
+    # Sales DB içindeki tabloları kontrol et ve yoksa oluştur
     exec_sales("""CREATE TABLE IF NOT EXISTS offer_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT, offer_id INTEGER, option_id INTEGER, quantity INTEGER DEFAULT 1)""")
     try:
@@ -40,7 +41,7 @@ def init_wizard_tables():
     except: pass
 
 # =====================================================================
-# HTML VE PDF ÖNİZLEME MOTORU (Responsive A4 Tasarım)
+# HTML VE PDF ÖNİZLEME MOTORU (A4 STANDARTLI)
 # =====================================================================
 def get_image_base64(img_path):
     if not img_path or not os.path.exists(img_path): return ""
@@ -55,6 +56,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     m_qty = conditions.get("machine_qty", 1)
     agreed_price = conditions.get("agreed_price", 0)
 
+    # Bayi Bilgilerini Çek
     try: u_info = get_user_query("SELECT company_name, logo_path, website, address_full, phone FROM users WHERE id=?", (user_id,))[0]
     except: u_info = None
     
@@ -71,7 +73,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     logo_b64 = get_image_base64(comp_logo)
     header_logo_html = f'<img src="{logo_b64}" style="max-height:60px;">' if logo_b64 else f'<div style="font-size:20px; font-weight:900; color:#1e293b;">{comp_name}</div>'
 
-    # TAM UYUMLU (RESPONSIVE) CSS KODLARI
+    # SIKIŞMAYAN, GERÇEK A4 CSS KODLARI
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; background: #cbd5e1; margin:0; padding:15px; display: flex; flex-direction: column; align-items: center; }
@@ -203,7 +205,9 @@ def show_offer_wizard(user_id, is_admin=False):
     # ADIM 2: DÜZENLEME VE MANUEL FİYAT
     elif st.session_state.wizard_step == 2:
         wd = st.session_state.wizard_data
-        col_opt, col_prev = st.columns([1.5, 2.5], gap="large")
+        
+        # SÜTUN ORANLARI GÜNCELLENDİ (Sol dar: 1.1, Sağ geniş: 2.9)
+        col_opt, col_prev = st.columns([1.1, 2.9], gap="large")
         
         with col_opt:
             if 'edit_offer_id' in st.session_state:
@@ -253,7 +257,7 @@ def show_offer_wizard(user_id, is_admin=False):
             calc_val = sub * (1 - (disc_p/100.0))
             
             st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
-            use_manual = st.checkbox("⚙️ Nihai Tutarı Manuel Belirle (İskontoyu Ezer)", value=wd.get("is_manual", False))
+            use_manual = st.checkbox("⚙️ Nihai Tutarı Manuel Belirle", value=wd.get("is_manual", False))
             
             if use_manual:
                 default_agreed = float(wd.get("agreed_price", calc_val))
