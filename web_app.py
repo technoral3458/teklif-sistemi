@@ -209,7 +209,7 @@ with st.sidebar:
         st.query_params.clear(); st.session_state.clear(); st.rerun()
 
 # =====================================================================
-# SAYFA İÇERİKLERİ: DÜZENLE VE KOPYALA MOTORU YARDIMCISI
+# SAYFA İÇERİKLERİ: DÜZENLE VE KOPYALA MOTORU YARDIMCISI (MANUEL FİYAT DESTEKLİ)
 # =====================================================================
 def load_offer_to_wizard(off_id):
     for key in list(st.session_state.keys()):
@@ -220,11 +220,15 @@ def load_offer_to_wizard(off_id):
     m_data = database.get_query("SELECT name, base_price, currency, compatible_options, image_path, specs, port_discount FROM models WHERE id=?", (off_data[1],))[0]
     c_name = database.get_query("SELECT company_name FROM customers WHERE id=?", (off_data[0],))[0][0]
     
+    # Yeni eklenen Manuel Fiyat ve Tutar bilgileri de yükleniyor
     st.session_state.wizard_data = {
         "cust_id": off_data[0], "cust_name": c_name, "m_id": off_data[1], "m_name": m_data[0],
         "m_price": m_data[1], "m_curr": m_data[2], "m_opts": m_data[3], "m_img": m_data[4], "m_specs": m_data[5], "m_disc": m_data[6], 
         "qty": conds.get("machine_qty", 1), "d_time": conds.get("delivery_time", ""), "ship": conds.get("shipping", ""),
-        "pay": conds.get("payment_plan_text", ""), "bnk": conds.get("bank", ""), "nts": conds.get("notes", ""), "disc_p": conds.get("discount_pct", 0.0)
+        "pay": conds.get("payment_plan_text", ""), "bnk": conds.get("bank", ""), "nts": conds.get("notes", ""), 
+        "disc_p": conds.get("discount_pct", 0.0),
+        "is_manual": conds.get("is_manual", False),
+        "agreed_price": conds.get("agreed_price", 0.0)
     }
     
     opt_items = database.get_query("SELECT option_id, quantity FROM offer_items WHERE offer_id=?", (off_id,))
@@ -261,7 +265,7 @@ if st.session_state.active_tab == ":house: Dashboard":
                         database.exec_query("UPDATE offers SET status=? WHERE id=?", (new_stat, oid))
                         st.toast(f"Teklif #{oid} güncellendi!"); st.rerun()
 
-# ---------------- YENİ KART SİSTEMLİ GEÇMİŞ TEKLİFLER ----------------
+# ---------------- KART SİSTEMLİ GEÇMİŞ TEKLİFLER ----------------
 elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
     st.header(":clipboard: Geçmiş Tekliflerim")
     offers = database.get_query("""SELECT o.id, c.company_name, m.name, o.offer_date, o.total_price, o.status FROM offers o JOIN customers c ON o.customer_id = c.id JOIN models m ON o.model_id = m.id WHERE o.user_id=? ORDER BY o.id DESC""", (st.session_state.user_id,))
@@ -269,8 +273,6 @@ elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
     if offers:
         for off in offers:
             off_id, c_name, m_name, o_date, t_price, o_status = off
-            
-            # Renkli Durum Bildirgesi
             status_color = "#10b981" if o_status == "Onaylandı" else ("#ef4444" if o_status == "Reddedildi" else "#f59e0b")
             
             with st.container(border=True):
@@ -280,22 +282,18 @@ elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
                 
                 st.write("")
                 btn_col1, btn_col2, btn_col3 = st.columns(3)
-                
                 if btn_col1.button(":pencil2: Düzenle", key=f"ed_{off_id}", use_container_width=True):
                     load_offer_to_wizard(off_id)
-                    st.session_state.edit_offer_id = off_id # Üzerine yazma bayrağı
+                    st.session_state.edit_offer_id = off_id
                     st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
                     if "_menu_radio" in st.session_state: del st.session_state["_menu_radio"]
                     st.rerun()
-                    
                 if btn_col2.button(":page_facing_up: Kopyala", key=f"cp_{off_id}", use_container_width=True):
                     load_offer_to_wizard(off_id)
-                    # edit_offer_id set ETMİYORUZ, böylece kaydederken YENİ TEKLİF açar
                     if 'edit_offer_id' in st.session_state: del st.session_state.edit_offer_id
                     st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
                     if "_menu_radio" in st.session_state: del st.session_state["_menu_radio"]
                     st.rerun()
-                    
                 if btn_col3.button(":wastebasket: Sil", key=f"rm_{off_id}", use_container_width=True):
                     database.exec_query("DELETE FROM offers WHERE id=?", (off_id,))
                     database.exec_query("DELETE FROM offer_items WHERE offer_id=?", (off_id,))
