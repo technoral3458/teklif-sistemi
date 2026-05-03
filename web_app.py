@@ -138,11 +138,9 @@ st.markdown("""
 # =====================================================================
 if not st.session_state.logged_in:
     
-    # Sayfayı yatayda üçe bölerek formu tam ortaya, şık bir boyutta hapsediyoruz.
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
     
     with col_main:
-        # Şık Logo ve Başlık (Roket emojisi yerine kurumsal logo)
         st.markdown("""
             <div style='text-align: center; padding: 20px 0 10px 0;'>
                 <img src="https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png" style="max-width: 220px; margin-bottom: 15px;">
@@ -153,7 +151,6 @@ if not st.session_state.logged_in:
 
         tab_login, tab_register, tab_forgot = st.tabs(["🔑 Giriş Yap", "📝 Yeni Kayıt", "❓ Şifremi Unuttum"])
         
-        # 1. GİRİŞ YAP SEKME İÇERİĞİ
         with tab_login:
             with st.container(border=True):
                 le = st.text_input("E-Posta Adresi", placeholder="ornek@firma.com").strip().lower()
@@ -177,7 +174,6 @@ if not st.session_state.logged_in:
                     else: 
                         st.error("Hatalı e-posta veya şifre!")
 
-        # 2. YENİ KAYIT SEKME İÇERİĞİ
         with tab_register:
             with st.container(border=True):
                 if st.session_state.reg_step == 1:
@@ -218,7 +214,6 @@ if not st.session_state.logged_in:
                         else:
                             st.error("Hatalı kod girdiniz.")
 
-        # 3. ŞİFRE SIFIRLAMA SEKME İÇERİĞİ
         with tab_forgot:
             with st.container(border=True):
                 if st.session_state.forgot_step == 1:
@@ -249,7 +244,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# TEMİZ VE TEKİL YAN MENÜ (ÇİFT MENÜ HATASI DÜZELTİLDİ)
+# TEMİZ VE TEKİL YAN MENÜ
 # =====================================================================
 with st.sidebar:
     st.image("https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png", use_container_width=True)
