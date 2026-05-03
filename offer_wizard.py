@@ -1,410 +1,253 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import database
-import customer_pages
-import model_management
-import offer_wizard
 import datetime
 import pandas as pd
-import hashlib
-import random
-import smtplib
-import sqlite3
-import uuid
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import json
+import os
+import base64
 
-# --- 1. SİSTEM YAPILANDIRMASI ---
-st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon="⚙️", layout="wide")
-
-# Şifreleme Fonksiyonu
-def hash_password(password):
-    return hashlib.sha256(str.encode(password)).hexdigest()
-
-def generate_code():
-    return str(random.randint(100000, 999999))
-
-# Gerçek E-Posta Motoru
-def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
-    SMTP_SERVER = "mail.ersanmakina.net"
-    SMTP_PORT = 587
-    SENDER_EMAIL = "sefa@ersanmakina.net"
-    SENDER_PASSWORD = "Sev32881-"
-
-    msg = MIMEMultipart()
-    msg['From'] = f"Ersan Makine B2B <{SENDER_EMAIL}>"
-    msg['To'] = to_email
-    msg['Subject'] = subject
-
-    body = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; color: #333;">
-        <h2 style="color: #0f172a;">Ersan Makine B2B Portalı</h2>
-        <p>Merhaba,</p>
-        <p>Sistem üzerinden yapılan işlem için gereken güvenlik kodunuz aşağıdadır:</p>
-        <div style="background-color: #f1f5f9; padding: 15px; border-left: 5px solid #3b82f6; font-size: 24px; font-weight: bold; letter-spacing: 5px;">
-            {code}
-        </div>
-        <hr style="border: 0; border-top: 1px solid #eee;">
-        <small style="color: #999;">Ersan Makine San. ve Tic. Ltd. Şti.</small>
-    </body>
-    </html>
-    """
-    msg.attach(MIMEText(body, 'html', 'utf-8'))
-
-    try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        return True
-    except Exception as e:
-        st.error(f"Mail gönderilemedi. Hata: {e}")
-        return False
-
-# =====================================================================
-# BAĞIMSIZ "users.db" VERİTABANI YÖNETİMİ
-# =====================================================================
-def exec_user_query(query, params=()):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute(query, params)
-    conn.commit()
-    conn.close()
-
-def get_user_query(query, params=()):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute(query, params)
-    res = c.fetchall()
-    conn.close()
-    return res
-
-def init_advanced_b2b():
-    exec_user_query("""CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        email TEXT UNIQUE, password TEXT, company_name TEXT, 
-        role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0,
-        user_type TEXT DEFAULT 'Satıcı', phone TEXT, 
-        is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT)""")
-        
-    admin_check = get_user_query("SELECT id FROM users WHERE email='admin@ersanmakina.net'")
-    if not admin_check:
-        exec_user_query("""INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type) 
-                           VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici')""", 
-                        ("admin@ersanmakina.net", hash_password("20132017")))
-
+def init_wizard_tables():
     database.exec_query("""CREATE TABLE IF NOT EXISTS offer_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT, offer_id INTEGER, option_id INTEGER, quantity INTEGER DEFAULT 1)""")
+    try:
+        of_cols = [c[1] for c in database.get_query("PRAGMA table_info(offers)")]
+        if "total_price" not in of_cols: database.exec_query("ALTER TABLE offers ADD COLUMN total_price REAL DEFAULT 0.0")
+        if "conditions" not in of_cols: database.exec_query("ALTER TABLE offers ADD COLUMN conditions TEXT DEFAULT ''")
+    except: pass
 
-init_advanced_b2b()
+# =====================================================================
+# GÖMÜLÜ ÖNİZLEME MOTORU (Başka dosyaya ihtiyaç duymaz)
+# =====================================================================
+def get_image_base64(img_path):
+    if not img_path or not os.path.exists(img_path): return ""
+    try:
+        with open(img_path, "rb") as f: b64 = base64.b64encode(f.read()).decode()
+        ext = os.path.splitext(img_path)[1].lower().replace('.', '')
+        return f"data:image/{ext if ext else 'png'};base64,{b64}"
+    except: return ""
 
-# --- 2. OTURUM DURUM YÖNETİMİ VE "SAYFAYI YENİLE" (F5) KORUMASI ---
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
-if "user_id" not in st.session_state: st.session_state.user_id = None
-if "user_role" not in st.session_state: st.session_state.user_role = None
-if "user_email" not in st.session_state: st.session_state.user_email = ""
+def generate_embedded_html(customer, model, base_price, machine_img, specs, selected_options, conditions, delivery_type, m_currency):
+    tarih = datetime.datetime.now().strftime("%d.%m.%Y")
+    m_qty = conditions.get("machine_qty", 1)
+    agreed_price = conditions.get("agreed_price", 0)
+    
+    m_img_b64 = get_image_base64(machine_img)
 
-if "reg_step" not in st.session_state: st.session_state.reg_step = 1
-if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
-if "temp_email" not in st.session_state: st.session_state.temp_email = ""
+    css = """
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #333; background: #fff; margin:0; padding:15px;}
+        .header { border-bottom: 2px solid #e67e22; padding-bottom: 10px; margin-bottom: 20px; }
+        .section-title { background: #1e293b; color: white; padding: 6px 12px; font-weight: bold; margin-top: 20px; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border-bottom: 1px solid #f1f5f9; padding: 10px; text-align: left; vertical-align: middle; }
+        th { color: #475569; }
+        .price-box { background: #f8fafc; border-left: 5px solid #e67e22; padding: 15px; text-align: right; margin-top: 20px; border-radius: 6px; }
+        .total-price { font-size: 32px; font-weight: 900; color: #e67e22; margin-top:5px; }
+    """
 
-if not st.session_state.logged_in:
-    current_token = st.query_params.get("session_token")
-    if current_token:
-        valid_user = get_user_query("SELECT id, user_type, is_approved, is_verified, role, email FROM users WHERE session_token=?", (current_token,))
-        if valid_user:
-            u_id, u_type, is_approved, is_verified, u_role, u_email = valid_user[0]
-            st.session_state.logged_in = True
-            st.session_state.user_id = u_id
-            st.session_state.user_role = u_role if u_role == 'admin' else ("manufacturer" if u_type == "Üretici" else "dealer")
-            st.session_state.user_email = u_email
+    html = f"""
+    <html><head><style>{css}</style></head><body>
+        <div class="header">
+            <table style="border:none; margin:0; padding:0;">
+                <tr>
+                    <td style="border:none; padding:0;"><h2 style="margin:0; color:#0f172a;">ERSAN MAKİNE</h2></td>
+                    <td align="right" style="border:none; padding:0; color:#64748b;">Tarih: {tarih}<br>Teklif No: TR-{datetime.datetime.now().strftime("%y%m%d")}</td>
+                </tr>
+            </table>
+        </div>
 
-# --- 3. CSS TASARIMI ---
-st.markdown("""
+        <div style="text-align:center; padding: 20px 0;">
+            <img src="{m_img_b64}" style="max-height:280px; object-fit:contain;"><br>
+            <h2 style="margin:15px 0 5px 0; color:#0f172a;">MODEL: {model}</h2>
+            <p style="font-size:16px; color:#475569; margin:0;">Sayın Yetkili: <b style="color:#0f172a;">{customer}</b></p>
+        </div>
+
+        <div class="section-title">🔍 MAKİNE ÖZELLİKLERİ VE DONANIMLAR</div>
+        <table>
+            <tr style="background:#f8fafc;">
+                <th>Görsel / Açıklama</th>
+                <th style="text-align:center;">Adet</th>
+                <th style="text-align:right;">Tutar</th>
+            </tr>
+            <tr>
+                <td><b style="font-size:14px; color:#0f172a;">{model} (Standart Donanım)</b></td>
+                <td style="text-align:center; font-weight:bold;">{m_qty}</td>
+                <td style="text-align:right; font-weight:bold;">{base_price*m_qty:,.2f} {m_currency}</td>
+            </tr>
+    """
+    
+    for opt in selected_options:
+        opt_img = get_image_base64(opt['i'])
+        img_tag = f'<img src="{opt_img}" style="max-width:50px; max-height:50px; border-radius:4px; margin-right:10px; float:left; object-fit:cover;">' if opt_img else ''
+        html += f"""
+            <tr>
+                <td>
+                    {img_tag}
+                    <b style="color:#10b981; font-size:14px;">+ {opt['n']}</b><br>
+                    <span style="font-size:11px; color:#64748b;">{opt['d']}</span>
+                </td>
+                <td style="text-align:center; font-weight:bold;">{opt['q']}</td>
+                <td style="text-align:right; font-weight:bold; color:#e67e22;">{(opt['p']*opt['q']):,.2f} {m_currency}</td>
+            </tr>
+        """
+
+    html += f"""
+        </table>
+
+        <div class="price-box">
+            <div style="font-size:14px; color:#64748b; font-weight:bold;">Teslimat: <span style="color:#e67e22;">{delivery_type}</span></div>
+            <div style="margin-top:15px; font-size:16px; font-weight:bold; color:#0f172a;">TOPLAM NET TUTAR (KDV Hariç)</div>
+            <div class="total-price">{agreed_price:,.2f} {m_currency}</div>
+        </div>
+        
+        <div style="margin-top:40px; font-size:11px; color:#94a3b8; text-align:center; border-top:1px solid #f1f5f9; padding-top:10px;">
+            Ersan Makine San. ve Tic. Ltd. Şti. | www.ersanmakina.net
+        </div>
+    </body></html>
+    """
+    return html
+
+# =====================================================================
+# ANA TEKLİF SİHİRBAZI FONKSİYONU
+# =====================================================================
+def show_offer_wizard(user_id, is_admin=False):
+    init_wizard_tables()
+    
+    st.markdown("""
     <style>
-    .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; text-align: center; margin-bottom: 15px;}
-    .stat-val { font-size: 32px; font-weight: 900; color: #1e293b; display: block; }
-    .stat-title { color: #64748b; text-transform: uppercase; font-size: 13px; font-weight: 700; }
+    .block-container { padding-top: 1rem; max-width: 99%; }
+    .opt-title { font-size: 12px !important; font-weight: 700; color: #1e293b; line-height: 1.2; }
+    .opt-price { font-size: 12px !important; font-weight: 800; color: #d97706; text-align: right; }
     </style>
     """, unsafe_allow_html=True)
-
-# --- 4. GİRİŞ, KAYIT VE ŞİFREMİ UNUTTUM EKRANI ---
-if not st.session_state.logged_in:
-    st.markdown("<h2 style='text-align: center; color: #0f172a;'>🚀 ERSAN MAKİNE B2B PORTALI</h2>", unsafe_allow_html=True)
-    st.markdown("---")
     
-    tab_login, tab_register, tab_forgot = st.tabs(["🔑 Sisteme Giriş", "📝 Yeni Üyelik", "❓ Şifremi Unuttum"])
-    
-    with tab_login:
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
-            login_email = st.text_input("E-Posta Adresi").strip().lower()
-            login_pwd = st.text_input("Şifre", type="password").strip()
-            
-            # YENİ EKLENEN: Beni Hatırla Seçeneği
-            remember_me = st.checkbox("Beni Hatırla", value=True)
-            
-            if st.button("Giriş Yap", use_container_width=True):
-                user = get_user_query("SELECT id, user_type, is_approved, is_verified, role FROM users WHERE email=? AND password=?", 
-                                         (login_email, hash_password(login_pwd)))
-                if user:
-                    u_id, u_type, is_approved, is_verified, u_role = user[0]
-                    if is_verified == 0:
-                        st.warning("⚠️ E-posta adresiniz doğrulanmamış! Lütfen önce kaydınızı tamamlayın.")
-                    elif is_approved == 0:
-                        st.warning("⏳ Hesabınız sistem yöneticisinin onayını bekliyor.")
-                    else:
-                        new_token = str(uuid.uuid4())
-                        exec_user_query("UPDATE users SET session_token=? WHERE id=?", (new_token, u_id))
-                        
-                        # Beni Hatırla işaretliyse token'ı URL'ye gömerek kalıcı yap
-                        if remember_me:
-                            st.query_params["session_token"] = new_token
-                            
-                        st.session_state.logged_in = True
-                        st.session_state.user_id = u_id
-                        st.session_state.user_role = u_role if u_role == 'admin' else ("manufacturer" if u_type == "Üretici" else "dealer")
-                        st.session_state.user_email = login_email
-                        st.rerun()
-                else:
-                    st.error("Hatalı e-posta veya şifre!")
-
-    with tab_register:
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
-            if st.session_state.reg_step == 1:
-                st.info("Zorunlu şirket bilgilerini giriniz.")
-                reg_type = st.selectbox("Faaliyet Türünüz *", ["Satıcı (Bayi)", "Üretici"])
-                reg_comp = st.text_input("Firma Tam Ünvanı *")
-                reg_phone = st.text_input("Firma İletişim Numarası *")
-                reg_email = st.text_input("Kurumsal E-Posta *").strip().lower()
-                reg_pwd = st.text_input("Sistem Şifresi Belirleyin *", type="password").strip()
-                
-                if st.button("Kayıt Ol ve E-Posta Doğrula", use_container_width=True):
-                    if all([reg_comp, reg_phone, reg_email, reg_pwd]):
-                        check_mail = get_user_query("SELECT id FROM users WHERE email=?", (reg_email,))
-                        if check_mail:
-                            st.error("Bu e-posta adresi zaten kayıtlı!")
-                        else:
-                            ver_code = generate_code()
-                            exec_user_query(
-                                "INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved) VALUES (?,?,?,?,?,?,0,0)",
-                                (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code)
-                            )
-                            if send_email(reg_email, ver_code, "Üyelik Doğrulama Kodu"):
-                                st.session_state.temp_email = reg_email
-                                st.session_state.reg_step = 2
-                                st.rerun()
-                    else:
-                        st.warning("Lütfen (*) ile işaretli tüm zorunlu alanları doldurun.")
-            
-            elif st.session_state.reg_step == 2:
-                st.success(f"{st.session_state.temp_email} adresine 6 haneli bir kod gönderdik.")
-                entered_code = st.text_input("Doğrulama Kodunu Giriniz", max_chars=6)
-                if st.button("Kodu Onayla", use_container_width=True):
-                    db_code = get_user_query("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,))
-                    if db_code and db_code[0][0] == entered_code:
-                        exec_user_query("UPDATE users SET is_verified=1, auth_code=NULL WHERE email=?", (st.session_state.temp_email,))
-                        st.session_state.reg_step = 1
-                        st.balloons()
-                        st.success("Tebrikler! E-postanız doğrulandı. Yöneticinin onayından sonra giriş yapabilirsiniz.")
-                    else:
-                        st.error("Hatalı kod girdiniz.")
-
-    with tab_forgot:
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
-            if st.session_state.forgot_step == 1:
-                f_email = st.text_input("Sisteme kayıtlı E-Posta Adresiniz").strip().lower()
-                if st.button("Şifre Sıfırlama Kodu Gönder", use_container_width=True):
-                    if f_email:
-                        user_exists = get_user_query("SELECT id FROM users WHERE email=?", (f_email,))
-                        if user_exists:
-                            reset_code = generate_code()
-                            exec_user_query("UPDATE users SET auth_code=? WHERE email=?", (reset_code, f_email))
-                            if send_email(f_email, reset_code, "Şifre Sıfırlama Kodu"):
-                                st.session_state.temp_email = f_email
-                                st.session_state.forgot_step = 2
-                                st.rerun()
-                        else:
-                            st.error("Sistemde böyle bir e-posta bulunamadı.")
-            
-            elif st.session_state.forgot_step == 2:
-                st.info(f"{st.session_state.temp_email} adresine sıfırlama kodu gönderildi.")
-                f_code = st.text_input("6 Haneli Sıfırlama Kodu", max_chars=6)
-                new_pwd = st.text_input("Yeni Şifreniz", type="password")
-                
-                if st.button("Şifremi Değiştir", use_container_width=True):
-                    valid_code = get_user_query("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,))
-                    if valid_code and valid_code[0][0] == f_code and len(new_pwd) > 0:
-                        exec_user_query("UPDATE users SET password=?, auth_code=NULL WHERE email=?", (hash_password(new_pwd), st.session_state.temp_email))
-                        st.session_state.forgot_step = 1
-                        st.success("Şifreniz başarıyla değiştirildi! Giriş sekmesinden hesabınıza erişebilirsiniz.")
-                    else:
-                        st.error("Hatalı kod veya boş şifre!")
-
-    st.stop()
-
-# --- 5. ANA PANEL VE YAN MENÜ ---
-with st.sidebar:
-    st.image("https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png")
-    
-    role_text = "Yönetici" if st.session_state.user_role == "admin" else ("Satıcı Bayi" if st.session_state.user_role == "dealer" else "Üretici Firma")
-    st.markdown(f"<div style='text-align:center; padding:10px; background:#1e293b; color:white; border-radius:5px; margin-bottom:15px;'>👤 {st.session_state.user_email}<br><small style='color:#cbd5e1;'>[{role_text}]</small></div>", unsafe_allow_html=True)
-    
-    menu_items = ["🏠 Dashboard"]
-    
-    if st.session_state.user_role == "admin":
-        menu_items.extend(["📄 Yeni Teklif Hazırla", "🏢 Bayi / Üretici Yönetimi", "📋 Tüm Teklifler", "📦 Tüm Modelleri Yönet", "👥 Müşterilerim"])
-    elif st.session_state.user_role == "dealer":
-        menu_items.extend(["📄 Yeni Teklif Hazırla", "👥 Müşterilerim", "📋 Geçmiş Tekliflerim"])
-    elif st.session_state.user_role == "manufacturer":
-        menu_items.extend(["📖 Ürün Kataloğu (Teknik)"])
-        
-    menu = st.radio("MENÜ", menu_items)
-    st.markdown("---")
-    
-    if st.button("🚪 Oturumu Kapat", use_container_width=True):
-        if st.session_state.user_id:
-            exec_user_query("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
-        st.query_params.clear()
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
-
-# --- 6. SAYFA İÇERİKLERİ ---
-
-if menu == "🏠 Dashboard":
-    st.header("Sistem Özeti")
-    if st.session_state.user_role == "admin":
-        u_count = get_user_query("SELECT COUNT(*) FROM users WHERE is_approved=1 AND role!='admin'")[0][0]
-        c_count = database.get_query("SELECT COUNT(*) FROM customers")[0][0]
-        o_count = database.get_query("SELECT COUNT(*) FROM offers")[0][0]
-        col1, col2, col3 = st.columns(3)
-        col1.markdown(f'<div class="stat-card"><span class="stat-title">Onaylı Üyeler</span><span class="stat-val">{u_count}</span></div>', unsafe_allow_html=True)
-        col2.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Sistemdeki Müşteriler</span><span class="stat-val">{c_count}</span></div>', unsafe_allow_html=True)
-        col3.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><span class="stat-title">Kesilen Teklifler</span><span class="stat-val">{o_count}</span></div>', unsafe_allow_html=True)
-    
-    elif st.session_state.user_role == "dealer":
-        c_count = database.get_query("SELECT COUNT(*) FROM customers WHERE user_id=?", (st.session_state.user_id,))[0][0]
-        o_count = database.get_query("SELECT COUNT(*) FROM offers WHERE user_id=?", (st.session_state.user_id,))[0][0]
-        col1, col2 = st.columns(2)
-        col1.markdown(f'<div class="stat-card"><span class="stat-title">Kayıtlı Müşterilerim</span><span class="stat-val">{c_count}</span></div>', unsafe_allow_html=True)
-        col2.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Verdiğim Teklifler</span><span class="stat-val">{o_count}</span></div>', unsafe_allow_html=True)
-    
-    elif st.session_state.user_role == "manufacturer":
-        m_count = database.get_query("SELECT COUNT(*) FROM models")[0][0]
-        st.markdown(f'<div class="stat-card"><span class="stat-title">Ersan Makine Ürün Gamı (Adet)</span><span class="stat-val">{m_count}</span></div>', unsafe_allow_html=True)
-        st.info("Üretici girişi yaptığınız için fiyatlandırma ve müşteri teklif sistemleri gizlenmiştir. Sol menüden makinelerin teknik dokümanlarını inceleyebilirsiniz.")
-
-elif menu == "👥 Müşterilerim":
-    is_admin = (st.session_state.user_role == "admin")
-    customer_pages.show_customer_management(st.session_state.user_id, is_admin)
-
-elif menu == "📦 Tüm Modelleri Yönet":
-    model_management.show_product_management()
-
-elif menu == "📄 Yeni Teklif Hazırla":
-    is_admin = (st.session_state.user_role == "admin")
-    offer_wizard.show_offer_wizard(st.session_state.user_id, is_admin)
-
-elif menu == "📋 Geçmiş Tekliflerim":
-    st.header("📋 Geçmiş Tekliflerim")
-    my_offers = database.get_query("""
-        SELECT o.offer_date, c.company_name, m.name, o.total_price 
-        FROM offers o JOIN customers c ON o.customer_id = c.id LEFT JOIN models m ON o.model_id = m.id
-        WHERE o.user_id = ? ORDER BY o.id DESC""", (st.session_state.user_id,))
-    if my_offers: 
-        st.dataframe(pd.DataFrame(my_offers, columns=["Tarih", "Müşteri", "Model", "Tutar"]), use_container_width=True)
+    if is_admin:
+        my_custs = database.get_query("SELECT id, company_name FROM customers ORDER BY company_name")
     else:
-        st.info("Henüz oluşturduğunuz bir teklif bulunmuyor.")
-
-elif menu == "📖 Ürün Kataloğu (Teknik)":
-    st.header("📖 Makine Teknik Kataloğu")
-    st.info("Makinelerin sadece donanım ve teknik özellikleri gösterilmektedir. Fiyat bilgisi yetkiniz dışındadır.")
-    models = database.get_query("SELECT name, category, specs FROM models")
-    if models:
-        st.dataframe(pd.DataFrame(models, columns=["Makine Modeli", "Kategori", "Teknik Özellikler"]), use_container_width=True)
-    else:
-        st.write("Sistemde kayıtlı makine yok.")
-
-elif menu == "🏢 Bayi / Üretici Yönetimi":
-    st.header("🏢 Üyelik Onay ve Yönetim Sistemi")
+        my_custs = database.get_query("SELECT id, company_name FROM customers WHERE user_id=? ORDER BY company_name", (user_id,))
     
-    st.subheader("⏳ E-Postasını Doğrulamış, Onay Bekleyenler")
-    pending = get_user_query("SELECT id, company_name, user_type, email, phone FROM users WHERE is_approved=0 AND is_verified=1 AND role!='admin'")
-    if pending:
-        for p_id, p_name, p_type, p_email, p_phone in pending:
-            with st.container(border=True):
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.markdown(f"**Firma:** {p_name} ({p_type}) | **Tel:** {p_phone} | **E-Posta:** {p_email}")
-                with col2:
-                    if st.button("✅ Sistemi Aç", key=f"app_{p_id}", use_container_width=True):
-                        exec_user_query("UPDATE users SET is_approved=1 WHERE id=?", (p_id,))
-                        st.rerun()
-    else:
-        st.info("Şu an onay bekleyen başvuru yok.")
-        
-    st.markdown("---")
-    st.subheader("✅ Aktif Sistem Üyeleri ve Düzenleme Paneli")
-    active = get_user_query("SELECT id, company_name, user_type, email, phone FROM users WHERE is_approved=1 AND role!='admin' ORDER BY id DESC")
-    
-    if active:
-        df_active = pd.DataFrame(active, columns=["ID", "Firma Adı", "Hesap Türü", "E-Posta", "Telefon"])
-        st.dataframe(df_active.drop(columns=["ID"]), use_container_width=True)
-        
-        st.markdown("#### 📝 Bayi / Üretici Düzenle veya Sil")
-        user_options = [f"{row[0]} - {row[1]} ({row[2]})" for row in active]
-        selected_user_str = st.selectbox("İşlem yapılacak üyeyi seçin:", ["Seçiniz..."] + user_options)
-        
-        if selected_user_str != "Seçiniz...":
-            selected_u_id = int(selected_user_str.split(" - ")[0])
-            u_info = [u for u in active if u[0] == selected_u_id][0]
-            
-            with st.form("edit_user_form"):
-                e_comp = st.text_input("Firma Adı", value=u_info[1])
-                type_index = 0 if "Satıcı" in str(u_info[2]) else 1
-                e_type = st.selectbox("Hesap Türü", ["Satıcı (Bayi)", "Üretici"], index=type_index)
-                e_email = st.text_input("E-Posta", value=u_info[3])
-                e_phone = st.text_input("Telefon", value=u_info[4])
-                
-                submit_u = st.form_submit_button("🔄 BİLGİLERİ GÜNCELLE", use_container_width=True)
-                
-            if submit_u:
-                exec_user_query("UPDATE users SET company_name=?, user_type=?, email=?, phone=? WHERE id=?", (e_comp, e_type, e_email, e_phone, selected_u_id))
-                st.success("Üye bilgileri başarıyla güncellendi!")
-                st.rerun()
-            
-            st.write("")
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
-                if st.button("🚫 Onayı İptal Et (Askıya Al)", use_container_width=True):
-                    exec_user_query("UPDATE users SET is_approved=0, session_token=NULL WHERE id=?", (selected_u_id,))
-                    st.warning("Kullanıcı askıya alındı. Onay bekleyenler listesine geri döndü ve sistemden atıldı.")
-                    st.rerun()
-            with col_b2:
-                if st.button("🗑️ Üyeyi Sistemden Tamamen Sil", use_container_width=True):
-                    exec_user_query("DELETE FROM users WHERE id=?", (selected_u_id,))
-                    st.error("Üye sistemden tamamen silindi!")
-                    st.rerun()
-    else:
-        st.info("Sistemde henüz aktif bayi veya üretici bulunmuyor.")
+    if not my_custs:
+        st.warning("⚠️ Önce müşteri eklemelisiniz.")
+        return
 
-elif menu == "📋 Tüm Teklifler":
-    st.header("Sistemdeki Tüm Teklifler")
-    all_offers = database.get_query("""
-        SELECT o.user_id, c.company_name, o.total_price, o.offer_date 
-        FROM offers o JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC""")
-        
-    if all_offers: 
-        final_list = []
-        for o_user_id, c_name, t_price, o_date in all_offers:
-            u_info = get_user_query("SELECT company_name FROM users WHERE id=?", (o_user_id,))
-            dealer_name = u_info[0][0] if u_info else "Bilinmeyen Bayi"
-            final_list.append([dealer_name, c_name, t_price, o_date])
+    col_left, col_mid, col_right = st.columns([1.1, 1.2, 2.7], gap="small")
+
+    engine_options_list = []
+    selected_options_for_db = []
+    selected_options_total = 0.0
+
+    # ----------------------------------------------------------
+    # SOL KOLON: AYARLAR
+    # ----------------------------------------------------------
+    with col_left:
+        st.markdown("<h6 style='font-weight:800; margin-bottom:0px;'>⚙️ AYARLAR</h6>", unsafe_allow_html=True)
+        with st.container(border=True):
+            f_currency = st.selectbox("Birim", ["USD", "EUR", "RMB", "TRY"], label_visibility="collapsed")
+            cats = database.get_query("SELECT name FROM categories ORDER BY id")
+            cat_list = ["Tüm Kategoriler"] + [c[0] for c in cats] if cats else ["Tüm Kategoriler"]
+            f_category = st.selectbox("Kategori", cat_list, label_visibility="collapsed")
+            selected_cust_name = st.selectbox("Müşteri", [c[1] for c in my_custs])
+            selected_cust_id = [c[0] for c in my_custs if c[1] == selected_cust_name][0]
+
+            if f_category == "Tüm Kategoriler":
+                model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=?", (f_currency,))
+            else:
+                model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=? AND category=?", (f_currency, f_category))
+
+            if not model_data:
+                st.error("Model yok.")
+                return
+
+            selected_model = st.selectbox("Makine Seçin", [m[1] for m in model_data])
+            m_info = [m for m in model_data if m[1] == selected_model][0]
+            m_id, m_price, m_currency, comp_opts_str, m_port_disc, m_img_path, m_specs = m_info[0], m_info[2], m_info[3], m_info[4], m_info[5], m_info[6], m_info[7]
+            m_qty = st.number_input("Adet", min_value=1, value=1)
+            delivery_type = st.selectbox("Teslimat", ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Gümrük İşlemleri Yapılmadan Limandan Devir"])
+
+        multiplier = 1.0
+        if "Liman" in delivery_type and m_port_disc:
+            multiplier = 1.0 - (float(m_port_disc) / 100.0)
+
+    # ----------------------------------------------------------
+    # ORTA KOLON: DONANIMLAR
+    # ----------------------------------------------------------
+    with col_mid:
+        st.markdown("<h6 style='color:#1d4ed8; font-weight:800; margin-bottom:0px;'>🔌 DONANIMLAR</h6>", unsafe_allow_html=True)
+        hide_specs = st.checkbox("Özellikleri Gizle", value=False)
+        with st.container(height=550):
+            if comp_opts_str:
+                comp_opt_ids = [opt.strip() for opt in str(comp_opts_str).split(",") if opt.strip()]
+                if comp_opt_ids:
+                    placeholders = ",".join("?" * len(comp_opt_ids))
+                    opts_query = f"SELECT id, opt_name, opt_price, currency, opt_desc, opt_image FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC"
+                    compatible_options = database.get_query(opts_query, tuple(comp_opt_ids))
+                    for opt in compatible_options:
+                        o_id, o_name, o_price, o_curr, o_desc, o_img = opt
+                        d_o_price = float(o_price) * multiplier
+                        with st.container(border=True):
+                            c_img, c_main = st.columns([1.2, 4])
+                            with c_img:
+                                if o_img and os.path.isfile(o_img):
+                                    try:
+                                        with open(o_img, "rb") as f: st.image(f.read(), use_container_width=True)
+                                    except: st.markdown("📷")
+                                else: st.markdown("📷")
+                            with c_main:
+                                st.markdown(f"<div class='opt-title'>{o_name}</div>", unsafe_allow_html=True)
+                                st.markdown(f"<div class='opt-price'>+ {d_o_price:,.0f} {o_curr}</div>", unsafe_allow_html=True)
+                                c_qty, c_chk = st.columns([2, 1])
+                                with c_chk: is_sel = st.checkbox("", key=f"c_{o_id}")
+                                with c_qty:
+                                    if is_sel:
+                                        o_qty = st.number_input("Adet", min_value=1, value=1, key=f"q_{o_id}", label_visibility="collapsed")
+                                        selected_options_total += (d_o_price * o_qty)
+                                        selected_options_for_db.append({"id": o_id, "qty": o_qty})
+                                        engine_options_list.append({'n': o_name, 'p': d_o_price, 'q': o_qty, 'i': o_img, 'd': o_desc, 's': o_curr})
+
+    # ----------------------------------------------------------
+    # HESAPLAMALAR VE ÖNİZLEME (SOL ALT VE SAĞ)
+    # ----------------------------------------------------------
+    sub_total = ((float(m_price) * multiplier) * m_qty) + selected_options_total
+    
+    with col_left:
+        with st.container(border=True):
+            st.caption(f"Liste: {sub_total:,.2f} {m_currency}")
+            discount_pct = st.number_input("İskonto %", min_value=0.0, max_value=100.0, value=0.0, step=0.5)
+            final_price = sub_total * (1 - (discount_pct / 100.0))
+            agreed_price = st.number_input("Net Fiyat", min_value=0.0, value=final_price, step=100.0)
+
+        conditions_data = {
+            "machine_qty": m_qty, "discount_pct": discount_pct, "subtotal_calculated": sub_total,
+            "agreed_price": agreed_price, "hide_specs": hide_specs, "delivery_type": delivery_type
+        }
+
+        # GÖMÜLÜ MOTOR İLE HTML ÜRETİMİ
+        html_preview = generate_embedded_html(
+            customer=selected_cust_name, model=selected_model, 
+            base_price=float(m_price) * multiplier, machine_img=m_img_path,
+            specs=m_specs, selected_options=engine_options_list, 
+            conditions=conditions_data, delivery_type=delivery_type, m_currency=m_currency
+        )
+
+        st.write("")
+        if st.button("💾 TEKLİFİ KAYDET", use_container_width=True, type="primary"):
+            try:
+                tarih = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+                cond_str = json.dumps(conditions_data)
+                database.exec_query("INSERT INTO offers (customer_id, model_id, total_price, user_id, offer_date, conditions) VALUES (?,?,?,?,?,?)",
+                                   (selected_cust_id, m_id, agreed_price, user_id, tarih, cond_str))
+                res_id = database.get_query("SELECT id FROM offers WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
+                if res_id and selected_options_for_db:
+                    new_id = res_id[0][0]
+                    for item in selected_options_for_db:
+                        database.exec_query("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", (new_id, item["id"], item["qty"]))
+                st.success("Sisteme Kaydedildi!")
+                st.balloons()
+            except Exception as e: st.error(f"Kayıt Hatası: {e}")
             
-        st.dataframe(pd.DataFrame(final_list, columns=["Bayi", "Müşteri", "Tutar", "Tarih"]), use_container_width=True)
-    else:
-        st.info("Sistemde hiç teklif bulunmuyor.")
+        st.info("💡 **PDF Almak İçin:** Sağdaki teklif raporunun herhangi bir yerine tıklayıp **CTRL+P** (Mac'te CMD+P) tuşuna basarak 'PDF Olarak Kaydet' diyebilirsiniz.")
+
+    # SAĞ KOLON: ÖNİZLEME
+    with col_right:
+        st.markdown("<h6 style='font-weight:800; margin-bottom:0px;'>📄 CANLI ÖNİZLEME</h6>", unsafe_allow_html=True)
+        components.html(html_preview, height=800, scrolling=True)
