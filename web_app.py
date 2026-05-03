@@ -86,8 +86,6 @@ for key in ["user_id", "user_role", "user_email"]:
     if key not in st.session_state: st.session_state[key] = None
 if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
-
-# HATA ÇÖZÜMÜ: Ana Menü Değişkeni Değiştirildi
 if "active_tab" not in st.session_state: st.session_state.active_tab = ":house: Dashboard"
 
 if not st.session_state.logged_in:
@@ -187,7 +185,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ YAN MENÜ (HATA ÇÖZÜMÜ)
+# GÜVENLİ YAN MENÜ
 # =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 20px;'><img src='{get_system_logo()}' style='max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
@@ -197,16 +195,12 @@ with st.sidebar:
     menu_items = [":house: Dashboard", ":page_facing_up: Yeni Teklif Hazırla", ":busts_in_silhouette: Müşterilerim", ":clipboard: Geçmiş Tekliflerim", ":gear: Profil Ayarlarım"]
     if st.session_state.user_role == "admin": menu_items.extend([":office: Bayi Yönetimi", ":package: Tüm Modelleri Yönet"])
     
-    # HATA ÇÖZÜMÜ: Yönlendirme güvenli hale getirildi
     try: m_idx = menu_items.index(st.session_state.active_tab)
     except: m_idx = 0
         
-    def _on_menu_change():
-        st.session_state.active_tab = st.session_state._menu_radio
-        
+    def _on_menu_change(): st.session_state.active_tab = st.session_state._menu_radio
     menu = st.radio("SİSTEM MENÜSÜ", menu_items, index=m_idx, key="_menu_radio", on_change=_on_menu_change, label_visibility="collapsed")
     
-    # Mobilde menü gizleme kodu
     components.html("""<script>const doc=window.parent.document;doc.querySelectorAll('div[data-testid="stSidebar"] .stRadio label').forEach(r=>{r.addEventListener('click',()=>{if(window.parent.innerWidth<=768){setTimeout(()=>{let b=doc.querySelector('div[data-testid="stSidebar"] + div');if(b)b.click();doc.dispatchEvent(new KeyboardEvent('keydown',{'key':'Escape'}));},100);}});});</script>""", height=0, width=0)
     
     st.markdown("---")
@@ -215,7 +209,34 @@ with st.sidebar:
         st.query_params.clear(); st.session_state.clear(); st.rerun()
 
 # =====================================================================
-# SAYFA İÇERİKLERİ VE YÖNLENDİRMELER
+# SAYFA İÇERİKLERİ: DÜZENLE VE KOPYALA MOTORU YARDIMCISI
+# =====================================================================
+def load_offer_to_wizard(off_id):
+    for key in list(st.session_state.keys()):
+        if key.startswith("o_") or key.startswith("q_") or key == "temp_del_type": del st.session_state[key]
+    
+    off_data = database.get_query("SELECT customer_id, model_id, conditions FROM offers WHERE id=?", (off_id,))[0]
+    conds = json.loads(off_data[2]) if off_data[2] else {}
+    m_data = database.get_query("SELECT name, base_price, currency, compatible_options, image_path, specs, port_discount FROM models WHERE id=?", (off_data[1],))[0]
+    c_name = database.get_query("SELECT company_name FROM customers WHERE id=?", (off_data[0],))[0][0]
+    
+    st.session_state.wizard_data = {
+        "cust_id": off_data[0], "cust_name": c_name, "m_id": off_data[1], "m_name": m_data[0],
+        "m_price": m_data[1], "m_curr": m_data[2], "m_opts": m_data[3], "m_img": m_data[4], "m_specs": m_data[5], "m_disc": m_data[6], 
+        "qty": conds.get("machine_qty", 1), "d_time": conds.get("delivery_time", ""), "ship": conds.get("shipping", ""),
+        "pay": conds.get("payment_plan_text", ""), "bnk": conds.get("bank", ""), "nts": conds.get("notes", ""), "disc_p": conds.get("discount_pct", 0.0)
+    }
+    
+    opt_items = database.get_query("SELECT option_id, quantity FROM offer_items WHERE offer_id=?", (off_id,))
+    for op_id, o_qty in opt_items:
+        st.session_state[f"o_{op_id}"] = True
+        st.session_state[f"q_{op_id}"] = o_qty
+        
+    st.session_state["temp_del_type"] = conds.get("delivery_type", "Gümrük İşlemleri Yapılmış Antrepo Teslim")
+    st.session_state.wizard_step = 2
+
+# =====================================================================
+# SAYFA YÖNLENDİRMELERİ
 # =====================================================================
 if st.session_state.active_tab == ":house: Dashboard":
     st.header(":bar_chart: Analiz Paneli")
@@ -240,64 +261,45 @@ if st.session_state.active_tab == ":house: Dashboard":
                         database.exec_query("UPDATE offers SET status=? WHERE id=?", (new_stat, oid))
                         st.toast(f"Teklif #{oid} güncellendi!"); st.rerun()
 
-# ---------------- TEKLİF DÜZENLEME MOTORU ----------------
+# ---------------- YENİ KART SİSTEMLİ GEÇMİŞ TEKLİFLER ----------------
 elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
     st.header(":clipboard: Geçmiş Tekliflerim")
     offers = database.get_query("""SELECT o.id, c.company_name, m.name, o.offer_date, o.total_price, o.status FROM offers o JOIN customers c ON o.customer_id = c.id JOIN models m ON o.model_id = m.id WHERE o.user_id=? ORDER BY o.id DESC""", (st.session_state.user_id,))
     
     if offers:
-        df = pd.DataFrame(offers, columns=["Kayıt No", "Müşteri", "Model", "Tarih", "Tutar", "Durum"])
-        st.dataframe(df.set_index("Kayıt No"), use_container_width=True)
-        
-        st.markdown("---")
-        st.subheader(":gear: Teklif İşlemleri (Düzenle / Sil)")
-        
-        offer_dict = {f"Teklif #{o[0]} - {o[1]} ({o[2]})": o[0] for o in offers}
-        sel_off = st.selectbox("İşlem yapılacak teklifi seçin:", ["Seçiniz..."] + list(offer_dict.keys()))
-        
-        if sel_off != "Seçiniz...":
-            off_id = offer_dict[sel_off]
-            c1, c2, c3 = st.columns([2, 2, 1])
+        for off in offers:
+            off_id, c_name, m_name, o_date, t_price, o_status = off
             
-            if c1.button(":pencil2: Bu Teklifi Geri Çağır ve Düzenle", type="primary", use_container_width=True):
-                # 1. Eski donanım ve şart belleklerini temizle
-                for key in list(st.session_state.keys()):
-                    if key.startswith("o_") or key.startswith("q_") or key == "temp_del_type": del st.session_state[key]
+            # Renkli Durum Bildirgesi
+            status_color = "#10b981" if o_status == "Onaylandı" else ("#ef4444" if o_status == "Reddedildi" else "#f59e0b")
+            
+            with st.container(border=True):
+                st.markdown(f"<h4 style='margin:0; color:#0f172a;'>{c_name}</h4>", unsafe_allow_html=True)
+                st.markdown(f"**Model:** {m_name} | **Tarih:** {o_date}")
+                st.markdown(f"**Tutar:** <span style='color:#ea580c; font-size:16px; font-weight:bold;'>{t_price:,.2f}</span> | **Durum:** <span style='color:{status_color}; font-weight:bold;'>{o_status}</span>", unsafe_allow_html=True)
                 
-                # 2. Verileri DB'den topla
-                off_data = database.get_query("SELECT customer_id, model_id, conditions FROM offers WHERE id=?", (off_id,))[0]
-                conds = json.loads(off_data[2]) if off_data[2] else {}
-                m_data = database.get_query("SELECT name, base_price, currency, compatible_options, image_path, specs, port_discount FROM models WHERE id=?", (off_data[1],))[0]
-                c_name = database.get_query("SELECT company_name FROM customers WHERE id=?", (off_data[0],))[0][0]
+                st.write("")
+                btn_col1, btn_col2, btn_col3 = st.columns(3)
                 
-                # 3. Sihirbazı Doldur
-                st.session_state.wizard_data = {
-                    "cust_id": off_data[0], "cust_name": c_name, "m_id": off_data[1], "m_name": m_data[0],
-                    "m_price": m_data[1], "m_curr": m_data[2], "m_opts": m_data[3], "m_img": m_data[4], "m_specs": m_data[5], "m_disc": m_data[6], 
-                    "qty": conds.get("machine_qty", 1), "d_time": conds.get("delivery_time", ""), "ship": conds.get("shipping", ""),
-                    "pay": conds.get("payment_plan_text", ""), "bnk": conds.get("bank", ""), "nts": conds.get("notes", ""), "disc_p": conds.get("discount_pct", 0.0)
-                }
-                
-                # 4. Seçili Opsiyonları Geri Getir
-                opt_items = database.get_query("SELECT option_id, quantity FROM offer_items WHERE offer_id=?", (off_id,))
-                for op_id, o_qty in opt_items:
-                    st.session_state[f"o_{op_id}"] = True
-                    st.session_state[f"q_{op_id}"] = o_qty
+                if btn_col1.button(":pencil2: Düzenle", key=f"ed_{off_id}", use_container_width=True):
+                    load_offer_to_wizard(off_id)
+                    st.session_state.edit_offer_id = off_id # Üzerine yazma bayrağı
+                    st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
+                    if "_menu_radio" in st.session_state: del st.session_state["_menu_radio"]
+                    st.rerun()
                     
-                st.session_state["temp_del_type"] = conds.get("delivery_type", "Gümrük İşlemleri Yapılmış Antrepo Teslim")
-                st.session_state.edit_offer_id = off_id
-                st.session_state.wizard_step = 2
-                
-                # 5. SİHİRBAZA GÜVENLİ YÖNLENDİR (Hata veren yer burasıydı)
-                st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
-                if "_menu_radio" in st.session_state:
-                    del st.session_state["_menu_radio"]
-                st.rerun()
-                
-            if c2.button(":wastebasket: Teklifi Sistemden Sil", use_container_width=True):
-                database.exec_query("DELETE FROM offers WHERE id=?", (off_id,))
-                database.exec_query("DELETE FROM offer_items WHERE offer_id=?", (off_id,))
-                st.error("Teklif silindi!"); st.rerun()
+                if btn_col2.button(":page_facing_up: Kopyala", key=f"cp_{off_id}", use_container_width=True):
+                    load_offer_to_wizard(off_id)
+                    # edit_offer_id set ETMİYORUZ, böylece kaydederken YENİ TEKLİF açar
+                    if 'edit_offer_id' in st.session_state: del st.session_state.edit_offer_id
+                    st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
+                    if "_menu_radio" in st.session_state: del st.session_state["_menu_radio"]
+                    st.rerun()
+                    
+                if btn_col3.button(":wastebasket: Sil", key=f"rm_{off_id}", use_container_width=True):
+                    database.exec_query("DELETE FROM offers WHERE id=?", (off_id,))
+                    database.exec_query("DELETE FROM offer_items WHERE offer_id=?", (off_id,))
+                    st.rerun()
     else:
         st.info("Henüz geçmiş bir teklifiniz bulunmuyor.")
 
