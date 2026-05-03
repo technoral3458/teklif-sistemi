@@ -357,7 +357,7 @@ elif menu == "📋 Geçmiş Tekliflerim":
     offers = database.get_query("SELECT offer_date, total_price, status FROM offers WHERE user_id=? ORDER BY id DESC", (st.session_state.user_id,))
     if offers: st.dataframe(pd.DataFrame(offers, columns=["Tarih", "Tutar", "Durum"]), use_container_width=True)
 
-elif menu == "📦 Tüm Modelleri Yönet":
+elif menu == "📦 Tüm Modelleri Yönettttt":
     model_management.show_product_management()
 
 elif menu == "🏢 Bayi Yönetimi":
