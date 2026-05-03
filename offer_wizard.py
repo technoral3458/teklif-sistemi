@@ -46,24 +46,37 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     logo_b64 = get_image_base64(comp_logo)
     header_logo_html = f'<img src="{logo_b64}" style="max-height:70px;">' if logo_b64 else f'<div style="font-size:24px; font-weight:900; color:#1e293b;">{comp_name}</div>'
 
+    # MOBİL VE A4 SİMÜLASYONU İÇİN ÖZEL CSS
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-        body { font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; background: #f8fafc; margin:0; padding:20px; }
-        .paper { background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 1000px; margin: 0 auto; }
-        .header { border-bottom: 3px solid #e67e22; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
-        .section-title { background: #0f172a; color: white; padding: 8px 15px; font-weight: 600; font-size: 14px; margin-top: 30px; border-radius: 6px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border-bottom: 1px solid #e2e8f0; padding: 12px 10px; text-align: left; vertical-align: middle; }
-        .price-box { background: #fffbeb; border: 2px solid #fed7aa; padding: 20px; text-align: right; margin-top: 30px; border-radius: 8px; }
-        .total-price { font-size: 32px; font-weight: 800; color: #ea580c; }
-        .elegant-conditions { margin-top: 40px; background: #f8fafc; padding: 25px; border-radius: 8px; border-left: 5px solid #3b82f6; page-break-inside: avoid; }
-        .elegant-conditions td { border: none; padding: 6px 0; font-size: 13px; color: #475569; }
-        .print-btn { background: #10b981; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 20px; font-weight: bold; text-transform: uppercase; }
-        @media print { .no-print { display: none !important; } .paper { box-shadow: none; padding: 0; margin: 0; } body { background: #fff; padding: 0; } .page-break { page-break-before: always; } }
+        body { font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; background: #cbd5e1; margin:0; padding:20px; display: flex; flex-direction: column; align-items: center; }
+        .paper { background: #fff; width: 100%; max-width: 210mm; min-height: 297mm; padding: 40px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border-top: 8px solid #2563eb; border-radius: 4px; margin-bottom: 20px; box-sizing: border-box; }
+        .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
+        .section-title { background: #f8fafc; color: #0f172a; padding: 8px 15px; font-weight: 800; font-size: 14px; margin-top: 30px; border-left: 4px solid #2563eb; text-transform: uppercase; }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; min-width: 500px; }
+        th, td { border-bottom: 1px solid #f1f5f9; padding: 12px 10px; text-align: left; vertical-align: middle; }
+        .price-box { background: #fffbeb; border: 1px solid #fde68a; padding: 20px; text-align: right; margin-top: 30px; border-radius: 4px; }
+        .total-price { font-size: 28px; font-weight: 800; color: #ea580c; }
+        .elegant-conditions { margin-top: 40px; background: #f8fafc; padding: 20px; border-left: 4px solid #eab308; }
+        .elegant-conditions table { min-width: 100%; }
+        .elegant-conditions td { padding: 8px 5px; font-size: 13px; color: #334155; }
+        .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; max-width: 210mm; margin-bottom: 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        /* MOBİL EKRANLAR İÇİN TAM UYUM */
+        @media (max-width: 768px) { 
+            body { padding: 10px 5px; }
+            .paper { padding: 20px; min-height: auto; border-top-width: 5px; }
+            .header { flex-direction: column; text-align: center; }
+            .header div { text-align: center !important; margin-bottom: 10px; }
+            .elegant-conditions td { display: block; width: 100%; padding: 4px 0; }
+            .elegant-conditions td:first-child { font-weight: bold; color: #0f172a; border-bottom: 1px dashed #cbd5e1; margin-top: 10px; }
+        }
+        @media print { .no-print { display: none !important; } .paper { box-shadow: none; border: none; width: 100%; max-width: 100%; padding: 0; } body { background: #fff; padding: 0; } }
     """
 
     html = f"""
-    <html><head><meta charset="utf-8"><style>{css}</style></head><body>
+    <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><body>
         <div class="no-print"><button class="print-btn" onclick="window.print()">🖨️ PDF OLARAK KAYDET / YAZDIR</button></div>
         <div class="paper">
             <div class="header">
@@ -80,27 +93,29 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     """
 
     if specs and str(specs).strip():
-        html += '<div class="section-title">🔍 MAKİNE STANDART ÖZELLİKLERİ</div><table>'
+        html += '<div class="section-title">🔍 MAKİNE STANDART ÖZELLİKLERİ</div><div class="table-responsive"><table>'
         for item in [x for x in str(specs).split("||") if x.strip()]:
             parts = item.split("|")
             t_spec = parts[0].strip() if len(parts) > 0 else ""
             d_spec = parts[1].strip() if len(parts) > 1 else ""
             img_tag = f'<img src="{get_image_base64(parts[2].strip() if len(parts)>2 else "")}" style="max-width:60px; max-height:40px; border-radius:4px;">' if (len(parts)>2 and parts[2].strip()) else ""
             html += f'<tr><td width="10%" style="text-align:center;">{img_tag}</td><td width="90%"><b>{t_spec}</b><br><small style="color:#64748b;">{d_spec}</small></td></tr>'
-        html += "</table>"
+        html += "</table></div>"
 
     html += f"""
         <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
+        <div class="table-responsive">
         <table><tr style="background:#f8fafc;"><th>Açıklama</th><th style="text-align:center;">Adet</th><th style="text-align:right;">Tutar</th></tr>
         <tr><td><b>{model} (Standart Donanım)</b></td><td style="text-align:center;">{m_qty}</td><td style="text-align:right;">{base_price*m_qty:,.2f} {m_currency}</td></tr>"""
     for opt in selected_options:
         html += f"<tr><td><b style='color:#2563eb;'>+ {opt['n']}</b><br><small>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
-    html += "</table>"
+    html += "</table></div>"
 
     html += f"""
         <div class="elegant-conditions">
             <div style="font-size: 15px; font-weight: bold; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 12px;">📌 Ticari ve Teknik Şartlar</div>
             <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">Değerli müşterimiz, sizlere sunmuş olduğumuz bu teklif kapsamındaki teslimat ve ödeme detayları aşağıdadır:</p>
+            <div class="table-responsive">
             <table>
                 <tr><td width="30%"><b>Teslimat Şekli:</b></td><td style="color:#ea580c; font-weight:bold;">{conditions.get('delivery_type','')}</td></tr>
                 <tr><td><b>Teslim Süresi:</b></td><td>{conditions.get('delivery_time','')}</td></tr>
@@ -108,6 +123,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
                 <tr><td><b>Ödeme Planı:</b></td><td>{conditions.get('payment_plan_text','')}</td></tr>
                 <tr><td><b>Banka Bilgileri:</b></td><td>{conditions.get('bank','')}</td></tr>
             </table>
+            </div>
         </div>
         <div class="price-box">
             <div style="font-size:15px; font-weight:bold; color:#ea580c; text-transform:uppercase;">Genel Toplam (KDV Hariç)</div>
@@ -134,7 +150,6 @@ def show_offer_wizard(user_id, is_admin=False):
 
     # ADIM 1
     if st.session_state.wizard_step == 1:
-        # Eğer geçmiş teklif düzenlemesinden dönüldüyse hafızayı temizle
         if 'edit_offer_id' in st.session_state: del st.session_state.edit_offer_id
         for key in list(st.session_state.keys()):
             if key.startswith("o_") or key.startswith("q_") or key == "temp_del_type": del st.session_state[key]
@@ -165,7 +180,7 @@ def show_offer_wizard(user_id, is_admin=False):
                     st.session_state.wizard_step = 2; st.rerun()
             else: st.error("Bu kriterlerde makine bulunamadı.")
 
-    # ADIM 2 (DÜZENLEME DESTEKLİ)
+    # ADIM 2 (DÜZENLEME VE MANUEL FİYAT DESTEKLİ)
     elif st.session_state.wizard_step == 2:
         wd = st.session_state.wizard_data
         col_opt, col_prev = st.columns([1.5, 2.5], gap="large")
@@ -206,13 +221,33 @@ def show_offer_wizard(user_id, is_admin=False):
                                 selected_options_for_db.append({"id": o[0], "qty": q_o})
                                 engine_options_list.append({'n': o[1], 'p': d_o_p, 'q': q_o, 'i': o[4], 'd': o[3]})
 
+            # -------------------------------------------------------------
+            # MANUEL FİYAT VE İSKONTO MOTORU
+            # -------------------------------------------------------------
             st.markdown("---")
             sub = ((wd["m_price"] * multiplier) * wd["qty"]) + opts_total
-            disc_p = st.number_input("Özel İskonto Oranı (%)", 0.0, 100.0, float(wd.get("disc_p", 0.0)), step=0.5)
-            agreed = sub * (1 - (disc_p/100.0))
-            st.info(f"Sistem Toplamı: {agreed:,.2f} {wd['m_curr']}")
             
-            conds = {"machine_qty": wd["qty"], "agreed_price": agreed, "subtotal_calculated": sub, "delivery_type": d_type, "delivery_time": d_time, "shipping": ship, "payment_plan_text": pay, "bank": bnk, "notes": nts, "discount_pct": disc_p}
+            # İskonto oranı girişi
+            disc_p = st.number_input("İskonto Oranı (%)", 0.0, 100.0, float(wd.get("disc_p", 0.0)), step=0.5)
+            calc_val = sub * (1 - (disc_p/100.0))
+            
+            # Manuel Tutar Belirleme Özelliği
+            use_manual = st.checkbox("⚙️ Nihai Tutarı Manuel Belirle (İskontoyu ezer)", value=wd.get("is_manual", False))
+            
+            if use_manual:
+                default_agreed = float(wd.get("agreed_price", calc_val))
+                if default_agreed == 0.0: default_agreed = calc_val
+                agreed = st.number_input("Müşteriye Sunulacak Net Tutar", value=default_agreed, step=50.0)
+            else:
+                agreed = calc_val
+                st.info(f"Hesaplanan Toplam: {agreed:,.2f} {wd['m_curr']}")
+            
+            conds = {
+                "machine_qty": wd["qty"], "agreed_price": agreed, "subtotal_calculated": sub, 
+                "delivery_type": d_type, "delivery_time": d_time, "shipping": ship, 
+                "payment_plan_text": pay, "bank": bnk, "notes": nts, 
+                "discount_pct": disc_p, "is_manual": use_manual
+            }
 
             # KAYDET VEYA GÜNCELLE BUTONU
             btn_txt = "💾 TEKLİFİ GÜNCELLE (ÜZERİNE YAZ)" if 'edit_offer_id' in st.session_state else "💾 TEKLİFİ ARŞİVE KAYDET"
@@ -233,8 +268,8 @@ def show_offer_wizard(user_id, is_admin=False):
                     st.balloons()
                 except Exception as e: st.error(f"Kayıt Hatası: {e}")
 
-        # CANLI ÖNİZLEME
+        # CANLI ÖNİZLEME BÖLÜMÜ
         with col_prev:
-            st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 CANLI RAPOR VE PDF</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 A4 RAPOR ÖNİZLEMESİ</div>", unsafe_allow_html=True)
             html = generate_embedded_html(wd["cust_name"], wd["m_name"], wd["m_price"]*multiplier, wd["m_img"], wd["m_specs"], engine_options_list, conds, wd["m_curr"], user_id)
             with st.container(border=True): components.html(html, height=900, scrolling=True)
