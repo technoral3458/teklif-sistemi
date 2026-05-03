@@ -53,7 +53,7 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
     except: return False
 
 # =====================================================================
-# VERİTABANI BAĞLANTILARI (Bölünmüş Mimariye Uygun)
+# VERİTABANI BAĞLANTILARI
 # =====================================================================
 def exec_user_query(query, params=()):
     conn = sqlite3.connect('users.db'); c = conn.cursor()
@@ -98,16 +98,15 @@ def init_advanced_b2b():
 
 init_advanced_b2b()
 
-# --- OTURUM YÖNETİMİ ---
+# --- OTURUM VE YÖNLENDİRME HATA ÇÖZÜMÜ ---
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 for key in ["user_id", "user_role", "user_email"]:
     if key not in st.session_state: st.session_state[key] = None
 if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
 
-# HATA ÇÖZÜMÜ: Yönlendirme değişkenleri baştan tanımlanıyor
 if "active_tab" not in st.session_state: st.session_state.active_tab = ":house: Dashboard"
-if "main_menu_radio" not in st.session_state: st.session_state.main_menu_radio = ":house: Dashboard"
+if "_menu_radio" not in st.session_state: st.session_state["_menu_radio"] = ":house: Dashboard"
 
 if not st.session_state.logged_in:
     current_token = st.query_params.get("session_token")
@@ -118,7 +117,7 @@ if not st.session_state.logged_in:
             st.session_state.logged_in, st.session_state.user_id, st.session_state.user_email = True, u_id, u_email
             st.session_state.user_role = u_role if u_role == 'admin' else ("manufacturer" if u_type == "Üretici" else "dealer")
 
-# --- GÜÇLÜ VE MOBİL UYUMLU CSS ---
+# --- CSS ---
 st.markdown("""
     <style>
     .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 8px; margin-bottom: 20px;}
@@ -206,7 +205,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ YAN MENÜ (Yönlendirme Hatası Tamamen Çözüldü)
+# GÜVENLİ YAN MENÜ
 # =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 20px;'><img src='{get_system_logo()}' style='max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
@@ -216,11 +215,10 @@ with st.sidebar:
     menu_items = [":house: Dashboard", ":page_facing_up: Yeni Teklif Hazırla", ":busts_in_silhouette: Müşterilerim", ":clipboard: Geçmiş Tekliflerim", ":gear: Profil Ayarlarım"]
     if st.session_state.user_role == "admin": menu_items.extend([":office: Bayi Yönetimi", ":package: Tüm Modelleri Yönet"])
     
-    # HATA ÇÖZÜMÜ: Sayfa geçişleri temiz değişkene bağlandı
     def _on_menu_change():
-        st.session_state.active_tab = st.session_state.main_menu_radio
+        st.session_state.active_tab = st.session_state._menu_radio
         
-    menu = st.radio("SİSTEM MENÜSÜ", menu_items, key="main_menu_radio", on_change=_on_menu_change, label_visibility="collapsed")
+    menu = st.radio("SİSTEM MENÜSÜ", menu_items, key="_menu_radio", on_change=_on_menu_change, label_visibility="collapsed")
     
     components.html("""<script>const doc=window.parent.document;doc.querySelectorAll('div[data-testid="stSidebar"] .stRadio label').forEach(r=>{r.addEventListener('click',()=>{if(window.parent.innerWidth<=768){setTimeout(()=>{let b=doc.querySelector('div[data-testid="stSidebar"] + div');if(b)b.click();doc.dispatchEvent(new KeyboardEvent('keydown',{'key':'Escape'}));},100);}});});</script>""", height=0, width=0)
     
@@ -262,7 +260,7 @@ def load_offer_to_wizard(off_id):
     st.session_state.wizard_step = 2
 
 # =====================================================================
-# SAYFA YÖNLENDİRMELERİ VE İÇERİKLER
+# SAYFA YÖNLENDİRMELERİ
 # =====================================================================
 if st.session_state.active_tab == ":house: Dashboard":
     st.header(":bar_chart: Analiz Paneli")
@@ -280,7 +278,6 @@ if st.session_state.active_tab == ":house: Dashboard":
         
         if recent_offers_raw:
             for oid, cust, mid, price, stat in recent_offers_raw:
-                # Makine adını factory_data'dan çek
                 m_name_res = get_factory("SELECT name FROM models WHERE id=?", (mid,))
                 mod = m_name_res[0][0] if m_name_res else "Bilinmeyen Model"
                 
@@ -316,13 +313,13 @@ elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
                     load_offer_to_wizard(off_id)
                     st.session_state.edit_offer_id = off_id
                     st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
-                    st.session_state.main_menu_radio = ":page_facing_up: Yeni Teklif Hazırla"
+                    st.session_state["_menu_radio"] = ":page_facing_up: Yeni Teklif Hazırla"
                     st.rerun()
                 if btn_col2.button(":page_facing_up: Kopyala", key=f"cp_{off_id}", use_container_width=True):
                     load_offer_to_wizard(off_id)
                     if 'edit_offer_id' in st.session_state: del st.session_state.edit_offer_id
                     st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
-                    st.session_state.main_menu_radio = ":page_facing_up: Yeni Teklif Hazırla"
+                    st.session_state["_menu_radio"] = ":page_facing_up: Yeni Teklif Hazırla"
                     st.rerun()
                 if btn_col3.button(":wastebasket: Sil", key=f"rm_{off_id}", use_container_width=True):
                     exec_sales("DELETE FROM offers WHERE id=?", (off_id,))
