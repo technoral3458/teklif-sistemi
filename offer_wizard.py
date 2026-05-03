@@ -17,7 +17,7 @@ def init_wizard_tables():
     except: pass
 
 # =====================================================================
-# GÖMÜLÜ ÖNİZLEME VE PDF YAZDIRMA MOTORU
+# GÖMÜLÜ ÖNİZLEME VE KUSURSUZ PDF YAZDIRMA MOTORU
 # =====================================================================
 def get_image_base64(img_path):
     if not img_path or not os.path.exists(img_path): return ""
@@ -33,25 +33,25 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     agreed_price = conditions.get("agreed_price", 0)
     m_img_b64 = get_image_base64(machine_img)
 
-    # Modern ve Temiz Tasarım + CSS Yazdırma (Print) Kuralları
+    # Modern CSS ve Yazdırma (Print) Kuralları
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; background: #f8fafc; margin:0; padding:20px; }
         .paper { background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 1000px; margin: 0 auto; }
-        .header { border-bottom: 3px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .header { border-bottom: 3px solid #e67e22; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
         .section-title { background: #0f172a; color: white; padding: 8px 15px; font-weight: 600; font-size: 14px; margin-top: 30px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border-bottom: 1px solid #e2e8f0; padding: 12px 10px; text-align: left; vertical-align: middle; }
         th { color: #64748b; font-size: 12px; text-transform: uppercase; }
-        .price-box { background: #eff6ff; border: 2px solid #bfdbfe; padding: 20px; text-align: right; margin-top: 30px; border-radius: 8px; }
-        .total-price { font-size: 36px; font-weight: 800; color: #1d4ed8; margin-top:5px; }
+        .price-box { background: #fffbeb; border: 2px solid #fed7aa; padding: 20px; text-align: right; margin-top: 30px; border-radius: 8px; }
+        .total-price { font-size: 36px; font-weight: 800; color: #ea580c; margin-top:5px; }
         
-        .print-btn { background: #10b981; color: white; border: none; padding: 12px 20px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .print-btn { background: #10b981; color: white; border: none; padding: 12px 20px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; margin-bottom: 20px; text-transform: uppercase; }
         .print-btn:hover { background: #059669; }
         
         @media print {
             body { background: #fff; padding: 0; }
-            .paper { box-shadow: none; padding: 0; margin: 0; max-width: 100%; }
+            .paper { box-shadow: none; padding: 0; margin: 0; max-width: 100%; border: none; }
             .no-print { display: none !important; }
         }
     """
@@ -59,8 +59,8 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     html = f"""
     <html><head><style>{css}</style></head><body>
         
-        <div class="no-print" style="text-align:right; margin-bottom: 20px;">
-            <button class="print-btn" onclick="window.print()">🖨️ YAZDIR / PDF OLARAK İNDİR</button>
+        <div class="no-print">
+            <button class="print-btn" onclick="window.print()">🖨️ PDF OLARAK KAYDET / YAZDIR</button>
         </div>
 
         <div class="paper">
@@ -107,7 +107,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
                     </div>
                 </td>
                 <td style="text-align:center; font-weight:bold; color:#0f172a;">{opt['q']}</td>
-                <td style="text-align:right; font-weight:bold; color:#e67e22;">{(opt['p']*opt['q']):,.2f} {m_currency}</td>
+                <td style="text-align:right; font-weight:bold; color:#ea580c;">{(opt['p']*opt['q']):,.2f} {m_currency}</td>
             </tr>
         """
 
@@ -116,7 +116,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
 
             <div class="price-box">
                 <div style="font-size:14px; color:#64748b; font-weight:600;">Teslimat Şartı: <span style="color:#0f172a;">{delivery_type}</span></div>
-                <div style="margin-top:15px; font-size:15px; font-weight:bold; color:#3b82f6; text-transform:uppercase;">Genel Toplam (KDV Hariç)</div>
+                <div style="margin-top:15px; font-size:15px; font-weight:bold; color:#ea580c; text-transform:uppercase;">Genel Toplam (KDV Hariç)</div>
                 <div class="total-price">{agreed_price:,.2f} {m_currency}</div>
             </div>
             
@@ -134,16 +134,17 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
-    # Modern ve Sıkı CSS
+    # Modern CSS (Mobilde taşmaları önler, butonları şıklaştırır)
     st.markdown("""
     <style>
     .block-container { padding-top: 1rem; max-width: 98%; }
     .stSelectbox label, .stNumberInput label { color: #475569 !important; font-size: 13px !important; font-weight: 600 !important; }
-    [data-testid="stVerticalBlockBorderWrapper"] > div { padding: 15px !important; border-radius: 12px !important; border-color: #e2e8f0 !important; }
+    .opt-card { padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .opt-price { color: #ea580c; font-weight: 800; font-size: 13px; }
     </style>
     """, unsafe_allow_html=True)
     
-    # State (Durum) Başlatma
+    # Adım Takibi (State Management)
     if 'wizard_step' not in st.session_state:
         st.session_state.wizard_step = 1
         st.session_state.wizard_data = {}
@@ -158,16 +159,16 @@ def show_offer_wizard(user_id, is_admin=False):
         return
 
     # -----------------------------------------------------------------
-    # ADIM 1: POPUP HİSSİYATLI BAŞLANGIÇ AYARLARI
+    # ADIM 1: SİHİRBAZ BAŞLANGICI (POPUP HİSSİYATI)
     # -----------------------------------------------------------------
     if st.session_state.wizard_step == 1:
-        st.markdown("<h3 style='text-align:center; color:#0f172a; margin-bottom: 30px;'>✨ Yeni Teklif Başlat</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align:center; color:#0f172a; margin-bottom: 30px;'>✨ Yeni Teklif Sihirbazı</h3>", unsafe_allow_html=True)
         
-        # Ekranı ortalamak için boş kolonlar (Mobil uyumlu)
+        # Ekranı ortalayarak Popup/Modal hissi veriyoruz
         c1, c2, c3 = st.columns([1, 2, 1])
         with c2:
             with st.container(border=True):
-                st.markdown("<div style='background:#f1f5f9; padding:10px; border-radius:8px; margin-bottom:15px; text-align:center; font-weight:bold; color:#3b82f6;'>1. Adım: Temel Ayarlar</div>", unsafe_allow_html=True)
+                st.markdown("<div style='background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:15px; text-align:center; font-weight:bold; color:#3b82f6; border:1px solid #e2e8f0;'>1. ADIM: TEMEL BİLGİLER</div>", unsafe_allow_html=True)
                 
                 selected_cust_name = st.selectbox("👤 Müşteri Seçimi", [c[1] for c in my_custs])
                 f_currency = st.selectbox("💵 Para Birimi", ["USD", "EUR", "RMB", "TRY"])
@@ -176,14 +177,10 @@ def show_offer_wizard(user_id, is_admin=False):
                 cat_list = ["Tüm Kategoriler"] + [c[0] for c in cats] if cats else ["Tüm Kategoriler"]
                 f_category = st.selectbox("🗂️ Makine Kategorisi", cat_list)
 
-                # Modele göre çekim
-                if f_category == "Tüm Kategoriler":
-                    model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=?", (f_currency,))
-                else:
-                    model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=? AND category=?", (f_currency, f_category))
+                model_data = database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=?", (f_currency,)) if f_category == "Tüm Kategoriler" else database.get_query("SELECT id, name, base_price, currency, compatible_options, port_discount, image_path, specs FROM models WHERE currency=? AND category=?", (f_currency, f_category))
 
                 if not model_data:
-                    st.error("Bu kategoride makine bulunamadı.")
+                    st.error("Bu kriterlere uygun makine bulunamadı.")
                 else:
                     selected_model = st.selectbox("🤖 Makine Modeli", [m[1] for m in model_data])
                     
@@ -192,11 +189,10 @@ def show_offer_wizard(user_id, is_admin=False):
                     delivery_type = cc2.selectbox("Teslimat", ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Gümrük İşlemleri Yapılmadan Limandan Devir"])
                     
                     st.write("")
-                    if st.button("Devam Et ➡️", type="primary", use_container_width=True):
+                    if st.button("Sonraki Adım: Donanım Seçimi ➡️", type="primary", use_container_width=True):
                         selected_cust_id = [c[0] for c in my_custs if c[1] == selected_cust_name][0]
                         m_info = [m for m in model_data if m[1] == selected_model][0]
                         
-                        # Verileri State'e kaydet
                         st.session_state.wizard_data = {
                             "cust_id": selected_cust_id, "cust_name": selected_cust_name,
                             "m_id": m_info[0], "m_name": selected_model, "m_price": m_info[2],
@@ -208,21 +204,21 @@ def show_offer_wizard(user_id, is_admin=False):
                         st.rerun()
 
     # -----------------------------------------------------------------
-    # ADIM 2: DİNAMİK DONANIM SEÇİMİ VE CANLI ÖNİZLEME
+    # ADIM 2: DİNAMİK 2 KOLONLU ÇALIŞMA ALANI
     # -----------------------------------------------------------------
     elif st.session_state.wizard_step == 2:
         wd = st.session_state.wizard_data
         
-        # Üst Bar (Geri Dön ve Özet)
+        # Üst Bilgi Barı ve Geri Dönüş
         col_back, col_info = st.columns([1, 5], vertical_alignment="center")
         if col_back.button("🔙 Ayarlara Dön"):
             st.session_state.wizard_step = 1
             st.rerun()
-        col_info.markdown(f"<div style='background:#eff6ff; padding:8px 15px; border-radius:8px; border:1px solid #bfdbfe; color:#1e40af;'><b>Müşteri:</b> {wd['cust_name']} &nbsp;|&nbsp; <b>Model:</b> {wd['m_name']} (x{wd['qty']})</div>", unsafe_allow_html=True)
+        col_info.markdown(f"<div style='background:#eff6ff; padding:10px 20px; border-radius:8px; border:1px solid #bfdbfe; color:#1e40af; font-size:14px;'><b>Müşteri:</b> {wd['cust_name']} &nbsp;|&nbsp; <b>Model:</b> {wd['m_name']} (x{wd['qty']})</div>", unsafe_allow_html=True)
         st.write("")
 
-        # MOBİL UYUMLU DİNAMİK TASARIM (Sol: Donanımlar, Sağ: Önizleme)
-        col_opt, col_prev = st.columns([1.2, 2.5], gap="medium")
+        # SADECE 2 KOLON: Sol (Donanımlar) - Sağ (Devasa Önizleme)
+        col_opt, col_prev = st.columns([1.5, 2.5], gap="large")
         
         engine_options_list = []
         selected_options_for_db = []
@@ -232,7 +228,9 @@ def show_offer_wizard(user_id, is_admin=False):
         if "Liman" in wd["delivery"] and wd["m_disc"]:
             multiplier = 1.0 - (float(wd["m_disc"]) / 100.0)
 
-        # SOL: DONANIMLAR
+        # ---------------------------------------------
+        # SOL KOLON: DONANIM SEÇİMİ VE FİYATLANDIRMA
+        # ---------------------------------------------
         with col_opt:
             st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>🔌 UYUMLU DONANIMLAR</div>", unsafe_allow_html=True)
             
@@ -248,23 +246,43 @@ def show_offer_wizard(user_id, is_admin=False):
                             o_id, o_name, o_price, o_curr, o_desc, o_img = opt
                             d_o_price = float(o_price) * multiplier
                             
+                            # Yeni Kompakt ve Akıllı Donanım Kartı
                             with st.container(border=True):
-                                st.checkbox(f"**{o_name}** (+{d_o_price:,.0f} {o_curr})", key=f"c_{o_id}")
-                                if st.session_state.get(f"c_{o_id}", False):
-                                    o_qty = st.number_input("Adet:", min_value=1, value=1, key=f"q_{o_id}")
+                                cc_img, cc_text, cc_chk = st.columns([1, 4, 1.5], vertical_alignment="center")
+                                
+                                with cc_img:
+                                    if o_img and os.path.isfile(o_img):
+                                        try:
+                                            with open(o_img, "rb") as f: st.image(f.read())
+                                        except: st.markdown("📷")
+                                    else: st.markdown("📷")
+                                        
+                                with cc_text:
+                                    st.markdown(f"<b style='font-size:13px; color:#1e293b;'>{o_name}</b><br><span class='opt-price'>+ {d_o_price:,.0f} {o_curr}</span>", unsafe_allow_html=True)
+                                
+                                with cc_chk:
+                                    is_selected = st.checkbox("Ekle", key=f"c_{o_id}")
+                                
+                                # Sadece seçiliyse adet kutusunu göster (Ekranı temiz tutar)
+                                if is_selected:
+                                    o_qty = st.number_input("Adet", min_value=1, value=1, key=f"q_{o_id}")
                                     selected_options_total += (d_o_price * o_qty)
                                     selected_options_for_db.append({"id": o_id, "qty": o_qty})
                                     engine_options_list.append({'n': o_name, 'p': d_o_price, 'q': o_qty, 'i': o_img, 'd': o_desc, 's': o_curr})
+                else:
+                    st.info("Donanım bulunmuyor.")
             
-            # FİYAT HESAPLAMA VE KAYIT (Sol Alt)
+            # Alt Kısım: Fiyat ve Kayıt
             st.markdown("---")
             sub_total = ((float(wd["m_price"]) * multiplier) * wd["qty"]) + selected_options_total
             
             with st.container(border=True):
-                st.markdown(f"<div style='font-size:12px; color:#64748b;'>Sistem Toplamı: <b>{sub_total:,.2f} {wd['m_curr']}</b></div>", unsafe_allow_html=True)
-                discount_pct = st.number_input("Özel İskonto (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5)
+                st.markdown(f"<div style='font-size:14px; color:#64748b; margin-bottom:10px;'>Sistem Toplamı: <b style='color:#0f172a;'>{sub_total:,.2f} {wd['m_curr']}</b></div>", unsafe_allow_html=True)
+                
+                c_disc, c_net = st.columns(2)
+                discount_pct = c_disc.number_input("Özel İskonto (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5)
                 final_price = sub_total * (1 - (discount_pct / 100.0))
-                agreed_price = st.number_input("Anlaşılan Net Fiyat", min_value=0.0, value=final_price, step=100.0)
+                agreed_price = c_net.number_input("Anlaşılan Net Fiyat", min_value=0.0, value=final_price, step=100.0)
 
             conditions_data = {
                 "machine_qty": wd["qty"], "discount_pct": discount_pct, "subtotal_calculated": sub_total,
@@ -283,11 +301,13 @@ def show_offer_wizard(user_id, is_admin=False):
                         new_id = res_id[0][0]
                         for item in selected_options_for_db:
                             database.exec_query("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", (new_id, item["id"], item["qty"]))
-                    st.success("Sisteme Başarıyla Kaydedildi!")
+                    st.success("Sisteme Başarıyla Kaydedildi! Müşterilerim sekmesinden inceleyebilirsiniz.")
                     st.balloons()
                 except Exception as e: st.error(f"Kayıt Hatası: {e}")
 
-        # SAĞ: CANLI ÖNİZLEME VE PDF 
+        # ---------------------------------------------
+        # SAĞ KOLON: DEVASA CANLI ÖNİZLEME VE PDF YAZDIRMA
+        # ---------------------------------------------
         with col_prev:
             st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 CANLI RAPOR VE PDF</div>", unsafe_allow_html=True)
             
@@ -298,5 +318,6 @@ def show_offer_wizard(user_id, is_admin=False):
                 conditions=conditions_data, delivery_type=wd['delivery'], m_currency=wd['m_curr']
             )
             
+            # İçinde PDF butonu olan HTML Frame
             with st.container(border=True):
                 components.html(html_preview, height=850, scrolling=True)
