@@ -30,7 +30,6 @@ def get_user_query(query, params=()):
     return res
 
 def init_wizard_tables():
-    # Sales DB içindeki tabloları kontrol et ve yoksa oluştur
     exec_sales("""CREATE TABLE IF NOT EXISTS offer_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT, offer_id INTEGER, option_id INTEGER, quantity INTEGER DEFAULT 1)""")
     try:
@@ -41,22 +40,29 @@ def init_wizard_tables():
     except: pass
 
 # =====================================================================
-# HTML VE PDF ÖNİZLEME MOTORU (A4 STANDARTLI)
+# HTML VE PDF ÖNİZLEME MOTORU (GÖRÜNMEYEN RESİMLER DÜZELTİLDİ)
 # =====================================================================
 def get_image_base64(img_path):
-    if not img_path or not os.path.exists(img_path): return ""
-    try:
-        with open(img_path, "rb") as f: b64 = base64.b64encode(f.read()).decode()
-        ext = os.path.splitext(img_path)[1].lower().replace('.', '')
-        return f"data:image/{ext if ext else 'png'};base64,{b64}"
-    except: return ""
+    if not img_path: return ""
+    
+    # HATA BURADAYDI: Sadece ana dizine bakıyordu. Artık 'images' klasörünü de kontrol ediyor!
+    paths_to_try = [img_path, f"images/{img_path}", f"../images/{img_path}"]
+    
+    for p in paths_to_try:
+        if os.path.exists(p) and os.path.isfile(p):
+            try:
+                with open(p, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode()
+                    ext = os.path.splitext(p)[1].lower().replace('.', '')
+                    return f"data:image/{ext if ext else 'png'};base64,{b64}"
+            except: pass
+    return ""
 
 def generate_embedded_html(customer, model, base_price, machine_img, specs, selected_options, conditions, m_currency, user_id):
     tarih = datetime.datetime.now().strftime("%d.%m.%Y")
     m_qty = conditions.get("machine_qty", 1)
     agreed_price = conditions.get("agreed_price", 0)
 
-    # Bayi Bilgilerini Çek
     try: u_info = get_user_query("SELECT company_name, logo_path, website, address_full, phone FROM users WHERE id=?", (user_id,))[0]
     except: u_info = None
     
@@ -73,7 +79,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     logo_b64 = get_image_base64(comp_logo)
     header_logo_html = f'<img src="{logo_b64}" style="max-height:60px;">' if logo_b64 else f'<div style="font-size:20px; font-weight:900; color:#1e293b;">{comp_name}</div>'
 
-    # SIKIŞMAYAN, GERÇEK A4 CSS KODLARI
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; background: #cbd5e1; margin:0; padding:15px; display: flex; flex-direction: column; align-items: center; }
@@ -87,7 +92,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         .elegant-conditions { margin-top: 30px; background: #f8fafc; padding: 15px; border-left: 4px solid #eab308; }
         .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 15px; border-radius: 6px; cursor: pointer; width: 100%; max-width: 800px; margin-bottom: 20px; font-weight: bold; }
         
-        /* MOBİL EKRANLAR İÇİN OTOMATİK DARALMA */
         @media (max-width: 650px) { 
             body { padding: 10px 5px; }
             .paper { padding: 15px; min-height: auto; border-top-width: 5px; }
@@ -206,7 +210,6 @@ def show_offer_wizard(user_id, is_admin=False):
     elif st.session_state.wizard_step == 2:
         wd = st.session_state.wizard_data
         
-        # SÜTUN ORANLARI GÜNCELLENDİ (Sol dar: 1.1, Sağ geniş: 2.9)
         col_opt, col_prev = st.columns([1.1, 2.9], gap="large")
         
         with col_opt:
