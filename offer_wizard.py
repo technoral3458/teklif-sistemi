@@ -8,7 +8,7 @@ import base64
 import sqlite3
 
 # =====================================================================
-# VERİTABANI BAĞLANTI MOTORLARI (Kullanıcının DB Yapısına Özel)
+# VERİTABANI BAĞLANTI MOTORLARI
 # =====================================================================
 def get_factory(query, params=()):
     conn = sqlite3.connect('factory_data.db', check_same_thread=False)
@@ -37,17 +37,16 @@ def init_wizard_tables():
         if "total_price" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN total_price REAL DEFAULT 0.0")
         if "conditions" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN conditions TEXT DEFAULT ''")
         if "status" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN status TEXT DEFAULT 'Beklemede'")
+        # HATA ÇÖZÜMÜ: Eksik olan user_id sütunu otomatik olarak tabloya ekleniyor
+        if "user_id" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN user_id INTEGER DEFAULT 1")
     except: pass
 
 # =====================================================================
-# HTML VE PDF ÖNİZLEME MOTORU (GÖRÜNMEYEN RESİMLER DÜZELTİLDİ)
+# HTML VE PDF ÖNİZLEME MOTORU (Responsive A4 Tasarım)
 # =====================================================================
 def get_image_base64(img_path):
     if not img_path: return ""
-    
-    # HATA BURADAYDI: Sadece ana dizine bakıyordu. Artık 'images' klasörünü de kontrol ediyor!
     paths_to_try = [img_path, f"images/{img_path}", f"../images/{img_path}"]
-    
     for p in paths_to_try:
         if os.path.exists(p) and os.path.isfile(p):
             try:
