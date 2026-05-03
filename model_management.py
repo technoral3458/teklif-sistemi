@@ -25,7 +25,6 @@ def exec_factory(query, params=()):
     except Exception as e:
         st.error(f"Veritabanı Yazma Hatası: {e}")
 
-# Veritabanına Adet İzni (allow_qty) Sütununu Otomatik Ekle
 def repair_factory_db():
     exec_factory("CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY AUTOINCREMENT, opt_name TEXT, opt_desc TEXT, opt_price REAL, opt_image TEXT, sort_order INTEGER DEFAULT 0)")
     try:
@@ -77,6 +76,7 @@ def show_product_management():
     if "view_mode" not in st.session_state: st.session_state.view_mode = "list"
     if "edit_mod_id" not in st.session_state: st.session_state.edit_mod_id = None
     if "edit_opt_id" not in st.session_state: st.session_state.edit_opt_id = None
+    if "edit_cat_id" not in st.session_state: st.session_state.edit_cat_id = None
 
     if st.session_state.view_mode == "list": show_list_view()
     elif st.session_state.view_mode == "mod_add": show_form_view(mode="add")
@@ -88,6 +88,7 @@ def show_list_view():
     st.header(":package: Fabrika Veritabanı Yönetimi")
     tab_mod, tab_opt, tab_cat = st.tabs(["📦 Modeller (Vitrin)", "⚙️ Ekstra Donanımlar (Vitrin)", "📂 Kategoriler"])
     
+    # ---------------- 1. MAKİNE MODELLERİ (VİTRİN) ----------------
     with tab_mod:
         col_title, col_add = st.columns([3, 1])
         col_title.subheader("Kayıtlı Makineler")
@@ -127,6 +128,7 @@ def show_list_view():
                                         exec_factory("DELETE FROM models WHERE id=?", (safe_mod_id,)); st.rerun()
         else: st.info("Sistemde henüz bir makine bulunmuyor.")
 
+    # ---------------- 2. EKSTRA DONANIMLAR (VİTRİN) ----------------
     with tab_opt:
         col_opt_t, col_opt_a = st.columns([3, 1])
         col_opt_t.subheader("Ekstra Donanımlar Vitrini")
@@ -161,24 +163,65 @@ def show_list_view():
                             if btn_c3.button("🗑️", key=f"od_{safe_opt_id}"):
                                 exec_factory("DELETE FROM options WHERE id=?", (safe_opt_id,)); st.rerun()
 
+    # ---------------- 3. KATEGORİLER (YENİ 4'LÜ VİTRİN VE DÜZENLEME SİSTEMİ) ----------------
     with tab_cat:
-        c1, c2 = st.columns([2,1])
-        with c1:
-            st.subheader("Mevcut Kategoriler")
-            cats = get_factory("SELECT id, name FROM categories")
-            if cats:
-                for cid, cname in cats:
-                    col_a, col_b = st.columns([4,1])
-                    col_a.write(f"📁 {cname}")
-                    if col_b.button("Sil", key=f"del_cat_{cid}"): exec_factory("DELETE FROM categories WHERE id=?", (cid,)); st.rerun()
-        with c2:
-            st.subheader("Yeni Ekle")
-            with st.form("new_cat"):
-                n_cat = st.text_input("Kategori Adı")
-                if st.form_submit_button("Ekle") and n_cat:
-                    try: exec_factory("INSERT INTO categories (name) VALUES (?)", (n_cat,)); st.rerun()
-                    except: st.error("Kategori mevcut!")
+        c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+        c1.subheader("📂 Kategori Yönetimi")
+        with c2.form("new_cat_form", clear_on_submit=True):
+            cc1, cc2 = st.columns([3, 1])
+            n_cat = cc1.text_input("Yeni Kategori Ekle", label_visibility="collapsed", placeholder="Yeni Kategori Adı...")
+            if cc2.form_submit_button("➕ Ekle", use_container_width=True):
+                if n_cat.strip():
+                    try: 
+                        exec_factory("INSERT INTO categories (name) VALUES (?)", (n_cat.strip(),))
+                        st.rerun()
+                    except: st.error("Bu isimde bir kategori zaten mevcut!")
 
+        st.markdown("---")
+        cats = get_factory("SELECT id, name FROM categories ORDER BY name ASC")
+        
+        if cats:
+            for i in range(0, len(cats), 4):
+                cols = st.columns(4, gap="small")
+                for j in range(4):
+                    if i + j < len(cats):
+                        cid, cname = cats[i+j]
+                        with cols[j].container(border=True):
+                            # Düzenleme Modu
+                            if st.session_state.get("edit_cat_id") == cid:
+                                new_cname = st.text_input("Yeni Ad", value=cname, key=f"inp_cat_{cid}", label_visibility="collapsed")
+                                bc1, bc2 = st.columns(2)
+                                if bc1.button("💾", key=f"save_cat_{cid}", help="Kaydet", use_container_width=True):
+                                    if new_cname.strip() and new_cname.strip() != cname:
+                                        try:
+                                            # Kategori Adını Güncelle
+                                            exec_factory("UPDATE categories SET name=? WHERE id=?", (new_cname.strip(), cid))
+                                            # Bu kategoriye bağlı makinelerin kategorisini de otomatik güncelle (Cascade Update)
+                                            exec_factory("UPDATE models SET category=? WHERE category=?", (new_cname.strip(), cname))
+                                        except Exception as e:
+                                            st.error("Güncelleme hatası!")
+                                    st.session_state.edit_cat_id = None
+                                    st.rerun()
+                                if bc2.button("❌", key=f"cancel_cat_{cid}", help="İptal", use_container_width=True):
+                                    st.session_state.edit_cat_id = None
+                                    st.rerun()
+                            # Normal Mod
+                            else:
+                                st.markdown(f"<div style='text-align:center; padding:15px 0;'><span style='font-size:32px;'>📁</span><br><b style='color:#0f172a; font-size:16px;'>{cname}</b></div>", unsafe_allow_html=True)
+                                bc1, bc2 = st.columns(2)
+                                if bc1.button("✏️ Düzenle", key=f"ed_cat_{cid}", use_container_width=True):
+                                    st.session_state.edit_cat_id = cid
+                                    st.rerun()
+                                if bc2.button("🗑️ Sil", key=f"rm_cat_{cid}", use_container_width=True):
+                                    exec_factory("DELETE FROM categories WHERE id=?", (cid,))
+                                    st.rerun()
+        else:
+            st.info("Sistemde henüz bir kategori bulunmuyor.")
+
+
+# =====================================================================
+# GÖRÜNÜM 2.A: MAKİNE DÜZENLEME FORMU
+# =====================================================================
 def show_form_view(mode="add", mod_id=None):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
     if col_back.button("🔙 Listeye Dön", use_container_width=True):
@@ -288,6 +331,9 @@ def show_form_view(mode="add", mod_id=None):
                 exec_factory("""INSERT INTO models (name, category, base_price, currency, specs, compatible_options, port_discount, image_path) VALUES (?,?,?,?,?,?,?,?)""", (st.session_state.f_name, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, final_specs_str, final_opts_str, st.session_state.f_disc, st.session_state.f_img))
             st.session_state.view_mode = "list"; st.rerun()
 
+# =====================================================================
+# GÖRÜNÜM 2.B: DONANIM DÜZENLEME FORMU
+# =====================================================================
 def show_opt_form_view(mode="add", opt_id=None):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
     if col_back.button("🔙 Listeye Dön", use_container_width=True): st.session_state.view_mode = "list"; st.rerun()
