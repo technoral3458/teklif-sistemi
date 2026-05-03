@@ -3,6 +3,8 @@ import sqlite3
 import pandas as pd
 import os
 import base64
+import uuid
+from PIL import Image
 
 # =====================================================================
 # FABRİKA VERİTABANI BAĞLANTILARI
@@ -29,6 +31,7 @@ def exec_factory(query, params=()):
     except Exception as e:
         st.error(f"Veritabanı Yazma Hatası: {e}")
 
+# Görseli Base64'e Çevir (HTML İçin)
 def get_image_base64(img_path):
     if not img_path: return ""
     paths_to_try = [img_path, f"images/{img_path}", f"../images/{img_path}"]
@@ -39,6 +42,37 @@ def get_image_base64(img_path):
                 ext = os.path.splitext(p)[1].lower().replace('.', '')
                 return f"data:image/{ext if ext else 'png'};base64,{b64}"
     return ""
+
+# =====================================================================
+# OTOMATİK RESİM İŞLEME MOTORU (Piksel ve Kare Ayarı)
+# =====================================================================
+def process_image(uploaded_file, prefix="img", size=(200, 200), square=True):
+    if not os.path.exists("images"): os.makedirs("images")
+    try:
+        img = Image.open(uploaded_file)
+        if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+        
+        # Eğer KARE isteniyorsa, resmi merkezden kırp
+        if square:
+            width, height = img.size
+            new_size = min(width, height)
+            left = (width - new_size) / 2
+            top = (height - new_size) / 2
+            right = (width + new_size) / 2
+            bottom = (height + new_size) / 2
+            img = img.crop((left, top, right, bottom))
+        
+        # Yeniden boyutlandır
+        img = img.resize(size, Image.Resampling.LANCZOS)
+        
+        # Benzersiz isimle kaydet
+        filename = f"{prefix}_{uuid.uuid4().hex[:8]}.jpg"
+        filepath = os.path.join("images", filename)
+        img.save(filepath, "JPEG", quality=90)
+        return filename
+    except Exception as e:
+        st.error(f"Resim işleme hatası: {e}")
+        return ""
 
 # =====================================================================
 # ANA YÖNETİM MODÜLÜ (SAYFA GEÇİŞ MOTORU)
@@ -72,7 +106,7 @@ def show_list_view():
         col_title, col_add = st.columns([3, 1])
         col_title.subheader("Kayıtlı Makineler")
         if col_add.button("➕ YENİ MAKİNE EKLE", type="primary", use_container_width=True):
-            st.session_state.form_loaded = False # Yeni forma girerken hafızayı temizle
+            st.session_state.form_loaded = False 
             st.session_state.mod_view_mode = "add"
             st.rerun()
 
@@ -164,7 +198,6 @@ def show_list_view():
 # GÖRÜNÜM 2: GELİŞMİŞ VE DİNAMİK TAM SAYFA FORM
 # =====================================================================
 def show_form_view(mode="add", mod_id=None):
-    # Üst Bar ve Geri Dönüş
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
     if col_back.button("🔙 Listeye Dön", use_container_width=True):
         st.session_state.mod_view_mode = "list"
@@ -175,24 +208,17 @@ def show_form_view(mode="add", mod_id=None):
     st.markdown("---")
 
     # --- 1. HAFIZA (STATE) YÖNETİMİ ---
-    # Form ilk kez açıldığında veritabanından verileri çekip hafızaya alıyoruz.
     if not st.session_state.get("form_loaded", False):
         st.session_state.form_loaded = True
-        
         cats_list = [c[1] for c in get_factory("SELECT id, name FROM categories")]
         st.session_state.f_cats_list = cats_list if cats_list else ["Diğer Makinalar"]
         
         if is_edit:
             res = get_factory("SELECT name, base_price, currency, category, port_discount, image_path, specs, compatible_options FROM models WHERE id=?", (int(mod_id),))
             r = res[0]
-            st.session_state.f_name = r[0]
-            st.session_state.f_price = float(r[1])
-            st.session_state.f_curr = r[2]
-            st.session_state.f_cat = r[3]
-            st.session_state.f_disc = float(r[4])
-            st.session_state.f_img = r[5]
+            st.session_state.f_name, st.session_state.f_price, st.session_state.f_curr = r[0], float(r[1]), r[2]
+            st.session_state.f_cat, st.session_state.f_disc, st.session_state.f_img = r[3], float(r[4]), r[5]
             
-            # Specs'i parçalayıp dinamik satırlar için listeye çeviriyoruz
             s_list = []
             if r[6]:
                 for item in str(r[6]).split("||"):
@@ -204,16 +230,10 @@ def show_form_view(mode="add", mod_id=None):
                             "img": parts[2].strip() if len(parts) > 2 else ""
                         })
             st.session_state.f_specs = s_list if s_list else [{"title": "", "detail": "", "img": ""}]
-            
-            # Donanımları parse et
             st.session_state.f_opts = [x.strip() for x in str(r[7]).split(",") if x.strip()]
         else:
-            st.session_state.f_name = ""
-            st.session_state.f_price = 0.0
-            st.session_state.f_curr = "USD"
-            st.session_state.f_cat = st.session_state.f_cats_list[0]
-            st.session_state.f_disc = 0.0
-            st.session_state.f_img = ""
+            st.session_state.f_name, st.session_state.f_price, st.session_state.f_curr = "", 0.0, "USD"
+            st.session_state.f_cat, st.session_state.f_disc, st.session_state.f_img = st.session_state.f_cats_list[0], 0.0, ""
             st.session_state.f_specs = [{"title": "", "detail": "", "img": ""}]
             st.session_state.f_opts = []
 
@@ -234,25 +254,45 @@ def show_form_view(mode="add", mod_id=None):
             st.session_state.f_curr = col_c.selectbox("Para Birimi", ["USD", "EUR", "TRY"], index=idx_curr)
             
             st.session_state.f_disc = st.number_input("Liman Teslim İskontosu (%)", min_value=0.0, max_value=100.0, value=st.session_state.f_disc)
-            st.session_state.f_img = st.text_input("Ana Resim Yolu (Örn: makine_resmi.png)", value=st.session_state.f_img)
+            
+            # Ana Görsel Yükleyici
+            st.markdown("<small style='color:#64748b;'>*Makinenin ana görselini bilgisayarınızdan seçin*</small>", unsafe_allow_html=True)
+            st.file_uploader("Ana Görsel Dosyası", type=['png','jpg','jpeg'], key="up_main_img", label_visibility="collapsed")
         
         with c2:
             st.markdown("**Görsel Önizleme**")
-            prev_img = get_image_base64(st.session_state.f_img)
-            if prev_img: st.markdown(f'<img src="{prev_img}" style="width:100%; border-radius:8px; border:1px solid #e2e8f0;">', unsafe_allow_html=True)
-            else: st.markdown("<div style='height:200px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border:2px dashed #cbd5e1; border-radius:8px; color:#94a3b8;'>Görsel Yok</div>", unsafe_allow_html=True)
+            up_main = st.session_state.get("up_main_img")
+            if up_main:
+                st.image(up_main, use_container_width=True)
+            else:
+                prev_img = get_image_base64(st.session_state.f_img)
+                if prev_img: st.markdown(f'<img src="{prev_img}" style="width:100%; border-radius:8px; border:1px solid #e2e8f0;">', unsafe_allow_html=True)
+                else: st.markdown("<div style='height:200px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border:2px dashed #cbd5e1; border-radius:8px; color:#94a3b8;'>Görsel Yok</div>", unsafe_allow_html=True)
 
-    # 2.B - DİNAMİK TEKNİK ÖZELLİKLER (Masaüstü Programı Mantığı)
+    # 2.B - DİNAMİK VE RESİM YÜKLEMELİ TEKNİK ÖZELLİKLER
     with tab_teknik:
-        st.info("💡 Özellikleri alt alta ekleyin. İşlemi bitirdiğinizde kaydet butonuna basmayı unutmayın.")
+        st.info("💡 Özellikleri alt alta ekleyin. Resimleri seçtiğinizde, sistem otomatik olarak **200x200 piksel kare formata** kırpıp hizalayacaktır.")
         
-        # Dinamik satırların oluşturulması
         for i in range(len(st.session_state.f_specs)):
-            col_t, col_d, col_i, col_x = st.columns([3, 4, 2, 0.5], vertical_alignment="center")
+            col_t, col_d, col_i, col_x = st.columns([2.5, 4, 3, 0.5], vertical_alignment="center")
             
-            st.session_state.f_specs[i]["title"] = col_t.text_input("Başlık", value=st.session_state.f_specs[i]["title"], key=f"t_{i}", label_visibility="collapsed", placeholder="Başlık (Örn: Cnc Kontrol Sistemi)")
-            st.session_state.f_specs[i]["detail"] = col_d.text_input("Detay", value=st.session_state.f_specs[i]["detail"], key=f"d_{i}", label_visibility="collapsed", placeholder="Teknik Detay (Örn: Delta NC50E)")
-            st.session_state.f_specs[i]["img"] = col_i.text_input("Resim", value=st.session_state.f_specs[i]["img"], key=f"i_{i}", label_visibility="collapsed", placeholder="İkon (Örn: delta.png)")
+            st.session_state.f_specs[i]["title"] = col_t.text_input("Başlık", value=st.session_state.f_specs[i]["title"], key=f"t_{i}", label_visibility="collapsed", placeholder="Başlık (Örn: Kontrol)")
+            st.session_state.f_specs[i]["detail"] = col_d.text_input("Detay", value=st.session_state.f_specs[i]["detail"], key=f"d_{i}", label_visibility="collapsed", placeholder="Detay (Örn: Delta NC50E)")
+            
+            # Kare İkon Yükleyici ve Önizleme
+            with col_i:
+                c_prev, c_up = st.columns([1, 3], vertical_alignment="center")
+                
+                up_spec = st.session_state.get(f"up_spec_{i}")
+                if up_spec:
+                    c_prev.image(up_spec, width=40)
+                else:
+                    cur_img = st.session_state.f_specs[i].get("img", "")
+                    if cur_img:
+                        b64 = get_image_base64(cur_img)
+                        if b64: c_prev.markdown(f'<img src="{b64}" style="width:40px; height:40px; border-radius:4px; object-fit:cover; border:1px solid #cbd5e1;">', unsafe_allow_html=True)
+                
+                c_up.file_uploader("Resim Seç", type=['png','jpg','jpeg'], key=f"up_spec_{i}", label_visibility="collapsed")
             
             if col_x.button("❌", key=f"del_spec_{i}", help="Satırı Sil"):
                 st.session_state.f_specs.pop(i)
@@ -266,37 +306,42 @@ def show_form_view(mode="add", mod_id=None):
     with tab_donanim:
         st.write("Makine ile uyumlu olan opsiyonel donanımları işaretleyiniz:")
         opts_avail = get_factory("SELECT id, opt_name, opt_price FROM options ORDER BY opt_price DESC")
-        
-        new_opts = [] # İşaretlenenleri toplayacağımız liste
-        
-        # Seçenekleri 3 sütunlu ızgaraya dizelim
+        new_opts = []
         chk_cols = st.columns(3)
         for idx, opt in enumerate(opts_avail):
             o_id, o_name, o_price = opt
             is_checked = str(o_id) in st.session_state.f_opts
-            
             with chk_cols[idx % 3]:
                 if st.checkbox(f"{o_name} (+{o_price:,.0f})", value=is_checked, key=f"chk_{o_id}"):
                     new_opts.append(str(o_id))
-                    
         st.session_state.f_opts = new_opts
 
     st.markdown("---")
     
-    # --- 3. KAYDETME MOTORU ---
+    # --- 3. KAYDETME VE RESİM İŞLEME MOTORU ---
     if st.button("💾 " + ("DEĞİŞİKLİKLERİ KAYDET" if is_edit else "MAKİNEYİ SİSTEME EKLE"), type="primary", use_container_width=True):
         if not st.session_state.f_name or st.session_state.f_price <= 0:
             st.error("Lütfen makine adı ve geçerli bir fiyat girin!")
         else:
-            # Dinamik tabloyu veritabanının anladığı formata (||) dönüştür
+            # 1. Ana Resmi İşle (Dikdörtgen destekli)
+            up_main = st.session_state.get("up_main_img")
+            if up_main is not None:
+                st.session_state.f_img = process_image(up_main, prefix="machine", size=(800, 600), square=False)
+
+            # 2. Teknik Özellik İkonlarını İşle (Tam Kare - 200x200) ve Metni Oluştur
             spec_strs = []
-            for sp in st.session_state.f_specs:
+            for i, sp in enumerate(st.session_state.f_specs):
+                up_spec = st.session_state.get(f"up_spec_{i}")
+                if up_spec is not None:
+                    sp["img"] = process_image(up_spec, prefix="spec", size=(200, 200), square=True)
+                
                 if sp["title"].strip() or sp["detail"].strip():
                     spec_strs.append(f"{sp['title']}|{sp['detail']}|{sp['img']}")
             
             final_specs_str = " || ".join(spec_strs) + (" || " if spec_strs else "")
             final_opts_str = ",".join(st.session_state.f_opts)
             
+            # Veritabanına Yaz
             if is_edit:
                 exec_factory("""UPDATE models SET name=?, category=?, base_price=?, currency=?, specs=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?""", 
                              (st.session_state.f_name, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, 
