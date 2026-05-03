@@ -6,6 +6,8 @@ import json
 import os
 import base64
 import sqlite3
+import ntpath
+import posixpath
 
 # =====================================================================
 # VERİTABANI BAĞLANTI MOTORLARI
@@ -41,18 +43,23 @@ def init_wizard_tables():
     except: pass
 
 # =====================================================================
-# HTML VE PDF ÖNİZLEME MOTORU
+# GELİŞMİŞ VE AKILLI RESİM OKUMA MOTORU (ONARILDI)
 # =====================================================================
-def get_image_base64(img_path):
-    if not img_path: return ""
-    paths_to_try = [img_path, f"images/{img_path}", f"../images/{img_path}"]
+def get_image_base64(path):
+    if not path: return ""
+    if str(path).startswith("http"): return path
+    
+    # Windows yollarını çözer ve sadece dosya adını bulur
+    base_name = posixpath.basename(ntpath.basename(path))
+    paths_to_try = [path, f"images/{path}", f"../images/{path}", base_name, f"images/{base_name}"]
+    
     for p in paths_to_try:
         if os.path.exists(p) and os.path.isfile(p):
             try:
                 with open(p, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode()
                     ext = os.path.splitext(p)[1].lower().replace('.', '')
-                    return f"data:image/{ext if ext else 'png'};base64,{b64}"
+                    if not ext: ext = 'png'
+                    return f"data:image/{ext};base64,{base64.b64encode(f.read()).decode()}"
             except: pass
     return ""
 
@@ -75,31 +82,31 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         except: pass
 
     logo_b64 = get_image_base64(comp_logo)
-    header_logo_html = f'<img src="{logo_b64}" style="max-height:60px;">' if logo_b64 else f'<div style="font-size:20px; font-weight:900; color:#1e293b;">{comp_name}</div>'
+    header_logo_html = f'<img src="{logo_b64}" style="max-height:70px;">' if logo_b64 else f'<div style="font-size:22px; font-weight:900; color:#1e293b;">{comp_name}</div>'
 
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-        body { font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; background: #cbd5e1; margin:0; padding:15px; display: flex; flex-direction: column; align-items: center; }
-        .paper { background: #fff; width: 100%; max-width: 800px; min-height: 1120px; padding: 6%; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; }
-        .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .section-title { background: #f8fafc; color: #0f172a; padding: 8px 15px; font-weight: 800; font-size: 13px; margin-top: 25px; border-left: 4px solid #2563eb; text-transform: uppercase; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; word-wrap: break-word; }
-        th, td { border-bottom: 1px solid #f1f5f9; padding: 8px; text-align: left; vertical-align: middle; }
-        .price-box { background: #fffbeb; border: 1px solid #fde68a; padding: 15px; text-align: right; margin-top: 30px; border-radius: 4px; }
-        .total-price { font-size: 26px; font-weight: 800; color: #ea580c; word-break: break-all; }
-        .elegant-conditions { margin-top: 30px; background: #f8fafc; padding: 15px; border-left: 4px solid #eab308; }
-        .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 15px; border-radius: 6px; cursor: pointer; width: 100%; max-width: 800px; margin-bottom: 20px; font-weight: bold; }
+        body { font-family: 'Inter', sans-serif; font-size: 14px; color: #1e293b; background: #cbd5e1; margin:0; padding:15px; display: flex; flex-direction: column; align-items: center; }
+        .paper { background: #fff; width: 100%; max-width: 850px; min-height: 1120px; padding: 6%; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; }
+        .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .section-title { background: #f8fafc; color: #0f172a; padding: 10px 15px; font-weight: 800; font-size: 14px; margin-top: 30px; border-left: 5px solid #2563eb; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; word-wrap: break-word; }
+        th, td { border-bottom: 1px solid #f1f5f9; padding: 12px; text-align: left; vertical-align: middle; }
+        .price-box { background: #fffbeb; border: 1px solid #fde68a; padding: 20px; text-align: right; margin-top: 35px; border-radius: 6px; }
+        .total-price { font-size: 30px; font-weight: 900; color: #ea580c; word-break: break-all; }
+        .elegant-conditions { margin-top: 35px; background: #f8fafc; padding: 20px; border-left: 5px solid #eab308; }
+        .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; max-width: 850px; margin-bottom: 20px; font-weight: bold; }
         
         @media (max-width: 650px) { 
             body { padding: 10px 5px; }
             .paper { padding: 15px; min-height: auto; border-top-width: 5px; }
             .header { flex-direction: column; text-align: center; }
             .header div { text-align: center !important; margin-bottom: 5px; }
-            th, td { font-size: 11px; padding: 6px 4px; }
-            .total-price { font-size: 22px; }
-            .section-title { font-size: 12px; padding: 6px 10px; }
+            th, td { font-size: 12px; padding: 8px 4px; }
+            .total-price { font-size: 24px; }
+            .section-title { font-size: 13px; padding: 8px 10px; }
         }
-        @media print { .no-print { display: none !important; } .paper { box-shadow: none; border: none; padding: 0; margin: 0; width: 100%; min-height: auto; } body { background: #fff; padding: 0; } }
+        @media print { .no-print { display: none !important; } .paper { box-shadow: none; border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; min-height: auto; } body { background: #fff; padding: 0; } }
     """
 
     html = f"""
@@ -108,12 +115,12 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         <div class="paper">
             <div class="header">
                 <div>{header_logo_html}</div>
-                <div style="text-align:right; font-size: 11px; color: #64748b;"><b>{comp_web}</b><br>Tarih: {tarih}<br>Teklif No: TR-{datetime.datetime.now().strftime("%y%m%d")}</div>
+                <div style="text-align:right; font-size: 12px; color: #64748b;"><b>{comp_web}</b><br>Tarih: {tarih}<br>Teklif No: TR-{datetime.datetime.now().strftime("%y%m%d")}</div>
             </div>
-            <div style="text-align:center; padding: 10px 0;">
-                <img src="{get_image_base64(machine_img)}" style="max-height:220px; max-width:100%; object-fit:contain;"><br>
-                <h2 style="color:#0f172a; margin:10px 0; font-size:20px;">MODEL: {model}</h2>
-                <div style="display:inline-block; background:#f1f5f9; padding: 6px 15px; border-radius: 15px; font-size:13px; color:#475569;">
+            <div style="text-align:center; padding: 15px 0;">
+                <img src="{get_image_base64(machine_img)}" style="height:350px; max-width:100%; object-fit:contain;"><br>
+                <h2 style="color:#0f172a; margin:15px 0; font-size:24px; font-weight:900;">MODEL: {model}</h2>
+                <div style="display:inline-block; background:#f1f5f9; padding: 8px 20px; border-radius: 20px; font-size:15px; color:#475569;">
                     Sayın Yetkili: <b style="color:#0f172a;">{customer}</b>
                 </div>
             </div>
@@ -125,24 +132,28 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             parts = item.split("|")
             t_spec = parts[0].strip() if len(parts) > 0 else ""
             d_spec = parts[1].strip() if len(parts) > 1 else ""
-            img_tag = f'<img src="{get_image_base64(parts[2].strip() if len(parts)>2 else "")}" style="max-width:50px; max-height:35px; border-radius:4px;">' if (len(parts)>2 and parts[2].strip()) else ""
-            html += f'<tr><td style="width:15%; text-align:center;">{img_tag}</td><td style="width:85%;"><b>{t_spec}</b><br><small style="color:#64748b;">{d_spec}</small></td></tr>'
+            img_b64 = get_image_base64(parts[2].strip() if len(parts)>2 else "")
+            
+            # GÖRSELLER BÜYÜTÜLDÜ VE ŞIKLAŞTIRILDI
+            img_tag = f'<img src="{img_b64}" style="width:100%; max-width:120px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if img_b64 else "<span style='color:#cbd5e1;'>-</span>"
+            html += f'<tr><td style="width:20%; text-align:center;">{img_tag}</td><td style="width:80%;"><b>{t_spec}</b><br><small style="color:#64748b; font-size:13px;">{d_spec}</small></td></tr>'
         html += "</table>"
 
     html += f"""
         <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
-        <table><tr style="background:#f8fafc;"><th style="width:15%; text-align:center;">Görsel</th><th style="width:40%;">Açıklama</th><th style="width:15%; text-align:center;">Adet</th><th style="width:30%; text-align:right;">Tutar</th></tr>
-        <tr><td style="text-align:center; color:#94a3b8;">-</td><td><b>{model} (Standart Donanım)</b></td><td style="text-align:center;">{m_qty}</td><td style="text-align:right;">{base_price*m_qty:,.2f} {m_currency}</td></tr>"""
+        <table><tr style="background:#f8fafc;"><th style="width:20%; text-align:center;">Görsel</th><th style="width:45%;">Açıklama</th><th style="width:10%; text-align:center;">Adet</th><th style="width:25%; text-align:right;">Tutar</th></tr>
+        <tr><td style="text-align:center; color:#94a3b8;">-</td><td><b>{model} (Standart Donanım)</b></td><td style="text-align:center;">{m_qty}</td><td style="text-align:right; font-size:15px;">{base_price*m_qty:,.2f} {m_currency}</td></tr>"""
     
     for opt in selected_options:
-        opt_img_tag = f'<img src="{get_image_base64(opt["i"])}" style="max-width:50px; max-height:35px; border-radius:4px; border:1px solid #cbd5e1;">' if opt["i"] else "<span style='color:#cbd5e1;'>-</span>"
-        html += f"<tr><td style='text-align:center;'>{opt_img_tag}</td><td><b style='color:#2563eb;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.2; margin-top:2px;'>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
+        opt_img_b64 = get_image_base64(opt["i"])
+        opt_img_tag = f'<img src="{opt_img_b64}" style="width:100%; max-width:120px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
+        html += f"<tr><td style='text-align:center;'>{opt_img_tag}</td><td><b style='color:#2563eb; font-size:14px;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.3; margin-top:4px; color:#475569;'>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold; font-size:15px;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
     html += "</table>"
 
     html += f"""
         <div class="elegant-conditions">
-            <div style="font-size: 13px; font-weight: bold; color: #1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-bottom: 8px;">📌 Ticari ve Teknik Şartlar</div>
-            <p style="font-size: 11px; color: #64748b; margin-bottom: 8px;">Sizlere sunmuş olduğumuz bu teklif kapsamındaki teslimat detayları:</p>
+            <div style="font-size: 15px; font-weight: bold; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 12px;">📌 Ticari ve Teknik Şartlar</div>
+            <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">Sizlere sunmuş olduğumuz bu teklif kapsamındaki teslimat detayları:</p>
             <table>
                 <tr><td style="width:35%;"><b>Teslimat Şekli:</b></td><td style="color:#ea580c; font-weight:bold;">{conditions.get('delivery_type','')}</td></tr>
                 <tr><td><b>Teslim Süresi:</b></td><td>{conditions.get('delivery_time','')}</td></tr>
@@ -152,10 +163,10 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             </table>
         </div>
         <div class="price-box">
-            <div style="font-size:12px; font-weight:bold; color:#ea580c; text-transform:uppercase;">Genel Toplam (KDV Hariç)</div>
+            <div style="font-size:14px; font-weight:bold; color:#ea580c; text-transform:uppercase;">Genel Toplam (KDV Hariç)</div>
             <div class="total-price">{agreed_price:,.2f} {m_currency}</div>
         </div>
-        <div style="margin-top:20px; text-align:center; font-size:10px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:10px;">{comp_adr} | {comp_tel}</div>
+        <div style="margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px;">{comp_adr} | {comp_tel}</div>
         </div></body></html>"""
     return html
 
@@ -209,7 +220,9 @@ def show_offer_wizard(user_id, is_admin=False):
     # ADIM 2: DÜZENLEME VE MANUEL FİYAT
     elif st.session_state.wizard_step == 2:
         wd = st.session_state.wizard_data
-        col_opt, col_prev = st.columns([1.1, 2.9], gap="large")
+        
+        # Sütun oranları sol panelin daha net görünmesi için 1.3 / 2.7 yapıldı
+        col_opt, col_prev = st.columns([1.3, 2.7], gap="large")
         
         with col_opt:
             if 'edit_offer_id' in st.session_state:
@@ -250,16 +263,16 @@ def show_offer_wizard(user_id, is_admin=False):
                         for o in get_factory(f"SELECT id, opt_name, opt_price, opt_desc, opt_image FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC", tuple(ids)):
                             d_o_p = o[2] * multiplier
                             with st.container(border=True):
-                                # YENİ GÖRSEL DESTEKLİ DONANIM SEÇİM KARTI
-                                c_img, c_chk, c_qty = st.columns([1.2, 3, 1.2], vertical_alignment="center")
+                                # SOL MENÜDEKİ KÜÇÜK RESİMLER BÜYÜTÜLDÜ
+                                c_img, c_chk, c_qty = st.columns([1.5, 3, 1], vertical_alignment="center")
                                 
                                 img_b64 = get_image_base64(o[4])
                                 if img_b64:
-                                    c_img.markdown(f'<img src="{img_b64}" style="max-width:100%; max-height:40px; object-fit:contain; border-radius:4px; border:1px solid #cbd5e1;">', unsafe_allow_html=True)
+                                    c_img.markdown(f'<img src="{img_b64}" style="width:100%; max-height:80px; object-fit:contain; border-radius:6px; border:1px solid #cbd5e1; padding:2px;">', unsafe_allow_html=True)
                                 else:
-                                    c_img.markdown("<div style='text-align:center; color:#94a3b8; font-size:10px;'>-</div>", unsafe_allow_html=True)
+                                    c_img.markdown("<div style='text-align:center; color:#94a3b8; font-size:11px; padding:10px;'>Görsel Yok</div>", unsafe_allow_html=True)
                                 
-                                is_sel = c_chk.checkbox(f"{o[1]} (+{d_o_p:,.0f} {wd['m_curr']})", key=f"o_{o[0]}")
+                                is_sel = c_chk.checkbox(f"{o[1]}\n\n(+{d_o_p:,.0f} {wd['m_curr']})", key=f"o_{o[0]}")
                                 
                                 if is_sel:
                                     q_o = c_qty.number_input("Adet", 1, 100, 1, key=f"q_{o[0]}", label_visibility="collapsed")
