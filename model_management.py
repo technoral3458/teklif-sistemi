@@ -96,7 +96,7 @@ def show_product_management():
         show_form_view(mode="edit", mod_id=st.session_state.edit_mod_id)
 
 # =====================================================================
-# GÖRÜNÜM 1: KATEGORİLİ VE 3'LÜ VİTRİN TİPİ LİSTE
+# GÖRÜNÜM 1: KATEGORİLİ VE 4'LÜ VİTRİN TİPİ LİSTE
 # =====================================================================
 def show_list_view():
     st.header(":package: Fabrika Veritabanı Yönetimi")
@@ -119,20 +119,22 @@ def show_list_view():
             for cat in categories:
                 with st.expander(f"📁 {cat}", expanded=True):
                     cat_mods = df_mods[df_mods['category'] == cat].reset_index(drop=True)
-                    for i in range(0, len(cat_mods), 3):
-                        cols = st.columns(3, gap="medium")
-                        for j in range(3):
+                    
+                    # 4'LÜ GRID (IZGARA) SİSTEMİ MANTIĞI
+                    for i in range(0, len(cat_mods), 4):
+                        cols = st.columns(4, gap="small")
+                        for j in range(4):
                             if i + j < len(cat_mods):
                                 row = cat_mods.iloc[i + j]
                                 safe_mod_id = int(row['id']) 
                                 
                                 with cols[j].container(border=True):
                                     img_b64 = get_image_base64(row['image'])
-                                    if img_b64: st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:180px; object-fit:contain; margin-bottom:15px;"></div>', unsafe_allow_html=True)
-                                    else: st.markdown("<div style='height:180px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>Görsel Yok</div>", unsafe_allow_html=True)
+                                    if img_b64: st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:150px; object-fit:contain; margin-bottom:15px;"></div>', unsafe_allow_html=True)
+                                    else: st.markdown("<div style='height:150px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>Görsel Yok</div>", unsafe_allow_html=True)
                                     
-                                    st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{row['name']}'>{row['name']}</h4>", unsafe_allow_html=True)
-                                    st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:18px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
+                                    st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{row['name']}'>{row['name']}</h4>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
                                     
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
                                     if btn_c1.button("✏️", key=f"e_{safe_mod_id}", help="Düzenle", use_container_width=True):
