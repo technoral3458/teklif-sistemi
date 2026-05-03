@@ -3,10 +3,13 @@ import customer_pages, model_management, offer_wizard, dealer_management, profor
 import sqlite3, pandas as pd, hashlib, random, smtplib, uuid, os, base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import ntpath, posixpath
 
 st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon=":gear:", layout="wide", initial_sidebar_state="expanded")
 
-# --- GÜVENLİK VE MAİL FONKSİYONLARI ---
+# =====================================================================
+# GÜVENLİK VE MAİL FONKSİYONLARI
+# =====================================================================
 def hash_password(password): return hashlib.sha256(str.encode(password)).hexdigest()
 def generate_code(): return str(random.randint(100000, 999999))
 
@@ -21,16 +24,25 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
         return True
     except: return False
 
-# --- LOGO OKUMA MOTORU (ONARILDI) ---
+# =====================================================================
+# GELİŞMİŞ LOGO OKUMA MOTORU (Windows Yollarını Otomatik Çözer)
+# =====================================================================
 def get_base64_image(path):
     if not path: return ""
-    if path.startswith("http"): return path
+    if str(path).startswith("http"): return path
     
-    paths_to_try = [path, f"images/{path}", f"../images/{path}"]
+    # Eski Windows yollarını (C:/...) temizleyip sadece dosya adını alır
+    base_name = posixpath.basename(ntpath.basename(path))
+    paths_to_try = [path, f"images/{path}", f"../images/{path}", base_name, f"images/{base_name}"]
+    
     for p in paths_to_try:
         if os.path.exists(p) and os.path.isfile(p):
-            with open(p, "rb") as f: 
-                return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+            try:
+                with open(p, "rb") as f:
+                    ext = os.path.splitext(p)[1].lower().replace('.', '')
+                    if not ext: ext = 'png'
+                    return f"data:image/{ext};base64,{base64.b64encode(f.read()).decode()}"
+            except: pass
     return ""
 
 def get_system_logo():
@@ -40,23 +52,21 @@ def get_system_logo():
         res = conn.execute("SELECT logo_path FROM company_profile WHERE id=1").fetchall()
         conn.close()
         if res and res[0][0]:
-            path = res[0][0]
-            if path.startswith("http"): return path
-            b64 = get_base64_image(path)
+            b64 = get_base64_image(res[0][0])
             if b64: return b64
     except: pass
     return fallback_url
 
-# --- VERİTABANI TAMİRCİSİ ---
+# =====================================================================
+# VERİTABANI TAMİRCİSİ VE KURULUMU
+# =====================================================================
 def repair_databases():
-    # Users DB
     conn = sqlite3.connect('users.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0, user_type TEXT DEFAULT 'Satıcı', phone TEXT, is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT, logo_path TEXT, website TEXT, address_full TEXT)""")
     if not conn.execute("SELECT id FROM users WHERE email='admin@ersanmakina.net'").fetchall():
         conn.execute("""INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici')""", ("admin@ersanmakina.net", hash_password("20132017")))
     conn.commit(); conn.close()
 
-    # Sales DB
     conn = sqlite3.connect('sales_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS offers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, model_id INTEGER)""")
     cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
@@ -69,7 +79,9 @@ def repair_databases():
 
 repair_databases()
 
-# --- OTURUM YÖNETİMİ ---
+# =====================================================================
+# OTURUM VE STATE YÖNETİMİ
+# =====================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 for key in ["user_id", "user_role", "user_email"]:
     if key not in st.session_state: st.session_state[key] = None
@@ -102,7 +114,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ EKRANI (TAMAMEN ONARILDI)
+# GİRİŞ, KAYIT VE ŞİFRE EKRANLARI (EKSİKSİZ)
 # =====================================================================
 if not st.session_state.logged_in:
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
@@ -110,15 +122,13 @@ if not st.session_state.logged_in:
         sys_logo = get_system_logo()
         st.markdown(f"""<div style='text-align: center; padding: 20px 0 10px 0;'><img src="{sys_logo}" style="max-height: 80px; margin-bottom: 15px; object-fit: contain;"></div>""", unsafe_allow_html=True)
         
-        # 3 SEKMELİ YAPI GERİ GELDİ
         t_login, t_reg, t_forg = st.tabs([":key: Giriş", ":memo: Kayıt", ":question: Şifremi Unuttum"])
         
         with t_login:
             with st.container(border=True):
                 le = st.text_input("E-Posta Adresi").strip().lower()
                 lp = st.text_input("Şifre", type="password")
-                rem = st.checkbox("Beni Hatırla", value=True) # BENİ HATIRLA GERİ GELDİ
-                
+                rem = st.checkbox("Beni Hatırla", value=True)
                 if st.button("SİSTEME GİRİŞ YAP", type="primary", use_container_width=True):
                     conn = sqlite3.connect('users.db')
                     user = conn.execute("SELECT id, user_type, is_approved, is_verified, role FROM users WHERE email=? AND password=?", (le, hash_password(lp))).fetchall()
@@ -130,7 +140,6 @@ if not st.session_state.logged_in:
                             conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0][0]))
                             conn.commit()
                             if rem: st.query_params["session_token"] = tok
-                            
                             st.session_state.logged_in, st.session_state.user_id, st.session_state.user_email = True, user[0][0], le
                             st.session_state.user_role = user[0][4] if user[0][4] == 'admin' else ("manufacturer" if user[0][1] == "Üretici" else "dealer")
                             st.rerun()
@@ -148,8 +157,7 @@ if not st.session_state.logged_in:
                     if st.button("Kayıt Ol", use_container_width=True):
                         if all([reg_comp, reg_phone, reg_email, reg_pwd]):
                             conn = sqlite3.connect('users.db')
-                            if conn.execute("SELECT id FROM users WHERE email=?", (reg_email,)).fetchall(): 
-                                st.error("E-posta kullanımda!")
+                            if conn.execute("SELECT id FROM users WHERE email=?", (reg_email,)).fetchall(): st.error("E-posta kullanımda!")
                             else:
                                 ver_code = generate_code()
                                 conn.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved) VALUES (?,?,?,?,?,?,0,0)", (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code))
@@ -177,16 +185,13 @@ if not st.session_state.logged_in:
                     f_email = st.text_input("Kayıtlı E-Posta Adresiniz").strip().lower()
                     if st.button("Sıfırlama Kodu Gönder", use_container_width=True):
                         conn = sqlite3.connect('users.db')
-                        user_exists = conn.execute("SELECT id FROM users WHERE email=?", (f_email,)).fetchone()
-                        if user_exists:
+                        if conn.execute("SELECT id FROM users WHERE email=?", (f_email,)).fetchone():
                             reset_code = generate_code()
                             conn.execute("UPDATE users SET auth_code=? WHERE email=?", (reset_code, f_email))
                             conn.commit()
-                            if send_email(f_email, reset_code, "Ersan Makine - Şifre Sıfırlama"):
-                                st.session_state.temp_email = f_email
-                                st.session_state.forgot_step = 2
-                                st.rerun()
-                            else: st.error("E-posta sunucusu yanıt vermedi.")
+                            if send_email(f_email, reset_code, "Şifre Sıfırlama Kodu"):
+                                st.session_state.temp_email = f_email; st.session_state.forgot_step = 2; st.rerun()
+                            else: st.error("E-posta gönderilemedi.")
                         else: st.error("Sistemde böyle bir e-posta bulunamadı.")
                         conn.close()
                 elif st.session_state.forgot_step == 2:
@@ -199,13 +204,13 @@ if not st.session_state.logged_in:
                             conn.execute("UPDATE users SET password=?, auth_code=NULL WHERE email=?", (hash_password(new_pwd), st.session_state.temp_email))
                             conn.commit()
                             st.session_state.forgot_step = 1
-                            st.success("Şifreniz başarıyla değiştirildi! Giriş sekmesinden giriş yapabilirsiniz.")
+                            st.success("Şifreniz değiştirildi! Giriş sekmesinden giriş yapabilirsiniz.")
                         else: st.error("Hatalı kod veya çok kısa şifre!")
                         conn.close()
     st.stop()
 
 # =====================================================================
-# SIDEBAR VE SAYFA YÖNLENDİRİCİ MOTORU
+# GÜVENLİ YAN MENÜ VE SAYFA YÖNLENDİRİCİ
 # =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 20px;'><img src='{get_system_logo()}' style='max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
@@ -226,6 +231,9 @@ with st.sidebar:
         conn.commit(); conn.close()
         st.query_params.clear(); st.session_state.clear(); st.rerun()
 
+# =====================================================================
+# MODÜLLER ARASI BAĞLANTILAR
+# =====================================================================
 if st.session_state.active_tab == "PROFORMA":
     proforma_invoice.show_proforma(st.session_state.proforma_id, st.session_state.user_id)
 elif st.session_state.active_tab == ":busts_in_silhouette: Müşterilerim":
@@ -236,32 +244,6 @@ elif st.session_state.active_tab == ":package: Tüm Modelleri Yönet":
     model_management.show_product_management()
 elif st.session_state.active_tab == ":office: Bayi Yönetimi":
     dealer_management.show_dealer_management()
-elif st.session_state.active_tab == ":gear: Profil Ayarlarım":
-    st.header(":gear: Kurumsal Profil Ayarları")
-    conn = sqlite3.connect('users.db')
-    u_data = conn.execute("SELECT company_name, email, phone, website, address_full, logo_path FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
-    conn.close()
-    with st.expander("👤 Bayi / Kişisel Bilgilerim", expanded=True):
-        with st.form("p_form"):
-            c1, c2 = st.columns(2)
-            p_name = c1.text_input("Firma Adı", value=u_data[0] if u_data else "")
-            p_web = c2.text_input("Web Sitesi", value=u_data[3] if u_data and u_data[3] else "")
-            p_phone = c1.text_input("Telefon", value=u_data[2] if u_data and u_data[2] else "")
-            p_adr = st.text_area("Açık Adres", value=u_data[4] if u_data and u_data[4] else "")
-            up_logo = st.file_uploader("Tekliflerde Görünecek Logonuz", type=['png','jpg','jpeg'])
-            if st.form_submit_button(":white_check_mark: PROFİLİ GÜNCELLE", type="primary"):
-                f_logo = u_data[5] if u_data else ""
-                if up_logo:
-                    if not os.path.exists("images"): os.makedirs("images")
-                    f_logo = f"images/logo_user_{st.session_state.user_id}.png"
-                    with open(f_logo, "wb") as f: f.write(up_logo.getbuffer())
-                conn = sqlite3.connect('users.db')
-                conn.execute("UPDATE users SET company_name=?, website=?, phone=?, address_full=?, logo_path=? WHERE id=?", (p_name, p_web, p_phone, p_adr, f_logo, st.session_state.user_id))
-                conn.commit(); conn.close()
-                st.success("Profiliniz güncellendi!"); st.rerun()
-elif st.session_state.active_tab == ":house: Dashboard":
-    st.header(":bar_chart: Analiz Paneli")
-    st.info("Sistem Menüsünden istediğiniz sayfaya geçiş yapabilirsiniz.")
 elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
     st.header(":clipboard: Geçmiş Tekliflerim")
     conn = sqlite3.connect('sales_data.db')
@@ -274,7 +256,6 @@ elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
         for off in offers_raw:
             off_id, c_name, m_id, o_date, t_price, o_status = off
             status_color = "#10b981" if o_status in ["Onaylandı", "Siparişe Çevir"] else ("#ef4444" if o_status == "Reddedildi" else "#f59e0b")
-            
             try: 
                 conn_f = sqlite3.connect('factory_data.db')
                 m_name = conn_f.execute("SELECT name FROM models WHERE id=?", (m_id,)).fetchone()[0]
@@ -300,3 +281,103 @@ elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
                     conn.commit(); conn.close()
                     st.rerun()
     else: st.info("Geçmiş teklif bulunmuyor.")
+
+elif st.session_state.active_tab == ":gear: Profil Ayarlarım":
+    st.header(":gear: Kurumsal Profil Ayarları")
+    conn = sqlite3.connect('users.db')
+    u_data = conn.execute("SELECT company_name, email, phone, website, address_full, logo_path FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
+    conn.close()
+    with st.expander("👤 Bayi / Kişisel Bilgilerim", expanded=True):
+        with st.form("p_form"):
+            c1, c2 = st.columns(2)
+            p_name = c1.text_input("Firma Adı", value=u_data[0] if u_data else "")
+            p_web = c2.text_input("Web Sitesi", value=u_data[3] if u_data and u_data[3] else "")
+            p_phone = c1.text_input("Telefon", value=u_data[2] if u_data and u_data[2] else "")
+            p_adr = st.text_area("Açık Adres", value=u_data[4] if u_data and u_data[4] else "")
+            up_logo = st.file_uploader("Tekliflerde Görünecek Logonuz", type=['png','jpg','jpeg'])
+            if st.form_submit_button(":white_check_mark: PROFİLİ GÜNCELLE", type="primary"):
+                f_logo = u_data[5] if u_data else ""
+                if up_logo:
+                    if not os.path.exists("images"): os.makedirs("images")
+                    f_logo = f"images/logo_user_{st.session_state.user_id}.png"
+                    with open(f_logo, "wb") as f: f.write(up_logo.getbuffer())
+                conn = sqlite3.connect('users.db')
+                conn.execute("UPDATE users SET company_name=?, website=?, phone=?, address_full=?, logo_path=? WHERE id=?", (p_name, p_web, p_phone, p_adr, f_logo, st.session_state.user_id))
+                conn.commit(); conn.close()
+                st.success("Profiliniz güncellendi!"); st.rerun()
+                
+    if st.session_state.user_role == 'admin':
+        with st.expander("🚀 SİSTEM GENEL AYARLARI (Yönetici)", expanded=True):
+            with st.form("sys_form"):
+                new_sys_logo = st.file_uploader("Yeni Sistem Logosu Seçin", type=['png','jpg','jpeg'])
+                if st.form_submit_button("SİSTEM LOGOSUNU DEĞİŞTİR"):
+                    if new_sys_logo:
+                        if not os.path.exists("images"): os.makedirs("images")
+                        sys_path = f"images/system_logo_main.png"
+                        with open(sys_path, "wb") as f: f.write(new_sys_logo.getbuffer())
+                        conn = sqlite3.connect('factory_data.db')
+                        conn.execute("UPDATE company_profile SET logo_path=? WHERE id=1", (sys_path,))
+                        conn.commit(); conn.close()
+                        st.success("Sistem logosu güncellendi!"); st.rerun()
+
+# =====================================================================
+# DASHBOARD (TAM TEŞEKKÜLLÜ ANALİZ PANELİ)
+# =====================================================================
+elif st.session_state.active_tab == ":house: Dashboard":
+    st.header(":bar_chart: Analiz Paneli")
+    
+    if st.session_state.user_role == "admin":
+        conn = sqlite3.connect('sales_data.db')
+        offers_raw = conn.execute("SELECT total_price, status FROM offers").fetchall()
+        conn.close()
+        df_dash = pd.DataFrame(offers_raw, columns=["Tutar", "Durum"])
+        c1, c2, c3, c4 = st.columns(4)
+        c1.markdown(f'<div class="stat-card"><span class="stat-title">Toplam Hacim</span><span class="stat-val">{df_dash["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><span class="stat-title">Bekleyen</span><span class="stat-val">{df_dash[df_dash["Durum"]=="Beklemede"]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Satışa Dönen</span><span class="stat-val">{df_dash[df_dash["Durum"].isin(["Onaylandı", "Siparişe Çevir"])]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+        
+        conn_u = sqlite3.connect('users.db')
+        d_count = conn_u.execute("SELECT COUNT(*) FROM users WHERE role='dealer'").fetchone()[0]
+        users_raw = conn_u.execute("SELECT id, company_name FROM users").fetchall()
+        user_dict = {u[0]: u[1] for u in users_raw}
+        conn_u.close()
+        c4.markdown(f'<div class="stat-card" style="border-left-color:#6366f1;"><span class="stat-title">Kayıtlı Bayiler</span><span class="stat-val">{d_count}</span></div>', unsafe_allow_html=True)
+
+        st.subheader("🔄 Bayilerin Son Teklifleri")
+        conn = sqlite3.connect('sales_data.db')
+        recent = conn.execute("SELECT o.id, c.company_name, o.model_id, o.total_price, o.status, o.user_id FROM offers o JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC LIMIT 15").fetchall()
+        conn.close()
+        
+        if recent:
+            for oid, cust, mid, price, stat, uid in recent:
+                try:
+                    conn_f = sqlite3.connect('factory_data.db')
+                    m_name = conn_f.execute("SELECT name FROM models WHERE id=?", (mid,)).fetchone()[0]
+                    conn_f.close()
+                except: m_name = "Bilinmeyen Model"
+                
+                bayi_ismi = user_dict.get(uid, "Bilinmeyen Bayi")
+                with st.container(border=True):
+                    ca, cb, cc = st.columns([3, 1, 1])
+                    ca.markdown(f"**{cust}** (Bayi: <span style='color:#2563eb;'>{bayi_ismi}</span>)<br><small>{m_name} | {price:,.2f}</small>", unsafe_allow_html=True)
+                    new_stat = cb.selectbox("Durum", ["Beklemede", "Siparişe Çevir", "Reddedildi"], index=["Beklemede", "Siparişe Çevir", "Reddedildi"].index(stat if stat in ["Beklemede", "Siparişe Çevir", "Reddedildi"] else "Beklemede"), key=f"stat_{oid}", label_visibility="collapsed")
+                    if cc.button("Güncelle", key=f"btn_{oid}", use_container_width=True):
+                        conn = sqlite3.connect('sales_data.db')
+                        conn.execute("UPDATE offers SET status=? WHERE id=?", (new_stat, oid))
+                        conn.commit(); conn.close()
+                        st.toast(f"Teklif #{oid} güncellendi!"); st.rerun()
+        else: st.info("Sistemde henüz teklif bulunmuyor.")
+
+    else:
+        # BAYİ DASHBOARD GÖRÜNÜMÜ
+        conn = sqlite3.connect('sales_data.db')
+        offers_raw = conn.execute("SELECT total_price, status FROM offers WHERE user_id=?", (st.session_state.user_id,)).fetchall()
+        conn.close()
+        df_dash = pd.DataFrame(offers_raw, columns=["Tutar", "Durum"])
+        
+        c1, c2, c3 = st.columns(3)
+        c1.markdown(f'<div class="stat-card"><span class="stat-title">Toplam Hacmim</span><span class="stat-val">{df_dash["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div class="stat-card" style="border-left-color:#f59e0b;"><span class="stat-title">Bekleyen Tekliflerim</span><span class="stat-val">{df_dash[df_dash["Durum"]=="Beklemede"]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div class="stat-card" style="border-left-color:#10b981;"><span class="stat-title">Satışa Dönen (Siparişler)</span><span class="stat-val">{df_dash[df_dash["Durum"].isin(["Onaylandı", "Siparişe Çevir"])]["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
+        
+        st.info("Müşterilerinizle ilgili işlemlere sol menüden ulaşabilirsiniz.")
