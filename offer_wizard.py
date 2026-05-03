@@ -108,6 +108,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     html = f"""
     <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><body>
         <div class="no-print"><button class="print-btn" onclick="window.print()">🖨️ PDF OLARAK KAYDET / YAZDIR</button></div>
+        
         <div class="paper">
             {page_header_html}
             <div style="text-align:center; padding: 15px 0;">
@@ -126,6 +127,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             t_spec = parts[0].strip() if len(parts) > 0 else ""
             d_spec = parts[1].strip() if len(parts) > 1 else ""
             img_b64 = get_image_base64(parts[2].strip() if len(parts)>2 else "")
+            
             img_tag = f'<img src="{img_b64}" style="max-width:140px; max-height:80px; width:auto; height:auto; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if img_b64 else "<span style='color:#cbd5e1;'>-</span>"
             html += f'<tr><td style="width:25%; text-align:center; vertical-align:middle;">{img_tag}</td><td style="width:75%; vertical-align:middle;"><b>{t_spec}</b><br><small style="color:#64748b; font-size:13px;">{d_spec}</small></td></tr>'
         html += "</table>"
@@ -266,7 +268,8 @@ def show_offer_wizard(user_id, is_admin=False):
                         
                         img_b64 = get_image_base64(o_img)
                         if img_b64:
-                            st.markdown(f'<img src="{img_b64}" style="width:100%; max-height:350px; object-fit:contain; border-radius:6px; border:2px solid #cbd5e1; margin-bottom:10px;">', unsafe_allow_html=True)
+                            # 350px YERİNE 200px OLARAK GÜNCELLENDİ
+                            st.markdown(f'<img src="{img_b64}" style="width:100%; max-height:200px; object-fit:contain; border-radius:6px; border:2px solid #cbd5e1; margin-bottom:10px;">', unsafe_allow_html=True)
                         else:
                             st.markdown("<div style='width:100%; height:150px; background:#f1f5f9; border-radius:6px; border:2px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; margin-bottom:10px;'>Görsel Yok</div>", unsafe_allow_html=True)
 
