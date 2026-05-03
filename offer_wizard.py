@@ -57,6 +57,9 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         .print-btn { background: #10b981; color: white; border: none; padding: 12px 20px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; margin-bottom: 20px; text-transform: uppercase; }
         .print-btn:hover { background: #059669; }
         
+        .elegant-conditions { margin-top: 40px; page-break-inside: avoid; background: #f8fafc; padding: 25px; border-radius: 8px; border-left: 4px solid #3b82f6; }
+        .elegant-conditions td { padding: 8px 10px; border-bottom: 1px dashed #cbd5e1; font-size: 13px; color: #475569; }
+        
         @media print {
             body { background: #fff; padding: 0; }
             .paper { box-shadow: none; padding: 0; margin: 0; max-width: 100%; border: none; }
@@ -87,8 +90,36 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
                     Sayın Yetkili: <b style="color:#0f172a;">{customer}</b>
                 </div>
             </div>
+    """
 
-            <div class="section-title">🔍 MAKİNE ÖZELLİKLERİ VE DONANIMLAR</div>
+    # --- STANDART ÖZELLİKLER (Sizin preview_engine mantığı ile) ---
+    if specs and str(specs).strip():
+        html += """<div class="section-title">🔍 MAKİNE STANDART ÖZELLİKLERİ</div><table>"""
+        specs_list = [item for item in str(specs).split("||") if item.strip()]
+        for item in specs_list:
+            parts = item.split("|")
+            title = parts[0].strip() if len(parts) > 0 else ""
+            desc = parts[1].strip() if len(parts) > 1 else ""
+            img_name = parts[2].strip() if len(parts) > 2 else ""
+            
+            desc = desc.replace("\n", "<br>")
+            spec_img_b64 = get_image_base64(img_name)
+            img_tag = f'<img src="{spec_img_b64}" style="max-width:60px; max-height:40px; border-radius:4px; object-fit:cover; border:1px solid #e2e8f0;">' if spec_img_b64 else ''
+            
+            html += f"""
+            <tr>
+                <td width="10%" style="text-align:center;">{img_tag}</td>
+                <td width="90%">
+                    <b style="font-size:14px; color:#0f172a;">{title}</b><br>
+                    <span style="font-size:12px; color:#64748b;">{desc}</span>
+                </td>
+            </tr>
+            """
+        html += "</table>"
+
+    # --- DONANIMLAR ---
+    html += f"""
+            <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
             <table>
                 <tr style="background:#f8fafc;">
                     <th>Görsel / Açıklama</th>
@@ -121,26 +152,33 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
 
     html += "</table>"
 
-    # ŞARTLAR TABLOSU
+    # --- DAHA KİBAR ŞARTLAR TABLOSU ---
     html += f"""
-        <div style="margin-top: 40px;">
-            <div class="section-title" style="background:#e67e22;">📝 SATIŞ VE TESLİMAT ŞARTLARI</div>
-            <table>
+        <div class="elegant-conditions">
+            <div style="font-size: 15px; font-weight: bold; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 12px;">
+                📌 Ticari ve Teknik Şartlar
+            </div>
+            <p style="font-size: 12px; color: #64748b; margin-bottom: 15px; line-height:1.5;">
+                Değerli müşterimiz, sizlere sunmuş olduğumuz bu teklif kapsamındaki satış, teslimat ve ödeme detayları bilgilerinize sunulmuştur:
+            </p>
+            <table style="margin-top:0;">
                 <tr>
-                    <td width="25%"><b>Teslimat Şekli:</b></td>
+                    <td width="25%"><b style="color:#334155;">Teslimat Şekli:</b></td>
                     <td style="color:#ea580c; font-weight:bold;">{delivery_type}</td>
                 </tr>
-                <tr><td><b>Teslim Süresi:</b></td><td>{delivery_time}</td></tr>
-                <tr><td><b>Nakliye / Lojistik:</b></td><td>{shipping}</td></tr>
-                <tr><td valign="top"><b>Ödeme Planı:</b></td><td>{payment_plan if payment_plan else "<i>Belirtilmedi</i>"}</td></tr>
-                <tr><td valign="top"><b>Banka Bilgileri:</b></td><td>{bank_info}</td></tr>
+                <tr><td><b style="color:#334155;">Teslim Süresi:</b></td><td>{delivery_time}</td></tr>
+                <tr><td><b style="color:#334155;">Nakliye / Lojistik:</b></td><td>{shipping}</td></tr>
+                <tr><td valign="top"><b style="color:#334155;">Ödeme Planı:</b></td><td>{payment_plan if payment_plan else "<i>Müşteri temsilcisi ile görüşülecektir.</i>"}</td></tr>
+                <tr><td valign="top"><b style="color:#334155;">Banka Bilgileri:</b></td><td>{bank_info if bank_info else "-"}</td></tr>
             </table>
-        </div>
     """
 
     if notes.strip():
-        html += f'<div style="margin-top:15px; padding:15px; background:#f8fafc; border-left:4px solid #94a3b8; font-size:13px; color:#475569;"><b>Özel Notlar:</b><br>{notes}</div>'
+        html += f'<div style="margin-top:15px; padding:12px; background:#fff; border-radius:6px; font-size:12px; color:#475569;"><b>Özel Notlar:</b><br>{notes}</div>'
 
+    html += "</div>"
+
+    # --- FİYAT ÖZETİ ---
     html += f"""
             <div class="price-box">
                 <div style="font-size:15px; font-weight:bold; color:#ea580c; text-transform:uppercase;">Genel Toplam (KDV Hariç)</div>
@@ -184,7 +222,7 @@ def show_offer_wizard(user_id, is_admin=False):
         return
 
     # -----------------------------------------------------------------
-    # ADIM 1: SADECE TEMEL BİLGİLER (Teslimat buradan kalktı)
+    # ADIM 1: SADECE TEMEL BİLGİLER
     # -----------------------------------------------------------------
     if st.session_state.wizard_step == 1:
         st.markdown("<h3 style='text-align:center; color:#0f172a; margin-bottom: 30px;'>✨ Yeni Teklif Sihirbazı</h3>", unsafe_allow_html=True)
@@ -210,7 +248,7 @@ def show_offer_wizard(user_id, is_admin=False):
                     m_qty = st.number_input("Makine Adedi", min_value=1, value=1)
                     
                     st.write("")
-                    if st.button("Sonraki Adım: Şartlar ve Donanım ➡️", type="primary", use_container_width=True):
+                    if st.button("Sonraki Adım: Donanım ve Şartlar ➡️", type="primary", use_container_width=True):
                         selected_cust_id = [c[0] for c in my_custs if c[1] == selected_cust_name][0]
                         m_info = [m for m in model_data if m[1] == selected_model][0]
                         
@@ -224,7 +262,7 @@ def show_offer_wizard(user_id, is_admin=False):
                         st.rerun()
 
     # -----------------------------------------------------------------
-    # ADIM 2: ŞARTLAR, DONANIMLAR VE ÖNİZLEME
+    # ADIM 2: DONANIMLAR, ŞARTLAR VE ÖNİZLEME
     # -----------------------------------------------------------------
     elif st.session_state.wizard_step == 2:
         wd = st.session_state.wizard_data
@@ -244,23 +282,16 @@ def show_offer_wizard(user_id, is_admin=False):
 
         # SOL KOLON
         with col_opt:
-            # 1. SATIŞ ŞARTLARI BÖLÜMÜ (Yeni Eklendi)
-            with st.expander("📝 SATIŞ VE TESLİMAT ŞARTLARI", expanded=True):
-                delivery_type = st.selectbox("Teslimat Şekli", ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Gümrük İşlemleri Yapılmadan Limandan Devir"])
-                delivery_time = st.text_input("Teslim Süresi", value="Sipariş onayından itibaren 90 iş günü")
-                shipping = st.text_input("Nakliye / Lojistik", value="Alıcıya Aittir")
-                payment_plan_text = st.text_area("Ödeme Planı", value="%30 Peşin, Kalanı Teslimatta")
-                bank = st.text_area("Banka Bilgileri")
-                notes = st.text_area("Özel Notlar")
             
-            # Seçilen teslimat şekline göre iskontoyu hesapla
+            # 1. DONANIMLAR BÖLÜMÜ
+            st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>🔌 UYUMLU DONANIMLAR</div>", unsafe_allow_html=True)
+            
+            # Seçilen teslimat şekline göre iskontoyu hesaplamak için geçici değişken
+            delivery_type_temp = st.session_state.get("temp_del_type", "Gümrük İşlemleri Yapılmış Antrepo Teslim")
             multiplier = 1.0
-            if "Liman" in delivery_type and wd["m_disc"]:
+            if "Liman" in delivery_type_temp and wd["m_disc"]:
                 multiplier = 1.0 - (float(wd["m_disc"]) / 100.0)
 
-            # 2. DONANIMLAR BÖLÜMÜ
-            st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-top:20px; margin-bottom:10px;'>🔌 UYUMLU DONANIMLAR</div>", unsafe_allow_html=True)
-            
             with st.container(height=400):
                 if wd["m_opts"]:
                     comp_opt_ids = [opt.strip() for opt in str(wd["m_opts"]).split(",") if opt.strip()]
@@ -295,6 +326,16 @@ def show_offer_wizard(user_id, is_admin=False):
                                     engine_options_list.append({'n': o_name, 'p': d_o_price, 'q': o_qty, 'i': o_img, 'd': o_desc, 's': o_curr})
                 else:
                     st.info("Donanım bulunmuyor.")
+
+            # 2. ŞARTLAR BÖLÜMÜ (Artık Donanımların Altında!)
+            st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-top:20px; margin-bottom:10px;'>📝 SATIŞ VE TESLİMAT ŞARTLARI</div>", unsafe_allow_html=True)
+            with st.expander("Şartları Düzenlemek İçin Tıklayın", expanded=False):
+                delivery_type = st.selectbox("Teslimat Şekli", ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Gümrük İşlemleri Yapılmadan Limandan Devir"], key="temp_del_type")
+                delivery_time = st.text_input("Teslim Süresi", value="Sipariş onayından itibaren 90 iş günü")
+                shipping = st.text_input("Nakliye / Lojistik", value="Alıcıya Aittir")
+                payment_plan_text = st.text_area("Ödeme Planı", value="%30 Peşin, Kalanı Teslimatta")
+                bank = st.text_area("Banka Bilgileri")
+                notes = st.text_area("Özel Notlar")
             
             # 3. FİYAT VE KAYIT
             st.markdown("---")
