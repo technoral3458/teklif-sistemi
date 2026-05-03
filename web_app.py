@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components  # YENİ EKLENDİ (JS Motoru için)
 import database
 import customer_pages
 import model_management
@@ -17,7 +18,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # --- 1. SİSTEM YAPILANDIRMASI ---
-st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon=":gear:", layout="wide")
+st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon=":gear:", layout="wide", initial_sidebar_state="expanded")
 
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
@@ -25,7 +26,7 @@ def hash_password(password):
 def generate_code():
     return str(random.randint(100000, 999999))
 
-# Görseli Base64 formatına çeviren yardımcı
+# Görseli Base64 formatına çeviren yardımcı (HTML içinde yerel dosya göstermek için)
 def get_base64_image(path):
     if path and os.path.exists(path):
         with open(path, "rb") as f:
@@ -137,22 +138,22 @@ if not st.session_state.logged_in:
 st.markdown("""
     <style>
     .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 8px; margin-bottom: 20px;}
-    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 20px; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap; }
+    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 20px; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap;}
     .stTabs [aria-selected="true"] { background-color: #2563eb !important; color: white !important; border: 1px solid #2563eb; }
     .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; text-align: center; margin-bottom: 15px;}
     .stat-val { font-size: 28px; font-weight: 900; color: #1e293b; display: block; }
     .stat-title { color: #64748b; text-transform: uppercase; font-size: 11px; font-weight: 700; }
     
-    /* MOBİL EKRAN (TELEFON) İÇİN ÖZEL SIKIŞTIRMA */
+    /* MOBİL EKRAN İÇİN ÖZEL DÜZENLEMELER */
     @media (max-width: 768px) {
-        .stTabs [data-baseweb="tab"] { padding: 8px 12px; font-size: 13px; }
+        .stTabs [data-baseweb="tab"] { padding: 8px 6px; font-size: 12px; white-space: normal; text-align: center; }
         .stTabs [data-baseweb="tab-list"] { gap: 4px; }
     }
     </style>
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ EKRANI (DİNAMİK LOGOLU VE MOBİL OPTİMİZE)
+# GİRİŞ EKRANI
 # =====================================================================
 if not st.session_state.logged_in:
     
@@ -167,7 +168,6 @@ if not st.session_state.logged_in:
             </div>
         """, unsafe_allow_html=True)
 
-        # Sekme isimleri mobilde taşmaması için kısaltıldı
         tab_login, tab_register, tab_forgot = st.tabs([":key: Giriş", ":memo: Kayıt", ":question: Şifre"])
         
         with tab_login:
@@ -263,12 +263,12 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# TEMİZ VE TEKİL YAN MENÜ
+# TEMİZ, TEKİL VE MOBİL AKILLI YAN MENÜ
 # =====================================================================
 with st.sidebar:
     st.markdown(f"""
         <div style='text-align: center; margin-bottom: 20px;'>
-            <img src="{get_system_logo()}" style="max-height: 60px; object-fit: contain;">
+            <img src="{get_system_logo()}" style="max-width: 100%; height: auto; max-height: 70px; object-fit: contain;">
         </div>
     """, unsafe_allow_html=True)
     
@@ -287,6 +287,27 @@ with st.sidebar:
         menu_items.extend([":office: Bayi Yönetimi", ":package: Tüm Modelleri Yönet"])
         
     menu = st.radio("SİSTEM MENÜSÜ", menu_items, label_visibility="collapsed")
+    
+    # --- MOBİLDE MENÜYÜ OTOMATİK KAPATAN AKILLI JS MOTORU ---
+    components.html("""
+        <script>
+        const doc = window.parent.document;
+        const radios = doc.querySelectorAll('div[data-testid="stSidebar"] .stRadio label');
+        radios.forEach(radio => {
+            radio.addEventListener('click', () => {
+                if (window.parent.innerWidth <= 768) {
+                    setTimeout(() => {
+                        // Mobil ekranda arka plan perdesine (overlay) tıklayarak menüyü kapat
+                        let backdrop = doc.querySelector('div[data-testid="stSidebar"] + div');
+                        if (backdrop) backdrop.click();
+                        // Yedek plan: ESC tuşu gönder
+                        doc.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Escape'}));
+                    }, 100);
+                }
+            });
+        });
+        </script>
+    """, height=0, width=0)
     
     st.markdown("---")
     if st.button(":door: Oturumu Kapat", use_container_width=True):
