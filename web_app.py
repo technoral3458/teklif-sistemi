@@ -1,6 +1,5 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import database
 import customer_pages
 import model_management
 import offer_wizard
@@ -32,7 +31,9 @@ def get_base64_image(path):
 
 def get_system_logo():
     try:
-        res = database.get_query("SELECT logo_path FROM company_profile WHERE id=1")
+        conn = sqlite3.connect('factory_data.db', check_same_thread=False)
+        res = conn.execute("SELECT logo_path FROM company_profile WHERE id=1").fetchall()
+        conn.close()
         if res and res[0][0]:
             path = res[0][0]
             if path.startswith("http"): return path
@@ -52,7 +53,7 @@ def send_email(to_email, code, subject="Ersan Makine - Doğrulama Kodu"):
     except: return False
 
 # =====================================================================
-# VERİTABANI İNŞASI
+# VERİTABANI BAĞLANTILARI (Bölünmüş Mimariye Uygun)
 # =====================================================================
 def exec_user_query(query, params=()):
     conn = sqlite3.connect('users.db'); c = conn.cursor()
@@ -61,6 +62,24 @@ def exec_user_query(query, params=()):
 def get_user_query(query, params=()):
     conn = sqlite3.connect('users.db', check_same_thread=False); c = conn.cursor()
     c.execute(query, params); res = c.fetchall(); conn.close(); return res
+
+def get_sales(query, params=()):
+    try:
+        conn = sqlite3.connect('sales_data.db', check_same_thread=False)
+        c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
+        return res
+    except: return []
+
+def exec_sales(query, params=()):
+    conn = sqlite3.connect('sales_data.db'); c = conn.cursor()
+    c.execute(query, params); conn.commit(); conn.close()
+
+def get_factory(query, params=()):
+    try:
+        conn = sqlite3.connect('factory_data.db', check_same_thread=False)
+        c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
+        return res
+    except: return []
 
 def init_advanced_b2b():
     exec_user_query("""CREATE TABLE IF NOT EXISTS users (
@@ -73,11 +92,10 @@ def init_advanced_b2b():
     if "website" not in cols: cursor.execute("ALTER TABLE users ADD COLUMN website TEXT")
     if "address_full" not in cols: cursor.execute("ALTER TABLE users ADD COLUMN address_full TEXT")
     conn.commit(); conn.close()
-    database.exec_query("""CREATE TABLE IF NOT EXISTS company_profile (id INTEGER PRIMARY KEY CHECK (id = 1), company_name TEXT, logo_path TEXT)""")
-    if not database.get_query("SELECT id FROM company_profile WHERE id=1"):
-        database.exec_query("INSERT INTO company_profile (id, logo_path) VALUES (1, 'https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png')")
+    
     if not get_user_query("SELECT id FROM users WHERE email='admin@ersanmakina.net'"):
         exec_user_query("""INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici')""", ("admin@ersanmakina.net", hash_password("20132017")))
+
 init_advanced_b2b()
 
 # --- OTURUM YÖNETİMİ ---
@@ -86,7 +104,10 @@ for key in ["user_id", "user_role", "user_email"]:
     if key not in st.session_state: st.session_state[key] = None
 if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
+
+# HATA ÇÖZÜMÜ: Yönlendirme değişkenleri baştan tanımlanıyor
 if "active_tab" not in st.session_state: st.session_state.active_tab = ":house: Dashboard"
+if "main_menu_radio" not in st.session_state: st.session_state.main_menu_radio = ":house: Dashboard"
 
 if not st.session_state.logged_in:
     current_token = st.query_params.get("session_token")
@@ -185,7 +206,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ YAN MENÜ
+# GÜVENLİ YAN MENÜ (Yönlendirme Hatası Tamamen Çözüldü)
 # =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 20px;'><img src='{get_system_logo()}' style='max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
@@ -195,11 +216,11 @@ with st.sidebar:
     menu_items = [":house: Dashboard", ":page_facing_up: Yeni Teklif Hazırla", ":busts_in_silhouette: Müşterilerim", ":clipboard: Geçmiş Tekliflerim", ":gear: Profil Ayarlarım"]
     if st.session_state.user_role == "admin": menu_items.extend([":office: Bayi Yönetimi", ":package: Tüm Modelleri Yönet"])
     
-    try: m_idx = menu_items.index(st.session_state.active_tab)
-    except: m_idx = 0
+    # HATA ÇÖZÜMÜ: Sayfa geçişleri temiz değişkene bağlandı
+    def _on_menu_change():
+        st.session_state.active_tab = st.session_state.main_menu_radio
         
-    def _on_menu_change(): st.session_state.active_tab = st.session_state._menu_radio
-    menu = st.radio("SİSTEM MENÜSÜ", menu_items, index=m_idx, key="_menu_radio", on_change=_on_menu_change, label_visibility="collapsed")
+    menu = st.radio("SİSTEM MENÜSÜ", menu_items, key="main_menu_radio", on_change=_on_menu_change, label_visibility="collapsed")
     
     components.html("""<script>const doc=window.parent.document;doc.querySelectorAll('div[data-testid="stSidebar"] .stRadio label').forEach(r=>{r.addEventListener('click',()=>{if(window.parent.innerWidth<=768){setTimeout(()=>{let b=doc.querySelector('div[data-testid="stSidebar"] + div');if(b)b.click();doc.dispatchEvent(new KeyboardEvent('keydown',{'key':'Escape'}));},100);}});});</script>""", height=0, width=0)
     
@@ -209,29 +230,30 @@ with st.sidebar:
         st.query_params.clear(); st.session_state.clear(); st.rerun()
 
 # =====================================================================
-# SAYFA İÇERİKLERİ: DÜZENLE VE KOPYALA MOTORU YARDIMCISI (MANUEL FİYAT DESTEKLİ)
+# DÜZENLE VE KOPYALA MOTORU
 # =====================================================================
 def load_offer_to_wizard(off_id):
     for key in list(st.session_state.keys()):
         if key.startswith("o_") or key.startswith("q_") or key == "temp_del_type": del st.session_state[key]
     
-    off_data = database.get_query("SELECT customer_id, model_id, conditions FROM offers WHERE id=?", (off_id,))[0]
+    off_data = get_sales("SELECT customer_id, model_id, conditions FROM offers WHERE id=?", (off_id,))[0]
     conds = json.loads(off_data[2]) if off_data[2] else {}
-    m_data = database.get_query("SELECT name, base_price, currency, compatible_options, image_path, specs, port_discount FROM models WHERE id=?", (off_data[1],))[0]
-    c_name = database.get_query("SELECT company_name FROM customers WHERE id=?", (off_data[0],))[0][0]
     
-    # Yeni eklenen Manuel Fiyat ve Tutar bilgileri de yükleniyor
+    m_data_raw = get_factory("SELECT name, base_price, currency, compatible_options, image_path, specs, port_discount FROM models WHERE id=?", (off_data[1],))
+    if not m_data_raw: st.error("Bu makine fabrika veritabanından silinmiş!"); return
+    m_data = m_data_raw[0]
+    
+    c_name = get_sales("SELECT company_name FROM customers WHERE id=?", (off_data[0],))[0][0]
+    
     st.session_state.wizard_data = {
         "cust_id": off_data[0], "cust_name": c_name, "m_id": off_data[1], "m_name": m_data[0],
         "m_price": m_data[1], "m_curr": m_data[2], "m_opts": m_data[3], "m_img": m_data[4], "m_specs": m_data[5], "m_disc": m_data[6], 
         "qty": conds.get("machine_qty", 1), "d_time": conds.get("delivery_time", ""), "ship": conds.get("shipping", ""),
         "pay": conds.get("payment_plan_text", ""), "bnk": conds.get("bank", ""), "nts": conds.get("notes", ""), 
-        "disc_p": conds.get("discount_pct", 0.0),
-        "is_manual": conds.get("is_manual", False),
-        "agreed_price": conds.get("agreed_price", 0.0)
+        "disc_p": conds.get("discount_pct", 0.0), "is_manual": conds.get("is_manual", False), "agreed_price": conds.get("agreed_price", 0.0)
     }
     
-    opt_items = database.get_query("SELECT option_id, quantity FROM offer_items WHERE offer_id=?", (off_id,))
+    opt_items = get_sales("SELECT option_id, quantity FROM offer_items WHERE offer_id=?", (off_id,))
     for op_id, o_qty in opt_items:
         st.session_state[f"o_{op_id}"] = True
         st.session_state[f"q_{op_id}"] = o_qty
@@ -240,12 +262,12 @@ def load_offer_to_wizard(off_id):
     st.session_state.wizard_step = 2
 
 # =====================================================================
-# SAYFA YÖNLENDİRMELERİ
+# SAYFA YÖNLENDİRMELERİ VE İÇERİKLER
 # =====================================================================
 if st.session_state.active_tab == ":house: Dashboard":
     st.header(":bar_chart: Analiz Paneli")
     if st.session_state.user_role == "admin":
-        offers_raw = database.get_query("SELECT total_price, status, offer_date FROM offers")
+        offers_raw = get_sales("SELECT total_price, status, offer_date FROM offers")
         df_dash = pd.DataFrame(offers_raw, columns=["Tutar", "Durum", "Tarih"])
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(f'<div class="stat-card"><span class="stat-title">Toplam Hacim</span><span class="stat-val">{df_dash["Tutar"].sum():,.2f}</span></div>', unsafe_allow_html=True)
@@ -254,26 +276,34 @@ if st.session_state.active_tab == ":house: Dashboard":
         c4.markdown(f'<div class="stat-card" style="border-left-color:#6366f1;"><span class="stat-title">Bayi Sayısı</span><span class="stat-val">{get_user_query("SELECT COUNT(*) FROM users WHERE role=\'dealer\'")[0][0]}</span></div>', unsafe_allow_html=True)
 
         st.subheader("🔄 Son Tekliflerin Durumu")
-        recent_offers = database.get_query("SELECT o.id, c.company_name, m.name, o.total_price, o.status FROM offers o JOIN customers c ON o.customer_id = c.id JOIN models m ON o.model_id = m.id ORDER BY o.id DESC LIMIT 10")
-        if recent_offers:
-            for oid, cust, mod, price, stat in recent_offers:
+        recent_offers_raw = get_sales("SELECT o.id, c.company_name, o.model_id, o.total_price, o.status FROM offers o JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC LIMIT 10")
+        
+        if recent_offers_raw:
+            for oid, cust, mid, price, stat in recent_offers_raw:
+                # Makine adını factory_data'dan çek
+                m_name_res = get_factory("SELECT name FROM models WHERE id=?", (mid,))
+                mod = m_name_res[0][0] if m_name_res else "Bilinmeyen Model"
+                
                 with st.container(border=True):
                     ca, cb, cc = st.columns([3, 1, 1])
                     ca.markdown(f"**{cust}**<br><small>{mod} | {price:,.2f}</small>", unsafe_allow_html=True)
                     new_stat = cb.selectbox("Durum", ["Beklemede", "Onaylandı", "Reddedildi"], index=["Beklemede", "Onaylandı", "Reddedildi"].index(stat if stat in ["Beklemede", "Onaylandı", "Reddedildi"] else "Beklemede"), key=f"stat_{oid}", label_visibility="collapsed")
                     if cc.button("Güncelle", key=f"btn_{oid}", use_container_width=True):
-                        database.exec_query("UPDATE offers SET status=? WHERE id=?", (new_stat, oid))
+                        exec_sales("UPDATE offers SET status=? WHERE id=?", (new_stat, oid))
                         st.toast(f"Teklif #{oid} güncellendi!"); st.rerun()
 
 # ---------------- KART SİSTEMLİ GEÇMİŞ TEKLİFLER ----------------
 elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
     st.header(":clipboard: Geçmiş Tekliflerim")
-    offers = database.get_query("""SELECT o.id, c.company_name, m.name, o.offer_date, o.total_price, o.status FROM offers o JOIN customers c ON o.customer_id = c.id JOIN models m ON o.model_id = m.id WHERE o.user_id=? ORDER BY o.id DESC""", (st.session_state.user_id,))
+    offers_raw = get_sales("SELECT o.id, c.company_name, o.model_id, o.offer_date, o.total_price, o.status FROM offers o JOIN customers c ON o.customer_id = c.id WHERE o.user_id=? ORDER BY o.id DESC", (st.session_state.user_id,))
     
-    if offers:
-        for off in offers:
-            off_id, c_name, m_name, o_date, t_price, o_status = off
+    if offers_raw:
+        for off in offers_raw:
+            off_id, c_name, m_id, o_date, t_price, o_status = off
             status_color = "#10b981" if o_status == "Onaylandı" else ("#ef4444" if o_status == "Reddedildi" else "#f59e0b")
+            
+            m_name_res = get_factory("SELECT name FROM models WHERE id=?", (m_id,))
+            m_name = m_name_res[0][0] if m_name_res else "Bilinmeyen Model"
             
             with st.container(border=True):
                 st.markdown(f"<h4 style='margin:0; color:#0f172a;'>{c_name}</h4>", unsafe_allow_html=True)
@@ -286,17 +316,17 @@ elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
                     load_offer_to_wizard(off_id)
                     st.session_state.edit_offer_id = off_id
                     st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
-                    if "_menu_radio" in st.session_state: del st.session_state["_menu_radio"]
+                    st.session_state.main_menu_radio = ":page_facing_up: Yeni Teklif Hazırla"
                     st.rerun()
                 if btn_col2.button(":page_facing_up: Kopyala", key=f"cp_{off_id}", use_container_width=True):
                     load_offer_to_wizard(off_id)
                     if 'edit_offer_id' in st.session_state: del st.session_state.edit_offer_id
                     st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
-                    if "_menu_radio" in st.session_state: del st.session_state["_menu_radio"]
+                    st.session_state.main_menu_radio = ":page_facing_up: Yeni Teklif Hazırla"
                     st.rerun()
                 if btn_col3.button(":wastebasket: Sil", key=f"rm_{off_id}", use_container_width=True):
-                    database.exec_query("DELETE FROM offers WHERE id=?", (off_id,))
-                    database.exec_query("DELETE FROM offer_items WHERE offer_id=?", (off_id,))
+                    exec_sales("DELETE FROM offers WHERE id=?", (off_id,))
+                    exec_sales("DELETE FROM offer_items WHERE offer_id=?", (off_id,))
                     st.rerun()
     else:
         st.info("Henüz geçmiş bir teklifiniz bulunmuyor.")
@@ -329,7 +359,9 @@ elif st.session_state.active_tab == ":gear: Profil Ayarlarım":
                         if not os.path.exists("images"): os.makedirs("images")
                         sys_path = f"images/system_logo_main.png"
                         with open(sys_path, "wb") as f: f.write(new_sys_logo.getbuffer())
-                        database.exec_query("UPDATE company_profile SET logo_path=? WHERE id=1", (sys_path,))
+                        conn = sqlite3.connect('factory_data.db')
+                        conn.execute("UPDATE company_profile SET logo_path=? WHERE id=1", (sys_path,))
+                        conn.commit(); conn.close()
                         st.success("Sistem logosu başarıyla değiştirildi!"); st.rerun()
 
 elif st.session_state.active_tab == ":page_facing_up: Yeni Teklif Hazırla":
