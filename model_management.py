@@ -63,7 +63,7 @@ def show_product_management():
         show_form_view(mode="edit", mod_id=st.session_state.edit_mod_id)
 
 # =====================================================================
-# GÖRÜNÜM 1: KATEGORİLİ VE VİTRİN TİPİ LİSTE
+# GÖRÜNÜM 1: KATEGORİLİ VE 3'LÜ VİTRİN TİPİ LİSTE
 # =====================================================================
 def show_list_view():
     st.header(":package: Fabrika Veritabanı Yönetimi")
@@ -85,34 +85,44 @@ def show_list_view():
             
             for cat in categories:
                 with st.expander(f"📁 {cat}", expanded=True):
-                    cat_mods = df_mods[df_mods['category'] == cat]
-                    for _, row in cat_mods.iterrows():
-                        with st.container(border=True):
-                            c_img, c_info, c_btn_edit, c_btn_copy, c_btn_del = st.columns([1.5, 5, 0.8, 0.8, 0.8], vertical_alignment="center")
-                            
-                            img_b64 = get_image_base64(row['image'])
-                            if img_b64:
-                                c_img.markdown(f'<img src="{img_b64}" style="width:100%; height:70px; object-fit:contain; border-radius:4px; border:1px solid #e2e8f0; padding:2px;">', unsafe_allow_html=True)
-                            else:
-                                c_img.markdown("<div style='height:70px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:12px;'>Görsel Yok</div>", unsafe_allow_html=True)
-                            
-                            c_info.markdown(f"<h5 style='margin:0; color:#0f172a;'>{row['name']}</h5><span style='color:#ea580c; font-weight:700; font-size:15px;'>{row['price']:,.2f} {row['currency']}</span>", unsafe_allow_html=True)
-                            
-                            if c_btn_edit.button("✏️", key=f"e_{row['id']}", help="Düzenle", use_container_width=True):
-                                st.session_state.edit_mod_id = row['id']
-                                st.session_state.mod_view_mode = "edit"
-                                st.rerun()
-                                
-                            if c_btn_copy.button("📄", key=f"c_{row['id']}", help="Kopyala", use_container_width=True):
-                                m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos FROM models WHERE id=?", (row['id'],))[0]
-                                exec_factory("""INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos) 
-                                                VALUES (?,?,?,?,?,?,?,?,?,?)""", 
-                                             (m_data[0] + " (Kopya)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9]))
-                                st.success("Makine başarıyla çoğaltıldı!"); st.rerun()
-                                
-                            if c_btn_del.button("🗑️", key=f"d_{row['id']}", help="Sil", use_container_width=True):
-                                exec_factory("DELETE FROM models WHERE id=?", (row['id'],))
-                                st.error("Makine silindi!"); st.rerun()
+                    cat_mods = df_mods[df_mods['category'] == cat].reset_index(drop=True)
+                    
+                    # 3'LÜ GRID (IZGARA) SİSTEMİ MANTIĞI
+                    for i in range(0, len(cat_mods), 3):
+                        cols = st.columns(3, gap="medium")
+                        for j in range(3):
+                            if i + j < len(cat_mods):
+                                row = cat_mods.iloc[i + j]
+                                with cols[j].container(border=True):
+                                    
+                                    # Yüksek ve Net Görsel Alanı
+                                    img_b64 = get_image_base64(row['image'])
+                                    if img_b64:
+                                        st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:180px; object-fit:contain; margin-bottom:15px;"></div>', unsafe_allow_html=True)
+                                    else:
+                                        st.markdown("<div style='height:180px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>Görsel Yok</div>", unsafe_allow_html=True)
+                                    
+                                    # Başlık ve Fiyat Alanı (Uzun isimler taşmasın diye CSS ile kırpılır)
+                                    st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{row['name']}'>{row['name']}</h4>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:18px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
+                                    
+                                    # Yan Yana 3 Aksiyon Butonu
+                                    btn_c1, btn_c2, btn_c3 = st.columns(3)
+                                    if btn_c1.button("✏️", key=f"e_{row['id']}", help="Düzenle", use_container_width=True):
+                                        st.session_state.edit_mod_id = row['id']
+                                        st.session_state.mod_view_mode = "edit"
+                                        st.rerun()
+                                        
+                                    if btn_c2.button("📄", key=f"c_{row['id']}", help="Kopyala", use_container_width=True):
+                                        m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos FROM models WHERE id=?", (row['id'],))[0]
+                                        exec_factory("""INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos) 
+                                                        VALUES (?,?,?,?,?,?,?,?,?,?)""", 
+                                                     (m_data[0] + " (Kopya)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9]))
+                                        st.success("Makine başarıyla çoğaltıldı!"); st.rerun()
+                                        
+                                    if btn_c3.button("🗑️", key=f"d_{row['id']}", help="Sil", use_container_width=True):
+                                        exec_factory("DELETE FROM models WHERE id=?", (row['id'],))
+                                        st.error("Makine silindi!"); st.rerun()
         else:
             st.info("Sistemde henüz bir makine bulunmuyor.")
 
