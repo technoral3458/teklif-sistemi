@@ -93,8 +93,10 @@ def show_list_view():
                         for j in range(3):
                             if i + j < len(cat_mods):
                                 row = cat_mods.iloc[i + j]
+                                # HATA ÇÖZÜMÜ: Pandas ID'si saf rakama çevrildi.
+                                safe_mod_id = int(row['id']) 
+                                
                                 with cols[j].container(border=True):
-                                    
                                     # Yüksek ve Net Görsel Alanı
                                     img_b64 = get_image_base64(row['image'])
                                     if img_b64:
@@ -102,26 +104,30 @@ def show_list_view():
                                     else:
                                         st.markdown("<div style='height:180px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>Görsel Yok</div>", unsafe_allow_html=True)
                                     
-                                    # Başlık ve Fiyat Alanı (Uzun isimler taşmasın diye CSS ile kırpılır)
+                                    # Başlık ve Fiyat Alanı
                                     st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{row['name']}'>{row['name']}</h4>", unsafe_allow_html=True)
                                     st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:18px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
                                     
                                     # Yan Yana 3 Aksiyon Butonu
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
-                                    if btn_c1.button("✏️", key=f"e_{row['id']}", help="Düzenle", use_container_width=True):
-                                        st.session_state.edit_mod_id = row['id']
+                                    
+                                    # 1. DÜZENLEME
+                                    if btn_c1.button("✏️", key=f"e_{safe_mod_id}", help="Düzenle", use_container_width=True):
+                                        st.session_state.edit_mod_id = safe_mod_id
                                         st.session_state.mod_view_mode = "edit"
                                         st.rerun()
                                         
-                                    if btn_c2.button("📄", key=f"c_{row['id']}", help="Kopyala", use_container_width=True):
-                                        m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos FROM models WHERE id=?", (row['id'],))[0]
+                                    # 2. ÇOĞALTMA / KOPYALAMA
+                                    if btn_c2.button("📄", key=f"c_{safe_mod_id}", help="Kopyala", use_container_width=True):
+                                        m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos FROM models WHERE id=?", (safe_mod_id,))[0]
                                         exec_factory("""INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos) 
                                                         VALUES (?,?,?,?,?,?,?,?,?,?)""", 
                                                      (m_data[0] + " (Kopya)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9]))
                                         st.success("Makine başarıyla çoğaltıldı!"); st.rerun()
                                         
-                                    if btn_c3.button("🗑️", key=f"d_{row['id']}", help="Sil", use_container_width=True):
-                                        exec_factory("DELETE FROM models WHERE id=?", (row['id'],))
+                                    # 3. SİLME
+                                    if btn_c3.button("🗑️", key=f"d_{safe_mod_id}", help="Sil", use_container_width=True):
+                                        exec_factory("DELETE FROM models WHERE id=?", (safe_mod_id,))
                                         st.error("Makine silindi!"); st.rerun()
         else:
             st.info("Sistemde henüz bir makine bulunmuyor.")
@@ -185,7 +191,8 @@ def show_form_view(mode="add", mod_id=None):
 
     existing_data = {}
     if is_edit:
-        res = get_factory("SELECT name, base_price, currency, category, port_discount, image_path, specs, compatible_options FROM models WHERE id=?", (mod_id,))
+        # mod_id'nin tam olarak eşleştiğine emin olmak için integer kontrolü
+        res = get_factory("SELECT name, base_price, currency, category, port_discount, image_path, specs, compatible_options FROM models WHERE id=?", (int(mod_id),))
         if res:
             r = res[0]
             existing_data = {"name": r[0], "price": r[1], "curr": r[2], "cat": r[3], "disc": r[4], "img": r[5], "specs": r[6], "opts": str(r[7]).split(",") if r[7] else []}
@@ -229,7 +236,7 @@ def show_form_view(mode="add", mod_id=None):
                 opt_ids = ",".join([s.split(" - ")[0] for s in sel_opts])
                 if is_edit:
                     exec_factory("""UPDATE models SET name=?, category=?, base_price=?, currency=?, specs=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?""", 
-                                 (m_name, m_cat, m_price, m_curr, m_specs, opt_ids, m_disc, m_img, mod_id))
+                                 (m_name, m_cat, m_price, m_curr, m_specs, opt_ids, m_disc, m_img, int(mod_id)))
                     st.success("Makine başarıyla güncellendi!")
                 else:
                     exec_factory("""INSERT INTO models (name, category, base_price, currency, specs, compatible_options, port_discount, image_path) 
