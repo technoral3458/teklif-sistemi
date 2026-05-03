@@ -41,7 +41,7 @@ def init_wizard_tables():
     except: pass
 
 # =====================================================================
-# HTML VE PDF ÖNİZLEME MOTORU (DONANIM RESİMLERİ EKLENDİ)
+# HTML VE PDF ÖNİZLEME MOTORU
 # =====================================================================
 def get_image_base64(img_path):
     if not img_path: return ""
@@ -219,7 +219,6 @@ def show_offer_wizard(user_id, is_admin=False):
                 if st.button("🔙 Makine Değiştir"): st.session_state.wizard_step = 1; st.rerun()
             
             with st.expander("👤 MÜŞTERİ VE SATIŞ ŞARTLARI", expanded=True):
-                # DİNAMİK MÜŞTERİ DEĞİŞTİRİCİ
                 cust_names = [c[1] for c in my_custs]
                 current_cust = wd.get("cust_name", "")
                 idx = cust_names.index(current_cust) if current_cust in cust_names else 0
@@ -243,7 +242,7 @@ def show_offer_wizard(user_id, is_admin=False):
             
             selected_options_for_db, engine_options_list, opts_total = [], [], 0.0
             
-            with st.container(height=350):
+            with st.container(height=450):
                 if wd["m_opts"]:
                     ids = [x.strip() for x in str(wd["m_opts"]).split(",") if x.strip()]
                     if ids:
@@ -251,8 +250,17 @@ def show_offer_wizard(user_id, is_admin=False):
                         for o in get_factory(f"SELECT id, opt_name, opt_price, opt_desc, opt_image FROM options WHERE id IN ({placeholders}) ORDER BY sort_order ASC, id ASC", tuple(ids)):
                             d_o_p = o[2] * multiplier
                             with st.container(border=True):
-                                c_chk, c_qty = st.columns([3, 1])
-                                is_sel = c_chk.checkbox(f"{o[1]} (+{d_o_p:,.0f})", key=f"o_{o[0]}")
+                                # YENİ GÖRSEL DESTEKLİ DONANIM SEÇİM KARTI
+                                c_img, c_chk, c_qty = st.columns([1.2, 3, 1.2], vertical_alignment="center")
+                                
+                                img_b64 = get_image_base64(o[4])
+                                if img_b64:
+                                    c_img.markdown(f'<img src="{img_b64}" style="max-width:100%; max-height:40px; object-fit:contain; border-radius:4px; border:1px solid #cbd5e1;">', unsafe_allow_html=True)
+                                else:
+                                    c_img.markdown("<div style='text-align:center; color:#94a3b8; font-size:10px;'>-</div>", unsafe_allow_html=True)
+                                
+                                is_sel = c_chk.checkbox(f"{o[1]} (+{d_o_p:,.0f} {wd['m_curr']})", key=f"o_{o[0]}")
+                                
                                 if is_sel:
                                     q_o = c_qty.number_input("Adet", 1, 100, 1, key=f"q_{o[0]}", label_visibility="collapsed")
                                     opts_total += (d_o_p * q_o)
