@@ -37,12 +37,11 @@ def init_wizard_tables():
         if "total_price" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN total_price REAL DEFAULT 0.0")
         if "conditions" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN conditions TEXT DEFAULT ''")
         if "status" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN status TEXT DEFAULT 'Beklemede'")
-        # HATA ÇÖZÜMÜ: Eksik olan user_id sütunu otomatik olarak tabloya ekleniyor
         if "user_id" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN user_id INTEGER DEFAULT 1")
     except: pass
 
 # =====================================================================
-# HTML VE PDF ÖNİZLEME MOTORU (Responsive A4 Tasarım)
+# HTML VE PDF ÖNİZLEME MOTORU (DONANIM RESİMLERİ EKLENDİ)
 # =====================================================================
 def get_image_base64(img_path):
     if not img_path: return ""
@@ -132,10 +131,12 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
 
     html += f"""
         <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
-        <table><tr style="background:#f8fafc;"><th style="width:55%;">Açıklama</th><th style="width:15%; text-align:center;">Adet</th><th style="width:30%; text-align:right;">Tutar</th></tr>
-        <tr><td><b>{model} (Standart Donanım)</b></td><td style="text-align:center;">{m_qty}</td><td style="text-align:right;">{base_price*m_qty:,.2f} {m_currency}</td></tr>"""
+        <table><tr style="background:#f8fafc;"><th style="width:15%; text-align:center;">Görsel</th><th style="width:40%;">Açıklama</th><th style="width:15%; text-align:center;">Adet</th><th style="width:30%; text-align:right;">Tutar</th></tr>
+        <tr><td style="text-align:center; color:#94a3b8;">-</td><td><b>{model} (Standart Donanım)</b></td><td style="text-align:center;">{m_qty}</td><td style="text-align:right;">{base_price*m_qty:,.2f} {m_currency}</td></tr>"""
+    
     for opt in selected_options:
-        html += f"<tr><td><b style='color:#2563eb;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.2; margin-top:2px;'>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
+        opt_img_tag = f'<img src="{get_image_base64(opt["i"])}" style="max-width:50px; max-height:35px; border-radius:4px; border:1px solid #cbd5e1;">' if opt["i"] else "<span style='color:#cbd5e1;'>-</span>"
+        html += f"<tr><td style='text-align:center;'>{opt_img_tag}</td><td><b style='color:#2563eb;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.2; margin-top:2px;'>{opt['d']}</small></td><td style='text-align:center;'>{opt['q']}</td><td style='text-align:right; font-weight:bold;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
     html += "</table>"
 
     html += f"""
@@ -208,17 +209,27 @@ def show_offer_wizard(user_id, is_admin=False):
     # ADIM 2: DÜZENLEME VE MANUEL FİYAT
     elif st.session_state.wizard_step == 2:
         wd = st.session_state.wizard_data
-        
         col_opt, col_prev = st.columns([1.1, 2.9], gap="large")
         
         with col_opt:
             if 'edit_offer_id' in st.session_state:
-                st.info("✏️ **DÜZENLEME MODU:** Şu an geçmiş bir teklifi güncelliyorsunuz.")
+                st.info("✏️ **DÜZENLEME MODU:** Geçmiş bir teklifi güncelliyorsunuz.")
                 if st.button("❌ İptal Et ve Sıfırdan Başla"): st.session_state.wizard_step = 1; st.rerun()
             else:
-                if st.button("Makine Değiştir"): st.session_state.wizard_step = 1; st.rerun()
+                if st.button("🔙 Makine Değiştir"): st.session_state.wizard_step = 1; st.rerun()
             
-            with st.expander("SATIŞ ŞARTLARINI DÜZENLE", expanded=False):
+            with st.expander("👤 MÜŞTERİ VE SATIŞ ŞARTLARI", expanded=True):
+                # DİNAMİK MÜŞTERİ DEĞİŞTİRİCİ
+                cust_names = [c[1] for c in my_custs]
+                current_cust = wd.get("cust_name", "")
+                idx = cust_names.index(current_cust) if current_cust in cust_names else 0
+                
+                selected_cust_name = st.selectbox("Teklif Verilen Müşteri", cust_names, index=idx)
+                if selected_cust_name != wd.get("cust_name"):
+                    wd["cust_name"] = selected_cust_name
+                    wd["cust_id"] = [c[0] for c in my_custs if c[1] == selected_cust_name][0]
+
+                st.markdown("---")
                 d_type = st.selectbox("Teslimat Şekli", ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Limandan Devir", "Yurtiçi Teslim (Standart)"], key="temp_del_type")
                 d_time = st.text_input("Teslim Süresi", wd.get("d_time", "Sipariş onayından itibaren 90 iş günü"))
                 ship = st.text_input("Nakliye / Lojistik", wd.get("ship", "Alıcıya Aittir"))
