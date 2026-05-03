@@ -156,15 +156,15 @@ if not st.session_state.logged_in:
     
     with col_main:
         sys_logo = get_system_logo()
+        # "B2B Bayi Portalı" yazısı buradan kaldırıldı. Sadece Logo ve alt bilgi metni var.
         st.markdown(f"""
             <div style='text-align: center; padding: 20px 0 10px 0;'>
                 <img src="{sys_logo}" style="max-height: 80px; margin-bottom: 15px; object-fit: contain;">
-                <h2 style='color: #0f172a; font-weight: 800; font-size: 24px; margin:0;'>B2B Bayi Portalı</h2>
                 <p style='color: #64748b; font-size: 14px;'>Sisteme erişmek için bilgilerinizi giriniz.</p>
             </div>
         """, unsafe_allow_html=True)
 
-        tab_login, tab_register, tab_forgot = st.tabs([":key: Giriş Yap", ":memo: Yeni Kayıt", ":question: Şifremi Unutttttum"])
+        tab_login, tab_register, tab_forgot = st.tabs([":key: Giriş Yap", ":memo: Yeni Kayıt", ":question: Şifremi Unuttum"])
         
         with tab_login:
             with st.container(border=True):
