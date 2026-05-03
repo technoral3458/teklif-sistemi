@@ -97,15 +97,68 @@ if not st.session_state.logged_in:
             st.session_state.logged_in, st.session_state.user_id, st.session_state.user_email = True, u_id, u_email
             st.session_state.user_role = u_role if u_role == 'admin' else ("manufacturer" if u_type == "Üretici" else "dealer")
 
-# --- CSS ---
+# --- GELİŞMİŞ ARAYÜZ VE MODERN MENÜ CSS ---
 st.markdown("""
     <style>
+    /* Genel Panel Sekmeleri (Tabs) */
     .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 8px; margin-bottom: 20px;}
     .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 20px; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap;}
     .stTabs [aria-selected="true"] { background-color: #2563eb !important; color: white !important; border: 1px solid #2563eb; }
+    
+    /* Dashboard İstatistik Kartları */
     .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; text-align: center; margin-bottom: 15px;}
     .stat-val { font-size: 28px; font-weight: 900; color: #1e293b; display: block; }
     .stat-title { color: #64748b; text-transform: uppercase; font-size: 11px; font-weight: 700; }
+    
+    /* =========================================
+       MODERN YAN MENÜ SİHİRBAZLIĞI (CSS)
+       ========================================= */
+    /* 1. Orijinal yuvarlak seçim kutularını tamamen gizle */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
+        display: none !important;
+    }
+    
+    /* 2. Menü elemanlarının arasındaki boşlukları daralt */
+    [data-testid="stSidebar"] div[role="radiogroup"] {
+        gap: 6px !important;
+    }
+    
+    /* 3. Menü elemanlarını şık butonlara/bloklara çevir */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label {
+        padding: 12px 15px;
+        margin-bottom: 0px;
+        border-radius: 8px;
+        background-color: transparent;
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+        width: 100%;
+        color: #475569;
+    }
+    
+    /* 4. Mouse ile üzerine gelindiğinde (Hover) */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+        background-color: #e2e8f0;
+        color: #0f172a;
+    }
+    
+    /* 5. Aktif olan (Seçili) menü elemanı */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] {
+        background-color: #2563eb !important;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);
+    }
+    
+    /* 6. Aktif elemanın yazı rengini beyaz yap */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] p {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Menü içi yazı font ayarı */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p {
+        font-size: 15px !important;
+        font-weight: 600;
+    }
+    
     @media (max-width: 768px) { .stTabs [data-baseweb="tab"] { padding: 8px 6px; font-size: 12px; white-space: normal; text-align: center; } .stTabs [data-baseweb="tab-list"] { gap: 4px; } }
     </style>
 """, unsafe_allow_html=True)
@@ -207,22 +260,48 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ YAN MENÜ
+# GÜVENLİ VE MODERN YAN MENÜ
 # =====================================================================
 with st.sidebar:
-    st.markdown(f"<div style='text-align: center; margin-bottom: 20px;'><img src='{get_system_logo()}' style='max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
-    r_text = {"admin": "Yönetici", "dealer": "Satıcı Bayi", "manufacturer": "Üretici"}.get(st.session_state.user_role, "Kullanıcı")
-    st.markdown(f"<div style='background-color:#1e293b; padding:15px; border-radius:8px; text-align:center; color:white; margin-bottom:20px;'><div style='font-size:14px; font-weight:bold;'>&#128100; {st.session_state.user_email}</div><div style='font-size:12px; color:#94a3b8;'>[{r_text}]</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align: center; margin-bottom: 25px; margin-top: 10px;'><img src='{get_system_logo()}' style='max-height: 65px; object-fit: contain;'></div>", unsafe_allow_html=True)
     
-    menu_items = [":house: Dashboard", ":page_facing_up: Yeni Teklif Hazırla", ":busts_in_silhouette: Müşterilerim", ":clipboard: Geçmiş Tekliflerim", ":gear: Profil Ayarlarım"]
-    if st.session_state.user_role == "admin": menu_items.extend([":office: Bayi Yönetimi", ":package: Tüm Modelleri Yönet"])
+    # Modern Profil Kartı
+    r_text = {"admin": "Sistem Yöneticisi", "dealer": "Satıcı Bayi", "manufacturer": "Üretici"}.get(st.session_state.user_role, "Kullanıcı")
+    st.markdown(f"""
+        <div style='background-color:#f8fafc; padding:15px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:25px; display:flex; align-items:center; gap:10px;'>
+            <div style='background:#2563eb; color:white; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:16px;'>
+                {st.session_state.user_email[0].upper()}
+            </div>
+            <div style='overflow:hidden;'>
+                <div style='font-size:13px; font-weight:700; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div>
+                <div style='font-size:11px; color:#64748b; font-weight:600;'>{r_text}</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Menü Öğeleri
+    menu_items = [
+        "📊 Dashboard", 
+        "📝 Yeni Teklif Hazırla", 
+        "👥 Müşterilerim", 
+        "📋 Geçmiş Tekliflerim", 
+        "⚙️ Profil Ayarlarım"
+    ]
+    if st.session_state.user_role == "admin": 
+        menu_items.extend(["🏢 Bayi Yönetimi", "📦 Tüm Modelleri Yönet"])
     
     idx = menu_items.index(st.session_state.active_tab) if st.session_state.active_tab in menu_items else 0
-    def sync_menu(): st.session_state.active_tab = st.session_state.m_radio
+    
+    def sync_menu(): 
+        st.session_state.active_tab = st.session_state.m_radio
+
+    # CSS ile gizlenen gizli radyolar
     st.radio("MENÜ", menu_items, index=idx, key="m_radio", on_change=sync_menu, label_visibility="collapsed")
 
-    st.markdown("---")
-    if st.button(":door: Oturumu Kapat", use_container_width=True):
+    st.markdown("<hr style='margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+    
+    # Çıkış Butonu
+    if st.button("🚪 Sistemi Kapat", use_container_width=True):
         conn = sqlite3.connect('users.db')
         conn.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
         conn.commit(); conn.close()
@@ -233,20 +312,20 @@ with st.sidebar:
 # =====================================================================
 if st.session_state.active_tab == "PROFORMA":
     proforma_invoice.show_proforma(st.session_state.proforma_id, st.session_state.user_id)
-elif st.session_state.active_tab == ":busts_in_silhouette: Müşterilerim":
+elif st.session_state.active_tab == "👥 Müşterilerim":
     customer_pages.show_customer_management(st.session_state.user_id, st.session_state.user_role == "admin")
-elif st.session_state.active_tab == ":page_facing_up: Yeni Teklif Hazırla":
+elif st.session_state.active_tab == "📝 Yeni Teklif Hazırla":
     offer_wizard.show_offer_wizard(st.session_state.user_id, st.session_state.user_role == "admin")
-elif st.session_state.active_tab == ":package: Tüm Modelleri Yönet":
+elif st.session_state.active_tab == "📦 Tüm Modelleri Yönet":
     model_management.show_product_management()
-elif st.session_state.active_tab == ":office: Bayi Yönetimi":
+elif st.session_state.active_tab == "🏢 Bayi Yönetimi":
     dealer_management.show_dealer_management()
 
 # =====================================================================
 # GELİŞMİŞ DASHBOARD (ANALİZ PANELİ VE BAYİ TAKİBİ)
 # =====================================================================
-elif st.session_state.active_tab == ":house: Dashboard":
-    st.header(":bar_chart: Analiz ve Bayi Takip Paneli")
+elif st.session_state.active_tab == "📊 Dashboard":
+    st.header("📊 Analiz ve Bayi Takip Paneli")
     
     if st.session_state.user_role == "admin":
         conn_u = sqlite3.connect('users.db')
@@ -275,7 +354,7 @@ elif st.session_state.active_tab == ":house: Dashboard":
             col_chart, col_leader = st.columns([2, 1])
             
             with col_chart:
-                st.subheader("📊 Bayi Bazlı Satış Performansı")
+                st.subheader("📈 Bayi Bazlı Satış Performansı")
                 df_sales = df_offers[df_offers["status"].isin(["Onaylandı", "Siparişe Çevir"])]
                 if not df_sales.empty:
                     sales_by_dealer = df_sales.groupby('Bayi')['total_price'].sum().reset_index()
@@ -286,7 +365,6 @@ elif st.session_state.active_tab == ":house: Dashboard":
             with col_leader:
                 st.subheader("🏆 Bayi Liderlik Tablosu")
                 leaderboard = df_offers.groupby('Bayi').agg(Toplam_Teklif=('id', 'count'), Toplam_Hacim=('total_price', 'sum')).reset_index().sort_values(by='Toplam_Hacim', ascending=False)
-                # Tablo formatını güzelleştir
                 leaderboard['Toplam_Hacim'] = leaderboard['Toplam_Hacim'].apply(lambda x: f"{x:,.2f}")
                 st.dataframe(leaderboard, use_container_width=True, hide_index=True)
 
@@ -354,8 +432,8 @@ elif st.session_state.active_tab == ":house: Dashboard":
 # =====================================================================
 # GEÇMİŞ TEKLİFLER VE PROFİL AYARLARI
 # =====================================================================
-elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
-    st.header(":clipboard: Geçmiş Tekliflerim")
+elif st.session_state.active_tab == "📋 Geçmiş Tekliflerim":
+    st.header("📋 Geçmiş Tekliflerim")
     conn = sqlite3.connect('sales_data.db')
     q = "SELECT o.id, c.company_name, o.model_id, o.offer_date, o.total_price, o.status FROM offers o JOIN customers c ON o.customer_id = c.id"
     if st.session_state.user_role != 'admin': q += f" WHERE o.user_id={st.session_state.user_id}"
@@ -378,7 +456,7 @@ elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
                 btn_col1, btn_col2, btn_col3 = st.columns(3)
                 if btn_col1.button("✏️ Düzenle", key=f"ed_{off_id}", use_container_width=True):
                     st.session_state.edit_offer_id = off_id
-                    st.session_state.active_tab = ":page_facing_up: Yeni Teklif Hazırla"
+                    st.session_state.active_tab = "📝 Yeni Teklif Hazırla"
                     st.rerun()
                 if btn_col2.button("📄 Proforma", key=f"pr_{off_id}", use_container_width=True):
                     st.session_state.proforma_id = off_id
@@ -392,8 +470,8 @@ elif st.session_state.active_tab == ":clipboard: Geçmiş Tekliflerim":
                     st.rerun()
     else: st.info("Geçmiş teklif bulunmuyor.")
 
-elif st.session_state.active_tab == ":gear: Profil Ayarlarım":
-    st.header(":gear: Kurumsal Profil Ayarları")
+elif st.session_state.active_tab == "⚙️ Profil Ayarlarım":
+    st.header("⚙️ Kurumsal Profil Ayarları")
     conn = sqlite3.connect('users.db')
     u_data = conn.execute("SELECT company_name, email, phone, website, address_full, logo_path FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
     conn.close()
