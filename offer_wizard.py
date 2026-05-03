@@ -72,7 +72,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     """
 
     html = f"""
-    <html><head><style>{css}</style></head><body>
+    <html><head><meta charset="utf-8"><style>{css}</style></head><body>
         <div class="no-print"><button class="print-btn" onclick="window.print()">🖨️ PDF OLARAK KAYDET / YAZDIR</button></div>
         <div class="paper">
             <div class="header">
@@ -91,7 +91,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             </div>
     """
 
-    # --- STANDART ÖZELLİKLER ---
+    # --- MAKİNE STANDART ÖZELLİKLERİ ---
     if specs and str(specs).strip():
         html += '<div class="section-title">🔍 MAKİNE STANDART ÖZELLİKLERİ</div><table>'
         specs_list = [item for item in str(specs).split("||") if item.strip()]
@@ -109,7 +109,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
                 </tr>"""
         html += "</table>"
 
-    # --- DONANIMLAR ---
+    # --- SEÇİLEN OPSİYONLAR ---
     html += f"""
         <div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div>
         <table>
@@ -145,11 +145,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
                 <tr><td><b>Ödeme Planı:</b></td><td>{conditions.get('payment_plan_text','')}</td></tr>
                 <tr><td><b>Banka Bilgileri:</b></td><td>{conditions.get('bank','')}</td></tr>
             </table>
-    """
-    if conditions.get('notes', ''):
-        html += f'<div style="margin-top:15px; padding:12px; background:#fff; border-radius:6px; font-size:12px; color:#475569;"><b>Özel Notlar:</b><br>{conditions.get("notes","")}</div>'
-    
-    html += f"""
         </div>
         <div class="price-box">
             <div style="font-size:15px; font-weight:bold; color:#ea580c; text-transform:uppercase;">Genel Toplam (KDV Hariç)</div>
@@ -174,21 +169,21 @@ def show_offer_wizard(user_id, is_admin=False):
     my_custs = database.get_query("SELECT id, company_name FROM customers WHERE user_id=?", (user_id,)) if not is_admin else database.get_query("SELECT id, company_name FROM customers")
     
     if not my_custs:
-        st.warning("⚠️ Lütfen önce 'Müşterilerim' menüsünden bir müşteri ekleyiniz.")
+        st.warning(":warning: Lütfen önce 'Müşterilerim' menüsünden bir müşteri ekleyiniz.")
         return
 
     # -----------------------------------------------------------------
     # ADIM 1: MÜŞTERİ VE MAKİNE SEÇİMİ
     # -----------------------------------------------------------------
     if st.session_state.wizard_step == 1:
-        st.markdown("### ✨ Yeni Teklif Başlat")
+        st.markdown("### :sparkles: Yeni Teklif Başlat")
         with st.container(border=True):
-            sc_name = st.selectbox("👤 Müşteri Seçimi", [c[1] for c in my_custs])
-            f_curr = st.selectbox("💵 Para Birimi", ["USD", "EUR", "TRY"])
+            sc_name = st.selectbox("Müşteri Seçimi", [c[1] for c in my_custs])
+            f_curr = st.selectbox("Para Birimi", ["USD", "EUR", "TRY"])
             
             cats = database.get_query("SELECT name FROM categories")
             cat_list = ["Tüm Kategoriler"] + [c[0] for c in cats]
-            f_cat = st.selectbox("🗂️ Kategori", cat_list)
+            f_cat = st.selectbox("Kategori", cat_list)
             
             m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount FROM models WHERE currency=?"
             m_params = (f_curr,)
@@ -199,10 +194,10 @@ def show_offer_wizard(user_id, is_admin=False):
             model_data = database.get_query(m_query, m_params)
 
             if model_data:
-                sel_m_name = st.selectbox("🤖 Makine Modeli", [m[1] for m in model_data])
+                sel_m_name = st.selectbox("Makine Modeli", [m[1] for m in model_data])
                 m_qty = st.number_input("Makine Adedi", min_value=1, value=1)
                 
-                if st.button("Sonraki Adım: Donanım ve Şartlar ➡️", type="primary", use_container_width=True):
+                if st.button("Sonraki Adım: Donanım ve Şartlar", type="primary", use_container_width=True):
                     m_info = [m for m in model_data if m[1] == sel_m_name][0]
                     st.session_state.wizard_data = {
                         "cust_id": [c[0] for c in my_custs if c[1] == sc_name][0],
@@ -222,10 +217,10 @@ def show_offer_wizard(user_id, is_admin=False):
         col_opt, col_prev = st.columns([1.5, 2.5], gap="large")
         
         with col_opt:
-            if st.button("🔙 Makine Değiştir"): st.session_state.wizard_step = 1; st.rerun()
+            if st.button("Makine Değiştir"): st.session_state.wizard_step = 1; st.rerun()
             
             # 1. ŞARTLAR PANELİ
-            with st.expander("📝 SATIŞ ŞARTLARINI DÜZENLE", expanded=False):
+            with st.expander("SATIŞ ŞARTLARINI DÜZENLE", expanded=False):
                 d_type = st.selectbox("Teslimat Şekli", ["Antrepo Teslim", "Limandan Devir"], key="temp_del_type")
                 d_time = st.text_input("Teslim Süresi", "Sipariş onayından itibaren 90 iş günü")
                 ship = st.text_input("Nakliye / Lojistik", "Alıcıya Aittir")
@@ -271,7 +266,7 @@ def show_offer_wizard(user_id, is_admin=False):
                 "payment_plan_text": pay, "bank": bnk, "notes": nts
             }
 
-            if st.button("💾 TEKLİFİ ARŞİVE KAYDET", type="primary", use_container_width=True):
+            if st.button("TEKLİFİ ARŞİVE KAYDET", type="primary", use_container_width=True):
                 try:
                     tarih = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
                     database.exec_query("INSERT INTO offers (customer_id, model_id, total_price, user_id, offer_date, status, conditions) VALUES (?,?,?,?,?,?,?)",
