@@ -2,141 +2,149 @@ import streamlit as st
 import database
 import pandas as pd
 
-def init_customer_table():
-    # Veritabanı sütun eksikliklerini ZORLA giderir (Hata riskini sıfırlar)
-    try:
-        database.exec_query("CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT)")
-        cols = [c[1] for c in database.get_query("PRAGMA table_info(customers)")]
-        
-        # Eğer eski veritabanında bu sütunlar yoksa, hata vermemesi için otomatik ekler
-        if "contact_person" not in cols: database.exec_query("ALTER TABLE customers ADD COLUMN contact_person TEXT DEFAULT ''")
-        if "description" not in cols: database.exec_query("ALTER TABLE customers ADD COLUMN description TEXT DEFAULT ''")
-        if "tax_office" not in cols: database.exec_query("ALTER TABLE customers ADD COLUMN tax_office TEXT DEFAULT ''")
-        if "tax_no" not in cols: database.exec_query("ALTER TABLE customers ADD COLUMN tax_no TEXT DEFAULT ''")
-        if "phone" not in cols: database.exec_query("ALTER TABLE customers ADD COLUMN phone TEXT DEFAULT ''")
-        if "email" not in cols: database.exec_query("ALTER TABLE customers ADD COLUMN email TEXT DEFAULT ''")
-        if "address" not in cols: database.exec_query("ALTER TABLE customers ADD COLUMN address TEXT DEFAULT ''")
-        if "user_id" not in cols: database.exec_query("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 0")
-    except Exception as e:
-        pass
-
 def show_customer_management(user_id, is_admin=False):
-    init_customer_table()
-    
-    st.markdown("<h2 style='color: #1e293b;'>👥 Müşteri Cari Kart Yönetimi</h2>", unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["📋 Müşteri Listesi & Düzenle", "➕ Yeni Müşteri Ekle"])
+    # --- MODERN STİL ŞABLONU ---
+    st.markdown("""
+        <style>
+        .block-container { padding-top: 2rem; }
+        .customer-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid #3b82f6;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .section-header {
+            color: #1e293b;
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+        .stTabs [data-baseweb="tab"] {
+            background-color: #f1f5f9;
+            border-radius: 10px 10px 0px 0px;
+            padding: 10px 20px;
+            font-weight: 600;
+        }
+        .stTabs [aria-selected="true"] { background-color: #3b82f6 !important; color: white !important; }
+        </style>
+    """, unsafe_allow_html=True)
 
-    # Verileri Çekme
-    if is_admin:
-        query = "SELECT id, company_name, contact_person, phone, email, tax_office, tax_no, address, description FROM customers ORDER BY id DESC"
-        params = ()
-    else:
-        query = "SELECT id, company_name, contact_person, phone, email, tax_office, tax_no, address, description FROM customers WHERE user_id = ? ORDER BY id DESC"
-        params = (user_id,)
-    
-    raw_data = database.get_query(query, params)
-    df = pd.DataFrame(raw_data, columns=["ID", "Firma Adı", "Yetkili", "Telefon", "E-Posta", "Vergi Dairesi", "Vergi No", "Adres", "Açıklama"])
+    st.markdown("<h2 style='color: #0f172a;'>👥 Müşteri & Cari Yönetimi</h2>", unsafe_allow_html=True)
 
-    # ==========================================
-    # 1. SEKME: LİSTE VE DÜZENLE
-    # ==========================================
-    with tab1:
-        search_term = st.text_input("🔍 Müşteri Ara (Firma Adı, Yetkili veya Telefon)").lower()
+    tab_list, tab_add = st.tabs(["🔍 Müşteri Sorgula & Düzenle", "➕ Yeni Müşteri Kaydı"])
+
+    # ==========================================================
+    # SEKME 1: LİSTELEME VE DÜZENLEME
+    # ==========================================================
+    with tab_list:
+        # Arama Motoru
+        search_q = st.text_input("Firma Adı veya Yetkili İle Ara...", placeholder="Örn: Ersan Makine")
         
-        if not df.empty:
-            filtered_df = df
-            if search_term:
-                # astype(str) ekledik ki boş verilerde pandas hata vermesin
-                filtered_df = df[
-                    df["Firma Adı"].astype(str).str.lower().str.contains(search_term, na=False) | 
-                    df["Yetkili"].astype(str).str.lower().str.contains(search_term, na=False) |
-                    df["Telefon"].astype(str).str.lower().str.contains(search_term, na=False)
-                ]
+        # Veri Çekme
+        if is_admin:
+            query = "SELECT * FROM customers WHERE company_name LIKE ?"
+            params = (f"%{search_q}%",)
+        else:
+            query = "SELECT * FROM customers WHERE user_id=? AND company_name LIKE ?"
+            params = (user_id, f"%{search_q}%")
             
-            st.dataframe(filtered_df.drop(columns=["ID"]), use_container_width=True)
+        customers = database.get_query(query, params)
+
+        if customers:
+            # Pandas ile şık tablo gösterimi
+            df = pd.DataFrame(customers, columns=["ID", "Firma Ünvanı", "Vergi Dairesi", "Vergi No", "Yetkili Kişi", "Telefon", "E-Posta", "Adres", "Bayi ID"])
+            st.dataframe(df.drop(columns=["ID", "Bayi ID"]), use_container_width=True)
             
             st.markdown("---")
-            st.subheader("📝 Seçili Müşteriyi Düzenle / Sil")
+            st.markdown("<div class='section-header'>⚙️ Kayıt Güncelleme / Silme</div>", unsafe_allow_html=True)
             
-            cust_options = [f"{row['ID']} - {row['Firma Adı']}" for idx, row in filtered_df.iterrows()]
-            selected_cust_str = st.selectbox("İşlem yapılacak müşteriyi seçin:", ["Seçiniz..."] + cust_options)
+            selected_cust = st.selectbox("İşlem yapılacak müşteriyi seçin:", [f"{c[0]} - {c[1]}" for c in customers])
             
-            if selected_cust_str != "Seçiniz...":
-                selected_id = int(selected_cust_str.split(" - ")[0])
-                cust_info = df[df["ID"] == selected_id].iloc[0]
+            if selected_cust:
+                c_id = int(selected_cust.split(" - ")[0])
+                c_data = [c for c in customers if c[0] == c_id][0]
                 
-                with st.form("edit_cust_form"):
-                    e_name = st.text_input("Firma Unvanı *", value=str(cust_info["Firma Adı"]))
-                    e_contact = st.text_input("Yetkili Kişi", value=str(cust_info["Yetkili"]) if pd.notna(cust_info["Yetkili"]) else "")
+                with st.expander(f"📝 {c_data[1]} Bilgilerini Düzenle", expanded=True):
+                    with st.form(f"edit_form_{c_id}"):
+                        e_col1, e_col2 = st.columns(2)
+                        new_name = e_col1.text_input("Firma Tam Ünvanı", value=c_data[1])
+                        new_auth = e_col2.text_input("Yetkili Kişi", value=c_data[4])
+                        
+                        e_col3, e_col4 = st.columns(2)
+                        new_tel = e_col3.text_input("Telefon", value=c_data[5])
+                        new_mail = e_col4.text_input("E-Posta", value=c_data[6])
+                        
+                        new_adr = st.text_area("Açık Adres", value=c_data[7], height=100)
+                        
+                        btn_update = st.form_submit_button("🔄 BİLGİLERİ GÜNCELLE", use_container_width=True)
+                        
+                        if btn_update:
+                            database.exec_query(
+                                "UPDATE customers SET company_name=?, contact_person=?, phone=?, email=?, address=? WHERE id=?",
+                                (new_name, new_auth, new_tel, new_mail, new_adr, c_id)
+                            )
+                            st.success("Müşteri bilgileri başarıyla güncellendi!")
+                            st.rerun()
                     
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        e_phone = st.text_input("Telefon No", value=str(cust_info["Telefon"]) if pd.notna(cust_info["Telefon"]) else "")
-                        e_tax_off = st.text_input("Vergi Dairesi", value=str(cust_info["Vergi Dairesi"]) if pd.notna(cust_info["Vergi Dairesi"]) else "")
-                    with col2:
-                        e_email = st.text_input("E-Posta Adresi", value=str(cust_info["E-Posta"]) if pd.notna(cust_info["E-Posta"]) else "")
-                        e_tax_no = st.text_input("Vergi Numarası", value=str(cust_info["Vergi No"]) if pd.notna(cust_info["Vergi No"]) else "")
-                    
-                    e_addr = st.text_area("Açık Adres", value=str(cust_info["Adres"]) if pd.notna(cust_info["Adres"]) else "")
-                    e_desc = st.text_area("Açıklama", value=str(cust_info["Açıklama"]) if pd.notna(cust_info["Açıklama"]) else "")
-                    
-                    updated = st.form_submit_button("🔄 BİLGİLERİ GÜNCELLE", use_container_width=True)
-                    
-                if updated:
-                    try:
-                        database.exec_query("""
-                            UPDATE customers 
-                            SET company_name=?, contact_person=?, phone=?, email=?, tax_office=?, tax_no=?, address=?, description=?
-                            WHERE id=?""", 
-                            (e_name, e_contact, e_phone, e_email, e_tax_off, e_tax_no, e_addr, e_desc, selected_id))
-                        st.success("Müşteri bilgileri başarıyla güncellendi!")
+                    if st.button("🗑️ BU MÜŞTERİYİ SİSTEMDEN SİL", type="secondary", use_container_width=True):
+                        database.exec_query("DELETE FROM customers WHERE id=?", (c_id,))
+                        st.error("Kayıt silindi.")
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Güncelleme Hatası: {e}")
-                
-                st.write("")
-                if st.button("🗑️ BU MÜŞTERİYİ SİL", use_container_width=True):
-                    database.exec_query("DELETE FROM customers WHERE id=?", (selected_id,))
-                    st.error("Müşteri kaydı sistemden silindi!")
-                    st.rerun()
         else:
-            st.info("Sistemde henüz kayıtlı müşteri bulunmamaktadır.")
+            st.info("Henüz kayıtlı bir müşteri bulunmuyor veya arama kriterine uygun sonuç yok.")
 
-    # ==========================================
-    # 2. SEKME: YENİ MÜŞTERİ EKLE
-    # ==========================================
-    with tab2:
-        st.subheader("➕ Yeni Müşteri Kaydı")
-        with st.form("new_cust_form"):
-            c_name = st.text_input("Firma Unvanı * (Zorunlu)")
-            c_contact = st.text_input("Yetkili Kişi")
+    # ==========================================================
+    # SEKME 2: YENİ MÜŞTERİ EKLEME (MODERN FORM)
+    # ==========================================================
+    with tab_add:
+        st.markdown("""
+            <div style='background:#f8fafc; padding:20px; border-radius:15px; border:1px solid #e2e8f0;'>
+                <h4 style='margin-top:0; color:#1e40af;'>✨ Yeni Müşteri Portföyü Oluştur</h4>
+                <p style='color:#64748b; font-size:14px;'>Müşteri bilgilerini eksiksiz girmek, teklif formlarınızın profesyonel görünmesini sağlar.</p>
+            </div>
+        """, unsafe_allow_html=True)
+        st.write("")
+
+        with st.form("new_customer_form", clear_on_submit=True):
+            # 1. GRUP: ŞİRKET KİMLİĞİ
+            st.markdown("<div class='section-header'>🏢 Şirket Kimliği</div>", unsafe_allow_html=True)
+            col1, col2 = st.columns([2, 1])
+            comp_name = col1.text_input("Firma Ünvanı *", placeholder="Örn: Ersan Makine Mobilya Ltd. Şti.")
+            auth_person = col2.text_input("Görüşülen Yetkili", placeholder="Ad Soyad")
             
-            col1, col2 = st.columns(2)
-            with col1:
-                c_phone = st.text_input("Telefon No")
-                c_tax_off = st.text_input("Vergi Dairesi")
-            with col2:
-                c_email = st.text_input("E-Posta Adresi")
-                c_tax_no = st.text_input("Vergi Numarası")
+            # 2. GRUP: İLETİŞİM
+            st.markdown("<div class='section-header'>📞 İletişim Bilgileri</div>", unsafe_allow_html=True)
+            col3, col4 = st.columns(2)
+            tel = col3.text_input("Telefon Numarası", placeholder="+90 5xx ...")
+            mail = col4.text_input("E-Posta Adresi", placeholder="ornek@firma.com")
             
-            c_addr = st.text_area("Açık Adres")
-            c_desc = st.text_area("Açıklama")
+            # 3. GRUP: VERGİ VE ADRES
+            st.markdown("<div class='section-header'>⚖️ Ticari Detaylar</div>", unsafe_allow_html=True)
+            col5, col6 = st.columns(2)
+            tax_off = col5.text_input("Vergi Dairesi")
+            tax_no = col6.text_input("Vergi Numarası")
             
-            submitted = st.form_submit_button("💾 MÜŞTERİYİ KAYDET", use_container_width=True)
+            address = st.text_area("Sevkiyat / Fatura Adresi", placeholder="Mahalle, Sokak, No, İlçe/İl", height=100)
             
-            if submitted:
-                if c_name.strip():
+            st.markdown("---")
+            submit_btn = st.form_submit_button("✅ MÜŞTERİYİ PORTFÖYE EKLE", type="primary", use_container_width=True)
+
+            if submit_btn:
+                if comp_name:
                     try:
                         database.exec_query(
-                            "INSERT INTO customers (company_name, contact_person, phone, email, tax_office, tax_no, address, description, user_id) VALUES (?,?,?,?,?,?,?,?,?)",
-                            (c_name, c_contact, c_phone, c_email, c_tax_off, c_tax_no, c_addr, c_desc, user_id)
+                            "INSERT INTO customers (company_name, tax_office, tax_no, contact_person, phone, email, address, user_id) VALUES (?,?,?,?,?,?,?,?)",
+                            (comp_name, tax_off, tax_no, auth_person, tel, mail, address, user_id)
                         )
                         st.balloons()
-                        st.success(f"'{c_name}' başarıyla kaydedildi!")
-                        st.rerun()
+                        st.success(f"'{comp_name}' başarıyla kaydedildi! Artık bu müşteriye teklif hazırlayabilirsiniz.")
                     except Exception as e:
-                        # EĞER HATA OLURSA KIRMIZI KUTUYLA EKRANA BASACAK
-                        st.error(f"Kayıt Hatası (Lütfen bu hatayı bana gönderin): {e}")
+                        st.error(f"Kayıt sırasında bir hata oluştu: {e}")
                 else:
-                    st.error("Lütfen Firma Unvanı alanını boş bırakmayınız!")
+                    st.warning("Lütfen en azından 'Firma Ünvanı' alanını doldurunuz.")
