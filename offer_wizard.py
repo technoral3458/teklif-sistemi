@@ -1,123 +1,143 @@
 import streamlit as st
-import streamlit.components.v1 as components
-import datetime
-import pandas as pd
-import json
-import os
-import base64
 import sqlite3
-import ntpath
-import posixpath
+import pandas as pd
+import datetime
 
 # =====================================================================
-# VERİTABANI BAĞLANTI MOTORLARI
+# VERİTABANI MOTORLARI
 # =====================================================================
-def get_factory(query, params=()):
-    conn = sqlite3.connect('factory_data.db', check_same_thread=False)
-    c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
-    return res
-
-def get_sales(query, params=()):
-    conn = sqlite3.connect('sales_data.db', check_same_thread=False)
-    c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
-    return res
-
-def exec_sales(query, params=()):
-    conn = sqlite3.connect('sales_data.db')
-    c = conn.cursor(); c.execute(query, params); conn.commit(); conn.close()
-
-def get_user_query(query, params=()):
-    conn = sqlite3.connect('users.db', check_same_thread=False)
-    c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
-    return res
-
-def init_wizard_tables():
-    exec_sales("""CREATE TABLE IF NOT EXISTS offer_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, offer_id INTEGER, option_id INTEGER, quantity INTEGER DEFAULT 1)""")
-    try:
-        of_cols = [c[1] for c in get_sales("PRAGMA table_info(offers)")]
-        if "total_price" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN total_price REAL DEFAULT 0.0")
-        if "conditions" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN conditions TEXT DEFAULT ''")
-        if "status" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN status TEXT DEFAULT 'Beklemede'")
-        if "user_id" not in of_cols: exec_sales("ALTER TABLE offers ADD COLUMN user_id INTEGER DEFAULT 1")
-    except: pass
+def get_db_connection(db_name):
+    return sqlite3.connect(db_name, check_same_thread=False)
 
 # =====================================================================
-# GELİŞMİŞ VE AKILLI RESİM OKUMA MOTORU
+# TEKLİF YÖNETİM MODÜLÜ (TAM LİSTE)
 # =====================================================================
-def get_image_base64(path):
-    if not path: return ""
-    if str(path).startswith("http"): return path
-    base_name = posixpath.basename(ntpath.basename(path))
-    paths_to_try = [path, f"images/{path}", f"../images/{path}", base_name, f"images/{base_name}"]
-    for p in paths_to_try:
-        if os.path.exists(p) and os.path.isfile(p):
-            try:
-                with open(p, "rb") as f:
-                    ext = os.path.splitext(p)[1].lower().replace('.', '')
-                    if not ext: ext = 'png'
-                    return f"data:image/{ext};base64,{base64.b64encode(f.read()).decode()}"
-            except: pass
-    return ""
+def show_offer_management(user_id, user_role):
+    st.markdown("### 📋 Teklif Listesi ve Durum Yönetimi")
+    
+    conn_s = get_db_connection('sales_data.db')
+    
+    # Tüm teklifleri veritabanından çek
+    offers_raw = conn_s.execute("SELECT id, customer_id, model_id, total_price, status, user_id, offer_date FROM offers ORDER BY id DESC").fetchall()
+    
+    if not offers_raw:
+        st.info("Sistemde henüz kayıtlı bir teklif bulunmuyor.")
+        conn_s.close()
+        return
 
-def generate_embedded_html(customer, model, base_price, machine_img, specs, selected_options, conditions, m_currency, user_id):
-    tarih = datetime.datetime.now().strftime("%d.%m.%Y")
-    m_qty = conditions.get("machine_qty", 1)
-    agreed_price = conditions.get("agreed_price", 0)
-    teklif_no = f"TR-{datetime.datetime.now().strftime('%y%m%d')}"
+    # Verileri DataFrame'e aktar
+    df_offers = pd.DataFrame(offers_raw, columns=["id", "customer_id", "model_id", "total_price", "status", "user_id", "offer_date"])
+    
+    # İlgili isimleri diğer veritabanlarından çekip eşleştirme
+    conn_u = get_db_connection('users.db')
+    user_dict = {u[0]: u[1] for u in conn_u.execute("SELECT id, company_name FROM users").fetchall()}
+    conn_u.close()
 
-    try: u_info = get_user_query("SELECT company_name, logo_path, website, address_full, phone FROM users WHERE id=?", (user_id,))[0]
-    except: u_info = None
-    
-    comp_name = u_info[0] if u_info and u_info[0] else "ERSAN MAKİNE"
-    comp_logo = u_info[1] if u_info and u_info[1] else ""
-    comp_web = u_info[2] if u_info and u_info[2] else "www.ersanmakina.net"
-    comp_adr = u_info[3] if u_info and u_info[3] else "Ersan Makine San. Tic. Ltd. Şti."
-    comp_tel = u_info[4] if u_info and u_info[4] else ""
+    cust_dict = {c[0]: c[1] for c in conn_s.execute("SELECT id, company_name FROM customers").fetchall()}
+    
+    conn_f = get_db_connection('factory_data.db')
+    mod_dict = {m[0]: m[1] for m in conn_f.execute("SELECT id, name FROM models").fetchall()}
+    conn_f.close()
 
-    if not comp_logo:
-        try: comp_logo = get_factory("SELECT logo_path FROM company_profile WHERE id=1")[0][0]
-        except: pass
+    df_offers['Bayi'] = df_offers['user_id'].map(user_dict).fillna("Bilinmeyen Bayi")
+    df_offers['Müşteri'] = df_offers['customer_id'].map(cust_dict).fillna("Bilinmeyen Müşteri")
+    df_offers['Model'] = df_offers['model_id'].map(mod_dict).fillna("Bilinmeyen Model")
 
-    logo_b64 = get_image_base64(comp_logo)
-    header_logo_html = f'<img src="{logo_b64}" style="max-height:70px; width:auto; object-fit:contain;">' if logo_b64 else f'<div style="font-size:22px; font-weight:900; color:#1e293b;">{comp_name}</div>'
+    # Eğer yönetici değilse sadece kendi tekliflerini görsün
+    if user_role != 'admin':
+        df_offers = df_offers[df_offers['user_id'] == user_id]
 
-    css = """
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-        body { font-family: 'Inter', sans-serif; font-size: 14px; color: #1e293b; background: #cbd5e1; margin:0; padding:15px; display: flex; flex-direction: column; align-items: center; }
-        .paper { background: #fff; width: 100%; max-width: 850px; min-height: 1120px; padding: 6%; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; margin-bottom: 40px; }
-        .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .section-title { background: #f8fafc; color: #0f172a; padding: 10px 15px; font-weight: 800; font-size: 14px; margin-top: 30px; border-left: 5px solid #2563eb; text-transform: uppercase; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; word-wrap: break-word; }
-        th, td { border-bottom: 1px solid #f1f5f9; padding: 12px; text-align: left; vertical-align: middle; }
-        .price-box { background: #fffbeb; border: 1px solid #fde68a; padding: 20px; text-align: right; margin-top: 35px; border-radius: 6px; }
-        .total-price { font-size: 30px; font-weight: 900; color: #ea580c; word-break: break-all; }
-        .elegant-conditions { margin-top: 35px; background: #f8fafc; padding: 20px; border-left: 5px solid #eab308; }
-        .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; max-width: 850px; margin-bottom: 20px; font-weight: bold; }
-        .footer-info { margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px; }
-        @media print { .no-print { display: none !important; } .paper { box-shadow: none; border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; min-height: auto; } body { background: #fff; padding: 0; } .page-break { page-break-before: always; } }
-    """
+    # --- FİLTRELEME ALANI (Kibar ve Kompakt Tasarım) ---
+    with st.expander("🔍 Filtreleme Seçenekleri", expanded=True):
+        f1, f2 = st.columns(2)
+        if user_role == 'admin':
+            bayi_filtresi = f1.selectbox("Bayi Seçimi", ["Tümü"] + list(df_offers['Bayi'].unique()))
+        else:
+            bayi_filtresi = "Tümü"
+            
+        durum_filtresi = f2.selectbox("Durum Seçimi", ["Tümü", "Beklemede", "Siparişe Çevir", "Reddedildi"])
 
-    page_header_html = f"""
-        <div class="header">
-            <div>{header_logo_html}</div>
-            <div style="text-align:right; font-size: 12px; color: #64748b;"><b>{comp_web}</b><br>Tarih: {tarih}<br>Teklif No: {teklif_no}</div>
-        </div>
-    """
+    # Filtreleri Uygula
+    filtered_df = df_offers.copy()
+    if bayi_filtresi != "Tümü":
+        filtered_df = filtered_df[filtered_df['Bayi'] == bayi_filtresi]
+    if durum_filtresi != "Tümü":
+        filtered_df = filtered_df[filtered_df['status'] == durum_filtresi]
 
-    html = f"""
-    <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><body>
-        <div class="no-print"><button class="print-btn" onclick="window.print()">🖨️ PDF OLARAK KAYDET / YAZDIR</button></div>
-        <div class="paper">
-            {page_header_html}
-            <div style="text-align:center; padding: 15px 0;">
-                <img src="{get_image_base64(machine_img)}" style="max-width:100%; max-height:350px; width:auto; height:auto; object-fit:contain; display:block; margin:0 auto;"><br>
-                <h2 style="color:#0f172a; margin:15px 0; font-size:24px; font-weight:900;">MODEL: {model}</h2>
-                <div style="display:inline-block; background:#f1f5f9; padding: 8px 20px; border-radius: 20px; font-size:15px; color:#475569;">
-                    Sayın Yetkili: <b style="color:#0f172a;">{customer}</b>
-                </div>
-            </div>
-    """
+    st.markdown("---")
 
-    if specs and str(specs).strip():
-        html += '<div class="section-title">🔍 MAKİNE STANDART ÖZELLİKLERİ</div><table>'
+    if filtered_df.empty:
+        st.warning("Bu kriterlere uygun teklif bulunamadı.")
+        conn_s.close()
+        return
+
+    # --- KARTLI VE ZARİF LİSTELEME GÖRÜNÜMÜ ---
+    for _, row in filtered_df.iterrows():
+        off_id = row['id']
+        stat = row['status']
+        
+        # Siparişe Çevrilenler için Açık Yeşil Arka Plan Rengi
+        bg_color = "#f0fdf4" if stat == "Siparişe Çevir" else "#ffffff"
+        border_color = "#bbf7d0" if stat == "Siparişe Çevir" else "#e2e8f0"
+        
+        with st.container():
+            st.markdown(f"""
+                <div style="background-color:{bg_color}; padding:15px; border-radius:10px; border:1px solid {border_color}; margin-bottom:5px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span style="font-size:16px; font-weight:800; color:#0f172a;">{row['Müşteri']}</span>
+                            <div style="font-size:13px; color:#64748b; margin-top:2px;">
+                                <b>{row['Bayi']}</b> | Tarih: {row['offer_date']}
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:18px; font-weight:900; color:#ea580c;">{row['total_price']:,.2f}</div>
+                            <div style="font-size:12px; font-weight:600; color:#64748b;">{row['Model']}</div>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # --- AKSİYON BUTONLARI VE DURUM YÖNETİMİ ---
+            c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
+            
+            # Yönetici ise durumu değiştirebilir
+            if user_role == 'admin':
+                new_stat = c1.selectbox(
+                    "Durum", 
+                    ["Beklemede", "Siparişe Çevir", "Reddedildi"], 
+                    index=["Beklemede", "Siparişe Çevir", "Reddedildi"].index(stat if stat in ["Beklemede", "Siparişe Çevir", "Reddedildi"] else "Beklemede"), 
+                    key=f"s_{off_id}", 
+                    label_visibility="collapsed"
+                )
+                if c1.button("✔️ Güncelle", key=f"b_{off_id}", use_container_width=True):
+                    # Siparişe çevrildiyse o anki saati damgala
+                    o_time = datetime.datetime.now().strftime("%d.%m.%Y %H:%M") if new_stat == "Siparişe Çevir" else ""
+                    conn_s.execute("UPDATE offers SET status=?, order_date=? WHERE id=?", (new_stat, o_time, off_id))
+                    conn_s.commit()
+                    st.toast(f"#{off_id} Numaralı Teklif Güncellendi!")
+                    st.rerun()
+            else:
+                # Bayi ise sadece durumu görür
+                c1.markdown(f"<div style='text-align:center; padding:7px; background:#f1f5f9; border-radius:5px; font-size:13px; font-weight:800; color:#475569;'>{stat}</div>", unsafe_allow_html=True)
+
+            if c2.button("✏️ Düzenle", key=f"e_{off_id}", use_container_width=True):
+                st.session_state.edit_offer_id = off_id
+                st.session_state.active_tab = "📝 Yeni Teklif Hazırla"
+                st.rerun()
+            
+            if c3.button("📄 Proforma", key=f"p_{off_id}", use_container_width=True):
+                st.session_state.proforma_id = off_id
+                st.session_state.active_tab = "PROFORMA"
+                st.rerun()
+            
+            if c4.button("🗑️ Sil", key=f"r_{off_id}", use_container_width=True):
+                conn_s.execute("DELETE FROM offers WHERE id=?", (off_id,))
+                conn_s.execute("DELETE FROM offer_items WHERE offer_id=?", (off_id,))
+                conn_s.commit()
+                st.rerun()
+            
+            # Kartlar arası şık bir boşluk
+            st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
+    
+    conn_s.close()
