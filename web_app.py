@@ -189,10 +189,10 @@ def repair_databases():
 repair_databases()
 
 # =====================================================================
-# OTURUM YÖNETİMİ
+# OTURUM YÖNETİMİ VE MENÜ KAPANMA TETİKLEYİCİSİ
 # =====================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
-for key in ["user_id", "user_role", "user_email", "allowed_menus"]:
+for key in ["user_id", "user_role", "user_email", "allowed_menus", "close_sidebar"]:
     if key not in st.session_state: st.session_state[key] = None
 if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
@@ -213,11 +213,28 @@ if not st.session_state.logged_in:
             st.session_state.user_email = valid_user[3]
             st.session_state.allowed_menus = valid_user[4]
 
-# --- MODERN ARAYÜZ CSS ---
+# --- KÜRESEL CSS (MOBİL UYUMLU SEKMELER VE KARTLAR İÇİN) ---
 st.markdown("""
     <style>
-    .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 8px; margin-bottom: 20px;}
-    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 20px; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap;}
+    /* SEKMELERİN (TABS) MOBİL EKRANDA TAŞMAMASI İÇİN ESNEK YAPI (WRAP) */
+    .stTabs [data-baseweb="tab-list"] { 
+        justify-content: center; 
+        gap: 5px; 
+        margin-bottom: 20px;
+        flex-wrap: wrap; /* Dar ekranda alt satıra geçmesini sağlar */
+    }
+    .stTabs [data-baseweb="tab"] { 
+        background-color: #f1f5f9; 
+        border-radius: 8px; 
+        padding: 8px 12px !important; 
+        font-size: 14px !important;
+        font-weight: 600; 
+        color: #475569; 
+        border: 1px solid #e2e8f0; 
+        white-space: normal !important; /* Uzun metinlerin kutu içinde alt satıra inmesini sağlar */
+        text-align: center;
+        flex: 1 1 auto; /* Kutuların boşluklara göre esnemesini sağlar */
+    }
     .stTabs [aria-selected="true"] { background-color: #2563eb !important; color: white !important; border: 1px solid #2563eb; }
     
     .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; text-align: center; margin-bottom: 15px;}
@@ -353,18 +370,12 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    # --- YENİ DİNAMİK MENÜ YÖNETİMİ ---
     if st.session_state.user_role == "admin":
         menu_items = [_("m_dash"), _("m_new"), _("m_cust"), _("m_past"), _("m_order"), _("m_prof"), _("m_deal"), _("m_model")]
     else:
-        # Veritabanından gelen yetkileri okur
         allowed = st.session_state.allowed_menus.split(',') if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
-        
-        # BÜTÜN MENÜLER İÇİN YETKİ KONTROLÜ EKLENDİ (Tüm Valid Keys)
         valid_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model"]
-        
         menu_items = [_(k.strip()) for k in allowed if k.strip() in valid_keys]
-        
         if not menu_items:
             menu_items = [_("m_prof")]
     
@@ -372,12 +383,16 @@ with st.sidebar:
         st.session_state.active_tab = menu_items[0]
         
     idx = menu_items.index(st.session_state.active_tab)
-    def sync_menu(): st.session_state.active_tab = st.session_state.m_radio
+    
+    # MENÜ SEÇİLDİĞİNDE TETİKLENEN FONKSİYON
+    def sync_menu(): 
+        st.session_state.active_tab = st.session_state.m_radio
+        st.session_state.close_sidebar = True # Kapatma sinyalini ver
+        
     st.radio("MENÜ", menu_items, index=idx, key="m_radio", on_change=sync_menu, label_visibility="collapsed")
 
     st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
     
-    # Dil Seçici (Sidebar Altında)
     lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
     current_idx = list(lang_opts.keys()).index(st.session_state.lang) if st.session_state.lang in lang_opts else 0
     sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=current_idx, key="sidebar_lang_sel")
@@ -385,13 +400,30 @@ with st.sidebar:
         st.session_state.lang = sel
         st.rerun()
         
-    # Çıkış Butonu
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     if st.button(_("logout"), use_container_width=True):
         conn = sqlite3.connect('users.db')
         conn.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
         conn.commit(); conn.close()
         st.query_params.clear(); st.session_state.clear(); st.rerun()
+
+# =====================================================================
+# MOBİL CİHAZLAR İÇİN OTOMATİK MENÜ KAPATICI (GÖRÜNMEZ SİNYAL)
+# =====================================================================
+if st.session_state.get("close_sidebar", False):
+    st.session_state.close_sidebar = False
+    import streamlit.components.v1 as components
+    components.html("""
+        <script>
+            if (window.parent.innerWidth <= 768) {
+                // Streamlit'e menüyü kapatması için yerel ESC tuşu sinyali gönder
+                window.parent.document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+                // Alternatif olarak karartma perdesine tıklama emri ver
+                const backdrop = window.parent.document.querySelector('[data-testid="stSidebar"] + div');
+                if (backdrop) { backdrop.click(); }
+            }
+        </script>
+    """, height=0, width=0)
 
 # =====================================================================
 # SAYFA YÖNLENDİRİCİ MOTORU
