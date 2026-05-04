@@ -9,7 +9,7 @@ import ntpath, posixpath
 st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon=":gear:", layout="wide", initial_sidebar_state="expanded")
 
 # =====================================================================
-# 🌍 ÇOKLU DİL MOTORU VE OTOMATİK DİL ALGILAYICI
+# 🌍 ÇOKLU DİL MOTORU VE OTOMATİK DİL ALGILAYICI (TR - EN - ZH)
 # =====================================================================
 # Tarayıcı dilini otomatik oku (Auto-Detect)
 if 'lang' not in st.session_state:
@@ -17,13 +17,14 @@ if 'lang' not in st.session_state:
         accept_lang = st.context.headers.get("Accept-Language", "")
         if accept_lang:
             primary_lang = accept_lang.split(',')[0][:2].lower()
-            st.session_state.lang = primary_lang if primary_lang in ["tr", "en"] else "en"
+            # Eğer tarayıcı TR, EN veya ZH (Çince) ise onu seç, değilse İngilizce başla
+            st.session_state.lang = primary_lang if primary_lang in ["tr", "en", "zh"] else "en"
         else:
             st.session_state.lang = "tr"
     except:
         st.session_state.lang = "tr"
 
-# Dil Sözlüğü
+# Dil Sözlüğü (Türkçe, İngilizce, Çince)
 DICTIONARY = {
     "tr": {
         "login_tab": "🔑 Giriş", "reg_tab": "📝 Kayıt", "forg_tab": "❓ Şifremi Unuttum",
@@ -76,17 +77,47 @@ DICTIONARY = {
         "d_tot_offer": "My Total Offers", "d_pend": "Pending Offers", "d_appr": "Converted to Order",
         "d_last_date": "Last Activity Date", "d_title": "📊 Performance & Showcase", "d_showcase": "🌟 Machine Showcase",
         "no_record": "No Record", "unknown": "Unknown", "none_yet": "None Yet", "no_image": "No showcase images found."
+    },
+    "zh": {
+        "login_tab": "🔑 登录", "reg_tab": "📝 注册", "forg_tab": "❓ 忘记密码",
+        "email": "电子邮件地址", "pass": "密码", "rem": "记住我", "login_btn": "登录系统",
+        "sys_err": "电子邮件或密码错误！", "sys_unver": "电子邮件未验证！", "sys_wait": "等待帐户批准。",
+        "reg_type": "业务类型", "dealer": "经销商", "manuf": "制造商",
+        "comp_name": "公司全称 *", "phone": "电话 *", "reg_btn": "注册",
+        "req_fields": "(*) 必填字段。", "email_in_use": "电子邮件已被使用！",
+        "code_sent": "验证码已发送", "mail_err": "无法发送电子邮件。",
+        "enter_code": "输入您电子邮件中的验证码", "verify_btn": "验证",
+        "ver_success": "已验证！管理员批准后即可登录。", "wrong_code": "验证码错误！",
+        "f_email": "注册的电子邮件地址", "send_reset": "发送重置验证码",
+        "no_email": "系统中未找到此电子邮件。", "new_pass": "设置新密码",
+        "change_pass": "更改密码", "pass_changed": "密码已更改！您现在可以登录。",
+        
+        "m_dash": "📊 仪表板", "m_new": "📝 创建新报价", "m_cust": "👥 我的客户", 
+        "m_past": "📋 历史报价", "m_order": "📦 订单", "m_prof": "⚙️ 个人资料设置",
+        "m_deal": "🏢 经销商管理", "m_model": "📦 管理所有型号", "logout": "🚪 退出系统",
+        
+        "role_admin": "系统管理员", "role_dealer": "经销商", "role_manuf": "制造商",
+        
+        "d_top_deal": "报价最多的经销商", "d_last_deal": "最近活跃的经销商",
+        "d_top_country": "热门国家", "d_top_city": "热门城市",
+        "d_tot_offer": "我的总报价", "d_pend": "待处理报价", "d_appr": "转换为订单",
+        "d_last_date": "最后活动日期", "d_title": "📊 绩效与展示", "d_showcase": "🌟 机器展示",
+        "no_record": "无记录", "unknown": "未知", "none_yet": "暂无", "no_image": "未找到展示图片。"
     }
 }
 
 # Çeviri okuyucu fonksiyon
 def _(key): return DICTIONARY.get(st.session_state.lang, DICTIONARY["tr"]).get(key, key)
 
-# Manuel dil değiştirici
+# Manuel dil değiştirici (TR - EN - ZH)
 def lang_selector():
-    c1, c2 = st.columns([9, 1])
+    c1, c2 = st.columns([8.5, 1.5])
     with c2:
-        sel = st.selectbox("🌍", ["tr", "en"], format_func=lambda x: "🇹🇷 TR" if x=="tr" else "🇬🇧 EN", index=0 if st.session_state.lang=="tr" else 1, label_visibility="collapsed")
+        lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
+        # Mevcut dilin index'ini bul (hata olmaması için fallback ekliyoruz)
+        current_idx = list(lang_opts.keys()).index(st.session_state.lang) if st.session_state.lang in lang_opts else 0
+        
+        sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=current_idx, label_visibility="collapsed")
         if sel != st.session_state.lang:
             st.session_state.lang = sel
             st.rerun()
@@ -101,7 +132,7 @@ def send_email(to_email, code, subject="Ersan Makine"):
     SMTP_SERVER = "mail.ersanmakina.net"; SMTP_PORT = 587
     SENDER_EMAIL = "sefa@ersanmakina.net"; SENDER_PASSWORD = "Sev32881-"
     msg = MIMEMultipart(); msg['From'] = f"Ersan Makine B2B <{SENDER_EMAIL}>"; msg['To'] = to_email; msg['Subject'] = subject
-    msg.attach(MIMEText(f"Kod / Code: {code}", 'plain'))
+    msg.attach(MIMEText(f"Kod / Code / 代码: {code}", 'plain'))
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT); server.starttls(); server.login(SENDER_EMAIL, SENDER_PASSWORD); server.send_message(msg); server.quit()
         return True
@@ -478,12 +509,12 @@ elif st.session_state.active_tab == _("m_prof"):
     with st.expander("👤", expanded=True):
         with st.form("p_form"):
             c1, c2 = st.columns(2)
-            p_name = c1.text_input("Firma Adı / Company Name", value=u_data[0] if u_data else "")
-            p_web = c2.text_input("Web Sitesi / Website", value=u_data[3] if u_data and u_data[3] else "")
-            p_phone = c1.text_input("Telefon / Phone", value=u_data[2] if u_data and u_data[2] else "")
-            p_adr = st.text_area("Açık Adres / Full Address", value=u_data[4] if u_data and u_data[4] else "")
-            up_logo = st.file_uploader("Logonuz / Your Logo", type=['png','jpg','jpeg'])
-            if st.form_submit_button("💾 GÜNCELLE / UPDATE", type="primary"):
+            p_name = c1.text_input("Firma Adı / Company Name / 公司名称", value=u_data[0] if u_data else "")
+            p_web = c2.text_input("Web Sitesi / Website / 网站", value=u_data[3] if u_data and u_data[3] else "")
+            p_phone = c1.text_input("Telefon / Phone / 电话", value=u_data[2] if u_data and u_data[2] else "")
+            p_adr = st.text_area("Açık Adres / Full Address / 详细地址", value=u_data[4] if u_data and u_data[4] else "")
+            up_logo = st.file_uploader("Logonuz / Your Logo / 您的标志", type=['png','jpg','jpeg'])
+            if st.form_submit_button("💾 GÜNCELLE / UPDATE / 更新", type="primary"):
                 f_logo = u_data[5] if u_data else ""
                 if up_logo:
                     if not os.path.exists("images"): os.makedirs("images")
@@ -492,13 +523,13 @@ elif st.session_state.active_tab == _("m_prof"):
                 conn = sqlite3.connect('users.db')
                 conn.execute("UPDATE users SET company_name=?, website=?, phone=?, address_full=?, logo_path=? WHERE id=?", (p_name, p_web, p_phone, p_adr, f_logo, st.session_state.user_id))
                 conn.commit(); conn.close()
-                st.success("Güncellendi / Updated!"); st.rerun()
+                st.success("Güncellendi / Updated / 已更新！"); st.rerun()
                 
     if st.session_state.user_role == 'admin':
-        with st.expander("🚀 SİSTEM GENEL AYARLARI / SYSTEM SETTINGS", expanded=True):
+        with st.expander("🚀 SİSTEM GENEL AYARLARI / SYSTEM SETTINGS / 系统设置", expanded=True):
             with st.form("sys_form"):
-                new_sys_logo = st.file_uploader("Sistem Logosu Seç / Select System Logo", type=['png','jpg','jpeg'])
-                if st.form_submit_button("SİSTEM LOGOSUNU DEĞİŞTİR / CHANGE LOGO"):
+                new_sys_logo = st.file_uploader("Sistem Logosu Seç / Select System Logo / 选择系统标志", type=['png','jpg','jpeg'])
+                if st.form_submit_button("SİSTEM LOGOSUNU DEĞİŞTİR / CHANGE LOGO / 更改系统标志"):
                     if new_sys_logo:
                         if not os.path.exists("images"): os.makedirs("images")
                         sys_path = f"images/system_logo_main.png"
@@ -506,4 +537,4 @@ elif st.session_state.active_tab == _("m_prof"):
                         conn = sqlite3.connect('factory_data.db')
                         conn.execute("UPDATE company_profile SET logo_path=? WHERE id=1", (sys_path,))
                         conn.commit(); conn.close()
-                        st.success("Sistem logosu güncellendi / System logo updated!"); st.rerun()
+                        st.success("Sistem logosu güncellendi / System logo updated / 系统标志已更新！"); st.rerun()
