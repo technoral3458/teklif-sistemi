@@ -40,6 +40,7 @@ DICTIONARY = {
         "m_dash": "📊 Dashboard", "m_new": "📝 Yeni Teklif Hazırla", "m_cust": "👥 Müşterilerim", 
         "m_past": "📋 Geçmiş Tekliflerim", "m_order": "📦 Siparişler", "m_prof": "⚙️ Profil Ayarlarım",
         "m_deal": "🏢 Bayi Yönetimi", "m_model": "📦 Tüm Modelleri Yönet", "logout": "🚪 Sistemi Kapat",
+        "lang_sel": "Sistem Dili / Language",
         
         "role_admin": "Sistem Yöneticisi", "role_dealer": "Satıcı Bayi", "role_manuf": "Üretici",
         
@@ -66,6 +67,7 @@ DICTIONARY = {
         "m_dash": "📊 Dashboard", "m_new": "📝 Create New Offer", "m_cust": "👥 My Customers", 
         "m_past": "📋 Past Offers", "m_order": "📦 Orders", "m_prof": "⚙️ Profile Settings",
         "m_deal": "🏢 Dealer Management", "m_model": "📦 Manage Models", "logout": "🚪 Logout",
+        "lang_sel": "System Language",
         
         "role_admin": "System Admin", "role_dealer": "Dealer", "role_manuf": "Manufacturer",
         
@@ -92,6 +94,7 @@ DICTIONARY = {
         "m_dash": "📊 仪表板", "m_new": "📝 创建新报价", "m_cust": "👥 我的客户", 
         "m_past": "📋 历史报价", "m_order": "📦 订单", "m_prof": "⚙️ 个人资料设置",
         "m_deal": "🏢 经销商管理", "m_model": "📦 管理所有型号", "logout": "🚪 退出系统",
+        "lang_sel": "系统语言 (Language)",
         
         "role_admin": "系统管理员", "role_dealer": "经销商", "role_manuf": "制造商",
         
@@ -105,12 +108,13 @@ DICTIONARY = {
 
 def _(key): return DICTIONARY.get(st.session_state.lang, DICTIONARY["tr"]).get(key, key)
 
-def lang_selector(key_suffix):
-    c1, c2 = st.columns([8.5, 1.5])
-    with c2:
+# Sadece Giriş Ekranı İçin Dil Seçici
+def main_lang_selector():
+    c1, c2, c3 = st.columns([7, 2, 1])
+    with c3:
         lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
         current_idx = list(lang_opts.keys()).index(st.session_state.lang) if st.session_state.lang in lang_opts else 0
-        sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=current_idx, key=f"lang_sel_{key_suffix}", label_visibility="collapsed")
+        sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=current_idx, key="main_lang_sel", label_visibility="collapsed")
         if sel != st.session_state.lang:
             st.session_state.lang = sel
             st.rerun()
@@ -156,7 +160,7 @@ def get_system_logo():
     return fallback_url
 
 # =====================================================================
-# VERİTABANI TAMİRCİSİ (HATA ÖNLEYİCİ - GÜNCELLENDİ)
+# VERİTABANI TAMİRCİSİ (HATA ÖNLEYİCİ)
 # =====================================================================
 def repair_databases():
     conn = sqlite3.connect('users.db')
@@ -172,7 +176,6 @@ def repair_databases():
     o_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
     if "order_date" not in o_cols: conn.execute("ALTER TABLE offers ADD COLUMN order_date TEXT DEFAULT ''")
     
-    # MÜŞTERİ TABLOSU İÇİN GÜÇLENDİRİLMİŞ EKSİK SÜTUN KONTROLÜ
     c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
     if "user_id" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 1")
     if "country" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN country TEXT DEFAULT ''")
@@ -181,7 +184,6 @@ def repair_databases():
     if "email" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN email TEXT DEFAULT ''")
     if "phone" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN phone TEXT DEFAULT ''")
     if "address" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN address TEXT DEFAULT ''")
-    
     conn.commit(); conn.close()
 
 repair_databases()
@@ -233,11 +235,11 @@ st.markdown("""
 # GİRİŞ, KAYIT VE ŞİFRE EKRANLARI
 # =====================================================================
 if not st.session_state.logged_in:
-    lang_selector("login_screen")
+    main_lang_selector() # Sadece giriş ekranına özel, bozulmayan dil seçici
     
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
     with col_main:
-        st.markdown(f"""<div style='text-align: center; padding: 20px 0 10px 0;'><img src="{get_system_logo()}" style="max-height: 80px; margin-bottom: 15px; object-fit: contain;"></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style='text-align: center; padding: 10px 0 20px 0;'><img src="{get_system_logo()}" style="max-width: 100%; max-height: 80px; object-fit: contain;"></div>""", unsafe_allow_html=True)
         
         t_login, t_reg, t_forg = st.tabs([_("login_tab"), _("reg_tab"), _("forg_tab")])
         
@@ -327,25 +329,27 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ YAN MENÜ
+# GÜVENLİ VE MOBİL UYUMLU YAN MENÜ
 # =====================================================================
 with st.sidebar:
-    lang_selector("sidebar_menu")
-    st.markdown(f"<div style='text-align: center; margin-bottom: 25px; margin-top: 10px;'><img src='{get_system_logo()}' style='max-height: 65px; object-fit: contain;'></div>", unsafe_allow_html=True)
+    # 1. Logo (Mobilde taşmayı önleyen CSS)
+    st.markdown(f"<div style='text-align: center; margin-bottom: 20px; padding: 10px 0;'><img src='{get_system_logo()}' style='max-width: 90%; max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
     
+    # 2. Profil Kartı (Mobilde metin taşmasını önleyen yapı)
     r_text_key = "role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer")
     r_text = _(r_text_key)
     
     st.markdown(f"""
-        <div style='background-color:#f8fafc; padding:15px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:25px; display:flex; align-items:center; gap:10px;'>
-            <div style='background:#2563eb; color:white; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:16px;'>{st.session_state.user_email[0].upper()}</div>
-            <div style='overflow:hidden;'>
-                <div style='font-size:13px; font-weight:700; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div>
+        <div style='background-color:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:20px; display:flex; align-items:center; gap:10px; overflow-wrap: anywhere;'>
+            <div style='background:#2563eb; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:16px;'>{st.session_state.user_email[0].upper()}</div>
+            <div style='overflow:hidden; width:100%;'>
+                <div style='font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div>
                 <div style='font-size:11px; color:#64748b; font-weight:600;'>{r_text}</div>
             </div>
         </div>
     """, unsafe_allow_html=True)
     
+    # 3. Menü Öğeleri
     menu_items = [
         _("m_dash"), _("m_new"), _("m_cust"), _("m_past"), _("m_order"), _("m_prof")
     ]
@@ -359,7 +363,18 @@ with st.sidebar:
     def sync_menu(): st.session_state.active_tab = st.session_state.m_radio
     st.radio("MENÜ", menu_items, index=idx, key="m_radio", on_change=sync_menu, label_visibility="collapsed")
 
-    st.markdown("<hr style='margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+    
+    # 4. Dil Seçici (Artık en altta, düzeni bozmuyor)
+    lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
+    current_idx = list(lang_opts.keys()).index(st.session_state.lang) if st.session_state.lang in lang_opts else 0
+    sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=current_idx, key="sidebar_lang_sel")
+    if sel != st.session_state.lang:
+        st.session_state.lang = sel
+        st.rerun()
+        
+    # 5. Çıkış Butonu
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     if st.button(_("logout"), use_container_width=True):
         conn = sqlite3.connect('users.db')
         conn.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
