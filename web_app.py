@@ -167,8 +167,7 @@ if not st.session_state.logged_in:
         valid_user = conn.execute("SELECT id, user_type, role, email, allowed_menus FROM users WHERE session_token=?", (current_token,)).fetchone()
         conn.close()
         if valid_user:
-            st.session_state.logged_in = True
-            st.session_state.user_id, st.session_state.user_role, st.session_state.user_email, st.session_state.allowed_menus = valid_user[0], (valid_user[2] if valid_user[2] == 'admin' else ("manufacturer" if valid_user[1] == "Üretici" else "dealer")), valid_user[3], valid_user[4]
+            st.session_state.logged_in, st.session_state.user_id, st.session_state.user_role, st.session_state.user_email, st.session_state.allowed_menus = True, valid_user[0], (valid_user[2] if valid_user[2] == 'admin' else ("manufacturer" if valid_user[1] == "Üretici" else "dealer")), valid_user[3], valid_user[4]
 
 st.markdown("""
     <style>
@@ -184,7 +183,7 @@ st.markdown("""
     [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] { gap: 6px !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label { padding: 12px 15px; border-radius: 8px; transition: all 0.2s; cursor: pointer; color: #475569; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { background-color: #e2e8f0; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { background-color: #e2e8f0; color: #0f172a; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] { background-color: #2563eb !important; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3); }
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] p { color: white !important; font-weight: 700 !important; }
     
@@ -222,7 +221,6 @@ if not st.session_state.logged_in:
                             st.session_state.logged_in, st.session_state.user_id, st.session_state.user_role, st.session_state.user_email, st.session_state.allowed_menus = True, user[0], (user[4] if user[4]=='admin' else ("manufacturer" if user[1]=="Üretici" else "dealer")), le, user[5]
                             st.rerun()
                     else: st.error(_("sys_err"))
-        # (Kayıt ve Şifre sıfırlama kısımları aynı mantıkla devam eder...)
         with t_reg:
             with st.container(border=True):
                 if st.session_state.reg_step == 1:
@@ -246,7 +244,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ VE OTOMATİK KAPANAN YAN MENÜ
+# GÜVENLİ VE GARANTİLİ OTOMATİK KAPANAN YAN MENÜ
 # =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 15px; padding: 10px 0;'><img src='{get_system_logo()}' style='max-width: 90%; max-height: 55px; object-fit: contain;'></div>", unsafe_allow_html=True)
@@ -260,9 +258,11 @@ with st.sidebar:
         menu_items = [_(k.strip()) for k in allowed if k.strip() in v_keys]
     
     if "active_tab" not in st.session_state or st.session_state.active_tab not in menu_items: st.session_state.active_tab = menu_items[0]
+    
     def on_menu_change():
         st.session_state.active_tab = st.session_state.m_radio
-        st.session_state.close_sidebar = True # Kapatma komutunu ver
+        st.session_state.close_sidebar = True # Kapatma sinyalini etkinleştir
+        
     st.radio("MENÜ", menu_items, index=menu_items.index(st.session_state.active_tab), key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
     
     st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
@@ -273,28 +273,30 @@ with st.sidebar:
         c = sqlite3.connect('users.db'); c.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,)); c.commit(); c.close(); st.query_params.clear(); st.session_state.clear(); st.rerun()
 
 # =====================================================================
-# KESİN ÇÖZÜM: MOBİL OTOMATİK KAPATICI (JAVASCRIPT)
+# GARANTİLİ MOBİL MENÜ KAPATICI (DYNAMIC ID İLE)
 # =====================================================================
+# Kapatma sinyali geldiyse, her seferinde BENZERSİZ bir ID ile çalıştır.
+# Böylece Streamlit cache (hafıza) yapamaz, kod her tıklamada kesin olarak çalışır.
 if st.session_state.get("close_sidebar", False):
     st.session_state.close_sidebar = False
     import streamlit.components.v1 as components
-    components.html("""
-        <script>
-        setTimeout(function() {
+    
+    # UUID ekleyerek Streamlit'i bu kodu her defasında yeni sanıp çalıştırmaya zorluyoruz.
+    components.html(f"""
+        <script id="trigger-{uuid.uuid4().hex}">
+        setTimeout(function() {{
             var isMobile = window.parent.innerWidth <= 768;
-            if (isMobile) {
-                // 1. Yöntem: Escape tuşu simülasyonu
-                window.parent.document.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Escape', 'bubbles': true }));
-                
-                // 2. Yöntem: Streamlit Kapama Butonunu bul ve tıkla
-                var closeButton = window.parent.document.querySelector('button[kind="headerNoPadding"]');
-                if (closeButton) { closeButton.click(); }
-                
-                // 3. Yöntem: Arkaplan karartmasına (Backdrop) tıkla
+            if (isMobile) {{
+                // Escape tuşu yolla
+                window.parent.document.dispatchEvent(new KeyboardEvent('keydown', {{ 'key': 'Escape', 'bubbles': true }}));
+                // Çarpı butonuna tıkla
+                var closeBtn = window.parent.document.querySelector('button[kind="headerNoPadding"]');
+                if (closeBtn) {{ closeBtn.click(); }}
+                // Karanlık arkaplana tıkla
                 var backdrop = window.parent.document.querySelector('[data-testid="stSidebar"] + div');
-                if (backdrop) { backdrop.click(); }
-            }
-        }, 100); // 100ms gecikme ile kararlı çalışma sağlar
+                if (backdrop) {{ backdrop.click(); }}
+            }}
+        }}, 100);
         </script>
     """, height=0, width=0)
 
