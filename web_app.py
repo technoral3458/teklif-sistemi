@@ -11,20 +11,17 @@ st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon=":gear:", l
 # =====================================================================
 # 🌍 ÇOKLU DİL MOTORU VE OTOMATİK DİL ALGILAYICI (TR - EN - ZH)
 # =====================================================================
-# Tarayıcı dilini otomatik oku (Auto-Detect)
 if 'lang' not in st.session_state:
     try:
         accept_lang = st.context.headers.get("Accept-Language", "")
         if accept_lang:
             primary_lang = accept_lang.split(',')[0][:2].lower()
-            # Eğer tarayıcı TR, EN veya ZH (Çince) ise onu seç, değilse İngilizce başla
             st.session_state.lang = primary_lang if primary_lang in ["tr", "en", "zh"] else "en"
         else:
             st.session_state.lang = "tr"
     except:
         st.session_state.lang = "tr"
 
-# Dil Sözlüğü (Türkçe, İngilizce, Çince)
 DICTIONARY = {
     "tr": {
         "login_tab": "🔑 Giriş", "reg_tab": "📝 Kayıt", "forg_tab": "❓ Şifremi Unuttum",
@@ -106,18 +103,15 @@ DICTIONARY = {
     }
 }
 
-# Çeviri okuyucu fonksiyon
 def _(key): return DICTIONARY.get(st.session_state.lang, DICTIONARY["tr"]).get(key, key)
 
-# Manuel dil değiştirici (TR - EN - ZH)
-def lang_selector():
+# Çakışmayı önlemek için key_suffix eklendi
+def lang_selector(key_suffix):
     c1, c2 = st.columns([8.5, 1.5])
     with c2:
         lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
-        # Mevcut dilin index'ini bul (hata olmaması için fallback ekliyoruz)
         current_idx = list(lang_opts.keys()).index(st.session_state.lang) if st.session_state.lang in lang_opts else 0
-        
-        sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=current_idx, label_visibility="collapsed")
+        sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=current_idx, key=f"lang_sel_{key_suffix}", label_visibility="collapsed")
         if sel != st.session_state.lang:
             st.session_state.lang = sel
             st.rerun()
@@ -163,7 +157,7 @@ def get_system_logo():
     return fallback_url
 
 # =====================================================================
-# VERİTABANI TAMİRCİSİ (HATA ÖNLEYİCİ)
+# VERİTABANI TAMİRCİSİ
 # =====================================================================
 def repair_databases():
     conn = sqlite3.connect('users.db')
@@ -195,7 +189,6 @@ for key in ["user_id", "user_role", "user_email"]:
 if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
 
-# Aktif Tab kontrolü (Dil değişirse menü kırılmasın diye)
 if "active_tab" not in st.session_state: 
     st.session_state.active_tab = _("m_dash")
 
@@ -231,10 +224,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ, KAYIT VE ŞİFRE EKRANLARI (Çoklu Dil Uyumlu)
+# GİRİŞ, KAYIT VE ŞİFRE EKRANLARI (Hata Çözümlü)
 # =====================================================================
 if not st.session_state.logged_in:
-    lang_selector()
+    lang_selector("login_screen") # Key eklendi
     
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
     with col_main:
@@ -244,10 +237,11 @@ if not st.session_state.logged_in:
         
         with t_login:
             with st.container(border=True):
-                le = st.text_input(_("email")).strip().lower()
-                lp = st.text_input(_("pass"), type="password")
-                rem = st.checkbox(_("rem"), value=True)
-                if st.button(_("login_btn"), type="primary", use_container_width=True):
+                # KEY EKLENDİ
+                le = st.text_input(_("email"), key="login_email_inp").strip().lower()
+                lp = st.text_input(_("pass"), type="password", key="login_pass_inp")
+                rem = st.checkbox(_("rem"), value=True, key="login_rem_chk")
+                if st.button(_("login_btn"), type="primary", use_container_width=True, key="login_submit"):
                     conn = sqlite3.connect('users.db')
                     user = conn.execute("SELECT id, user_type, is_approved, is_verified, role FROM users WHERE email=? AND password=?", (le, hash_password(lp))).fetchone()
                     if user:
@@ -267,12 +261,13 @@ if not st.session_state.logged_in:
         with t_reg:
             with st.container(border=True):
                 if st.session_state.reg_step == 1:
-                    reg_type = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")])
-                    reg_comp = st.text_input(_("comp_name"))
-                    reg_phone = st.text_input(_("phone"))
-                    reg_email = st.text_input(_("email")).strip().lower()
-                    reg_pwd = st.text_input(_("pass"), type="password")
-                    if st.button(_("reg_btn"), use_container_width=True):
+                    # KEY EKLENDİ
+                    reg_type = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")], key="reg_type_sel")
+                    reg_comp = st.text_input(_("comp_name"), key="reg_comp_inp")
+                    reg_phone = st.text_input(_("phone"), key="reg_phone_inp")
+                    reg_email = st.text_input(_("email"), key="reg_email_inp").strip().lower()
+                    reg_pwd = st.text_input(_("pass"), type="password", key="reg_pass_inp")
+                    if st.button(_("reg_btn"), use_container_width=True, key="reg_submit"):
                         if all([reg_comp, reg_phone, reg_email, reg_pwd]):
                             conn = sqlite3.connect('users.db')
                             if conn.execute("SELECT id FROM users WHERE email=?", (reg_email,)).fetchone(): st.error(_("email_in_use"))
@@ -280,14 +275,15 @@ if not st.session_state.logged_in:
                                 ver_code = generate_code()
                                 conn.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved) VALUES (?,?,?,?,?,?,0,0)", (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code))
                                 conn.commit()
-                                if send_email(reg_email, ver_code, "Doğrulama / Verification"):
+                                if send_email(reg_email, ver_code, "Doğrulama / Verification / 验证"):
                                     st.session_state.temp_email, st.session_state.reg_step = reg_email, 2; st.rerun()
                                 else: st.error(_("mail_err"))
                             conn.close()
                         else: st.warning(_("req_fields"))
                 elif st.session_state.reg_step == 2:
-                    entered_code = st.text_input(_("enter_code"), max_chars=6)
-                    if st.button(_("verify_btn"), type="primary", use_container_width=True):
+                    # KEY EKLENDİ
+                    entered_code = st.text_input(_("enter_code"), max_chars=6, key="reg_code_inp")
+                    if st.button(_("verify_btn"), type="primary", use_container_width=True, key="verify_submit"):
                         conn = sqlite3.connect('users.db')
                         db_code = conn.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,)).fetchone()
                         if db_code and db_code[0] == entered_code:
@@ -300,22 +296,24 @@ if not st.session_state.logged_in:
         with t_forg:
             with st.container(border=True):
                 if st.session_state.forgot_step == 1:
-                    f_email = st.text_input(_("f_email")).strip().lower()
-                    if st.button(_("send_reset"), use_container_width=True):
+                    # KEY EKLENDİ
+                    f_email = st.text_input(_("f_email"), key="forg_email_inp").strip().lower()
+                    if st.button(_("send_reset"), use_container_width=True, key="forg_send_btn"):
                         conn = sqlite3.connect('users.db')
                         if conn.execute("SELECT id FROM users WHERE email=?", (f_email,)).fetchone():
                             reset_code = generate_code()
                             conn.execute("UPDATE users SET auth_code=? WHERE email=?", (reset_code, f_email))
                             conn.commit()
-                            if send_email(f_email, reset_code, "Sıfırlama / Password Reset"):
+                            if send_email(f_email, reset_code, "Sıfırlama / Reset / 重置"):
                                 st.session_state.temp_email = f_email; st.session_state.forgot_step = 2; st.rerun()
                             else: st.error(_("mail_err"))
                         else: st.error(_("no_email"))
                         conn.close()
                 elif st.session_state.forgot_step == 2:
-                    f_code = st.text_input(_("enter_code"), max_chars=6)
-                    new_pwd = st.text_input(_("new_pass"), type="password")
-                    if st.button(_("change_pass"), type="primary", use_container_width=True):
+                    # KEY EKLENDİ
+                    f_code = st.text_input(_("enter_code"), max_chars=6, key="forg_code_inp")
+                    new_pwd = st.text_input(_("new_pass"), type="password", key="forg_pass_inp")
+                    if st.button(_("change_pass"), type="primary", use_container_width=True, key="forg_submit_btn"):
                         conn = sqlite3.connect('users.db')
                         valid_code = conn.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,)).fetchone()
                         if valid_code and valid_code[0] == f_code and len(new_pwd) > 3:
@@ -328,10 +326,10 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ YAN MENÜ (Çevirili)
+# GÜVENLİ YAN MENÜ
 # =====================================================================
 with st.sidebar:
-    lang_selector()
+    lang_selector("sidebar_menu") # Key eklendi
     st.markdown(f"<div style='text-align: center; margin-bottom: 25px; margin-top: 10px;'><img src='{get_system_logo()}' style='max-height: 65px; object-fit: contain;'></div>", unsafe_allow_html=True)
     
     r_text_key = "role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer")
@@ -353,7 +351,6 @@ with st.sidebar:
     if st.session_state.user_role == "admin": 
         menu_items.extend([_("m_deal"), _("m_model")])
     
-    # Dil değiştirilirse active_tab ismi kırılmasın diye kontrol
     if st.session_state.active_tab not in menu_items:
         st.session_state.active_tab = menu_items[0]
         
