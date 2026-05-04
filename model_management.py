@@ -5,7 +5,6 @@ import os
 import base64
 import uuid
 from PIL import Image
-import streamlit.components.v1 as components
 
 # =====================================================================
 # 🤖 YAPAY ZEKA ÇEVİRİ MOTORU
@@ -25,7 +24,7 @@ def auto_translate_to_tr(text):
         return text
 
 # =====================================================================
-# 🌍 ÇOKLU DİL SÖZLÜĞÜ (TR - EN - ZH)
+# 🌍 ÇOKLU DİL SÖZLÜĞÜ
 # =====================================================================
 DICT_MODEL = {
     "tr": {
@@ -46,8 +45,8 @@ DICT_MODEL = {
         "m_name": "Makine Adı *", "m_cat": "Kategori",
         "price_lock": "🔒 Fiyatlandırma Yöneticiye aittir.",
         "dom_price": "Yurtiçi Fiyat *", "currency": "Para Birimi", "port_disc": "Liman İskontosu (%)",
-        "main_img": "Ana Görsel", "img_prev": "**Görsel Önizleme**",
-        "spec_title": "Özellik Başlığı", "spec_det": "Özellik Detayı", "choose_img": "Resim Seç",
+        "main_img": "Ana Görsel Dosyası", "img_prev": "**Görsel Önizleme**",
+        "spec_title": "Özellik Başlığı (Örn: Motor Gücü)", "spec_det": "Özellik Detayı (Örn: 5.5 kW)", "choose_img": "Resim Seç",
         "add_spec": "➕ YENİ ÖZELLİK SATIRI EKLE", "no_comp_opt": "Bu makineye tanımlı donanım bulunmuyor.",
         "save_changes": "💾 DEĞİŞİKLİKLERİ KAYDET", "add_sys": "💾 SİSTEME EKLE",
         "err_name": "Lütfen makine adını girin!", "err_price": "Lütfen geçerli bir fiyat girin!",
@@ -122,7 +121,7 @@ def _m(key):
     return DICT_MODEL.get(lang, DICT_MODEL["tr"]).get(key, key)
 
 # =====================================================================
-# VERİTABANI BAĞLANTILARI
+# FABRİKA VERİTABANI BAĞLANTILARI
 # =====================================================================
 def get_factory(query, params=()):
     try:
@@ -218,57 +217,47 @@ def show_product_management():
 # =====================================================================
 def show_list_view(user_role):
     # =====================================================================
-    # KESİN VE KIRILMAZ ÇÖZÜM: HEM CSS HEM DE JAVASCRIPT GARDİYANI
+    # NOKTA ATIŞI CERRAHİ CSS:
+    # Sadece .btn-marker etiketinin hemen yanındaki stHorizontalBlock'u etkiler.
+    # Ana tabloyu ve diğer hiçbir düzeni bozmaz!
     # =====================================================================
     st.markdown("""
     <style>
-    /* CSS Katmanı: Hedefli blokları yan yana tutmaya zorlar */
-    div.element-container:has(.mobile-row-buttons) + div.element-container > div[data-testid="stHorizontalBlock"] {
+    /* Makine ve Donanım kartlarındaki 3'lü buton için */
+    div.element-container:has(.btn-marker) + div[data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         gap: 0.3rem !important;
-        justify-content: space-between !important;
     }
-    div.element-container:has(.mobile-row-buttons) + div.element-container > div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    div.element-container:has(.btn-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
         width: 33.33% !important;
+        min-width: 0 !important;
+        flex: 1 1 0% !important;
+        padding: 0 !important;
+    }
+    
+    /* Kategorilerdeki 2'li buton için */
+    div.element-container:has(.btn-marker-2) + div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.3rem !important;
+    }
+    div.element-container:has(.btn-marker-2) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        width: 50% !important;
         min-width: 0 !important;
         flex: 1 1 0% !important;
         padding: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
-    
-    # JavaScript Katmanı: CSS'in ezilmesine karşı her 300ms'de bir kontrol edip zorla hizalar
-    components.html("""
-    <script>
-    setInterval(function() {
-        var blocks = window.parent.document.querySelectorAll('div[data-testid="stHorizontalBlock"]');
-        blocks.forEach(block => {
-            // Sadece içinde ✏️ ve 🗑️ emojileri barındıran buton satırlarını hedef al
-            if (block.innerHTML.includes('🗑️') && block.innerHTML.includes('✏️')) {
-                block.style.setProperty('display', 'flex', 'important');
-                block.style.setProperty('flex-direction', 'row', 'important');
-                block.style.setProperty('flex-wrap', 'nowrap', 'important');
-                block.style.setProperty('gap', '0.3rem', 'important');
-                
-                Array.from(block.children).forEach(col => {
-                    col.style.setProperty('width', '33.33%', 'important');
-                    col.style.setProperty('min-width', '0', 'important');
-                    col.style.setProperty('flex', '1 1 0%', 'important');
-                    col.style.setProperty('padding', '0', 'important');
-                });
-            }
-        });
-    }, 300);
-    </script>
-    """, height=0, width=0)
 
     st.header(_m("m_title"))
     tab_mod, tab_opt, tab_cat = st.tabs([_m("t_mod"), _m("t_opt"), _m("t_cat")])
     
     with tab_mod:
-        col_title, col_add = st.columns([5, 3], vertical_alignment="center")
+        col_title, col_add = st.columns([3, 1])
         col_title.subheader(_m("reg_mach"))
         if col_add.button(_m("add_mach"), type="primary", use_container_width=True, key="btn_add_mach_main"):
             st.session_state.form_loaded = False 
@@ -303,8 +292,8 @@ def show_list_view(user_role):
                                         if row['price'] > 0: st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
                                         else: st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
                                         
-                                    # CSS'i tetikleyen gizli etiket
-                                    st.markdown('<div class="mobile-row-buttons"></div>', unsafe_allow_html=True)
+                                    # CSS HİLESİNİ TETİKLEYEN İŞARETÇİ EKLENDİ
+                                    st.markdown('<div class="btn-marker"></div>', unsafe_allow_html=True)
                                     
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
                                     if btn_c1.button(_m("btn_edit"), key=f"me_{safe_mod_id}", use_container_width=True):
@@ -318,7 +307,7 @@ def show_list_view(user_role):
         else: st.info(_m("no_mach"))
 
     with tab_opt:
-        col_opt_t, col_opt_a = st.columns([5, 3], vertical_alignment="center")
+        col_opt_t, col_opt_a = st.columns([3, 1], vertical_alignment="center")
         col_opt_t.subheader(_m("opt_showcase"))
         if col_opt_a.button(_m("add_opt"), type="primary", use_container_width=True, key="btn_add_opt_main"):
             st.session_state.opt_form_loaded = False; st.session_state.view_mode = "opt_add"; st.rerun()
@@ -350,8 +339,8 @@ def show_list_view(user_role):
                                 if o_price > 0: st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>+{o_price:,.2f} USD</div>", unsafe_allow_html=True)
                                 else: st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
 
-                            # CSS'i tetikleyen gizli etiket
-                            st.markdown('<div class="mobile-row-buttons"></div>', unsafe_allow_html=True)
+                            # CSS HİLESİNİ TETİKLEYEN İŞARETÇİ EKLENDİ
+                            st.markdown('<div class="btn-marker"></div>', unsafe_allow_html=True)
                             
                             btn_c1, btn_c2, btn_c3 = st.columns(3)
                             if btn_c1.button(_m("btn_edit"), key=f"oe_{safe_opt_id}", use_container_width=True):
@@ -365,7 +354,7 @@ def show_list_view(user_role):
         else: st.info(_m("no_opt"))
 
     with tab_cat:
-        c1, c2 = st.columns([5, 3], vertical_alignment="bottom")
+        c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
         c1.subheader(_m("cat_mng"))
         with c2.form("new_cat_form", clear_on_submit=True):
             cc1, cc2 = st.columns([3, 1])
@@ -396,6 +385,10 @@ def show_list_view(user_role):
                                     st.session_state.edit_cat_id = None; st.rerun()
                             else:
                                 st.markdown(f"<div style='text-align:center; padding:15px 0;'><span style='font-size:32px;'>📁</span><br><b style='color:#0f172a; font-size:16px;'>{cname}</b></div>", unsafe_allow_html=True)
+                                
+                                # KATEGORİ İÇİN 2 BUTONLU HİLE
+                                st.markdown('<div class="btn-marker-2"></div>', unsafe_allow_html=True)
+                                
                                 bc1, bc2 = st.columns(2)
                                 if bc1.button(_m("btn_edit_txt"), key=f"ed_cat_{cid}", use_container_width=True):
                                     st.session_state.edit_cat_id = cid; st.rerun()
