@@ -4,41 +4,24 @@ import sqlite3, pandas as pd, hashlib, random, smtplib, uuid, os, base64, dateti
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import ntpath, posixpath
-from streamlit_javascript import st_javascript
 
 # --- SİSTEM AYARLARI ---
 st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon=":gear:", layout="wide", initial_sidebar_state="expanded")
 
 # =====================================================================
-# 🌍 OTOMATİK CİHAZ/TARAYICI DİLİ ALGILAMA & ÇOKLU DİL MOTORU
+# 🌍 ÇOKLU DİL MOTORU (SİZİN ORİJİNAL, EKLENTİSİZ KODUNUZ)
 # =====================================================================
 if 'lang' not in st.session_state:
-    # 1. Aşama: Tarayıcıdan gizlice cihaz dilini soruyoruz (Örn: 'tr-TR', 'zh-CN')
-    browser_lang = st_javascript("window.navigator.userLanguage || window.navigator.language;")
-    
-    # st_javascript ilk salisede 0 döner, cevap gelince string(metin) olur.
-    # Eğer JS'den cevap gelmişse, onu alıp kilitliyoruz.
-    if browser_lang and isinstance(browser_lang, str):
-        lang_code = browser_lang.lower()
-        if "zh" in lang_code:
-            st.session_state.lang = "zh"
-        elif "tr" in lang_code:
-            st.session_state.lang = "tr"
+    try:
+        # Tarayıcının gönderdiği sinyali okur (Eklenti gerektirmez)
+        accept_lang = st.context.headers.get("Accept-Language", "")
+        if accept_lang:
+            primary_lang = accept_lang.split(',')[0][:2].lower()
+            st.session_state.lang = primary_lang if primary_lang in ["tr", "en", "zh"] else "en"
         else:
-            st.session_state.lang = "en"
-        st.rerun() # Dili sabitlemek için sayfayı 1 kez hissettirmeden yeniler.
-        
-    # 2. Aşama: Eğer JS çalışmazsa (bazı eski telefonlarda), yedek olarak HTTP Header kontrolü yap
-    else:
-        try:
-            accept_lang = st.context.headers.get("Accept-Language", "")
-            if accept_lang:
-                primary_lang = accept_lang.split(',')[0][:2].lower()
-                st.session_state.lang = primary_lang if primary_lang in ["tr", "en", "zh"] else "en"
-            else:
-                st.session_state.lang = "tr"
-        except:
             st.session_state.lang = "tr"
+    except:
+        st.session_state.lang = "tr"
 
 DICTIONARY = {
     "tr": {
@@ -249,7 +232,7 @@ if not st.session_state.logged_in:
                             if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone(): st.error(_("email_in_use"))
                             else:
                                 vc = generate_code(); c.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,?,0,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')", (re, hash_password(rpw), rc, rp, rt, vc)); c.commit()
-                                if send_email(re, vc, "Code / 验证"): st.session_state.temp_email, st.session_state.reg_step = re, 2; st.rerun()
+                                if send_email(re, vc, "Code / 验证"): st.session_state.temp_email, st.session_state.reg_step = 2; st.rerun()
                             c.close()
                         else: st.warning(_("req_fields"))
                 elif st.session_state.reg_step == 2:
@@ -279,7 +262,7 @@ with st.sidebar:
     
     def on_menu_change():
         st.session_state.active_tab = st.session_state.m_radio
-        st.session_state.close_sidebar = True # Kapatma sinyalini etkinleştir
+        st.session_state.close_sidebar = True 
         
     st.radio("MENÜ", menu_items, index=menu_items.index(st.session_state.active_tab), key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
     
