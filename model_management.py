@@ -217,11 +217,60 @@ def show_product_management():
 # VİTRİN VE LİSTELEME
 # =====================================================================
 def show_list_view(user_role):
+
+    # =====================================================================
+    # 🚀 KESİN ÇÖZÜM: JAVASCRIPT İLE SADECE BUTON SATIRLARINI BULUP YANYANA DİZER
+    # (Ana tabloları ve kart yapılarını ASLA bozmaz)
+    # =====================================================================
+    components.html("""
+    <script>
+    function fixButtonsMobile() {
+        var markers = window.parent.document.querySelectorAll('.btn-marker');
+        markers.forEach(function(m) {
+            var container = m.closest('.element-container');
+            if(!container) return;
+            
+            var sibling = container.nextElementSibling;
+            var targetRow = null;
+            
+            // Markerden hemen sonraki veya içindeki stHorizontalBlock'u bul
+            for(var i=0; i<2; i++) {
+                if(sibling && sibling.getAttribute('data-testid') === 'stHorizontalBlock') {
+                    targetRow = sibling; break;
+                }
+                if(sibling && sibling.querySelector('[data-testid="stHorizontalBlock"]')) {
+                    targetRow = sibling.querySelector('[data-testid="stHorizontalBlock"]'); break;
+                }
+                if(sibling) sibling = sibling.nextElementSibling;
+            }
+            
+            if(targetRow) {
+                targetRow.style.setProperty('display', 'flex', 'important');
+                targetRow.style.setProperty('flex-direction', 'row', 'important');
+                targetRow.style.setProperty('flex-wrap', 'nowrap', 'important');
+                targetRow.style.setProperty('gap', '4px', 'important');
+                
+                var cols = targetRow.children;
+                for(var i=0; i<cols.length; i++) {
+                    cols[i].style.setProperty('width', (100/cols.length) + '%', 'important');
+                    cols[i].style.setProperty('min-width', '0', 'important');
+                    cols[i].style.setProperty('flex', '1 1 0%', 'important');
+                    cols[i].style.setProperty('padding', '0', 'important');
+                }
+            }
+        });
+    }
+    // Streamlit ekranı yeniledikçe bozulmasını engellemek için gardiyan görevinde
+    fixButtonsMobile();
+    setInterval(fixButtonsMobile, 300);
+    </script>
+    """, height=0, width=0)
+
     st.header(_m("m_title"))
     tab_mod, tab_opt, tab_cat = st.tabs([_m("t_mod"), _m("t_opt"), _m("t_cat")])
     
     with tab_mod:
-        col_title, col_add = st.columns([3, 1])
+        col_title, col_add = st.columns([5, 3], vertical_alignment="center")
         col_title.subheader(_m("reg_mach"))
         if col_add.button(_m("add_mach"), type="primary", use_container_width=True, key="btn_add_mach_main"):
             st.session_state.form_loaded = False 
@@ -256,8 +305,8 @@ def show_list_view(user_role):
                                         if row['price'] > 0: st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
                                         else: st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
                                         
-                                    # CERRAHİ JAVASCRIPT HEDEFİ İÇİN GİZLİ ETİKET (3 BUTON İÇİN)
-                                    st.markdown('<div class="action-buttons-wrapper"></div>', unsafe_allow_html=True)
+                                    # CSS Gardiyanı bu gizli noktayı bularak sadece hemen altındaki butonları hizalayacak
+                                    st.markdown('<div class="btn-marker" style="display:none;"></div>', unsafe_allow_html=True)
                                     
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
                                     with btn_c1:
@@ -274,7 +323,7 @@ def show_list_view(user_role):
         else: st.info(_m("no_mach"))
 
     with tab_opt:
-        col_opt_t, col_opt_a = st.columns([3, 1], vertical_alignment="center")
+        col_opt_t, col_opt_a = st.columns([5, 3], vertical_alignment="center")
         col_opt_t.subheader(_m("opt_showcase"))
         if col_opt_a.button(_m("add_opt"), type="primary", use_container_width=True, key="btn_add_opt_main"):
             st.session_state.opt_form_loaded = False; st.session_state.view_mode = "opt_add"; st.rerun()
@@ -306,9 +355,7 @@ def show_list_view(user_role):
                                 if o_price > 0: st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>+{o_price:,.2f} USD</div>", unsafe_allow_html=True)
                                 else: st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
 
-                            # CERRAHİ JAVASCRIPT HEDEFİ (3 BUTON İÇİN)
-                            st.markdown('<div class="action-buttons-wrapper"></div>', unsafe_allow_html=True)
-                            
+                            st.markdown('<div class="btn-marker" style="display:none;"></div>', unsafe_allow_html=True)
                             btn_c1, btn_c2, btn_c3 = st.columns(3)
                             with btn_c1:
                                 if st.button(_m("btn_edit"), key=f"oe_{safe_opt_id}", use_container_width=True):
@@ -324,7 +371,7 @@ def show_list_view(user_role):
         else: st.info(_m("no_opt"))
 
     with tab_cat:
-        c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+        c1, c2 = st.columns([5, 3], vertical_alignment="bottom")
         c1.subheader(_m("cat_mng"))
         with c2.form("new_cat_form", clear_on_submit=True):
             cc1, cc2 = st.columns([3, 1])
@@ -356,9 +403,7 @@ def show_list_view(user_role):
                             else:
                                 st.markdown(f"<div style='text-align:center; padding:15px 0;'><span style='font-size:32px;'>📁</span><br><b style='color:#0f172a; font-size:16px;'>{cname}</b></div>", unsafe_allow_html=True)
                                 
-                                # CERRAHİ JAVASCRIPT HEDEFİ (2 BUTON İÇİN)
-                                st.markdown('<div class="action-buttons-wrapper-2"></div>', unsafe_allow_html=True)
-                                
+                                st.markdown('<div class="btn-marker" style="display:none;"></div>', unsafe_allow_html=True)
                                 bc1, bc2 = st.columns(2)
                                 with bc1:
                                     if st.button(_m("btn_edit_txt"), key=f"ed_cat_{cid}", use_container_width=True):
@@ -368,63 +413,6 @@ def show_list_view(user_role):
                                         exec_factory("DELETE FROM categories WHERE id=?", (cid,)); st.rerun()
         else: st.info(_m("no_cat"))
 
-    # =====================================================================
-    # 🚨 HİÇBİR YERİ BOZMAYAN KUSURSUZ JAVASCRIPT ÇÖZÜMÜ 🚨
-    # =====================================================================
-    components.html("""
-    <script>
-    function forceButtonsInLine() {
-        // 3'LÜ BUTONLARI BUL VE YANYANA DİZ
-        var markers3 = window.parent.document.querySelectorAll('.action-buttons-wrapper');
-        markers3.forEach(function(marker) {
-            // Gizli etiketin olduğu kutunun ebeveynini bulur, onun hemen altındaki kolon satırına müdahale eder.
-            // Bu sayede ana sayfa tasarımını ASLA etkilemez.
-            var parentContainer = marker.closest('.element-container');
-            if (parentContainer && parentContainer.nextElementSibling) {
-                var buttonRow = parentContainer.nextElementSibling;
-                if (buttonRow.getAttribute('data-testid') === 'stHorizontalBlock') {
-                    buttonRow.style.setProperty('display', 'flex', 'important');
-                    buttonRow.style.setProperty('flex-direction', 'row', 'important');
-                    buttonRow.style.setProperty('flex-wrap', 'nowrap', 'important');
-                    buttonRow.style.setProperty('gap', '0.2rem', 'important');
-                    var cols = buttonRow.children;
-                    for(var i=0; i<cols.length; i++) {
-                        cols[i].style.setProperty('width', '33.33%', 'important');
-                        cols[i].style.setProperty('min-width', '0', 'important');
-                        cols[i].style.setProperty('padding', '0', 'important');
-                        cols[i].style.setProperty('flex', '1 1 0%', 'important');
-                    }
-                }
-            }
-        });
-
-        // 2'Lİ BUTONLARI (KATEGORİ KISMI) BUL VE YANYANA DİZ
-        var markers2 = window.parent.document.querySelectorAll('.action-buttons-wrapper-2');
-        markers2.forEach(function(marker) {
-            var parentContainer = marker.closest('.element-container');
-            if (parentContainer && parentContainer.nextElementSibling) {
-                var buttonRow = parentContainer.nextElementSibling;
-                if (buttonRow.getAttribute('data-testid') === 'stHorizontalBlock') {
-                    buttonRow.style.setProperty('display', 'flex', 'important');
-                    buttonRow.style.setProperty('flex-direction', 'row', 'important');
-                    buttonRow.style.setProperty('flex-wrap', 'nowrap', 'important');
-                    buttonRow.style.setProperty('gap', '0.2rem', 'important');
-                    var cols = buttonRow.children;
-                    for(var i=0; i<cols.length; i++) {
-                        cols[i].style.setProperty('width', '50%', 'important');
-                        cols[i].style.setProperty('min-width', '0', 'important');
-                        cols[i].style.setProperty('padding', '0', 'important');
-                        cols[i].style.setProperty('flex', '1 1 0%', 'important');
-                    }
-                }
-            }
-        });
-    }
-    // Streamlit DOM'u yeniledikçe bozulmaması için 0.5 saniyede bir kontrol et ve kilitle
-    forceButtonsInLine();
-    setInterval(forceButtonsInLine, 500);
-    </script>
-    """, height=0, width=0)
 
 # =====================================================================
 # MAKİNE EKLEME/DÜZENLEME FORMU
