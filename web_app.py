@@ -4,23 +4,41 @@ import sqlite3, pandas as pd, hashlib, random, smtplib, uuid, os, base64, dateti
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import ntpath, posixpath
+from streamlit_javascript import st_javascript
 
 # --- SİSTEM AYARLARI ---
 st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon=":gear:", layout="wide", initial_sidebar_state="expanded")
 
 # =====================================================================
-# 🌍 ÇOKLU DİL MOTORU
+# 🌍 OTOMATİK CİHAZ/TARAYICI DİLİ ALGILAMA & ÇOKLU DİL MOTORU
 # =====================================================================
 if 'lang' not in st.session_state:
-    try:
-        accept_lang = st.context.headers.get("Accept-Language", "")
-        if accept_lang:
-            primary_lang = accept_lang.split(',')[0][:2].lower()
-            st.session_state.lang = primary_lang if primary_lang in ["tr", "en", "zh"] else "en"
-        else:
+    # 1. Aşama: Tarayıcıdan gizlice cihaz dilini soruyoruz (Örn: 'tr-TR', 'zh-CN')
+    browser_lang = st_javascript("window.navigator.userLanguage || window.navigator.language;")
+    
+    # st_javascript ilk salisede 0 döner, cevap gelince string(metin) olur.
+    # Eğer JS'den cevap gelmişse, onu alıp kilitliyoruz.
+    if browser_lang and isinstance(browser_lang, str):
+        lang_code = browser_lang.lower()
+        if "zh" in lang_code:
+            st.session_state.lang = "zh"
+        elif "tr" in lang_code:
             st.session_state.lang = "tr"
-    except:
-        st.session_state.lang = "tr"
+        else:
+            st.session_state.lang = "en"
+        st.rerun() # Dili sabitlemek için sayfayı 1 kez hissettirmeden yeniler.
+        
+    # 2. Aşama: Eğer JS çalışmazsa (bazı eski telefonlarda), yedek olarak HTTP Header kontrolü yap
+    else:
+        try:
+            accept_lang = st.context.headers.get("Accept-Language", "")
+            if accept_lang:
+                primary_lang = accept_lang.split(',')[0][:2].lower()
+                st.session_state.lang = primary_lang if primary_lang in ["tr", "en", "zh"] else "en"
+            else:
+                st.session_state.lang = "tr"
+        except:
+            st.session_state.lang = "tr"
 
 DICTIONARY = {
     "tr": {
@@ -275,13 +293,10 @@ with st.sidebar:
 # =====================================================================
 # GARANTİLİ MOBİL MENÜ KAPATICI (DYNAMIC ID İLE)
 # =====================================================================
-# Kapatma sinyali geldiyse, her seferinde BENZERSİZ bir ID ile çalıştır.
-# Böylece Streamlit cache (hafıza) yapamaz, kod her tıklamada kesin olarak çalışır.
 if st.session_state.get("close_sidebar", False):
     st.session_state.close_sidebar = False
     import streamlit.components.v1 as components
     
-    # UUID ekleyerek Streamlit'i bu kodu her defasında yeni sanıp çalıştırmaya zorluyoruz.
     components.html(f"""
         <script id="trigger-{uuid.uuid4().hex}">
         setTimeout(function() {{
