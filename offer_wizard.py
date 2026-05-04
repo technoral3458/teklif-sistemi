@@ -164,6 +164,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     
     return html
 
+
 # =====================================================================
 # ANA SİHİRBAZ EKRANI
 # =====================================================================
@@ -171,19 +172,29 @@ def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
     # =====================================================================
-    # 🚀 KESİN KLAVYE ENGELLEYİCİ VE KİBAR TASARIM (BETON ZIRH) 🚀
+    # 🚀 KESİN KLAVYE ENGELLEYİCİ JAVASCRIPT GARDİYANI 🚀
+    # Bu kod, mobil cihazlarda o kutulara tıkladığınız an klavyenin
+    # açılmasını donanımsal olarak yasaklar.
     # =====================================================================
+    components.html("""
+    <script>
+    setInterval(function() {
+        var inputs = window.parent.document.querySelectorAll('div[data-baseweb="select"] input');
+        inputs.forEach(function(input) {
+            if(!input.hasAttribute('readonly')) {
+                input.setAttribute('readonly', 'readonly');
+                input.style.cursor = 'pointer';
+            }
+            // Tıklandığında odağı anında iptal edip klavyeyi bloke et
+            input.onfocus = function() { this.blur(); };
+        });
+    }, 300);
+    </script>
+    """, height=0, width=0)
+
+    # 📱 KİBAR KUTU CSS TASARIMI
     st.markdown("""
         <style>
-        /* CSS HİLESİ: Input alanını tıklanmaz yapar, sadece menüyü açar. KLAVYE ASLA AÇILAMAZ! */
-        div[data-baseweb="select"] input { 
-            pointer-events: none !important; 
-            caret-color: transparent !important;
-            user-select: none !important;
-            -webkit-user-select: none !important;
-        }
-        
-        /* Kibar Kutu Tasarımı */
         div.st-emotion-cache-1jicfl2 { 
             border-radius: 12px !important;
             border: 1px solid #e2e8f0 !important;
@@ -196,21 +207,7 @@ def show_offer_wizard(user_id, is_admin=False):
         .stToggle label { font-size: 14px !important; font-weight: 800 !important; color: #2563eb !important; }
         </style>
     """, unsafe_allow_html=True)
-
-    # JS YEDEKLEMESİ: Streamlit yenilense bile inputu readonly yapar ve odaktan çıkarır
-    components.html("""
-    <script>
-    setInterval(function() {
-        var inputs = window.parent.document.querySelectorAll('div[data-baseweb="select"] input');
-        inputs.forEach(function(input) {
-            input.setAttribute('readonly', 'true');
-            input.setAttribute('inputmode', 'none');
-            input.onfocus = function() { this.blur(); };
-        });
-    }, 500);
-    </script>
-    """, height=0, width=0)
-
+    
     my_custs = get_sales("SELECT id, company_name FROM customers WHERE user_id=? ORDER BY company_name ASC", (user_id,)) if not is_admin else get_sales("SELECT id, company_name FROM customers ORDER BY company_name ASC")
     
     if not my_custs:
@@ -236,20 +233,25 @@ def show_offer_wizard(user_id, is_admin=False):
         st.markdown("<div style='font-size:14px; font-weight:900; color:#2563eb; margin-bottom:8px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            # --- ZORUNLU BOŞ AÇILIŞ MANTIĞI ---
-            # Listelerin en başına sahte bir "Lütfen Seçiniz..." elemanı ekliyoruz.
-            CUST_PROMPT = "Lütfen Müşteri Seçiniz..."
-            MACH_PROMPT = "Lütfen Makine Seçiniz..."
-
-            c_names = [CUST_PROMPT] + [c[1] for c in my_custs]
-            idx_c = c_names.index(wd.get("cust_name")) if wd.get("cust_name") in c_names else 0
             
-            sel_cust = st.selectbox("Teklif Verilecek Müşteri", c_names, index=idx_c)
+            c_names = [c[1] for c in my_custs]
+            
+            # --- HAFIZAYI SIFIRLAMAK İÇİN KİMLİK(KEY) DEĞİŞTİRİLDİ VE INDEX=NONE YAPILDI ---
+            sel_cust = st.selectbox(
+                "Teklif Verilecek Müşteri", 
+                options=c_names, 
+                index=None, 
+                placeholder="Lütfen Müşteri Seçiniz...",
+                key="wiz_cust_v3"
+            )
 
             cats = ["Tüm Kategoriler"] + [c[0] for c in get_factory("SELECT name FROM categories ORDER BY name ASC")]
-            idx_cat = cats.index(wd.get("category")) if wd.get("category") in cats else 0
-            
-            sel_cat = st.selectbox("Kategori Filtresi", cats, index=idx_cat)
+            sel_cat = st.selectbox(
+                "Kategori Filtresi", 
+                options=cats,
+                index=0,
+                key="wiz_cat_v3"
+            )
 
             m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount, currency FROM models"
             m_params = []
@@ -263,15 +265,21 @@ def show_offer_wizard(user_id, is_admin=False):
                 st.warning("Bu kategoride makine bulunamadı.")
                 return
 
-            m_names = [MACH_PROMPT] + [m[1] for m in machines]
-            idx_m = m_names.index(wd.get("m_name")) if wd.get("m_name") in m_names else 0
+            m_names = [m[1] for m in machines]
             
-            sel_m = st.selectbox("Makine Modeli", m_names, index=idx_m)
+            # --- HAFIZAYI SIFIRLAMAK İÇİN KİMLİK(KEY) DEĞİŞTİRİLDİ VE INDEX=NONE YAPILDI ---
+            sel_m = st.selectbox(
+                "Makine Modeli", 
+                options=m_names, 
+                index=None,
+                placeholder="Lütfen Makine Modeli Seçiniz...",
+                key="wiz_mach_v3"
+            )
             
-            m_qty = st.number_input("Makine Adedi", 1, 100, wd.get("qty", 1))
+            m_qty = st.number_input("Makine Adedi", 1, 100, 1)
 
-        # --- EĞER SAHTE SEÇENEKLER AKTİFSE AŞAĞIYI GİZLE ---
-        if sel_cust == CUST_PROMPT or sel_m == MACH_PROMPT:
+        # --- EĞER MÜŞTERİ VEYA MAKİNE SEÇİLMEDİYSE AŞAĞIYI GİZLE ---
+        if sel_cust is None or sel_m is None:
             with col_prev:
                 st.info("💡 Teklif detaylarını ve A4 raporunu görmek için lütfen yandaki panelden Müşteri ve Makine seçimi yapınız.")
             return
