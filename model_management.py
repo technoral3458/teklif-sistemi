@@ -29,7 +29,7 @@ DICT_MODEL = {
         "price_lock": "🔒 Fiyat ve İskonto belirleme yetkiniz yoktur. Fiyatlandırma Yönetici tarafından yapılacaktır.",
         "dom_price": "Yurtiçi Fiyat *", "currency": "Para Birimi", "port_disc": "Liman Teslim İskontosu (%)",
         "main_img": "Ana Görsel Dosyası", "img_prev": "**Görsel Önizleme**",
-        "spec_title": "Başlık", "spec_det": "Detay", "choose_img": "Resim Seç",
+        "spec_title": "Özellik Başlığı (Örn: Motor Gücü)", "spec_det": "Özellik Detayı (Örn: 5.5 kW)", "choose_img": "Resim Seç",
         "add_spec": "➕ YENİ ÖZELLİK SATIRI EKLE", "no_comp_opt": "Bu makineye tanımlı donanım bulunmuyor.",
         "save_changes": "💾 DEĞİŞİKLİKLERİ KAYDET", "add_sys": "💾 MAKİNEYİ SİSTEME EKLE",
         "err_name": "Lütfen makine adını girin!", "err_price": "Lütfen geçerli bir fiyat girin!",
@@ -57,7 +57,7 @@ DICT_MODEL = {
         "price_lock": "🔒 You don't have permission to set prices. Pricing will be done by the Admin.",
         "dom_price": "Domestic Price *", "currency": "Currency", "port_disc": "Port Delivery Discount (%)",
         "main_img": "Main Image File", "img_prev": "**Image Preview**",
-        "spec_title": "Title", "spec_det": "Detail", "choose_img": "Choose Image",
+        "spec_title": "Spec Title (e.g. Motor Power)", "spec_det": "Spec Detail (e.g. 5.5 kW)", "choose_img": "Choose Image",
         "add_spec": "➕ ADD NEW SPEC ROW", "no_comp_opt": "No compatible options defined for this machine.",
         "save_changes": "💾 SAVE CHANGES", "add_sys": "💾 ADD MACHINE TO SYSTEM",
         "err_name": "Please enter the machine name!", "err_price": "Please enter a valid price!",
@@ -85,7 +85,7 @@ DICT_MODEL = {
         "price_lock": "🔒 您无权设置价格。定价将由管理员完成。",
         "dom_price": "国内价格 *", "currency": "货币", "port_disc": "港口交货折扣 (%)",
         "main_img": "主图像文件", "img_prev": "**图像预览**",
-        "spec_title": "标题", "spec_det": "详情", "choose_img": "选择图像",
+        "spec_title": "规格标题 (例如: 电机功率)", "spec_det": "规格详情 (例如: 5.5 kW)", "choose_img": "选择图像",
         "add_spec": "➕ 添加新规格行", "no_comp_opt": "没有为此机器定义兼容选项。",
         "save_changes": "💾 保存更改", "add_sys": "💾 将机器添加到系统",
         "err_name": "请输入机器名称！", "err_price": "请输入有效价格！",
@@ -386,20 +386,41 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
 
     with tab_teknik:
         for i in range(len(st.session_state.f_specs)):
-            col_t, col_d, col_i, col_x = st.columns([2.5, 4, 3, 0.5], vertical_alignment="center")
-            st.session_state.f_specs[i]["title"] = col_t.text_input(_m("spec_title"), value=st.session_state.f_specs[i]["title"], key=f"t_{i}", label_visibility="collapsed")
-            st.session_state.f_specs[i]["detail"] = col_d.text_input(_m("spec_det"), value=st.session_state.f_specs[i]["detail"], key=f"d_{i}", label_visibility="collapsed")
-            with col_i:
-                c_prev, c_up = st.columns([1, 3], vertical_alignment="center")
-                up_spec = st.session_state.get(f"up_spec_{i}")
-                if up_spec: c_prev.image(up_spec, width=40)
-                else:
-                    cur_img = st.session_state.f_specs[i].get("img", "")
-                    if cur_img:
-                        b64 = get_image_base64(cur_img)
-                        if b64: c_prev.markdown(f'<img src="{b64}" style="width:40px; height:40px; border-radius:4px; object-fit:contain;">', unsafe_allow_html=True)
-                c_up.file_uploader(_m("choose_img"), type=['png','jpg','jpeg'], key=f"up_spec_{i}", label_visibility="collapsed")
-            if col_x.button("❌", key=f"del_spec_{i}"): st.session_state.f_specs.pop(i); st.rerun()
+            # MOBİL UYUM VE GÖRÜNÜRLÜK İÇİN KUTU (CONTAINER) İÇİNE ALDIK
+            with st.container(border=True):
+                col_t, col_d, col_i, col_x = st.columns([3, 4, 3, 1], vertical_alignment="bottom")
+                
+                st.session_state.f_specs[i]["title"] = col_t.text_input(
+                    _m("spec_title"), 
+                    value=st.session_state.f_specs[i]["title"], 
+                    key=f"t_{i}", 
+                    placeholder=_m("spec_title")
+                )
+                
+                st.session_state.f_specs[i]["detail"] = col_d.text_input(
+                    _m("spec_det"), 
+                    value=st.session_state.f_specs[i]["detail"], 
+                    key=f"d_{i}", 
+                    placeholder=_m("spec_det")
+                )
+                
+                with col_i:
+                    c_prev, c_up = st.columns([1, 2], vertical_alignment="bottom")
+                    up_spec = st.session_state.get(f"up_spec_{i}")
+                    if up_spec: 
+                        c_prev.image(up_spec, width=40)
+                    else:
+                        cur_img = st.session_state.f_specs[i].get("img", "")
+                        if cur_img:
+                            b64 = get_image_base64(cur_img)
+                            if b64: c_prev.markdown(f'<img src="{b64}" style="width:40px; height:40px; border-radius:4px; object-fit:contain;">', unsafe_allow_html=True)
+                    
+                    c_up.file_uploader(_m("choose_img"), type=['png','jpg','jpeg'], key=f"up_spec_{i}", label_visibility="collapsed")
+                
+                if col_x.button("❌", key=f"del_spec_{i}", use_container_width=True): 
+                    st.session_state.f_specs.pop(i); st.rerun()
+                    
+        st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
         if st.button(_m("add_spec"), use_container_width=True):
             st.session_state.f_specs.append({"title": "", "detail": "", "img": ""}); st.rerun()
 
