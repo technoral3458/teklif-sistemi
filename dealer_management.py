@@ -1,40 +1,92 @@
 import streamlit as st
 import sqlite3
+import pandas as pd
 
 def show_dealer_management():
     st.header("🏢 Bayi ve Üretici Yönetimi")
     
+    # --- ARAMA ÇUBUĞU ---
+    search_query = st.text_input("🔍 Bayi Ara (Firma Adı, E-Posta veya Telefon ile)", placeholder="Aramak istediğiniz kelimeyi yazın...")
+    st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
+    
+    # --- KULLANICI VERİLERİNİ ÇEK ---
     conn = sqlite3.connect('users.db')
-    # Admin hariç tüm kullanıcıları getir
     users = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved FROM users WHERE role != 'admin' ORDER BY id DESC").fetchall()
+    conn.close()
+    
+    # --- SATIŞ VERİLERİNİ ÇEK (İstatistikler için) ---
+    conn_s = sqlite3.connect('sales_data.db')
+    all_offers = conn_s.execute("SELECT user_id, status, total_price FROM offers").fetchall()
+    conn_s.close()
+    
+    # Verileri hızlı analiz için Pandas'a alıyoruz
+    df_offers = pd.DataFrame(all_offers, columns=['user_id', 'status', 'total_price'])
     
     if not users:
         st.info("Sistemde henüz kayıtlı bayi veya üretici bulunmuyor.")
-        conn.close()
         return
         
+    # Arama filtresini uygula
+    if search_query:
+        search_query = search_query.lower()
+        users = [u for u in users if search_query in str(u[1]).lower() or search_query in str(u[2]).lower() or search_query in str(u[3]).lower()]
+        
+        if not users:
+            st.warning("Arama kriterinize uygun bayi bulunamadı.")
+            return
+
+    # BAYİLERİ LİSTELE
     for u in users:
         u_id, u_company, u_email, u_phone, u_type, u_approved = u
         
+        # --- İSTATİSTİKLERİ HESAPLA ---
+        dealer_offers = df_offers[df_offers['user_id'] == u_id]
+        t_count = len(dealer_offers)
+        t_vol = dealer_offers['total_price'].sum()
+        
+        conv_offers = dealer_offers[dealer_offers['status'].isin(["Onaylandı", "Siparişe Çevir"])]
+        c_count = len(conv_offers)
+        c_vol = conv_offers['total_price'].sum()
+        
         with st.container(border=True):
             # 1. BAŞLIK VE TEMEL BİLGİLER
-            st.markdown(f"### {u_company}")
-            
-            # Duruma göre renkli etiket
             status_color = "#10b981" if u_approved else "#ef4444"
             status_text = "Aktif" if u_approved else "Askıda / Onay Bekliyor"
             
             st.markdown(f"""
-                <div style="font-size:14px; color:#475569; margin-bottom:15px;">
-                    <b style="color:#2563eb;">{u_type}</b> | 📧 {u_email} | 📞 {u_phone} | 
-                    <span style="color:{status_color}; font-weight:bold;">{status_text}</span>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0; color:#0f172a;">{u_company}</h3>
+                    <span style="background-color:{status_color}15; color:{status_color}; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:800; border:1px solid {status_color}50;">{status_text}</span>
+                </div>
+                <div style="font-size:14px; color:#64748b; margin-top:5px; margin-bottom:15px;">
+                    <b style="color:#2563eb;">{u_type}</b> | 📧 {u_email} | 📞 {u_phone if u_phone else 'Belirtilmemiş'}
                 </div>
             """, unsafe_allow_html=True)
             
-            # 2. DÜZENLEME ALANI (Otomatik kapanma özelliği için expanded=False)
+            # 2. MİNİ İSTATİSTİK PANELİ (YENİ EKLENDİ)
+            st.markdown(f"""
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="flex:1; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; text-align:center;">
+                        <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Toplam Teklif</div>
+                        <div style="font-size:18px; color:#0f172a; font-weight:900;">{t_count}</div>
+                    </div>
+                    <div style="flex:1; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; text-align:center;">
+                        <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Toplam Hacim</div>
+                        <div style="font-size:18px; color:#3b82f6; font-weight:900;">{t_vol:,.0f}</div>
+                    </div>
+                    <div style="flex:1; background:#ecfdf5; padding:10px; border-radius:8px; border:1px solid #a7f3d0; text-align:center;">
+                        <div style="font-size:11px; color:#059669; font-weight:700; text-transform:uppercase;">Siparişe Dönen</div>
+                        <div style="font-size:18px; color:#10b981; font-weight:900;">{c_count}</div>
+                    </div>
+                    <div style="flex:1; background:#ecfdf5; padding:10px; border-radius:8px; border:1px solid #a7f3d0; text-align:center;">
+                        <div style="font-size:11px; color:#059669; font-weight:700; text-transform:uppercase;">Sipariş Hacmi</div>
+                        <div style="font-size:18px; color:#10b981; font-weight:900;">{c_vol:,.0f}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # 3. DÜZENLEME ALANI
             with st.expander("✏️ Bilgileri Düzenle / Yönet", expanded=False):
-                
-                # --- GÜNCELLEME FORMU ---
                 with st.form(key=f"form_dealer_{u_id}"):
                     c1, c2 = st.columns(2)
                     new_company = c1.text_input("Firma Adı", value=u_company)
@@ -50,12 +102,10 @@ def show_dealer_management():
                         conn_update = sqlite3.connect('users.db')
                         conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=? WHERE id=?", 
                                             (new_company, new_type, new_email, new_phone, u_id))
-                        conn_update.commit()
-                        conn_update.close()
+                        conn_update.commit(); conn_update.close()
                         st.toast(f"{new_company} bilgileri güncellendi!")
-                        st.rerun() # Sayfayı yeniler ve expander'ı otomatik kapatır
+                        st.rerun()
                         
-                # --- AKSİYON BUTONLARI (ASKIYA AL / SİL) ---
                 st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
                 c3, c4 = st.columns(2)
                 
@@ -80,5 +130,3 @@ def show_dealer_management():
                     conn_act.commit(); conn_act.close()
                     st.toast("Hesap sistemden silindi!")
                     st.rerun()
-                    
-    conn.close()
