@@ -170,34 +170,47 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
-    # 🚀 KESİN KLAVYE ENGELLEYİCİ JAVASCRIPT GARDİYANI 🚀
-    # Bu kod mobilde selectbox içindeki gizli metin kutusuna "readonly" basar,
-    # böylece klavye asla açılmaz, sadece menü aşağı iner.
+    # =====================================================================
+    # 🚀 KESİN KLAVYE ENGELLEYİCİ VE KİBAR TASARIM (BETON ZIRH) 🚀
+    # =====================================================================
+    st.markdown("""
+        <style>
+        /* CSS HİLESİ: Input alanını tıklanmaz yapar, sadece menüyü açar. KLAVYE ASLA AÇILAMAZ! */
+        div[data-baseweb="select"] input { 
+            pointer-events: none !important; 
+            caret-color: transparent !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+        
+        /* Kibar Kutu Tasarımı */
+        div.st-emotion-cache-1jicfl2 { 
+            border-radius: 12px !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important;
+            padding: 1.5rem !important;
+        }
+        .stSelectbox label, .stTextInput label, .stNumberInput label, .stTextArea label {
+            font-size: 13px !important; font-weight: 700 !important; color: #475569 !important; margin-bottom:4px !important;
+        }
+        .stToggle label { font-size: 14px !important; font-weight: 800 !important; color: #2563eb !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # JS YEDEKLEMESİ: Streamlit yenilense bile inputu readonly yapar ve odaktan çıkarır
     components.html("""
     <script>
-    function disableKeyboard() {
+    setInterval(function() {
         var inputs = window.parent.document.querySelectorAll('div[data-baseweb="select"] input');
         inputs.forEach(function(input) {
-            input.setAttribute('readonly', 'readonly');
-            input.style.cursor = 'pointer';
+            input.setAttribute('readonly', 'true');
+            input.setAttribute('inputmode', 'none');
+            input.onfocus = function() { this.blur(); };
         });
-    }
-    // Streamlit DOM güncelledikçe klavyeyi kilitli tutmak için
-    disableKeyboard();
-    setInterval(disableKeyboard, 300);
+    }, 500);
     </script>
     """, height=0, width=0)
 
-    # 📱 KİBAR KUTU CSS TASARIMI
-    st.markdown("""
-        <style>
-        .stSelectbox label, .stTextInput label, .stNumberInput label, .stTextArea label {
-            font-size: 13px !important; font-weight: 700 !important; color: #475569 !important;
-        }
-        .stToggle label { font-size: 13px !important; font-weight: 800 !important; color: #2563eb !important; }
-        </style>
-    """, unsafe_allow_html=True)
-    
     my_custs = get_sales("SELECT id, company_name FROM customers WHERE user_id=? ORDER BY company_name ASC", (user_id,)) if not is_admin else get_sales("SELECT id, company_name FROM customers ORDER BY company_name ASC")
     
     if not my_custs:
@@ -223,28 +236,20 @@ def show_offer_wizard(user_id, is_admin=False):
         st.markdown("<div style='font-size:14px; font-weight:900; color:#2563eb; margin-bottom:8px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            c_names = [c[1] for c in my_custs]
+            # --- ZORUNLU BOŞ AÇILIŞ MANTIĞI ---
+            # Listelerin en başına sahte bir "Lütfen Seçiniz..." elemanı ekliyoruz.
+            CUST_PROMPT = "Lütfen Müşteri Seçiniz..."
+            MACH_PROMPT = "Lütfen Makine Seçiniz..."
+
+            c_names = [CUST_PROMPT] + [c[1] for c in my_custs]
+            idx_c = c_names.index(wd.get("cust_name")) if wd.get("cust_name") in c_names else 0
             
-            # --- 🚀 BOŞ (SEÇİMSİZ) AÇILIŞ MANTIĞI ---
-            # Eğer düzenleme modundaysa (veya daha önce seçilmişse) eski veriyi bulur.
-            # Sıfırdan başlanıyorsa index = None (Bomboş) olur.
-            idx_c = c_names.index(wd.get("cust_name")) if wd.get("cust_name") in c_names else None
-            
-            sel_cust = st.selectbox(
-                "Teklif Verilecek Müşteri", 
-                c_names, 
-                index=idx_c, 
-                placeholder="Lütfen Müşteri Seçiniz..."
-            )
+            sel_cust = st.selectbox("Teklif Verilecek Müşteri", c_names, index=idx_c)
 
             cats = ["Tüm Kategoriler"] + [c[0] for c in get_factory("SELECT name FROM categories ORDER BY name ASC")]
             idx_cat = cats.index(wd.get("category")) if wd.get("category") in cats else 0
             
-            sel_cat = st.selectbox(
-                "Kategori Filtresi", 
-                cats,
-                index=idx_cat
-            )
+            sel_cat = st.selectbox("Kategori Filtresi", cats, index=idx_cat)
 
             m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount, currency FROM models"
             m_params = []
@@ -255,35 +260,28 @@ def show_offer_wizard(user_id, is_admin=False):
 
             machines = get_factory(m_query, tuple(m_params))
             if not machines:
-                st.warning("Bu kategoride makine yok.")
+                st.warning("Bu kategoride makine bulunamadı.")
                 return
 
-            m_names = [m[1] for m in machines]
+            m_names = [MACH_PROMPT] + [m[1] for m in machines]
+            idx_m = m_names.index(wd.get("m_name")) if wd.get("m_name") in m_names else 0
             
-            # Makine de sıfırdan başlarken bomboş gelir
-            idx_m = m_names.index(wd.get("m_name")) if wd.get("m_name") in m_names else None
-            
-            sel_m = st.selectbox(
-                "Makine Modeli", 
-                m_names, 
-                index=idx_m,
-                placeholder="Lütfen Makine Modeli Seçiniz..."
-            )
+            sel_m = st.selectbox("Makine Modeli", m_names, index=idx_m)
             
             m_qty = st.number_input("Makine Adedi", 1, 100, wd.get("qty", 1))
 
-        # --- EĞER MÜŞTERİ VEYA MAKİNE SEÇİLMEDİYSE AŞAĞIYI GİZLE ---
-        if sel_cust is None or sel_m is None:
+        # --- EĞER SAHTE SEÇENEKLER AKTİFSE AŞAĞIYI GİZLE ---
+        if sel_cust == CUST_PROMPT or sel_m == MACH_PROMPT:
             with col_prev:
                 st.info("💡 Teklif detaylarını ve A4 raporunu görmek için lütfen yandaki panelden Müşteri ve Makine seçimi yapınız.")
             return
 
-        # SADECE SEÇİM YAPILINCA BURADAN AŞAĞISI ÇALIŞIR
+        # SADECE GERÇEK SEÇİM YAPILINCA BURADAN AŞAĞISI ÇALIŞIR
         cust_id = [c[0] for c in my_custs if c[1] == sel_cust][0]
         m_info = next(m for m in machines if m[1] == sel_m)
         m_id, m_name, m_price, m_opts_str, m_img, m_specs, m_disc, m_curr = m_info
 
-        st.markdown("<div style='font-size:14px; font-weight:900; color:#2563eb; margin-top:15px; margin-bottom:8px;'>2. SATIŞ ŞARTLARI</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:14px; font-weight:900; color:#1e293b; margin-top:20px; margin-bottom:10px; border-bottom:2px solid #e2e8f0; padding-bottom:5px;'>2. SATIŞ ŞARTLARI</div>", unsafe_allow_html=True)
         with st.expander("📝 Şartları Görüntüle / Düzenle", expanded=False):
             del_types = ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Limandan Devir", "Yurtiçi Teslim (Standart)"]
             saved_del_type = st.session_state.get("temp_del_type", "Gümrük İşlemleri Yapılmış Antrepo Teslim")
@@ -296,7 +294,7 @@ def show_offer_wizard(user_id, is_admin=False):
             bnk = st.text_area("Banka Bilgileri", wd.get("bnk", ""))
             nts = st.text_area("Özel Notlar", wd.get("nts", ""))
 
-        st.markdown("<div style='font-size:14px; font-weight:900; color:#2563eb; margin-top:15px; margin-bottom:8px;'>3. EKSTRA DONANIMLAR</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:14px; font-weight:900; color:#1e293b; margin-top:20px; margin-bottom:10px; border-bottom:2px solid #e2e8f0; padding-bottom:5px;'>3. EKSTRA DONANIMLAR</div>", unsafe_allow_html=True)
         multiplier = 1.0
         if "Liman" in d_type and m_disc:
             multiplier = 1.0 - (float(m_disc) / 100.0)
@@ -342,7 +340,7 @@ def show_offer_wizard(user_id, is_admin=False):
                 else:
                     st.info("Bu makineye tanımlı donanım bulunmuyor.")
 
-        st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-top:15px; margin-bottom:8px;'>4. FİYATLANDIRMA VE KAYIT</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:14px; font-weight:900; color:#1e293b; margin-top:20px; margin-bottom:10px; border-bottom:2px solid #e2e8f0; padding-bottom:5px;'>4. FİYATLANDIRMA VE KAYIT</div>", unsafe_allow_html=True)
         with st.container(border=True):
             sub = ((m_price * multiplier) * m_qty) + opts_total
 
