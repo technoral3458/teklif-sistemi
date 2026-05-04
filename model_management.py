@@ -187,6 +187,22 @@ def show_product_management():
 # VİTRİN VE LİSTELEME
 # =====================================================================
 def show_list_view(user_role):
+    # KART İÇİ BUTONLARI MOBİLDE YAN YANA TUTAN ÖZEL CSS HİLESİ
+    st.markdown("""
+    <style>
+    div[data-testid="stVerticalBlock"]:has(.card-btn-group) > div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
+    }
+    div[data-testid="stVerticalBlock"]:has(.card-btn-group) > div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        width: 33.33% !important;
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.header(_m("m_title"))
     tab_mod, tab_opt, tab_cat = st.tabs([_m("t_mod"), _m("t_opt"), _m("t_cat")])
     
@@ -222,16 +238,19 @@ def show_list_view(user_role):
                                     else:
                                         st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
                                         
+                                    # CSS HİLESİNİ TETİKLEYEN GİZLİ ETİKET
+                                    st.markdown('<span class="card-btn-group"></span>', unsafe_allow_html=True)
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
-                                    if btn_c1.button(_m("btn_edit"), key=f"me_{safe_mod_id}"):
+                                    
+                                    if btn_c1.button(_m("btn_edit"), key=f"me_{safe_mod_id}", use_container_width=True):
                                         st.session_state.edit_mod_id = safe_mod_id
                                         st.session_state.form_loaded = False
                                         st.session_state.view_mode = "mod_edit"; st.rerun()
-                                    if btn_c2.button(_m("btn_copy"), key=f"mc_{safe_mod_id}"):
+                                    if btn_c2.button(_m("btn_copy"), key=f"mc_{safe_mod_id}", use_container_width=True):
                                         m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos FROM models WHERE id=?", (safe_mod_id,))[0]
                                         exec_factory("""INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos) VALUES (?,?,?,?,?,?,?,?,?,?)""", (m_data[0] + " (Kopya)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9]))
                                         st.success(_m("copied")); st.rerun()
-                                    if btn_c3.button(_m("btn_del"), key=f"md_{safe_mod_id}"):
+                                    if btn_c3.button(_m("btn_del"), key=f"md_{safe_mod_id}", use_container_width=True):
                                         exec_factory("DELETE FROM models WHERE id=?", (safe_mod_id,)); st.rerun()
         else: st.info(_m("no_mach"))
 
@@ -263,16 +282,19 @@ def show_list_view(user_role):
                             else:
                                 st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
 
+                            # CSS HİLESİNİ TETİKLEYEN GİZLİ ETİKET
+                            st.markdown('<span class="card-btn-group"></span>', unsafe_allow_html=True)
                             btn_c1, btn_c2, btn_c3 = st.columns(3)
-                            if btn_c1.button(_m("btn_edit"), key=f"oe_{safe_opt_id}"):
+                            
+                            if btn_c1.button(_m("btn_edit"), key=f"oe_{safe_opt_id}", use_container_width=True):
                                 st.session_state.edit_opt_id = safe_opt_id
                                 st.session_state.opt_form_loaded = False
                                 st.session_state.view_mode = "opt_edit"; st.rerun()
-                            if btn_c2.button(_m("btn_copy"), key=f"oc_{safe_opt_id}"):
+                            if btn_c2.button(_m("btn_copy"), key=f"oc_{safe_opt_id}", use_container_width=True):
                                 o_data = get_factory("SELECT opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty FROM options WHERE id=?", (safe_opt_id,))[0]
                                 exec_factory("INSERT INTO options (opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty) VALUES (?,?,?,?,?,?)", (o_data[0] + " (Kopya)", o_data[1], o_data[2], o_data[3], o_data[4], o_data[5]))
                                 st.rerun()
-                            if btn_c3.button(_m("btn_del"), key=f"od_{safe_opt_id}"):
+                            if btn_c3.button(_m("btn_del"), key=f"od_{safe_opt_id}", use_container_width=True):
                                 exec_factory("DELETE FROM options WHERE id=?", (safe_opt_id,)); st.rerun()
         else: st.info(_m("no_opt"))
 
@@ -386,7 +408,6 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
 
     with tab_teknik:
         for i in range(len(st.session_state.f_specs)):
-            # MOBİL UYUM VE GÖRÜNÜRLÜK İÇİN KUTU (CONTAINER) İÇİNE ALDIK
             with st.container(border=True):
                 col_t, col_d, col_i, col_x = st.columns([3, 4, 3, 1], vertical_alignment="bottom")
                 
