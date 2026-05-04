@@ -159,28 +159,23 @@ def get_system_logo():
     return fallback_url
 
 # =====================================================================
-# VERİTABANI TAMİRCİSİ (Menü İzni İçin Güncellendi)
+# VERİTABANI TAMİRCİSİ
 # =====================================================================
 def repair_databases():
     conn = sqlite3.connect('users.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0, user_type TEXT DEFAULT 'Satıcı', phone TEXT, is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT, logo_path TEXT, website TEXT, address_full TEXT)""")
-    
-    # Yeni eklendi: allowed_menus sütunu var mı kontrol et, yoksa ekle.
     u_cols = [c[1] for c in conn.execute("PRAGMA table_info(users)").fetchall()]
     if "allowed_menus" not in u_cols: 
         conn.execute("ALTER TABLE users ADD COLUMN allowed_menus TEXT DEFAULT 'm_dash,m_new,m_cust,m_past,m_order,m_prof'")
-        
     if not conn.execute("SELECT id FROM users WHERE email='admin@ersanmakina.net'").fetchone():
-        conn.execute("INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type, allowed_menus) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici', 'm_dash,m_new,m_cust,m_past,m_order,m_prof')", ("admin@ersanmakina.net", hash_password("20132017")))
+        conn.execute("INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type, allowed_menus) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici', 'm_dash,m_new,m_cust,m_past,m_order,m_prof,m_deal,m_model')", ("admin@ersanmakina.net", hash_password("20132017")))
     conn.commit(); conn.close()
 
     conn = sqlite3.connect('sales_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS offers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, model_id INTEGER, total_price REAL DEFAULT 0.0, conditions TEXT DEFAULT '', status TEXT DEFAULT 'Beklemede', user_id INTEGER DEFAULT 1, offer_date TEXT DEFAULT '', order_date TEXT DEFAULT '')""")
     conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1)""")
-    
     o_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
     if "order_date" not in o_cols: conn.execute("ALTER TABLE offers ADD COLUMN order_date TEXT DEFAULT ''")
-    
     c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
     if "user_id" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 1")
     if "country" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN country TEXT DEFAULT ''")
@@ -189,7 +184,6 @@ def repair_databases():
     if "email" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN email TEXT DEFAULT ''")
     if "phone" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN phone TEXT DEFAULT ''")
     if "address" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN address TEXT DEFAULT ''")
-    
     conn.commit(); conn.close()
 
 repair_databases()
@@ -210,7 +204,6 @@ if not st.session_state.logged_in:
     current_token = st.query_params.get("session_token")
     if current_token:
         conn = sqlite3.connect('users.db', check_same_thread=False)
-        # allowed_menus da çekiliyor
         valid_user = conn.execute("SELECT id, user_type, role, email, allowed_menus FROM users WHERE session_token=?", (current_token,)).fetchone()
         conn.close()
         if valid_user:
@@ -273,7 +266,7 @@ if not st.session_state.logged_in:
                             st.session_state.user_id = user[0]
                             st.session_state.user_role = user[4] if user[4] == 'admin' else ("manufacturer" if user[1] == "Üretici" else "dealer")
                             st.session_state.user_email = le
-                            st.session_state.allowed_menus = user[5] # Menü yetkileri yüklendi
+                            st.session_state.allowed_menus = user[5]
                             st.rerun()
                     else: st.error(_("sys_err"))
                     conn.close()
@@ -292,7 +285,6 @@ if not st.session_state.logged_in:
                             if conn.execute("SELECT id FROM users WHERE email=?", (reg_email,)).fetchone(): st.error(_("email_in_use"))
                             else:
                                 ver_code = generate_code()
-                                # Yeni kullanıcılara varsayılan olarak tüm temel menüler açık verilir
                                 conn.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,?,0,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')", (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code))
                                 conn.commit()
                                 if send_email(reg_email, ver_code, "Doğrulama / Verification / 验证"):
@@ -361,18 +353,18 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    # --- DİNAMİK MENÜ YÖNETİMİ ---
+    # --- YENİ DİNAMİK MENÜ YÖNETİMİ ---
     if st.session_state.user_role == "admin":
         menu_items = [_("m_dash"), _("m_new"), _("m_cust"), _("m_past"), _("m_order"), _("m_prof"), _("m_deal"), _("m_model")]
     else:
-        # DB'den gelen izinleri okur, virgüllerden ayırır ve temizler
+        # Veritabanından gelen yetkileri okur
         allowed = st.session_state.allowed_menus.split(',') if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
         
-        # Sadece geçerli anahtarları Çeviriciye gönderip menüye ekler
-        valid_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
+        # BÜTÜN MENÜLER İÇİN YETKİ KONTROLÜ EKLENDİ (Tüm Valid Keys)
+        valid_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model"]
+        
         menu_items = [_(k.strip()) for k in allowed if k.strip() in valid_keys]
         
-        # Eğer yönetici tüm yetkileri kaldırmışsa, sistem çökmesin diye sadece Profil ekranı kalsın
         if not menu_items:
             menu_items = [_("m_prof")]
     
@@ -385,7 +377,7 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
     
-    # Dil Seçici
+    # Dil Seçici (Sidebar Altında)
     lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
     current_idx = list(lang_opts.keys()).index(st.session_state.lang) if st.session_state.lang in lang_opts else 0
     sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=current_idx, key="sidebar_lang_sel")
