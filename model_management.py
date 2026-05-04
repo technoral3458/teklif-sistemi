@@ -14,7 +14,7 @@ DICT_MODEL = {
         "m_title": "📦 Fabrika Veritabanı Yönetimi",
         "t_mod": "📦 Modeller (Vitrin)", "t_opt": "⚙️ Ekstra Donanımlar", "t_cat": "📂 Kategoriler",
         "reg_mach": "Kayıtlı Makineler", "add_mach": "➕ YENİ MAKİNE EKLE",
-        "no_img": "Görsel Yok", "price_wait": "Fiyat Bekleniyor",
+        "no_img": "Görsel Yok", "price_wait": "Fiyat Bekleniyor", "no_auth_price": "🔒 Fiyat Gizli",
         "btn_edit": "✏️", "btn_copy": "📄", "btn_del": "🗑️",
         "copied": "Kopyalandı!", "no_mach": "Sistemde henüz bir makine bulunmuyor.",
         "opt_showcase": "Ekstra Donanımlar Vitrini", "add_opt": "➕ YENİ DONANIM EKLE",
@@ -42,7 +42,7 @@ DICT_MODEL = {
         "m_title": "📦 Factory Database Management",
         "t_mod": "📦 Models (Showcase)", "t_opt": "⚙️ Extra Options", "t_cat": "📂 Categories",
         "reg_mach": "Registered Machines", "add_mach": "➕ ADD NEW MACHINE",
-        "no_img": "No Image", "price_wait": "Price Pending",
+        "no_img": "No Image", "price_wait": "Price Pending", "no_auth_price": "🔒 Price Hidden",
         "btn_edit": "✏️", "btn_copy": "📄", "btn_del": "🗑️",
         "copied": "Copied!", "no_mach": "No machines found in the system yet.",
         "opt_showcase": "Extra Options Showcase", "add_opt": "➕ ADD NEW OPTION",
@@ -70,7 +70,7 @@ DICT_MODEL = {
         "m_title": "📦 工厂数据库管理",
         "t_mod": "📦 型号 (展示)", "t_opt": "⚙️ 额外选项", "t_cat": "📂 类别",
         "reg_mach": "已注册机器", "add_mach": "➕ 添加新机器",
-        "no_img": "无图像", "price_wait": "等待定价",
+        "no_img": "无图像", "price_wait": "等待定价", "no_auth_price": "🔒 价格隐藏",
         "btn_edit": "✏️", "btn_copy": "📄", "btn_del": "🗑️",
         "copied": "已复制！", "no_mach": "系统中尚未找到机器。",
         "opt_showcase": "额外选项展示", "add_opt": "➕ 添加新选项",
@@ -187,15 +187,35 @@ def show_product_management():
 # VİTRİN VE LİSTELEME
 # =====================================================================
 def show_list_view(user_role):
+    # NOKTA ATIŞI (CERRAHİ) CSS - SADECE 3 BUTONU HEDEFLER
+    st.markdown("""
+    <style>
+    div.element-container:has(.btn-marker) + div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
+    }
+    div.element-container:has(.btn-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        width: 33.33% !important;
+        min-width: 0 !important;
+        flex: 1 1 0% !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.header(_m("m_title"))
     tab_mod, tab_opt, tab_cat = st.tabs([_m("t_mod"), _m("t_opt"), _m("t_cat")])
     
     with tab_mod:
-        col_title, col_add = st.columns([3, 1])
+        col_title, col_add = st.columns([5, 3], vertical_alignment="center")
         col_title.subheader(_m("reg_mach"))
-        if col_add.button(_m("add_mach"), type="primary", use_container_width=True):
+        
+        # BUTONUN KİLİTLENMEMESİ (PASİF OLMAMASI) İÇİN KEY EKLENDİ
+        if col_add.button(_m("add_mach"), type="primary", use_container_width=True, key="btn_add_mach_main"):
             st.session_state.form_loaded = False 
-            st.session_state.view_mode = "mod_add"; st.rerun()
+            st.session_state.view_mode = "mod_add"
+            st.rerun()
 
         st.markdown("---")
         mods = get_factory("SELECT id, name, category, base_price, currency, image_path FROM models ORDER BY category ASC, name ASC")
@@ -217,11 +237,17 @@ def show_list_view(user_role):
                                     
                                     st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{row['name']}'>{row['name']}</h4>", unsafe_allow_html=True)
                                     
-                                    if row['price'] > 0:
-                                        st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
+                                    # ÜRETİCİDEN VİTRİN FİYATLARINI DA GİZLEYELİM
+                                    if user_role == "manufacturer":
+                                        st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('no_auth_price')}</div>", unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
+                                        if row['price'] > 0:
+                                            st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
+                                        else:
+                                            st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
                                         
+                                    st.markdown('<span class="btn-marker"></span>', unsafe_allow_html=True)
+                                    
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
                                     if btn_c1.button(_m("btn_edit"), key=f"me_{safe_mod_id}", use_container_width=True):
                                         st.session_state.edit_mod_id = safe_mod_id
@@ -236,10 +262,14 @@ def show_list_view(user_role):
         else: st.info(_m("no_mach"))
 
     with tab_opt:
-        col_opt_t, col_opt_a = st.columns([3, 1])
+        col_opt_t, col_opt_a = st.columns([5, 3], vertical_alignment="center")
         col_opt_t.subheader(_m("opt_showcase"))
-        if col_opt_a.button(_m("add_opt"), type="primary", use_container_width=True):
-            st.session_state.opt_form_loaded = False; st.session_state.view_mode = "opt_add"; st.rerun()
+        
+        # BUTONUN KİLİTLENMEMESİ İÇİN KEY EKLENDİ
+        if col_opt_a.button(_m("add_opt"), type="primary", use_container_width=True, key="btn_add_opt_main"):
+            st.session_state.opt_form_loaded = False
+            st.session_state.view_mode = "opt_add"
+            st.rerun()
 
         st.markdown("---")
         opts = get_factory("SELECT id, opt_name, opt_price, opt_desc, opt_image FROM options ORDER BY id DESC")
@@ -258,11 +288,17 @@ def show_list_view(user_role):
                             st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{o_name}'>{o_name}</h4>", unsafe_allow_html=True)
                             st.markdown(f"<div style='color:#64748b; font-size:12px; height:36px; overflow:hidden; margin-bottom:5px;'>{o_desc if o_desc else '-'}</div>", unsafe_allow_html=True)
                             
-                            if o_price > 0:
-                                st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>+{o_price:,.2f} USD</div>", unsafe_allow_html=True)
+                            # ÜRETİCİDEN VİTRİN FİYATLARINI DA GİZLEYELİM
+                            if user_role == "manufacturer":
+                                st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('no_auth_price')}</div>", unsafe_allow_html=True)
                             else:
-                                st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
+                                if o_price > 0:
+                                    st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>+{o_price:,.2f} USD</div>", unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
 
+                            st.markdown('<span class="btn-marker"></span>', unsafe_allow_html=True)
+                            
                             btn_c1, btn_c2, btn_c3 = st.columns(3)
                             if btn_c1.button(_m("btn_edit"), key=f"oe_{safe_opt_id}", use_container_width=True):
                                 st.session_state.edit_opt_id = safe_opt_id
@@ -277,7 +313,7 @@ def show_list_view(user_role):
         else: st.info(_m("no_opt"))
 
     with tab_cat:
-        c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+        c1, c2 = st.columns([5, 3], vertical_alignment="bottom")
         c1.subheader(_m("cat_mng"))
         with c2.form("new_cat_form", clear_on_submit=True):
             cc1, cc2 = st.columns([3, 1])
@@ -316,45 +352,12 @@ def show_list_view(user_role):
                                     exec_factory("DELETE FROM categories WHERE id=?", (cid,)); st.rerun()
         else: st.info(_m("no_cat"))
 
-    # =====================================================================
-    # KESİN VE CERRAHİ BUTON DÜZELTİCİ (JAVASCRIPT)
-    # Bu kod CSS'in yapamadığı "sadece 3 butonu bul ve yan yana diz" işini yapar,
-    # diğer hiçbir resim veya form sütununu bozmaz.
-    # =====================================================================
-    import streamlit.components.v1 as components
-    components.html("""
-    <script>
-    function forceButtonsInRow() {
-        const blocks = window.parent.document.querySelectorAll('div[data-testid="stHorizontalBlock"]');
-        blocks.forEach(block => {
-            // Sadece 3 butonu olan ve içinde çöp kutusu emojisi barındıran satırları hedef alır
-            if (block.children.length === 3 && block.innerHTML.includes('🗑️')) {
-                block.style.cssText = 'display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 0.3rem !important; justify-content: center !important;';
-                Array.from(block.children).forEach(col => {
-                    col.style.cssText = 'width: 33.33% !important; min-width: 0 !important; flex: 1 1 0% !important; padding: 0 !important; margin: 0 !important;';
-                });
-            }
-            // Kategorilerdeki 2 butonu olan satırları hedef alır
-            if (block.children.length === 2 && block.innerHTML.includes('🗑️') && block.innerHTML.includes('✏️')) {
-                block.style.cssText = 'display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 0.3rem !important; justify-content: center !important;';
-                Array.from(block.children).forEach(col => {
-                    col.style.cssText = 'width: 50% !important; min-width: 0 !important; flex: 1 1 0% !important; padding: 0 !important; margin: 0 !important;';
-                });
-            }
-        });
-    }
-    forceButtonsInRow();
-    setTimeout(forceButtonsInRow, 100);
-    setTimeout(forceButtonsInRow, 500);
-    </script>
-    """, height=0, width=0)
-
 # =====================================================================
 # MAKİNE EKLEME/DÜZENLEME FORMU
 # =====================================================================
 def show_form_view(mode="add", mod_id=None, user_role="dealer"):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
-    if col_back.button(_m("back_list"), use_container_width=True):
+    if col_back.button(_m("back_list"), use_container_width=True, key="btn_back_from_mach"):
         st.session_state.view_mode = "list"; st.rerun()
     
     is_edit = (mode == "edit" and mod_id is not None)
@@ -452,7 +455,7 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                     st.session_state.f_specs.pop(i); st.rerun()
                     
         st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
-        if st.button(_m("add_spec"), use_container_width=True):
+        if st.button(_m("add_spec"), use_container_width=True, key="btn_add_spec_row"):
             st.session_state.f_specs.append({"title": "", "detail": "", "img": ""}); st.rerun()
 
     with tab_donanim:
@@ -461,15 +464,21 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
         chk_cols = st.columns(3)
         for idx, opt in enumerate(opts_avail):
             o_id, o_name, o_price = opt
-            p_text = f"(+{o_price:,.0f})" if o_price > 0 else f"({_m('price_wait')})"
+            
+            # ÜRETİCİ SEÇİM YAPARKEN FİYATLARI GÖRMESİN (GİZLEME)
+            if user_role == "manufacturer":
+                p_text = ""
+            else:
+                p_text = f"(+{o_price:,.0f})" if o_price > 0 else f"({_m('price_wait')})"
+                
             is_checked = str(o_id) in st.session_state.f_opts
             with chk_cols[idx % 3]:
-                if st.checkbox(f"{o_name} {p_text}", value=is_checked, key=f"chk_{o_id}"): new_opts.append(str(o_id))
+                if st.checkbox(f"{o_name} {p_text}".strip(), value=is_checked, key=f"chk_{o_id}"): new_opts.append(str(o_id))
         st.session_state.f_opts = new_opts
 
     st.markdown("---")
     btn_save_text = _m("save_changes") if is_edit else _m("add_sys")
-    if st.button(btn_save_text, type="primary", use_container_width=True):
+    if st.button(btn_save_text, type="primary", use_container_width=True, key="btn_save_machine"):
         
         if not st.session_state.f_name: 
             st.error(_m("err_name"))
@@ -501,7 +510,7 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
 # =====================================================================
 def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
-    if col_back.button(_m("back_list"), use_container_width=True): st.session_state.view_mode = "list"; st.rerun()
+    if col_back.button(_m("back_list"), use_container_width=True, key="btn_back_from_opt"): st.session_state.view_mode = "list"; st.rerun()
     is_edit = (mode == "edit" and opt_id is not None)
     col_title.header(_m("edit_opt_title") if is_edit else _m("new_opt_title"))
     st.markdown("---")
@@ -541,7 +550,7 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
                 if prev_img: st.markdown(f'<img src="{prev_img}" style="width:100%; border-radius:8px;">', unsafe_allow_html=True)
 
         btn_save_opt_text = _m("save_changes") if is_edit else _m("add_sys")
-        if st.button("💾 " + btn_save_opt_text, type="primary", use_container_width=True):
+        if st.button("💾 " + btn_save_opt_text, type="primary", use_container_width=True, key="btn_save_option"):
             
             if not st.session_state.o_name: 
                 st.error(_m("err_opt_name"))
