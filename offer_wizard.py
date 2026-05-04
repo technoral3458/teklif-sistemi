@@ -164,7 +164,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     
     return html
 
-
 # =====================================================================
 # ANA SİHİRBAZ EKRANI
 # =====================================================================
@@ -172,29 +171,33 @@ def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
     # =====================================================================
-    # 🚀 KESİN KLAVYE ENGELLEYİCİ JAVASCRIPT GARDİYANI 🚀
-    # Bu kod, mobil cihazlarda o kutulara tıkladığınız an klavyenin
-    # açılmasını donanımsal olarak yasaklar.
+    # 🚀 YUMUŞAK AMA KESİN KLAVYE ENGELLEYİCİ (TIKLAMAYI BOZMAZ) 🚀
+    # Seçim kutusuna "inputmode: none" uygular. Bu komut, tıklamaya izin verir
+    # ancak işletim sistemine "Klavye açma" emri gönderir.
     # =====================================================================
     components.html("""
     <script>
-    setInterval(function() {
-        var inputs = window.parent.document.querySelectorAll('div[data-baseweb="select"] input');
-        inputs.forEach(function(input) {
-            if(!input.hasAttribute('readonly')) {
-                input.setAttribute('readonly', 'readonly');
-                input.style.cursor = 'pointer';
-            }
-            // Tıklandığında odağı anında iptal edip klavyeyi bloke et
-            input.onfocus = function() { this.blur(); };
+    function disableKeyboardSoftly() {
+        var doc = window.parent.document;
+        var inputs = doc.querySelectorAll('div[data-baseweb="select"] input');
+        inputs.forEach(function(inp) {
+            inp.setAttribute('inputmode', 'none'); // KLAVYEYİ ENGELLEYEN ASIL KOD
         });
-    }, 300);
+    }
+    var observer = new MutationObserver(disableKeyboardSoftly);
+    observer.observe(window.parent.document.body, {childList: true, subtree: true});
+    disableKeyboardSoftly();
     </script>
     """, height=0, width=0)
 
-    # 📱 KİBAR KUTU CSS TASARIMI
+    # 📱 KİBAR KUTU CSS TASARIMI (POINTER-EVENTS SİLİNDİ, SEÇİM YAPILABİLİR)
     st.markdown("""
         <style>
+        /* Arama yaparken yanıp sönen imleci gizle */
+        div[data-baseweb="select"] input { 
+            caret-color: transparent !important;
+        }
+        
         div.st-emotion-cache-1jicfl2 { 
             border-radius: 12px !important;
             border: 1px solid #e2e8f0 !important;
@@ -234,24 +237,19 @@ def show_offer_wizard(user_id, is_admin=False):
         
         with st.container(border=True):
             
-            c_names = [c[1] for c in my_custs]
+            # --- TERTEMİZ BAŞLANGIÇ (SAHTE SEÇENEK MANTIĞI) ---
+            CUST_PROMPT = "Lütfen Müşteri Seçiniz..."
+            MACH_PROMPT = "Lütfen Makine Modeli Seçiniz..."
+
+            c_names = [CUST_PROMPT] + [c[1] for c in my_custs]
+            idx_c = c_names.index(wd.get("cust_name")) if wd.get("cust_name") in c_names else 0
             
-            # --- HAFIZAYI SIFIRLAMAK İÇİN KİMLİK(KEY) DEĞİŞTİRİLDİ VE INDEX=NONE YAPILDI ---
-            sel_cust = st.selectbox(
-                "Teklif Verilecek Müşteri", 
-                options=c_names, 
-                index=None, 
-                placeholder="Lütfen Müşteri Seçiniz...",
-                key="wiz_cust_v3"
-            )
+            sel_cust = st.selectbox("Teklif Verilecek Müşteri", c_names, index=idx_c)
 
             cats = ["Tüm Kategoriler"] + [c[0] for c in get_factory("SELECT name FROM categories ORDER BY name ASC")]
-            sel_cat = st.selectbox(
-                "Kategori Filtresi", 
-                options=cats,
-                index=0,
-                key="wiz_cat_v3"
-            )
+            idx_cat = cats.index(wd.get("category")) if wd.get("category") in cats else 0
+            
+            sel_cat = st.selectbox("Kategori Filtresi", cats, index=idx_cat)
 
             m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount, currency FROM models"
             m_params = []
@@ -265,26 +263,20 @@ def show_offer_wizard(user_id, is_admin=False):
                 st.warning("Bu kategoride makine bulunamadı.")
                 return
 
-            m_names = [m[1] for m in machines]
+            m_names = [MACH_PROMPT] + [m[1] for m in machines]
+            idx_m = m_names.index(wd.get("m_name")) if wd.get("m_name") in m_names else 0
             
-            # --- HAFIZAYI SIFIRLAMAK İÇİN KİMLİK(KEY) DEĞİŞTİRİLDİ VE INDEX=NONE YAPILDI ---
-            sel_m = st.selectbox(
-                "Makine Modeli", 
-                options=m_names, 
-                index=None,
-                placeholder="Lütfen Makine Modeli Seçiniz...",
-                key="wiz_mach_v3"
-            )
+            sel_m = st.selectbox("Makine Modeli", m_names, index=idx_m)
             
             m_qty = st.number_input("Makine Adedi", 1, 100, 1)
 
-        # --- EĞER MÜŞTERİ VEYA MAKİNE SEÇİLMEDİYSE AŞAĞIYI GİZLE ---
-        if sel_cust is None or sel_m is None:
+        # --- EĞER LÜTFEN SEÇİNİZ YAZIYORSA AŞAĞIYI GİZLE ---
+        if sel_cust == CUST_PROMPT or sel_m == MACH_PROMPT:
             with col_prev:
                 st.info("💡 Teklif detaylarını ve A4 raporunu görmek için lütfen yandaki panelden Müşteri ve Makine seçimi yapınız.")
             return
 
-        # SADECE GERÇEK SEÇİM YAPILINCA BURADAN AŞAĞISI ÇALIŞIR
+        # SADECE GERÇEK BİR FİRMA VE MAKİNE SEÇİLİNCE BURADAN AŞAĞISI ÇALIŞIR
         cust_id = [c[0] for c in my_custs if c[1] == sel_cust][0]
         m_info = next(m for m in machines if m[1] == sel_m)
         m_id, m_name, m_price, m_opts_str, m_img, m_specs, m_disc, m_curr = m_info
