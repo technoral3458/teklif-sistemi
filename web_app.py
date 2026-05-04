@@ -105,7 +105,6 @@ DICTIONARY = {
 
 def _(key): return DICTIONARY.get(st.session_state.lang, DICTIONARY["tr"]).get(key, key)
 
-# Çakışmayı önlemek için key_suffix eklendi
 def lang_selector(key_suffix):
     c1, c2 = st.columns([8.5, 1.5])
     with c2:
@@ -157,7 +156,7 @@ def get_system_logo():
     return fallback_url
 
 # =====================================================================
-# VERİTABANI TAMİRCİSİ
+# VERİTABANI TAMİRCİSİ (HATA ÖNLEYİCİ - GÜNCELLENDİ)
 # =====================================================================
 def repair_databases():
     conn = sqlite3.connect('users.db')
@@ -168,14 +167,21 @@ def repair_databases():
 
     conn = sqlite3.connect('sales_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS offers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, model_id INTEGER, total_price REAL DEFAULT 0.0, conditions TEXT DEFAULT '', status TEXT DEFAULT 'Beklemede', user_id INTEGER DEFAULT 1, offer_date TEXT DEFAULT '', order_date TEXT DEFAULT '')""")
-    conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER, country TEXT DEFAULT '', city TEXT DEFAULT '')""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1)""")
     
     o_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
     if "order_date" not in o_cols: conn.execute("ALTER TABLE offers ADD COLUMN order_date TEXT DEFAULT ''")
     
+    # MÜŞTERİ TABLOSU İÇİN GÜÇLENDİRİLMİŞ EKSİK SÜTUN KONTROLÜ
     c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
+    if "user_id" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 1")
     if "country" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN country TEXT DEFAULT ''")
     if "city" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN city TEXT DEFAULT ''")
+    if "authorized_person" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN authorized_person TEXT DEFAULT ''")
+    if "email" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN email TEXT DEFAULT ''")
+    if "phone" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN phone TEXT DEFAULT ''")
+    if "address" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN address TEXT DEFAULT ''")
+    
     conn.commit(); conn.close()
 
 repair_databases()
@@ -224,10 +230,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ, KAYIT VE ŞİFRE EKRANLARI (Hata Çözümlü)
+# GİRİŞ, KAYIT VE ŞİFRE EKRANLARI
 # =====================================================================
 if not st.session_state.logged_in:
-    lang_selector("login_screen") # Key eklendi
+    lang_selector("login_screen")
     
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
     with col_main:
@@ -237,7 +243,6 @@ if not st.session_state.logged_in:
         
         with t_login:
             with st.container(border=True):
-                # KEY EKLENDİ
                 le = st.text_input(_("email"), key="login_email_inp").strip().lower()
                 lp = st.text_input(_("pass"), type="password", key="login_pass_inp")
                 rem = st.checkbox(_("rem"), value=True, key="login_rem_chk")
@@ -261,7 +266,6 @@ if not st.session_state.logged_in:
         with t_reg:
             with st.container(border=True):
                 if st.session_state.reg_step == 1:
-                    # KEY EKLENDİ
                     reg_type = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")], key="reg_type_sel")
                     reg_comp = st.text_input(_("comp_name"), key="reg_comp_inp")
                     reg_phone = st.text_input(_("phone"), key="reg_phone_inp")
@@ -281,7 +285,6 @@ if not st.session_state.logged_in:
                             conn.close()
                         else: st.warning(_("req_fields"))
                 elif st.session_state.reg_step == 2:
-                    # KEY EKLENDİ
                     entered_code = st.text_input(_("enter_code"), max_chars=6, key="reg_code_inp")
                     if st.button(_("verify_btn"), type="primary", use_container_width=True, key="verify_submit"):
                         conn = sqlite3.connect('users.db')
@@ -296,7 +299,6 @@ if not st.session_state.logged_in:
         with t_forg:
             with st.container(border=True):
                 if st.session_state.forgot_step == 1:
-                    # KEY EKLENDİ
                     f_email = st.text_input(_("f_email"), key="forg_email_inp").strip().lower()
                     if st.button(_("send_reset"), use_container_width=True, key="forg_send_btn"):
                         conn = sqlite3.connect('users.db')
@@ -310,7 +312,6 @@ if not st.session_state.logged_in:
                         else: st.error(_("no_email"))
                         conn.close()
                 elif st.session_state.forgot_step == 2:
-                    # KEY EKLENDİ
                     f_code = st.text_input(_("enter_code"), max_chars=6, key="forg_code_inp")
                     new_pwd = st.text_input(_("new_pass"), type="password", key="forg_pass_inp")
                     if st.button(_("change_pass"), type="primary", use_container_width=True, key="forg_submit_btn"):
@@ -329,7 +330,7 @@ if not st.session_state.logged_in:
 # GÜVENLİ YAN MENÜ
 # =====================================================================
 with st.sidebar:
-    lang_selector("sidebar_menu") # Key eklendi
+    lang_selector("sidebar_menu")
     st.markdown(f"<div style='text-align: center; margin-bottom: 25px; margin-top: 10px;'><img src='{get_system_logo()}' style='max-height: 65px; object-fit: contain;'></div>", unsafe_allow_html=True)
     
     r_text_key = "role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer")
