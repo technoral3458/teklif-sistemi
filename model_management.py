@@ -187,26 +187,6 @@ def show_product_management():
 # VİTRİN VE LİSTELEME
 # =====================================================================
 def show_list_view(user_role):
-    # =====================================================================
-    # NOKTA ATIŞI (CERRAHİ) CSS - SADECE 3 BUTONU HEDEFLER
-    # =====================================================================
-    st.markdown("""
-    <style>
-    /* btn-marker etiketini bul, ondan hemen sonra gelen kolon dizisini yan yana kitle */
-    div.element-container:has(.btn-marker) + div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 0.5rem !important;
-    }
-    div.element-container:has(.btn-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-        width: 33.33% !important;
-        min-width: 0 !important;
-        flex: 1 1 0% !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     st.header(_m("m_title"))
     tab_mod, tab_opt, tab_cat = st.tabs([_m("t_mod"), _m("t_opt"), _m("t_cat")])
     
@@ -242,9 +222,6 @@ def show_list_view(user_role):
                                     else:
                                         st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
                                         
-                                    # CSS HİLESİNİ TETİKLEYEN GİZLİ NOKTA (SADECE BU 3 BUTONU YAN YANA KİTLER)
-                                    st.markdown('<span class="btn-marker"></span>', unsafe_allow_html=True)
-                                    
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
                                     if btn_c1.button(_m("btn_edit"), key=f"me_{safe_mod_id}", use_container_width=True):
                                         st.session_state.edit_mod_id = safe_mod_id
@@ -286,9 +263,6 @@ def show_list_view(user_role):
                             else:
                                 st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
 
-                            # CSS HİLESİNİ TETİKLEYEN GİZLİ NOKTA
-                            st.markdown('<span class="btn-marker"></span>', unsafe_allow_html=True)
-                            
                             btn_c1, btn_c2, btn_c3 = st.columns(3)
                             if btn_c1.button(_m("btn_edit"), key=f"oe_{safe_opt_id}", use_container_width=True):
                                 st.session_state.edit_opt_id = safe_opt_id
@@ -342,6 +316,38 @@ def show_list_view(user_role):
                                     exec_factory("DELETE FROM categories WHERE id=?", (cid,)); st.rerun()
         else: st.info(_m("no_cat"))
 
+    # =====================================================================
+    # KESİN VE CERRAHİ BUTON DÜZELTİCİ (JAVASCRIPT)
+    # Bu kod CSS'in yapamadığı "sadece 3 butonu bul ve yan yana diz" işini yapar,
+    # diğer hiçbir resim veya form sütununu bozmaz.
+    # =====================================================================
+    import streamlit.components.v1 as components
+    components.html("""
+    <script>
+    function forceButtonsInRow() {
+        const blocks = window.parent.document.querySelectorAll('div[data-testid="stHorizontalBlock"]');
+        blocks.forEach(block => {
+            // Sadece 3 butonu olan ve içinde çöp kutusu emojisi barındıran satırları hedef alır
+            if (block.children.length === 3 && block.innerHTML.includes('🗑️')) {
+                block.style.cssText = 'display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 0.3rem !important; justify-content: center !important;';
+                Array.from(block.children).forEach(col => {
+                    col.style.cssText = 'width: 33.33% !important; min-width: 0 !important; flex: 1 1 0% !important; padding: 0 !important; margin: 0 !important;';
+                });
+            }
+            // Kategorilerdeki 2 butonu olan satırları hedef alır
+            if (block.children.length === 2 && block.innerHTML.includes('🗑️') && block.innerHTML.includes('✏️')) {
+                block.style.cssText = 'display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 0.3rem !important; justify-content: center !important;';
+                Array.from(block.children).forEach(col => {
+                    col.style.cssText = 'width: 50% !important; min-width: 0 !important; flex: 1 1 0% !important; padding: 0 !important; margin: 0 !important;';
+                });
+            }
+        });
+    }
+    forceButtonsInRow();
+    setTimeout(forceButtonsInRow, 100);
+    setTimeout(forceButtonsInRow, 500);
+    </script>
+    """, height=0, width=0)
 
 # =====================================================================
 # MAKİNE EKLEME/DÜZENLEME FORMU
