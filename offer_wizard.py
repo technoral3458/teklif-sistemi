@@ -164,15 +164,39 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     
     return html
 
-def get_index(lst, item, default=0):
+def get_index(lst, item, default=None):
+    # Eğer öğe listede varsa indeksini döner. Yoksa (yeni teklifse) None (boş) döner.
     return lst.index(item) if item in lst else default
 
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
+    # KİBAR TASARIM VE KLAVYE ENGELLEYİCİ CSS
+    st.markdown("""
+        <style>
+        /* Combobox tıklandığında klavyeyi kesin olarak engeller */
+        div[data-baseweb="select"] input { 
+            inputmode: none !important; 
+            caret-color: transparent !important;
+            cursor: pointer !important;
+        }
+        /* İnce Çerçeveli Kibar Kutu Tasarımı */
+        div.st-emotion-cache-1jicfl2 { 
+            border-radius: 12px !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important;
+            padding: 1.5rem !important;
+        }
+        .stSelectbox label, .stTextInput label, .stNumberInput label, .stTextArea label {
+            font-size: 13px !important; font-weight: 700 !important; color: #475569 !important; margin-bottom:4px !important;
+        }
+        .stToggle label { font-size: 14px !important; font-weight: 800 !important; color: #2563eb !important; }
+        </style>
+    """, unsafe_allow_html=True)
+    
     my_custs = get_sales("SELECT id, company_name FROM customers WHERE user_id=?", (user_id,)) if not is_admin else get_sales("SELECT id, company_name FROM customers")
     if not my_custs:
-        st.warning(":warning: Lütfen önce 'Müşterilerim' menüsünden müşteri ekleyiniz.")
+        st.warning("⚠️ Lütfen önce 'Müşterilerim' menüsünden müşteri ekleyiniz.")
         return
 
     is_edit = 'edit_offer_id' in st.session_state
@@ -181,15 +205,6 @@ def show_offer_wizard(user_id, is_admin=False):
     col_opt, col_prev = st.columns([1.6, 2.4], gap="large")
 
     with col_opt:
-        st.markdown("""
-            <style>
-            .stSelectbox label, .stTextInput label, .stNumberInput label, .stTextArea label {
-                font-size: 12px !important; font-weight: 600 !important; color: #475569 !important;
-            }
-            .stToggle label { font-size: 13px !important; font-weight: 800 !important; color: #2563eb !important; }
-            </style>
-        """, unsafe_allow_html=True)
-
         if is_edit:
             st.info("✏️ Düzenleme Modu")
             if st.button("❌ İptal Et ve Sıfırdan Başla", use_container_width=True):
@@ -200,15 +215,29 @@ def show_offer_wizard(user_id, is_admin=False):
                         del st.session_state[key]
                 st.rerun()
 
-        st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-bottom:8px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:14px; font-weight:900; color:#1e293b; margin-bottom:10px; border-bottom:2px solid #e2e8f0; padding-bottom:5px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
+        
+        # --- KİBAR TASARIMLI SEÇİM KUTUSU ---
         with st.container(border=True):
             c_names = [c[1] for c in my_custs]
-            idx_c = get_index(c_names, wd.get("cust_name"))
-            sel_cust = st.selectbox("Teklif Verilecek Müşteri", c_names, index=idx_c)
-            cust_id = [c[0] for c in my_custs if c[1] == sel_cust][0]
+            
+            # Eğer kayıtlı veri varsa onu seçer, yoksa tertemiz (None) gelir
+            idx_c = get_index(c_names, wd.get("cust_name"), default=None)
+            sel_cust = st.selectbox(
+                "Müşteri Firma Adı", 
+                c_names, 
+                index=idx_c, 
+                placeholder="Lütfen Müşteri Seçiniz..."
+            )
 
             cats = ["Tüm Kategoriler"] + [c[0] for c in get_factory("SELECT name FROM categories")]
-            sel_cat = st.selectbox("Kategori Filtresi", cats)
+            
+            idx_cat = get_index(cats, wd.get("category"), default=0)
+            sel_cat = st.selectbox(
+                "Kategori Filtresi", 
+                cats, 
+                index=idx_cat
+            )
 
             m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount, currency FROM models"
             m_params = []
@@ -219,22 +248,37 @@ def show_offer_wizard(user_id, is_admin=False):
 
             machines = get_factory(m_query, tuple(m_params))
             if not machines:
-                st.warning("Bu kategoride makine yok.")
+                st.warning("Bu kategoride makine bulunamadı.")
                 return
 
             m_names = [m[1] for m in machines]
-            idx_m = get_index(m_names, wd.get("m_name"))
-            sel_m = st.selectbox("Makine Modeli", m_names, index=idx_m)
-
-            m_info = next(m for m in machines if m[1] == sel_m)
-            m_id, m_name, m_price, m_opts_str, m_img, m_specs, m_disc, m_curr = m_info
+            
+            # Eğer kayıtlı veri varsa onu seçer, yoksa tertemiz (None) gelir
+            idx_m = get_index(m_names, wd.get("m_name"), default=None)
+            sel_m = st.selectbox(
+                "Makine Modeli", 
+                m_names, 
+                index=idx_m, 
+                placeholder="Lütfen Makine Modeli Seçiniz..."
+            )
+            
             m_qty = st.number_input("Makine Adedi", 1, 100, wd.get("qty", 1))
 
-        st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-top:15px; margin-bottom:8px;'>2. SATIŞ ŞARTLARI</div>", unsafe_allow_html=True)
-        with st.expander("Şartları Görüntüle / Düzenle", expanded=False):
+        # Eğer müşteri VEYA makine seçilmediyse işlemi burada durdurur, aşağıyı kalabalıklaştırmaz
+        if not sel_cust or not sel_m:
+            with col_prev:
+                st.info("💡 Lütfen yukarıdan Müşteri ve Makine modelini seçerek teklif oluşturmaya başlayınız.")
+            return
+
+        cust_id = [c[0] for c in my_custs if c[1] == sel_cust][0]
+        m_info = next(m for m in machines if m[1] == sel_m)
+        m_id, m_name, m_price, m_opts_str, m_img, m_specs, m_disc, m_curr = m_info
+
+        st.markdown("<div style='font-size:14px; font-weight:900; color:#1e293b; margin-top:20px; margin-bottom:10px; border-bottom:2px solid #e2e8f0; padding-bottom:5px;'>2. SATIŞ ŞARTLARI</div>", unsafe_allow_html=True)
+        with st.expander("📝 Şartları Görüntüle / Düzenle", expanded=False):
             del_types = ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Limandan Devir", "Yurtiçi Teslim (Standart)"]
             saved_del_type = st.session_state.get("temp_del_type", "Gümrük İşlemleri Yapılmış Antrepo Teslim")
-            idx_d = get_index(del_types, saved_del_type)
+            idx_d = get_index(del_types, saved_del_type, default=0)
 
             d_type = st.selectbox("Teslimat Şekli", del_types, index=idx_d, key="temp_del_type")
             d_time = st.text_input("Teslim Süresi", wd.get("d_time", "Sipariş onayından itibaren 90 iş günü"))
@@ -243,7 +287,7 @@ def show_offer_wizard(user_id, is_admin=False):
             bnk = st.text_area("Banka Bilgileri", wd.get("bnk", ""))
             nts = st.text_area("Özel Notlar", wd.get("nts", ""))
 
-        st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-top:15px; margin-bottom:8px;'>3. EKSTRA DONANIMLAR</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:14px; font-weight:900; color:#1e293b; margin-top:20px; margin-bottom:10px; border-bottom:2px solid #e2e8f0; padding-bottom:5px;'>3. EKSTRA DONANIMLAR</div>", unsafe_allow_html=True)
         multiplier = 1.0
         if "Liman" in d_type and m_disc:
             multiplier = 1.0 - (float(m_disc) / 100.0)
@@ -276,14 +320,14 @@ def show_offer_wizard(user_id, is_admin=False):
                             c_info.markdown(f"<div style='font-size:15px; font-weight:900; color:#ea580c; margin-top:5px;'>+{d_o_p:,.0f} {m_curr}</div>", unsafe_allow_html=True)
 
                             # Sepete Ekle Switch'i (Toggle)
-                            is_sel = c_act.toggle("Sepete Ekle", key=f"tgl_{o_id}")
+                            is_sel = c_act.toggle("Ekle", key=f"tgl_{o_id}")
 
                             if is_sel:
                                 if allow_qty:
                                     q_o = c_act.number_input("Adet", 1, 100, 1, key=f"q_{o_id}", label_visibility="collapsed")
                                 else:
                                     q_o = 1
-                                    c_act.markdown("<div style='text-align:center; padding:6px; margin-top:8px; background:#ecfdf5; color:#10b981; border:1px solid #a7f3d0; border-radius:4px; font-weight:bold; font-size:12px;'>Sabit 1 Adet</div>", unsafe_allow_html=True)
+                                    c_act.markdown("<div style='text-align:center; padding:6px; margin-top:8px; background:#ecfdf5; color:#10b981; border:1px solid #a7f3d0; border-radius:4px; font-weight:bold; font-size:12px;'>1 Adet</div>", unsafe_allow_html=True)
                                     
                                 opts_total += (d_o_p * q_o)
                                 selected_options_for_db.append({"id": o_id, "qty": q_o})
@@ -291,7 +335,7 @@ def show_offer_wizard(user_id, is_admin=False):
                 else:
                     st.info("Bu makineye tanımlı donanım bulunmuyor.")
 
-        st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-top:15px; margin-bottom:8px;'>4. FİYATLANDIRMA VE KAYIT</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:14px; font-weight:900; color:#1e293b; margin-top:20px; margin-bottom:10px; border-bottom:2px solid #e2e8f0; padding-bottom:5px;'>4. FİYATLANDIRMA VE KAYIT</div>", unsafe_allow_html=True)
         with st.container(border=True):
             sub = ((m_price * multiplier) * m_qty) + opts_total
 
@@ -316,7 +360,7 @@ def show_offer_wizard(user_id, is_admin=False):
                 "discount_pct": disc_p, "is_manual": use_manual
             }
 
-            btn_txt = "💾 TEKLİFİ GÜNCELLE" if is_edit else "💾 TEKLİFİ OLUŞTUR VE ARŞİVLE"
+            btn_txt = "💾 TEKLİFİ GÜNCELLE" if is_edit else "📄 TEKLİFİ OLUŞTUR VE KAYDET"
             if st.button(btn_txt, type="primary", use_container_width=True):
                 try:
                     tarih = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
@@ -337,12 +381,12 @@ def show_offer_wizard(user_id, is_admin=False):
                             for item in selected_options_for_db: 
                                 exec_sales("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", 
                                            (res_id[0][0], item["id"], item["qty"]))
-                        st.success("Başarıyla Arşivlendi!")
+                        st.success("Teklif başarıyla kaydedildi! Geçmiş Tekliflerim menüsünden PDF alabilirsiniz.")
                     st.balloons()
                 except Exception as e: st.error(f"Kayıt Hatası: {e}")
 
     with col_prev:
-        st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 A4 RAPOR ÖNİZLEMESİ</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 TEKLİF PDF ÖNİZLEMESİ</div>", unsafe_allow_html=True)
         html = generate_embedded_html(sel_cust, m_name, m_price*multiplier, m_img, m_specs, engine_options_list, conds, m_curr, user_id)
         with st.container(border=True): 
             components.html(html, height=850, scrolling=True)
