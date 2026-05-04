@@ -9,9 +9,9 @@ def show_dealer_management():
     search_query = st.text_input("🔍 Bayi Ara (Firma Adı, E-Posta veya Telefon ile)", placeholder="Aramak istediğiniz kelimeyi yazın...")
     st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
     
-    # --- KULLANICI VERİLERİNİ ÇEK ---
+    # --- KULLANICI VERİLERİNİ ÇEK (allowed_menus sütunu eklendi) ---
     conn = sqlite3.connect('users.db')
-    users = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved FROM users WHERE role != 'admin' ORDER BY id DESC").fetchall()
+    users = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus FROM users WHERE role != 'admin' ORDER BY id DESC").fetchall()
     conn.close()
     
     # --- SATIŞ VERİLERİNİ ÇEK (İstatistikler için) ---
@@ -19,25 +19,22 @@ def show_dealer_management():
     all_offers = conn_s.execute("SELECT user_id, status, total_price FROM offers").fetchall()
     conn_s.close()
     
-    # Verileri hızlı analiz için Pandas'a alıyoruz
     df_offers = pd.DataFrame(all_offers, columns=['user_id', 'status', 'total_price'])
     
     if not users:
         st.info("Sistemde henüz kayıtlı bayi veya üretici bulunmuyor.")
         return
         
-    # Arama filtresini uygula
     if search_query:
         search_query = search_query.lower()
         users = [u for u in users if search_query in str(u[1]).lower() or search_query in str(u[2]).lower() or search_query in str(u[3]).lower()]
-        
         if not users:
             st.warning("Arama kriterinize uygun bayi bulunamadı.")
             return
 
     # BAYİLERİ LİSTELE
     for u in users:
-        u_id, u_company, u_email, u_phone, u_type, u_approved = u
+        u_id, u_company, u_email, u_phone, u_type, u_approved, u_menus = u
         
         # --- İSTATİSTİKLERİ HESAPLA ---
         dealer_offers = df_offers[df_offers['user_id'] == u_id]
@@ -49,7 +46,6 @@ def show_dealer_management():
         c_vol = conv_offers['total_price'].sum()
         
         with st.container(border=True):
-            # 1. BAŞLIK VE TEMEL BİLGİLER
             status_color = "#10b981" if u_approved else "#ef4444"
             status_text = "Aktif" if u_approved else "Askıda / Onay Bekliyor"
             
@@ -63,7 +59,6 @@ def show_dealer_management():
                 </div>
             """, unsafe_allow_html=True)
             
-            # 2. MİNİ İSTATİSTİK PANELİ (YENİ EKLENDİ)
             st.markdown(f"""
                 <div style="display:flex; gap:10px; margin-bottom:15px;">
                     <div style="flex:1; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; text-align:center;">
@@ -85,25 +80,47 @@ def show_dealer_management():
                 </div>
             """, unsafe_allow_html=True)
             
-            # 3. DÜZENLEME ALANI
-            with st.expander("✏️ Bilgileri Düzenle / Yönet", expanded=False):
+            # --- DÜZENLEME VE MENÜ YETKİLENDİRME ALANI ---
+            with st.expander("✏️ Bilgileri Düzenle ve Yetkileri Yönet", expanded=False):
                 with st.form(key=f"form_dealer_{u_id}"):
                     c1, c2 = st.columns(2)
                     new_company = c1.text_input("Firma Adı", value=u_company)
                     new_type = c2.selectbox("Faaliyet Türü", ["Satıcı (Bayi)", "Üretici"], index=0 if u_type=="Satıcı (Bayi)" else 1)
-                    
                     new_email = c1.text_input("E-Posta Adresi", value=u_email)
                     new_phone = c2.text_input("Telefon", value=u_phone if u_phone else "")
                     
-                    st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
-                    submit_btn = st.form_submit_button("🔄 GÜNCELLE", type="primary", use_container_width=True)
+                    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+                    st.markdown("<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>🔑 Kullanıcının Görüntüleyebileceği Menüler:</div>", unsafe_allow_html=True)
+                    
+                    # Kullanıcının mevcut izinleri (Boşsa hepsini varsayılan seç)
+                    menu_options = {
+                        "m_dash": "📊 Dashboard",
+                        "m_new": "📝 Yeni Teklif Hazırla",
+                        "m_cust": "👥 Müşterilerim",
+                        "m_past": "📋 Geçmiş Tekliflerim",
+                        "m_order": "📦 Siparişler",
+                        "m_prof": "⚙️ Profil Ayarlarım"
+                    }
+                    current_menus = u_menus.split(',') if u_menus is not None else list(menu_options.keys())
+                    
+                    selected_menus = []
+                    m_cols = st.columns(3)
+                    for idx, (k, v) in enumerate(menu_options.items()):
+                        with m_cols[idx % 3]:
+                            if st.checkbox(v, value=(k in current_menus), key=f"chk_{u_id}_{k}"):
+                                selected_menus.append(k)
+                    
+                    new_menus_str = ",".join(selected_menus)
+                    
+                    st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
+                    submit_btn = st.form_submit_button("🔄 BİLGİLERİ VE YETKİLERİ GÜNCELLE", type="primary", use_container_width=True)
                     
                     if submit_btn:
                         conn_update = sqlite3.connect('users.db')
-                        conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=? WHERE id=?", 
-                                            (new_company, new_type, new_email, new_phone, u_id))
+                        conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=? WHERE id=?", 
+                                            (new_company, new_type, new_email, new_phone, new_menus_str, u_id))
                         conn_update.commit(); conn_update.close()
-                        st.toast(f"{new_company} bilgileri güncellendi!")
+                        st.toast(f"{new_company} yetkileri güncellendi!")
                         st.rerun()
                         
                 st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
@@ -114,19 +131,16 @@ def show_dealer_management():
                         conn_act = sqlite3.connect('users.db')
                         conn_act.execute("UPDATE users SET is_approved=0 WHERE id=?", (u_id,))
                         conn_act.commit(); conn_act.close()
-                        st.toast("Hesap askıya alındı!")
                         st.rerun()
                 else:
                     if c3.button("✅ Hesabı Onayla / Aktifleştir", key=f"app_{u_id}", use_container_width=True):
                         conn_act = sqlite3.connect('users.db')
                         conn_act.execute("UPDATE users SET is_approved=1 WHERE id=?", (u_id,))
                         conn_act.commit(); conn_act.close()
-                        st.toast("Hesap aktifleştirildi!")
                         st.rerun()
                         
                 if c4.button("🗑️ Tamamen Sil", key=f"del_{u_id}", use_container_width=True):
                     conn_act = sqlite3.connect('users.db')
                     conn_act.execute("DELETE FROM users WHERE id=?", (u_id,))
                     conn_act.commit(); conn_act.close()
-                    st.toast("Hesap sistemden silindi!")
                     st.rerun()
