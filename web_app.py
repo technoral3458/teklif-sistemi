@@ -108,7 +108,6 @@ DICTIONARY = {
 
 def _(key): return DICTIONARY.get(st.session_state.lang, DICTIONARY["tr"]).get(key, key)
 
-# Sadece Giriş Ekranı İçin Dil Seçici
 def main_lang_selector():
     c1, c2, c3 = st.columns([7, 2, 1])
     with c3:
@@ -160,13 +159,19 @@ def get_system_logo():
     return fallback_url
 
 # =====================================================================
-# VERİTABANI TAMİRCİSİ (HATA ÖNLEYİCİ)
+# VERİTABANI TAMİRCİSİ (Menü İzni İçin Güncellendi)
 # =====================================================================
 def repair_databases():
     conn = sqlite3.connect('users.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0, user_type TEXT DEFAULT 'Satıcı', phone TEXT, is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT, logo_path TEXT, website TEXT, address_full TEXT)""")
+    
+    # Yeni eklendi: allowed_menus sütunu var mı kontrol et, yoksa ekle.
+    u_cols = [c[1] for c in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "allowed_menus" not in u_cols: 
+        conn.execute("ALTER TABLE users ADD COLUMN allowed_menus TEXT DEFAULT 'm_dash,m_new,m_cust,m_past,m_order,m_prof'")
+        
     if not conn.execute("SELECT id FROM users WHERE email='admin@ersanmakina.net'").fetchone():
-        conn.execute("INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici')", ("admin@ersanmakina.net", hash_password("20132017")))
+        conn.execute("INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type, allowed_menus) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici', 'm_dash,m_new,m_cust,m_past,m_order,m_prof')", ("admin@ersanmakina.net", hash_password("20132017")))
     conn.commit(); conn.close()
 
     conn = sqlite3.connect('sales_data.db')
@@ -184,6 +189,7 @@ def repair_databases():
     if "email" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN email TEXT DEFAULT ''")
     if "phone" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN phone TEXT DEFAULT ''")
     if "address" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN address TEXT DEFAULT ''")
+    
     conn.commit(); conn.close()
 
 repair_databases()
@@ -192,7 +198,7 @@ repair_databases()
 # OTURUM YÖNETİMİ
 # =====================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
-for key in ["user_id", "user_role", "user_email"]:
+for key in ["user_id", "user_role", "user_email", "allowed_menus"]:
     if key not in st.session_state: st.session_state[key] = None
 if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
@@ -204,11 +210,15 @@ if not st.session_state.logged_in:
     current_token = st.query_params.get("session_token")
     if current_token:
         conn = sqlite3.connect('users.db', check_same_thread=False)
-        valid_user = conn.execute("SELECT id, user_type, role, email FROM users WHERE session_token=?", (current_token,)).fetchone()
+        # allowed_menus da çekiliyor
+        valid_user = conn.execute("SELECT id, user_type, role, email, allowed_menus FROM users WHERE session_token=?", (current_token,)).fetchone()
         conn.close()
         if valid_user:
-            st.session_state.logged_in, st.session_state.user_id, st.session_state.user_email = True, valid_user[0], valid_user[3]
+            st.session_state.logged_in = True
+            st.session_state.user_id = valid_user[0]
             st.session_state.user_role = valid_user[2] if valid_user[2] == 'admin' else ("manufacturer" if valid_user[1] == "Üretici" else "dealer")
+            st.session_state.user_email = valid_user[3]
+            st.session_state.allowed_menus = valid_user[4]
 
 # --- MODERN ARAYÜZ CSS ---
 st.markdown("""
@@ -235,7 +245,7 @@ st.markdown("""
 # GİRİŞ, KAYIT VE ŞİFRE EKRANLARI
 # =====================================================================
 if not st.session_state.logged_in:
-    main_lang_selector() # Sadece giriş ekranına özel, bozulmayan dil seçici
+    main_lang_selector()
     
     col_left, col_main, col_right = st.columns([1, 1.2, 1])
     with col_main:
@@ -250,7 +260,7 @@ if not st.session_state.logged_in:
                 rem = st.checkbox(_("rem"), value=True, key="login_rem_chk")
                 if st.button(_("login_btn"), type="primary", use_container_width=True, key="login_submit"):
                     conn = sqlite3.connect('users.db')
-                    user = conn.execute("SELECT id, user_type, is_approved, is_verified, role FROM users WHERE email=? AND password=?", (le, hash_password(lp))).fetchone()
+                    user = conn.execute("SELECT id, user_type, is_approved, is_verified, role, allowed_menus FROM users WHERE email=? AND password=?", (le, hash_password(lp))).fetchone()
                     if user:
                         if user[3] == 0: st.warning(_("sys_unver"))
                         elif user[2] == 0: st.warning(_("sys_wait"))
@@ -259,8 +269,11 @@ if not st.session_state.logged_in:
                             conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0]))
                             conn.commit()
                             if rem: st.query_params["session_token"] = tok
-                            st.session_state.logged_in, st.session_state.user_id, st.session_state.user_email = True, user[0], le
+                            st.session_state.logged_in = True
+                            st.session_state.user_id = user[0]
                             st.session_state.user_role = user[4] if user[4] == 'admin' else ("manufacturer" if user[1] == "Üretici" else "dealer")
+                            st.session_state.user_email = le
+                            st.session_state.allowed_menus = user[5] # Menü yetkileri yüklendi
                             st.rerun()
                     else: st.error(_("sys_err"))
                     conn.close()
@@ -279,7 +292,8 @@ if not st.session_state.logged_in:
                             if conn.execute("SELECT id FROM users WHERE email=?", (reg_email,)).fetchone(): st.error(_("email_in_use"))
                             else:
                                 ver_code = generate_code()
-                                conn.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved) VALUES (?,?,?,?,?,?,0,0)", (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code))
+                                # Yeni kullanıcılara varsayılan olarak tüm temel menüler açık verilir
+                                conn.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,?,0,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')", (reg_email, hash_password(reg_pwd), reg_comp, reg_phone, reg_type, ver_code))
                                 conn.commit()
                                 if send_email(reg_email, ver_code, "Doğrulama / Verification / 验证"):
                                     st.session_state.temp_email, st.session_state.reg_step = reg_email, 2; st.rerun()
@@ -329,13 +343,11 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# GÜVENLİ VE MOBİL UYUMLU YAN MENÜ
+# GÜVENLİ VE DİNAMİK YAN MENÜ
 # =====================================================================
 with st.sidebar:
-    # 1. Logo (Mobilde taşmayı önleyen CSS)
     st.markdown(f"<div style='text-align: center; margin-bottom: 20px; padding: 10px 0;'><img src='{get_system_logo()}' style='max-width: 90%; max-height: 60px; object-fit: contain;'></div>", unsafe_allow_html=True)
     
-    # 2. Profil Kartı (Mobilde metin taşmasını önleyen yapı)
     r_text_key = "role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer")
     r_text = _(r_text_key)
     
@@ -349,12 +361,20 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    # 3. Menü Öğeleri
-    menu_items = [
-        _("m_dash"), _("m_new"), _("m_cust"), _("m_past"), _("m_order"), _("m_prof")
-    ]
-    if st.session_state.user_role == "admin": 
-        menu_items.extend([_("m_deal"), _("m_model")])
+    # --- DİNAMİK MENÜ YÖNETİMİ ---
+    if st.session_state.user_role == "admin":
+        menu_items = [_("m_dash"), _("m_new"), _("m_cust"), _("m_past"), _("m_order"), _("m_prof"), _("m_deal"), _("m_model")]
+    else:
+        # DB'den gelen izinleri okur, virgüllerden ayırır ve temizler
+        allowed = st.session_state.allowed_menus.split(',') if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
+        
+        # Sadece geçerli anahtarları Çeviriciye gönderip menüye ekler
+        valid_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
+        menu_items = [_(k.strip()) for k in allowed if k.strip() in valid_keys]
+        
+        # Eğer yönetici tüm yetkileri kaldırmışsa, sistem çökmesin diye sadece Profil ekranı kalsın
+        if not menu_items:
+            menu_items = [_("m_prof")]
     
     if st.session_state.active_tab not in menu_items:
         st.session_state.active_tab = menu_items[0]
@@ -365,7 +385,7 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
     
-    # 4. Dil Seçici (Artık en altta, düzeni bozmuyor)
+    # Dil Seçici
     lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
     current_idx = list(lang_opts.keys()).index(st.session_state.lang) if st.session_state.lang in lang_opts else 0
     sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=current_idx, key="sidebar_lang_sel")
@@ -373,7 +393,7 @@ with st.sidebar:
         st.session_state.lang = sel
         st.rerun()
         
-    # 5. Çıkış Butonu
+    # Çıkış Butonu
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     if st.button(_("logout"), use_container_width=True):
         conn = sqlite3.connect('users.db')
