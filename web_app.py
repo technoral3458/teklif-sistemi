@@ -9,11 +9,10 @@ import ntpath, posixpath
 st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon=":gear:", layout="wide", initial_sidebar_state="expanded")
 
 # =====================================================================
-# 🌍 ÇOKLU DİL MOTORU (SİZİN ORİJİNAL, EKLENTİSİZ KODUNUZ)
+# 🌍 ÇOKLU DİL MOTORU (ORİJİNAL - EKLENTİSİZ)
 # =====================================================================
 if 'lang' not in st.session_state:
     try:
-        # Tarayıcının gönderdiği sinyali okur (Eklenti gerektirmez)
         accept_lang = st.context.headers.get("Accept-Language", "")
         if accept_lang:
             primary_lang = accept_lang.split(',')[0][:2].lower()
@@ -172,7 +171,6 @@ if not st.session_state.logged_in:
 
 st.markdown("""
     <style>
-    /* MOBİL SEKMELER (TABS) DÜZENLEMESİ - TAŞMAYI ÖNLER */
     .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 5px; margin-bottom: 20px; flex-wrap: wrap !important; }
     .stTabs [data-baseweb="tab"] { 
         background-color: #f1f5f9; border-radius: 8px; padding: 10px 15px !important; font-size: 14px !important;
@@ -180,7 +178,6 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] { background-color: #2563eb !important; color: white !important; }
     
-    /* SIDEBAR MODERNİZASYONU */
     [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] { gap: 6px !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label { padding: 12px 15px; border-radius: 8px; transition: all 0.2s; cursor: pointer; color: #475569; }
@@ -188,7 +185,6 @@ st.markdown("""
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] { background-color: #2563eb !important; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3); }
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] p { color: white !important; font-weight: 700 !important; }
     
-    /* STAT KARTLARI */
     .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; text-align: center; margin-bottom: 15px;}
     .stat-val { font-size: 20px; font-weight: 900; color: #1e293b; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
     .stat-title { color: #64748b; text-transform: uppercase; font-size: 11px; font-weight: 700; margin-bottom:5px; display:block;}
@@ -196,7 +192,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ / KAYIT EKRANLARI
+# GİRİŞ / KAYIT / ŞİFREMİ UNUTTUM EKRANLARI
 # =====================================================================
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([7, 2, 1.5]); lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
@@ -208,6 +204,8 @@ if not st.session_state.logged_in:
     with col_m:
         st.markdown(f"<div style='text-align:center; padding:10px 0 20px 0;'><img src='{get_system_logo()}' style='max-width:100%; max-height:80px; object-fit:contain;'></div>", unsafe_allow_html=True)
         t_login, t_reg, t_forg = st.tabs([_("login_tab"), _("reg_tab"), _("forg_tab")])
+        
+        # --- GİRİŞ SEKMESİ ---
         with t_login:
             with st.container(border=True):
                 le = st.text_input(_("email"), key="l_e").strip().lower(); lp = st.text_input(_("pass"), type="password", key="l_p"); rem = st.checkbox(_("rem"), value=True, key="l_r")
@@ -222,6 +220,8 @@ if not st.session_state.logged_in:
                             st.session_state.logged_in, st.session_state.user_id, st.session_state.user_role, st.session_state.user_email, st.session_state.allowed_menus = True, user[0], (user[4] if user[4]=='admin' else ("manufacturer" if user[1]=="Üretici" else "dealer")), le, user[5]
                             st.rerun()
                     else: st.error(_("sys_err"))
+                    
+        # --- KAYIT SEKMESİ ---
         with t_reg:
             with st.container(border=True):
                 if st.session_state.reg_step == 1:
@@ -242,6 +242,55 @@ if not st.session_state.logged_in:
                         if db_c and db_c[0] == ec: c.execute("UPDATE users SET is_verified=1, auth_code=NULL WHERE email=?", (st.session_state.temp_email,)); c.commit(); st.session_state.reg_step = 1; st.success(_("ver_success"))
                         else: st.error(_("wrong_code"))
                         c.close()
+
+        # --- ŞİFREMİ UNUTTUM SEKMESİ ---
+        with t_forg:
+            with st.container(border=True):
+                if st.session_state.forgot_step == 1:
+                    fe = st.text_input(_("f_email"), key="f_e").strip().lower()
+                    if st.button(_("send_reset"), use_container_width=True):
+                        if fe:
+                            c = sqlite3.connect('users.db')
+                            user = c.execute("SELECT id FROM users WHERE email=?", (fe,)).fetchone()
+                            if user:
+                                vc = generate_code()
+                                c.execute("UPDATE users SET auth_code=? WHERE email=?", (vc, fe))
+                                c.commit()
+                                if send_email(fe, vc, "Şifre Sıfırlama Kodu / Password Reset Code"):
+                                    st.session_state.temp_forgot_email = fe
+                                    st.session_state.forgot_step = 2
+                                    st.rerun()
+                                else:
+                                    st.error(_("mail_err"))
+                            else:
+                                st.error(_("no_email"))
+                            c.close()
+                        else:
+                            st.warning(_("req_fields"))
+                elif st.session_state.forgot_step == 2:
+                    ec = st.text_input(_("enter_code"), max_chars=6, key="f_code")
+                    if st.button(_("verify_btn"), type="primary", use_container_width=True, key="btn_ver_forg"):
+                        c = sqlite3.connect('users.db')
+                        db_c = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_forgot_email,)).fetchone()
+                        if db_c and db_c[0] == ec:
+                            st.session_state.forgot_step = 3
+                            st.rerun()
+                        else:
+                            st.error(_("wrong_code"))
+                        c.close()
+                elif st.session_state.forgot_step == 3:
+                    np1 = st.text_input(_("new_pass"), type="password", key="np1")
+                    if st.button(_("change_pass"), type="primary", use_container_width=True):
+                        if np1:
+                            c = sqlite3.connect('users.db')
+                            c.execute("UPDATE users SET password=?, auth_code=NULL WHERE email=?", (hash_password(np1), st.session_state.temp_forgot_email))
+                            c.commit()
+                            c.close()
+                            st.session_state.forgot_step = 1
+                            st.success(_("pass_changed"))
+                        else:
+                            st.warning(_("req_fields"))
+
     st.stop()
 
 # =====================================================================
@@ -285,12 +334,9 @@ if st.session_state.get("close_sidebar", False):
         setTimeout(function() {{
             var isMobile = window.parent.innerWidth <= 768;
             if (isMobile) {{
-                // Escape tuşu yolla
                 window.parent.document.dispatchEvent(new KeyboardEvent('keydown', {{ 'key': 'Escape', 'bubbles': true }}));
-                // Çarpı butonuna tıkla
                 var closeBtn = window.parent.document.querySelector('button[kind="headerNoPadding"]');
                 if (closeBtn) {{ closeBtn.click(); }}
-                // Karanlık arkaplana tıkla
                 var backdrop = window.parent.document.querySelector('[data-testid="stSidebar"] + div');
                 if (backdrop) {{ backdrop.click(); }}
             }}
