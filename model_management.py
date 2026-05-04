@@ -187,18 +187,23 @@ def show_product_management():
 # VİTRİN VE LİSTELEME
 # =====================================================================
 def show_list_view(user_role):
-    # KART İÇİ BUTONLARI MOBİLDE YAN YANA TUTAN ÖZEL CSS HİLESİ
+    # =====================================================================
+    # MOBİL EKRANDA BUTONLARI YAN YANA TUTAN KESİN CSS ÇÖZÜMÜ
+    # =====================================================================
     st.markdown("""
     <style>
-    div[data-testid="stVerticalBlock"]:has(.card-btn-group) > div[data-testid="stHorizontalBlock"] {
+    div[data-testid="stVerticalBlock"]:has(.card-btn-group) div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 0.5rem !important;
+        gap: 0.3rem !important;
+        justify-content: center !important;
     }
-    div[data-testid="stVerticalBlock"]:has(.card-btn-group) > div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    div[data-testid="stVerticalBlock"]:has(.card-btn-group) div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
         width: 33.33% !important;
+        min-width: 33.33% !important;
         flex: 1 1 0% !important;
-        min-width: 0 !important;
+        padding: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -240,8 +245,8 @@ def show_list_view(user_role):
                                         
                                     # CSS HİLESİNİ TETİKLEYEN GİZLİ ETİKET
                                     st.markdown('<span class="card-btn-group"></span>', unsafe_allow_html=True)
-                                    btn_c1, btn_c2, btn_c3 = st.columns(3)
                                     
+                                    btn_c1, btn_c2, btn_c3 = st.columns(3)
                                     if btn_c1.button(_m("btn_edit"), key=f"me_{safe_mod_id}", use_container_width=True):
                                         st.session_state.edit_mod_id = safe_mod_id
                                         st.session_state.form_loaded = False
@@ -284,8 +289,8 @@ def show_list_view(user_role):
 
                             # CSS HİLESİNİ TETİKLEYEN GİZLİ ETİKET
                             st.markdown('<span class="card-btn-group"></span>', unsafe_allow_html=True)
-                            btn_c1, btn_c2, btn_c3 = st.columns(3)
                             
+                            btn_c1, btn_c2, btn_c3 = st.columns(3)
                             if btn_c1.button(_m("btn_edit"), key=f"oe_{safe_opt_id}", use_container_width=True):
                                 st.session_state.edit_opt_id = safe_opt_id
                                 st.session_state.opt_form_loaded = False
