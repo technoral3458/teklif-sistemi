@@ -164,7 +164,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     
     return html
 
-
 # =====================================================================
 # ANA SİHİRBAZ EKRANI
 # =====================================================================
@@ -172,29 +171,41 @@ def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
     # =====================================================================
-    # 🚀 KESİN KLAVYE ENGELLEYİCİ JAVASCRIPT GARDİYANI 🚀
-    # Bu kod, mobil cihazlarda o kutulara tıkladığınız an klavyenin
-    # açılmasını donanımsal olarak yasaklar.
+    # 🚨 NÜKLEER SEÇENEK: MUTATION OBSERVER İLE KLAVYE ENGELLEYİCİ 🚨
+    # React ekranı her yenilediğinde ajan çalışır ve arama kutusunu felç eder.
     # =====================================================================
     components.html("""
     <script>
-    setInterval(function() {
-        var inputs = window.parent.document.querySelectorAll('div[data-baseweb="select"] input');
-        inputs.forEach(function(input) {
-            if(!input.hasAttribute('readonly')) {
-                input.setAttribute('readonly', 'readonly');
-                input.style.cursor = 'pointer';
-            }
-            // Tıklandığında odağı anında iptal edip klavyeyi bloke et
-            input.onfocus = function() { this.blur(); };
+    function lockKeyboards() {
+        var doc = window.parent.document;
+        var inputs = doc.querySelectorAll('div[data-baseweb="select"] input');
+        inputs.forEach(function(inp) {
+            // Sadece okunabilir yap
+            inp.setAttribute('readonly', 'true');
+            // Mobilde klavye tipini hiçlik yap
+            inp.setAttribute('inputmode', 'none');
+            // Dokunulduğunda odağı anında kaybet (iOS/Safari Koruması)
+            inp.addEventListener('touchstart', function(e) { this.blur(); });
+            inp.addEventListener('focus', function(e) { this.blur(); });
         });
-    }, 300);
+    }
+    // Ajanı sisteme kur (Ekran her değiştiğinde anında kilitler)
+    var observer = new MutationObserver(lockKeyboards);
+    observer.observe(window.parent.document.body, {childList: true, subtree: true});
+    lockKeyboards();
     </script>
     """, height=0, width=0)
 
-    # 📱 KİBAR KUTU CSS TASARIMI
+    # 📱 KİBAR KUTU CSS TASARIMI VE ZORUNLU GİZLEME
     st.markdown("""
         <style>
+        /* CSS Hilesi ile klavyeyi çift koldan engelle */
+        div[data-baseweb="select"] input { 
+            pointer-events: none !important; 
+            caret-color: transparent !important;
+            user-select: none !important;
+        }
+        
         div.st-emotion-cache-1jicfl2 { 
             border-radius: 12px !important;
             border: 1px solid #e2e8f0 !important;
@@ -233,24 +244,25 @@ def show_offer_wizard(user_id, is_admin=False):
         st.markdown("<div style='font-size:14px; font-weight:900; color:#2563eb; margin-bottom:8px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            
             c_names = [c[1] for c in my_custs]
             
-            # --- HAFIZAYI SIFIRLAMAK İÇİN KİMLİK(KEY) DEĞİŞTİRİLDİ VE INDEX=NONE YAPILDI ---
+            # 🔥 İLK AÇILIŞTA KESİN OLARAK BOŞ (NONE) GELMESİNİ SAĞLAYAN MANTIK
+            idx_c = c_names.index(wd.get("cust_name")) if wd.get("cust_name") in c_names else None
+            
             sel_cust = st.selectbox(
                 "Teklif Verilecek Müşteri", 
                 options=c_names, 
-                index=None, 
-                placeholder="Lütfen Müşteri Seçiniz...",
-                key="wiz_cust_v3"
+                index=idx_c, 
+                placeholder="Lütfen Müşteri Seçiniz..."
             )
 
             cats = ["Tüm Kategoriler"] + [c[0] for c in get_factory("SELECT name FROM categories ORDER BY name ASC")]
+            idx_cat = cats.index(wd.get("category")) if wd.get("category") in cats else 0
+            
             sel_cat = st.selectbox(
                 "Kategori Filtresi", 
                 options=cats,
-                index=0,
-                key="wiz_cat_v3"
+                index=idx_cat
             )
 
             m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount, currency FROM models"
@@ -267,24 +279,25 @@ def show_offer_wizard(user_id, is_admin=False):
 
             m_names = [m[1] for m in machines]
             
-            # --- HAFIZAYI SIFIRLAMAK İÇİN KİMLİK(KEY) DEĞİŞTİRİLDİ VE INDEX=NONE YAPILDI ---
+            # 🔥 İLK AÇILIŞTA KESİN OLARAK BOŞ (NONE) GELMESİNİ SAĞLAYAN MANTIK
+            idx_m = m_names.index(wd.get("m_name")) if wd.get("m_name") in m_names else None
+            
             sel_m = st.selectbox(
                 "Makine Modeli", 
                 options=m_names, 
-                index=None,
-                placeholder="Lütfen Makine Modeli Seçiniz...",
-                key="wiz_mach_v3"
+                index=idx_m,
+                placeholder="Lütfen Makine Seçiniz..."
             )
             
             m_qty = st.number_input("Makine Adedi", 1, 100, 1)
 
-        # --- EĞER MÜŞTERİ VEYA MAKİNE SEÇİLMEDİYSE AŞAĞIYI GİZLE ---
+        # 🔥 MÜŞTERİ VEYA MAKİNE SEÇİLMEDİYSE EKRANIN ALT KISMINI HİÇ GÖSTERME 🔥
         if sel_cust is None or sel_m is None:
             with col_prev:
                 st.info("💡 Teklif detaylarını ve A4 raporunu görmek için lütfen yandaki panelden Müşteri ve Makine seçimi yapınız.")
             return
 
-        # SADECE GERÇEK SEÇİM YAPILINCA BURADAN AŞAĞISI ÇALIŞIR
+        # SADECE SEÇİM YAPILDIKTAN SONRA BURADAN AŞAĞISI GÖRÜNÜR
         cust_id = [c[0] for c in my_custs if c[1] == sel_cust][0]
         m_info = next(m for m in machines if m[1] == sel_m)
         m_id, m_name, m_price, m_opts_str, m_img, m_specs, m_disc, m_curr = m_info
