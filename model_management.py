@@ -1,4 +1,3 @@
-
 import streamlit as st
 import sqlite3
 import pandas as pd
@@ -6,6 +5,100 @@ import os
 import base64
 import uuid
 from PIL import Image
+
+# =====================================================================
+# 🌍 ÇOKLU DİL (MULTI-LANGUAGE) SÖZLÜĞÜ (MODEL YÖNETİMİ İÇİN)
+# =====================================================================
+DICT_MODEL = {
+    "tr": {
+        "m_title": "📦 Fabrika Veritabanı Yönetimi",
+        "t_mod": "📦 Modeller (Vitrin)", "t_opt": "⚙️ Ekstra Donanımlar", "t_cat": "📂 Kategoriler",
+        "reg_mach": "Kayıtlı Makineler", "add_mach": "➕ YENİ MAKİNE EKLE",
+        "no_img": "Görsel Yok", "price_wait": "Fiyat Bekleniyor",
+        "btn_edit": "✏️", "btn_copy": "📄", "btn_del": "🗑️",
+        "copied": "Kopyalandı!", "no_mach": "Sistemde henüz bir makine bulunmuyor.",
+        "opt_showcase": "Ekstra Donanımlar Vitrini", "add_opt": "➕ YENİ DONANIM EKLE",
+        "no_opt": "Sistemde henüz bir ekstra donanım bulunmuyor.",
+        "cat_mng": "📂 Kategori Yönetimi", "new_cat": "Yeni Kategori Ekle", "new_cat_ph": "Yeni Kategori Adı...",
+        "btn_add": "➕ Ekle", "cat_exists": "Bu isimde bir kategori zaten mevcut!",
+        "new_name": "Yeni Ad", "save": "💾", "cancel": "❌", "btn_edit_txt": "✏️ Düzenle", "btn_del_txt": "🗑️ Sil",
+        "no_cat": "Sistemde henüz bir kategori bulunmuyor.",
+        "back_list": "🔙 Listeye Dön", "edit_mach": "✏️ Makine Kartı Düzenleyici", "new_mach": "✨ Yeni Makine Kartı Oluştur",
+        "tab_gen": "📄 Genel Bilgiler", "tab_tech": "⚙️ Teknik Özellikler", "tab_comp": "🔌 Uyumlu Donanımlar",
+        "m_name": "Makine Adı *", "m_cat": "Kategori",
+        "price_lock": "🔒 Fiyat ve İskonto belirleme yetkiniz yoktur. Fiyatlandırma Yönetici tarafından yapılacaktır.",
+        "dom_price": "Yurtiçi Fiyat *", "currency": "Para Birimi", "port_disc": "Liman Teslim İskontosu (%)",
+        "main_img": "Ana Görsel Dosyası", "img_prev": "**Görsel Önizleme**",
+        "spec_title": "Başlık", "spec_det": "Detay", "choose_img": "Resim Seç",
+        "add_spec": "➕ YENİ ÖZELLİK SATIRI EKLE", "no_comp_opt": "Bu makineye tanımlı donanım bulunmuyor.",
+        "save_changes": "💾 DEĞİŞİKLİKLERİ KAYDET", "add_sys": "💾 MAKİNEYİ SİSTEME EKLE",
+        "err_name": "Lütfen makine adını girin!", "err_price": "Lütfen geçerli bir fiyat girin!",
+        "edit_opt_title": "✏️ Donanım Düzenle", "new_opt_title": "✨ Yeni Ekstra Donanım Ekle",
+        "opt_name": "Donanım Adı *", "opt_price_lock": "🔒 Fiyatlandırma Yönetici tarafından yapılacaktır.",
+        "opt_price": "Fiyat *", "allow_qty": "Bu donanım için adet seçimi yapılabilir",
+        "opt_desc": "Açıklama", "opt_img_up": "Donanım Görseli", "err_opt_name": "Donanım Adı zorunludur!"
+    },
+    "en": {
+        "m_title": "📦 Factory Database Management",
+        "t_mod": "📦 Models (Showcase)", "t_opt": "⚙️ Extra Options", "t_cat": "📂 Categories",
+        "reg_mach": "Registered Machines", "add_mach": "➕ ADD NEW MACHINE",
+        "no_img": "No Image", "price_wait": "Price Pending",
+        "btn_edit": "✏️", "btn_copy": "📄", "btn_del": "🗑️",
+        "copied": "Copied!", "no_mach": "No machines found in the system yet.",
+        "opt_showcase": "Extra Options Showcase", "add_opt": "➕ ADD NEW OPTION",
+        "no_opt": "No extra options found in the system yet.",
+        "cat_mng": "📂 Category Management", "new_cat": "Add New Category", "new_cat_ph": "New Category Name...",
+        "btn_add": "➕ Add", "cat_exists": "A category with this name already exists!",
+        "new_name": "New Name", "save": "💾", "cancel": "❌", "btn_edit_txt": "✏️ Edit", "btn_del_txt": "🗑️ Delete",
+        "no_cat": "No categories found in the system yet.",
+        "back_list": "🔙 Back to List", "edit_mach": "✏️ Machine Card Editor", "new_mach": "✨ Create New Machine Card",
+        "tab_gen": "📄 General Info", "tab_tech": "⚙️ Technical Specs", "tab_comp": "🔌 Compatible Options",
+        "m_name": "Machine Name *", "m_cat": "Category",
+        "price_lock": "🔒 You don't have permission to set prices. Pricing will be done by the Admin.",
+        "dom_price": "Domestic Price *", "currency": "Currency", "port_disc": "Port Delivery Discount (%)",
+        "main_img": "Main Image File", "img_prev": "**Image Preview**",
+        "spec_title": "Title", "spec_det": "Detail", "choose_img": "Choose Image",
+        "add_spec": "➕ ADD NEW SPEC ROW", "no_comp_opt": "No compatible options defined for this machine.",
+        "save_changes": "💾 SAVE CHANGES", "add_sys": "💾 ADD MACHINE TO SYSTEM",
+        "err_name": "Please enter the machine name!", "err_price": "Please enter a valid price!",
+        "edit_opt_title": "✏️ Edit Option", "new_opt_title": "✨ Add New Extra Option",
+        "opt_name": "Option Name *", "opt_price_lock": "🔒 Pricing will be set by the Admin.",
+        "opt_price": "Price *", "allow_qty": "Allow quantity selection for this option",
+        "opt_desc": "Description", "opt_img_up": "Option Image", "err_opt_name": "Option Name is required!"
+    },
+    "zh": {
+        "m_title": "📦 工厂数据库管理",
+        "t_mod": "📦 型号 (展示)", "t_opt": "⚙️ 额外选项", "t_cat": "📂 类别",
+        "reg_mach": "已注册机器", "add_mach": "➕ 添加新机器",
+        "no_img": "无图像", "price_wait": "等待定价",
+        "btn_edit": "✏️", "btn_copy": "📄", "btn_del": "🗑️",
+        "copied": "已复制！", "no_mach": "系统中尚未找到机器。",
+        "opt_showcase": "额外选项展示", "add_opt": "➕ 添加新选项",
+        "no_opt": "系统中尚未找到额外选项。",
+        "cat_mng": "📂 类别管理", "new_cat": "添加新类别", "new_cat_ph": "新类别名称...",
+        "btn_add": "➕ 添加", "cat_exists": "该名称的类别已存在！",
+        "new_name": "新名称", "save": "💾", "cancel": "❌", "btn_edit_txt": "✏️ 编辑", "btn_del_txt": "🗑️ 删除",
+        "no_cat": "系统中尚未找到类别。",
+        "back_list": "🔙 返回列表", "edit_mach": "✏️ 机器卡片编辑器", "new_mach": "✨ 创建新机器卡片",
+        "tab_gen": "📄 一般信息", "tab_tech": "⚙️ 技术规格", "tab_comp": "🔌 兼容选项",
+        "m_name": "机器名称 *", "m_cat": "类别",
+        "price_lock": "🔒 您无权设置价格。定价将由管理员完成。",
+        "dom_price": "国内价格 *", "currency": "货币", "port_disc": "港口交货折扣 (%)",
+        "main_img": "主图像文件", "img_prev": "**图像预览**",
+        "spec_title": "标题", "spec_det": "详情", "choose_img": "选择图像",
+        "add_spec": "➕ 添加新规格行", "no_comp_opt": "没有为此机器定义兼容选项。",
+        "save_changes": "💾 保存更改", "add_sys": "💾 将机器添加到系统",
+        "err_name": "请输入机器名称！", "err_price": "请输入有效价格！",
+        "edit_opt_title": "✏️ 编辑选项", "new_opt_title": "✨ 添加新额外选项",
+        "opt_name": "选项名称 *", "opt_price_lock": "🔒 定价将由管理员设置。",
+        "opt_price": "价格 *", "allow_qty": "允许此选项的数量选择",
+        "opt_desc": "描述", "opt_img_up": "选项图像", "err_opt_name": "选项名称为必填项！"
+    }
+}
+
+def _m(key): 
+    lang = st.session_state.get('lang', 'tr')
+    return DICT_MODEL.get(lang, DICT_MODEL["tr"]).get(key, key)
 
 # =====================================================================
 # FABRİKA VERİTABANI BAĞLANTILARI
@@ -82,7 +175,6 @@ def show_product_management():
     if "edit_opt_id" not in st.session_state: st.session_state.edit_opt_id = None
     if "edit_cat_id" not in st.session_state: st.session_state.edit_cat_id = None
 
-    # Sisteme giriş yapan kişinin rolünü al (manufacturer, admin, dealer vs.)
     user_role = st.session_state.get("user_role", "dealer")
 
     if st.session_state.view_mode == "list": show_list_view(user_role)
@@ -95,13 +187,13 @@ def show_product_management():
 # VİTRİN VE LİSTELEME
 # =====================================================================
 def show_list_view(user_role):
-    st.header(":package: Fabrika Veritabanı Yönetimi")
-    tab_mod, tab_opt, tab_cat = st.tabs(["📦 Modeller (Vitrin)", "⚙️ Ekstra Donanımlar (Vitrin)", "📂 Kategoriler"])
+    st.header(_m("m_title"))
+    tab_mod, tab_opt, tab_cat = st.tabs([_m("t_mod"), _m("t_opt"), _m("t_cat")])
     
     with tab_mod:
         col_title, col_add = st.columns([3, 1])
-        col_title.subheader("Kayıtlı Makineler")
-        if col_add.button("➕ YENİ MAKİNE EKLE", type="primary", use_container_width=True):
+        col_title.subheader(_m("reg_mach"))
+        if col_add.button(_m("add_mach"), type="primary", use_container_width=True):
             st.session_state.form_loaded = False 
             st.session_state.view_mode = "mod_add"; st.rerun()
 
@@ -121,33 +213,32 @@ def show_list_view(user_role):
                                 with cols[j].container(border=True):
                                     img_b64 = get_image_base64(row['image'])
                                     if img_b64: st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:150px; object-fit:contain; margin-bottom:15px;"></div>', unsafe_allow_html=True)
-                                    else: st.markdown("<div style='height:150px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>Görsel Yok</div>", unsafe_allow_html=True)
+                                    else: st.markdown(f"<div style='height:150px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>{_m('no_img')}</div>", unsafe_allow_html=True)
                                     
                                     st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{row['name']}'>{row['name']}</h4>", unsafe_allow_html=True)
                                     
-                                    # Fiyat 0 ise Fiyat Bekleniyor yazısı göster (Üretici yeni eklediyse)
                                     if row['price'] > 0:
                                         st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>Fiyat Bekleniyor</div>", unsafe_allow_html=True)
+                                        st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
                                         
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
-                                    if btn_c1.button("✏️", key=f"me_{safe_mod_id}", help="Düzenle"):
+                                    if btn_c1.button(_m("btn_edit"), key=f"me_{safe_mod_id}"):
                                         st.session_state.edit_mod_id = safe_mod_id
                                         st.session_state.form_loaded = False
                                         st.session_state.view_mode = "mod_edit"; st.rerun()
-                                    if btn_c2.button("📄", key=f"mc_{safe_mod_id}", help="Kopyala"):
+                                    if btn_c2.button(_m("btn_copy"), key=f"mc_{safe_mod_id}"):
                                         m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos FROM models WHERE id=?", (safe_mod_id,))[0]
                                         exec_factory("""INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos) VALUES (?,?,?,?,?,?,?,?,?,?)""", (m_data[0] + " (Kopya)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9]))
-                                        st.success("Kopyalandı!"); st.rerun()
-                                    if btn_c3.button("🗑️", key=f"md_{safe_mod_id}", help="Sil"):
+                                        st.success(_m("copied")); st.rerun()
+                                    if btn_c3.button(_m("btn_del"), key=f"md_{safe_mod_id}"):
                                         exec_factory("DELETE FROM models WHERE id=?", (safe_mod_id,)); st.rerun()
-        else: st.info("Sistemde henüz bir makine bulunmuyor.")
+        else: st.info(_m("no_mach"))
 
     with tab_opt:
         col_opt_t, col_opt_a = st.columns([3, 1])
-        col_opt_t.subheader("Ekstra Donanımlar Vitrini")
-        if col_opt_a.button("➕ YENİ DONANIM EKLE", type="primary", use_container_width=True):
+        col_opt_t.subheader(_m("opt_showcase"))
+        if col_opt_a.button(_m("add_opt"), type="primary", use_container_width=True):
             st.session_state.opt_form_loaded = False; st.session_state.view_mode = "opt_add"; st.rerun()
 
         st.markdown("---")
@@ -162,40 +253,40 @@ def show_list_view(user_role):
                         with cols[j].container(border=True):
                             img_b64 = get_image_base64(o_img)
                             if img_b64: st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:120px; object-fit:contain; margin-bottom:15px;"></div>', unsafe_allow_html=True)
-                            else: st.markdown("<div style='height:120px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:12px; margin-bottom:15px;'>Görsel Yok</div>", unsafe_allow_html=True)
+                            else: st.markdown(f"<div style='height:120px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:12px; margin-bottom:15px;'>{_m('no_img')}</div>", unsafe_allow_html=True)
                             
                             st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{o_name}'>{o_name}</h4>", unsafe_allow_html=True)
                             st.markdown(f"<div style='color:#64748b; font-size:12px; height:36px; overflow:hidden; margin-bottom:5px;'>{o_desc if o_desc else '-'}</div>", unsafe_allow_html=True)
                             
-                            # Fiyat kontrolü
                             if o_price > 0:
                                 st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>+{o_price:,.2f} USD</div>", unsafe_allow_html=True)
                             else:
-                                st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>Fiyat Bekleniyor</div>", unsafe_allow_html=True)
+                                st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
 
                             btn_c1, btn_c2, btn_c3 = st.columns(3)
-                            if btn_c1.button("✏️", key=f"oe_{safe_opt_id}"):
+                            if btn_c1.button(_m("btn_edit"), key=f"oe_{safe_opt_id}"):
                                 st.session_state.edit_opt_id = safe_opt_id
                                 st.session_state.opt_form_loaded = False
                                 st.session_state.view_mode = "opt_edit"; st.rerun()
-                            if btn_c2.button("📄", key=f"oc_{safe_opt_id}"):
+                            if btn_c2.button(_m("btn_copy"), key=f"oc_{safe_opt_id}"):
                                 o_data = get_factory("SELECT opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty FROM options WHERE id=?", (safe_opt_id,))[0]
                                 exec_factory("INSERT INTO options (opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty) VALUES (?,?,?,?,?,?)", (o_data[0] + " (Kopya)", o_data[1], o_data[2], o_data[3], o_data[4], o_data[5]))
                                 st.rerun()
-                            if btn_c3.button("🗑️", key=f"od_{safe_opt_id}"):
+                            if btn_c3.button(_m("btn_del"), key=f"od_{safe_opt_id}"):
                                 exec_factory("DELETE FROM options WHERE id=?", (safe_opt_id,)); st.rerun()
+        else: st.info(_m("no_opt"))
 
     with tab_cat:
         c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
-        c1.subheader("📂 Kategori Yönetimi")
+        c1.subheader(_m("cat_mng"))
         with c2.form("new_cat_form", clear_on_submit=True):
             cc1, cc2 = st.columns([3, 1])
-            n_cat = cc1.text_input("Yeni Kategori Ekle", label_visibility="collapsed", placeholder="Yeni Kategori Adı...")
-            if cc2.form_submit_button("➕ Ekle", use_container_width=True):
+            n_cat = cc1.text_input(_m("new_cat"), label_visibility="collapsed", placeholder=_m("new_cat_ph"))
+            if cc2.form_submit_button(_m("btn_add"), use_container_width=True):
                 if n_cat.strip():
                     try: 
                         exec_factory("INSERT INTO categories (name) VALUES (?)", (n_cat.strip(),)); st.rerun()
-                    except: st.error("Bu isimde bir kategori zaten mevcut!")
+                    except: st.error(_m("cat_exists"))
 
         st.markdown("---")
         cats = get_factory("SELECT id, name FROM categories ORDER BY name ASC")
@@ -207,23 +298,23 @@ def show_list_view(user_role):
                         cid, cname = cats[i+j]
                         with cols[j].container(border=True):
                             if st.session_state.get("edit_cat_id") == cid:
-                                new_cname = st.text_input("Yeni Ad", value=cname, key=f"inp_cat_{cid}", label_visibility="collapsed")
+                                new_cname = st.text_input(_m("new_name"), value=cname, key=f"inp_cat_{cid}", label_visibility="collapsed")
                                 bc1, bc2 = st.columns(2)
-                                if bc1.button("💾", key=f"save_cat_{cid}", use_container_width=True):
+                                if bc1.button(_m("save"), key=f"save_cat_{cid}", use_container_width=True):
                                     if new_cname.strip() and new_cname.strip() != cname:
                                         exec_factory("UPDATE categories SET name=? WHERE id=?", (new_cname.strip(), cid))
                                         exec_factory("UPDATE models SET category=? WHERE category=?", (new_cname.strip(), cname))
                                     st.session_state.edit_cat_id = None; st.rerun()
-                                if bc2.button("❌", key=f"cancel_cat_{cid}", use_container_width=True):
+                                if bc2.button(_m("cancel"), key=f"cancel_cat_{cid}", use_container_width=True):
                                     st.session_state.edit_cat_id = None; st.rerun()
                             else:
                                 st.markdown(f"<div style='text-align:center; padding:15px 0;'><span style='font-size:32px;'>📁</span><br><b style='color:#0f172a; font-size:16px;'>{cname}</b></div>", unsafe_allow_html=True)
                                 bc1, bc2 = st.columns(2)
-                                if bc1.button("✏️ Düzenle", key=f"ed_cat_{cid}", use_container_width=True):
+                                if bc1.button(_m("btn_edit_txt"), key=f"ed_cat_{cid}", use_container_width=True):
                                     st.session_state.edit_cat_id = cid; st.rerun()
-                                if bc2.button("🗑️ Sil", key=f"rm_cat_{cid}", use_container_width=True):
+                                if bc2.button(_m("btn_del_txt"), key=f"rm_cat_{cid}", use_container_width=True):
                                     exec_factory("DELETE FROM categories WHERE id=?", (cid,)); st.rerun()
-        else: st.info("Sistemde henüz bir kategori bulunmuyor.")
+        else: st.info(_m("no_cat"))
 
 
 # =====================================================================
@@ -231,11 +322,11 @@ def show_list_view(user_role):
 # =====================================================================
 def show_form_view(mode="add", mod_id=None, user_role="dealer"):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
-    if col_back.button("🔙 Listeye Dön", use_container_width=True):
+    if col_back.button(_m("back_list"), use_container_width=True):
         st.session_state.view_mode = "list"; st.rerun()
     
     is_edit = (mode == "edit" and mod_id is not None)
-    col_title.header("✏️ Makine Kartı Düzenleyici" if is_edit else "✨ Yeni Makine Kartı Oluştur")
+    col_title.header(_m("edit_mach") if is_edit else _m("new_mach"))
     st.markdown("---")
 
     if not st.session_state.get("form_loaded", False):
@@ -262,44 +353,42 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
             st.session_state.f_specs = [{"title": "", "detail": "", "img": ""}]
             st.session_state.f_opts = []
 
-    tab_genel, tab_teknik, tab_donanim = st.tabs(["📄 Genel Bilgiler", "⚙️ Teknik Özellikler", "🔌 Uyumlu Ekstra Donanımlar"])
+    tab_genel, tab_teknik, tab_donanim = st.tabs([_m("tab_gen"), _m("tab_tech"), _m("tab_comp")])
     
     with tab_genel:
         c1, c2 = st.columns([3, 1])
         with c1:
-            st.session_state.f_name = st.text_input("Makine Adı *", value=st.session_state.f_name)
+            st.session_state.f_name = st.text_input(_m("m_name"), value=st.session_state.f_name)
             idx_cat = st.session_state.f_cats_list.index(st.session_state.f_cat) if st.session_state.f_cat in st.session_state.f_cats_list else 0
-            st.session_state.f_cat = st.selectbox("Kategori", st.session_state.f_cats_list, index=idx_cat)
+            st.session_state.f_cat = st.selectbox(_m("m_cat"), st.session_state.f_cats_list, index=idx_cat)
             
-            # --- ROL BAZLI FİYAT KISITLAMASI ---
             if user_role == "manufacturer":
-                st.warning("🔒 Fiyat ve İskonto belirleme yetkiniz yoktur. Fiyatlandırma Yönetici tarafından yapılacaktır.")
-                # Mevcut değerleri arka planda korumak için seansları ezmiyoruz, sadece UI'da göstermiyoruz.
+                st.warning(_m("price_lock"))
                 st.session_state.f_price = st.session_state.get('f_price', 0.0)
                 st.session_state.f_disc = st.session_state.get('f_disc', 0.0)
                 st.session_state.f_curr = st.session_state.get('f_curr', 'USD')
             else:
                 col_p, col_c = st.columns([3, 1])
-                st.session_state.f_price = col_p.number_input("Yurtiçi Fiyat *", min_value=0.0, value=st.session_state.f_price, step=100.0)
+                st.session_state.f_price = col_p.number_input(_m("dom_price"), min_value=0.0, value=st.session_state.f_price, step=100.0)
                 idx_curr = ["USD", "EUR", "TRY"].index(st.session_state.f_curr) if st.session_state.f_curr in ["USD", "EUR", "TRY"] else 0
-                st.session_state.f_curr = col_c.selectbox("Para Birimi", ["USD", "EUR", "TRY"], index=idx_curr)
-                st.session_state.f_disc = st.number_input("Liman Teslim İskontosu (%)", min_value=0.0, max_value=100.0, value=st.session_state.f_disc)
+                st.session_state.f_curr = col_c.selectbox(_m("currency"), ["USD", "EUR", "TRY"], index=idx_curr)
+                st.session_state.f_disc = st.number_input(_m("port_disc"), min_value=0.0, max_value=100.0, value=st.session_state.f_disc)
             
-            st.file_uploader("Ana Görsel Dosyası", type=['png','jpg','jpeg'], key="up_main_img")
+            st.file_uploader(_m("main_img"), type=['png','jpg','jpeg'], key="up_main_img")
         with c2:
-            st.markdown("**Görsel Önizleme**")
+            st.markdown(_m("img_prev"))
             up_main = st.session_state.get("up_main_img")
             if up_main: st.image(up_main, use_container_width=True)
             else:
                 prev_img = get_image_base64(st.session_state.f_img)
                 if prev_img: st.markdown(f'<img src="{prev_img}" style="width:100%; height:auto; max-height:300px; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-                else: st.markdown("<div style='height:200px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border:2px dashed #cbd5e1; border-radius:8px; color:#94a3b8;'>Görsel Yok</div>", unsafe_allow_html=True)
+                else: st.markdown(f"<div style='height:200px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border:2px dashed #cbd5e1; border-radius:8px; color:#94a3b8;'>{_m('no_img')}</div>", unsafe_allow_html=True)
 
     with tab_teknik:
         for i in range(len(st.session_state.f_specs)):
             col_t, col_d, col_i, col_x = st.columns([2.5, 4, 3, 0.5], vertical_alignment="center")
-            st.session_state.f_specs[i]["title"] = col_t.text_input("Başlık", value=st.session_state.f_specs[i]["title"], key=f"t_{i}", label_visibility="collapsed")
-            st.session_state.f_specs[i]["detail"] = col_d.text_input("Detay", value=st.session_state.f_specs[i]["detail"], key=f"d_{i}", label_visibility="collapsed")
+            st.session_state.f_specs[i]["title"] = col_t.text_input(_m("spec_title"), value=st.session_state.f_specs[i]["title"], key=f"t_{i}", label_visibility="collapsed")
+            st.session_state.f_specs[i]["detail"] = col_d.text_input(_m("spec_det"), value=st.session_state.f_specs[i]["detail"], key=f"d_{i}", label_visibility="collapsed")
             with col_i:
                 c_prev, c_up = st.columns([1, 3], vertical_alignment="center")
                 up_spec = st.session_state.get(f"up_spec_{i}")
@@ -309,9 +398,9 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                     if cur_img:
                         b64 = get_image_base64(cur_img)
                         if b64: c_prev.markdown(f'<img src="{b64}" style="width:40px; height:40px; border-radius:4px; object-fit:contain;">', unsafe_allow_html=True)
-                c_up.file_uploader("Resim Seç", type=['png','jpg','jpeg'], key=f"up_spec_{i}", label_visibility="collapsed")
+                c_up.file_uploader(_m("choose_img"), type=['png','jpg','jpeg'], key=f"up_spec_{i}", label_visibility="collapsed")
             if col_x.button("❌", key=f"del_spec_{i}"): st.session_state.f_specs.pop(i); st.rerun()
-        if st.button("➕ YENİ ÖZELLİK SATIRI EKLE", use_container_width=True):
+        if st.button(_m("add_spec"), use_container_width=True):
             st.session_state.f_specs.append({"title": "", "detail": "", "img": ""}); st.rerun()
 
     with tab_donanim:
@@ -320,21 +409,20 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
         chk_cols = st.columns(3)
         for idx, opt in enumerate(opts_avail):
             o_id, o_name, o_price = opt
-            # Üreticiye fiyatı göstermeyebiliriz veya gösterebiliriz. Görmesinde sakınca yok.
-            p_text = f"(+{o_price:,.0f})" if o_price > 0 else "(Fiyat Bekliyor)"
+            p_text = f"(+{o_price:,.0f})" if o_price > 0 else f"({_m('price_wait')})"
             is_checked = str(o_id) in st.session_state.f_opts
             with chk_cols[idx % 3]:
                 if st.checkbox(f"{o_name} {p_text}", value=is_checked, key=f"chk_{o_id}"): new_opts.append(str(o_id))
         st.session_state.f_opts = new_opts
 
     st.markdown("---")
-    if st.button("💾 " + ("DEĞİŞİKLİKLERİ KAYDET" if is_edit else "MAKİNEYİ SİSTEME EKLE"), type="primary", use_container_width=True):
+    btn_save_text = _m("save_changes") if is_edit else _m("add_sys")
+    if st.button(btn_save_text, type="primary", use_container_width=True):
         
-        # Validation
         if not st.session_state.f_name: 
-            st.error("Lütfen makine adını girin!")
+            st.error(_m("err_name"))
         elif user_role != "manufacturer" and st.session_state.f_price <= 0:
-            st.error("Lütfen geçerli bir fiyat girin!")
+            st.error(_m("err_price"))
         else:
             up_main = st.session_state.get("up_main_img")
             if up_main is not None: 
@@ -361,9 +449,9 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
 # =====================================================================
 def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
-    if col_back.button("🔙 Listeye Dön", use_container_width=True): st.session_state.view_mode = "list"; st.rerun()
+    if col_back.button(_m("back_list"), use_container_width=True): st.session_state.view_mode = "list"; st.rerun()
     is_edit = (mode == "edit" and opt_id is not None)
-    col_title.header("✏️ Donanım Düzenle" if is_edit else "✨ Yeni Ekstra Donanım Ekle")
+    col_title.header(_m("edit_opt_title") if is_edit else _m("new_opt_title"))
     st.markdown("---")
 
     if not st.session_state.get("opt_form_loaded", False):
@@ -380,33 +468,33 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
     with st.container(border=True):
         c1, c2 = st.columns([3, 1])
         with c1:
-            st.session_state.o_name = st.text_input("Donanım Adı *", value=st.session_state.o_name)
+            st.session_state.o_name = st.text_input(_m("opt_name"), value=st.session_state.o_name)
             
-            # --- ROL BAZLI FİYAT KISITLAMASI ---
             if user_role == "manufacturer":
-                st.warning("🔒 Fiyatlandırma Yönetici tarafından yapılacaktır.")
+                st.warning(_m("opt_price_lock"))
                 st.session_state.o_price = st.session_state.get('o_price', 0.0)
             else:
-                st.session_state.o_price = st.number_input("Fiyat *", min_value=0.0, value=st.session_state.o_price, step=50.0)
+                st.session_state.o_price = st.number_input(_m("opt_price"), min_value=0.0, value=st.session_state.o_price, step=50.0)
             
-            st.session_state.o_allow_qty = st.checkbox("Bu donanım için adet seçimi yapılabilir", value=st.session_state.o_allow_qty, help="İşareti kaldırırsanız teklif hazırlarken adet sorulmaz, sistem otomatik 1 olarak hesaplar.")
-            st.session_state.o_desc = st.text_area("Açıklama", value=st.session_state.o_desc, height=120)
-            st.file_uploader("Donanım Görseli", type=['png','jpg','jpeg'], key="up_opt_img")
+            st.session_state.o_allow_qty = st.checkbox(_m("allow_qty"), value=st.session_state.o_allow_qty)
+            st.session_state.o_desc = st.text_area(_m("opt_desc"), value=st.session_state.o_desc, height=120)
+            st.file_uploader(_m("opt_img_up"), type=['png','jpg','jpeg'], key="up_opt_img")
             
         with c2:
-            st.markdown("**Görsel Önizleme**")
+            st.markdown(_m("img_prev"))
             up_opt = st.session_state.get("up_opt_img")
             if up_opt: st.image(up_opt, use_container_width=True)
             else:
                 prev_img = get_image_base64(st.session_state.o_img)
                 if prev_img: st.markdown(f'<img src="{prev_img}" style="width:100%; border-radius:8px;">', unsafe_allow_html=True)
 
-        if st.button("💾 " + ("DEĞİŞİKLİKLERİ KAYDET" if is_edit else "DONANIMI SİSTEME EKLE"), type="primary", use_container_width=True):
+        btn_save_opt_text = _m("save_changes") if is_edit else _m("add_sys")
+        if st.button("💾 " + btn_save_opt_text, type="primary", use_container_width=True):
             
             if not st.session_state.o_name: 
-                st.error("Donanım Adı zorunludur!")
+                st.error(_m("err_opt_name"))
             elif user_role != "manufacturer" and st.session_state.o_price <= 0:
-                st.error("Geçerli bir fiyat girmek zorunludur!")
+                st.error(_m("err_price"))
             else:
                 up_opt = st.session_state.get("up_opt_img")
                 if up_opt is not None: st.session_state.o_img = process_image(up_opt, prefix="opt", size=(400, 400), square=True)
