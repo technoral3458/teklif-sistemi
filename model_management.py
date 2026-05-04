@@ -188,22 +188,21 @@ def show_product_management():
 # =====================================================================
 def show_list_view(user_role):
     # =====================================================================
-    # MOBİL EKRANDA BUTONLARI YAN YANA TUTAN KESİN CSS ÇÖZÜMÜ
+    # NOKTA ATIŞI (CERRAHİ) CSS - SADECE 3 BUTONU HEDEFLER
     # =====================================================================
     st.markdown("""
     <style>
-    div[data-testid="stVerticalBlock"]:has(.card-btn-group) div[data-testid="stHorizontalBlock"] {
+    /* btn-marker etiketini bul, ondan hemen sonra gelen kolon dizisini yan yana kitle */
+    div.element-container:has(.btn-marker) + div[data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 0.3rem !important;
-        justify-content: center !important;
+        gap: 0.5rem !important;
     }
-    div[data-testid="stVerticalBlock"]:has(.card-btn-group) div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    div.element-container:has(.btn-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
         width: 33.33% !important;
-        min-width: 33.33% !important;
+        min-width: 0 !important;
         flex: 1 1 0% !important;
-        padding: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -243,8 +242,8 @@ def show_list_view(user_role):
                                     else:
                                         st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
                                         
-                                    # CSS HİLESİNİ TETİKLEYEN GİZLİ ETİKET
-                                    st.markdown('<span class="card-btn-group"></span>', unsafe_allow_html=True)
+                                    # CSS HİLESİNİ TETİKLEYEN GİZLİ NOKTA (SADECE BU 3 BUTONU YAN YANA KİTLER)
+                                    st.markdown('<span class="btn-marker"></span>', unsafe_allow_html=True)
                                     
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
                                     if btn_c1.button(_m("btn_edit"), key=f"me_{safe_mod_id}", use_container_width=True):
@@ -287,8 +286,8 @@ def show_list_view(user_role):
                             else:
                                 st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:12px; margin-bottom:15px; padding:2px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
 
-                            # CSS HİLESİNİ TETİKLEYEN GİZLİ ETİKET
-                            st.markdown('<span class="card-btn-group"></span>', unsafe_allow_html=True)
+                            # CSS HİLESİNİ TETİKLEYEN GİZLİ NOKTA
+                            st.markdown('<span class="btn-marker"></span>', unsafe_allow_html=True)
                             
                             btn_c1, btn_c2, btn_c3 = st.columns(3)
                             if btn_c1.button(_m("btn_edit"), key=f"oe_{safe_opt_id}", use_container_width=True):
