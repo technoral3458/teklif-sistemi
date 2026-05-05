@@ -203,10 +203,14 @@ def show_offer_wizard(user_id, is_admin=False):
             padding-right: 0.5rem !important; 
             max-width: 100% !important; 
         }
+
+        /* Klavyeyi engeller */
         div[data-baseweb="select"] input { 
             caret-color: transparent !important; 
             inputmode: none !important;
         }
+        
+        /* Kibar Kutu Tasarımı */
         div.st-emotion-cache-1jicfl2 { 
             border-radius: 12px !important;
             border: 1px solid #e2e8f0 !important;
@@ -224,13 +228,14 @@ def show_offer_wizard(user_id, is_admin=False):
     <script>
     function disableMobileKeyboard() {
         var inputs = window.parent.document.querySelectorAll('div[data-baseweb="select"] input');
-        inputs.forEach(function(inp) { inp.setAttribute('inputmode', 'none'); });
+        inputs.forEach(function(inp) {
+            inp.setAttribute('inputmode', 'none'); 
+        });
     }
     setInterval(disableMobileKeyboard, 300);
     </script>
     """, height=0, width=0)
 
-    # Sistemdeki müşterileri çek
     my_custs = get_sales("SELECT id, company_name FROM customers WHERE user_id=? ORDER BY company_name ASC", (user_id,)) if not is_admin else get_sales("SELECT id, company_name FROM customers ORDER BY company_name ASC")
     if my_custs is None: my_custs = []
 
@@ -338,7 +343,7 @@ def show_offer_wizard(user_id, is_admin=False):
         with st.expander("📝 Şartları Görüntüle / Düzenle", expanded=False):
             del_types = ["Gümrük İşlemleri Yapılmış Antrepo Teslim", "Limandan Devir", "Yurtiçi Teslim (Standart)"]
             saved_del_type = st.session_state.get("temp_del_type", "Gümrük İşlemleri Yapılmış Antrepo Teslim")
-            idx_d = del_types.index(saved_del_type) if saved_del_type in del_types else 0
+            idx_d = get_index(del_types, saved_del_type, default=0)
 
             d_type = st.selectbox("Teslimat Şekli", del_types, index=idx_d, key="temp_del_type")
             d_time = st.text_input("Teslim Süresi", wd.get("d_time", "Sipariş onayından itibaren 90 iş günü"))
