@@ -82,21 +82,30 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     logo_b64 = get_image_base64(comp_logo)
     header_logo_html = f'<img src="{logo_b64}" style="max-height:70px; width:auto; object-fit:contain;">' if logo_b64 else f'<div style="font-size:22px; font-weight:900; color:#1e293b;">{comp_name}</div>'
 
-    # SİZİN İÇİN DÜZELTİLEN BÖLÜM: Arka plan beyaz yapıldı, gölgeler ve boşluklar sıfırlandı, A4 ölçüleri sabitlendi.
+    # SİZİN İÇİN DÜZELTİLEN BÖLÜM: Mobil Ekranlar (600px altı) için özel daralma payları eklendi.
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; font-size: 14px; color: #1e293b; background: #ffffff; margin:0; padding:0; display: flex; flex-direction: column; align-items: center; }
         .paper { background: #fff; width: 100%; max-width: 794px; min-height: 1123px; padding: 40px; border: 1px solid #e2e8f0; border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; margin: 0 auto 40px auto; }
         .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .section-title { background: #f8fafc; color: #0f172a; padding: 10px 15px; font-weight: 800; font-size: 14px; margin-top: 30px; border-left: 5px solid #2563eb; text-transform: uppercase; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; word-wrap: break-word; }
-        th, td { border-bottom: 1px solid #f1f5f9; padding: 12px; text-align: left; vertical-align: middle; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border-bottom: 1px solid #f1f5f9; padding: 12px; text-align: left; vertical-align: middle; word-wrap: break-word; }
         .price-box { background: #fffbeb; border: 1px solid #fde68a; padding: 20px; text-align: right; margin-top: 35px; border-radius: 6px; }
         .total-price { font-size: 30px; font-weight: 900; color: #ea580c; word-break: break-all; }
         .elegant-conditions { margin-top: 35px; background: #f8fafc; padding: 20px; border-left: 5px solid #eab308; }
         .print-btn-container { width: 100%; max-width: 794px; margin: 15px auto; text-align: center; }
         .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; }
         .footer-info { margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px; }
+        
+        /* MOBİL EKRANLAR İÇİN DÜZELTMELER (Görüntülerin üst üste binmesini engeller) */
+        @media screen and (max-width: 600px) {
+            .paper { padding: 15px; border-left: none; border-right: none; }
+            th, td { padding: 8px 4px; font-size: 12px; }
+            .section-title { font-size: 12px; padding: 8px 10px; }
+            .total-price { font-size: 22px; }
+        }
+        
         @media print { .no-print { display: none !important; } .paper { border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; min-height: auto; } body { background: #fff; padding: 0; } .page-break { page-break-before: always; } }
     """
 
@@ -128,7 +137,8 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             t_spec = parts[0].strip() if len(parts) > 0 else ""
             d_spec = parts[1].strip() if len(parts) > 1 else ""
             img_b64 = get_image_base64(parts[2].strip() if len(parts)>2 else "")
-            img_tag = f'<img src="{img_b64}" style="max-width:140px; max-height:80px; width:auto; height:auto; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if img_b64 else "<span style='color:#cbd5e1;'>-</span>"
+            # RESİM max-width: 100% YAPILDI. BÖYLECE ASLA YAZIYA TAŞAMAZ.
+            img_tag = f'<img src="{img_b64}" style="max-width:100%; max-height:80px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if img_b64 else "<span style='color:#cbd5e1;'>-</span>"
             html += f'<tr><td style="width:25%; text-align:center; vertical-align:middle;">{img_tag}</td><td style="width:75%; vertical-align:middle;"><b>{t_spec}</b><br><small style="color:#64748b; font-size:13px;">{d_spec}</small></td></tr>'
         html += "</table>"
 
@@ -138,7 +148,8 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             <table><tr style="background:#f8fafc;"><th style="width:25%; text-align:center;">Görsel</th><th style="width:40%;">Açıklama</th><th style="width:10%; text-align:center;">Adet</th><th style="width:25%; text-align:right;">Tutar</th></tr>"""
         for opt in selected_options:
             opt_img_b64 = get_image_base64(opt["i"])
-            opt_img_tag = f'<img src="{opt_img_b64}" style="max-width:140px; max-height:80px; width:auto; height:auto; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
+            # RESİM max-width: 100% YAPILDI. BÖYLECE ASLA YAZIYA TAŞAMAZ.
+            opt_img_tag = f'<img src="{opt_img_b64}" style="max-width:100%; max-height:80px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
             html += f"<tr><td style='text-align:center; vertical-align:middle;'>{opt_img_tag}</td><td style='vertical-align:middle;'><b style='color:#2563eb; font-size:14px;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.3; margin-top:4px; color:#475569;'>{opt['d']}</small></td><td style='text-align:center; vertical-align:middle;'>{opt['q']}</td><td style='text-align:right; font-weight:bold; font-size:15px; vertical-align:middle;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
         html += "</table>"
 
@@ -180,22 +191,17 @@ def show_offer_wizard(user_id, is_admin=False):
     # =====================================================================
     st.markdown("""
         <style>
-        /* 1. Kırmızı ile çizdiğiniz en üstteki devasa boşluğu ve gizli menüyü yok eder */
-        header[data-testid="stHeader"] {
-            display: none !important;
-        }
-        div[data-testid="stToolbar"] {
-            display: none !important;
-        }
+        header[data-testid="stHeader"] { display: none !important; }
+        div[data-testid="stToolbar"] { display: none !important; }
         .block-container {
-            padding-top: 0rem !important; /* Üst Boşluk Sıfırlandı */
+            padding-top: 0rem !important; 
             padding-bottom: 0rem !important;
-            padding-left: 0.5rem !important; /* Sol Boşluk Neredeyse Sıfırlandı */
-            padding-right: 0.5rem !important; /* Sağ Boşluk Neredeyse Sıfırlandı */
-            max-width: 100% !important; /* Tam Ekran Genişliği */
+            padding-left: 0.5rem !important; 
+            padding-right: 0.5rem !important; 
+            max-width: 100% !important; 
         }
 
-        /* 2. Klavyeyi tetikleyen imleci ve yazma özelliğini gizle (Seçim Bozulmaz) */
+        /* Klavyeyi tetikleyen imleci ve yazma özelliğini gizle (Seçim Bozulmaz) */
         div[data-baseweb="select"] input { 
             caret-color: transparent !important; 
             inputmode: none !important;
@@ -237,7 +243,7 @@ def show_offer_wizard(user_id, is_admin=False):
     is_edit = 'edit_offer_id' in st.session_state
     wd = st.session_state.get('wizard_data', {})
 
-    col_opt, col_prev = st.columns([1.6, 2.4], gap="small") # Gap daraltıldı, A4 Raporuna geniş yer açıldı
+    col_opt, col_prev = st.columns([1.6, 2.4], gap="small")
 
     with col_opt:
         if is_edit:
@@ -254,7 +260,6 @@ def show_offer_wizard(user_id, is_admin=False):
         
         with st.container(border=True):
             
-            # --- SAHTE SEÇENEK İLE TERTEMİZ BAŞLANGIÇ ---
             CUST_PROMPT = "Lütfen Müşteri Seçiniz..."
             MACH_PROMPT = "Lütfen Makine Modeli Seçiniz..."
 
@@ -287,13 +292,11 @@ def show_offer_wizard(user_id, is_admin=False):
             
             m_qty = st.number_input("Makine Adedi", 1, 100, wd.get("qty", 1))
 
-        # --- EĞER LÜTFEN SEÇİNİZ YAZIYORSA AŞAĞIYI GİZLE ---
         if sel_cust == CUST_PROMPT or sel_m == MACH_PROMPT:
             with col_prev:
                 st.info("💡 Teklif detaylarını ve A4 raporunu görmek için lütfen yandaki panelden Müşteri ve Makine seçimi yapınız.")
             return
 
-        # SADECE GERÇEK BİR FİRMA VE MAKİNE SEÇİLİNCE BURADAN AŞAĞISI ÇALIŞIR
         cust_id = [c[0] for c in my_custs if c[1] == sel_cust][0]
         m_info = next(m for m in machines if m[1] == sel_m)
         m_id, m_name, m_price, m_opts_str, m_img, m_specs, m_disc, m_curr = m_info
@@ -410,7 +413,5 @@ def show_offer_wizard(user_id, is_admin=False):
     with col_prev:
         st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 A4 RAPOR ÖNİZLEMESİ</div>", unsafe_allow_html=True)
         html = generate_embedded_html(sel_cust, m_name, m_price*multiplier, m_img, m_specs, engine_options_list, conds, m_curr, user_id)
-        
-        # HTML İçeriğini Scroll Olamayan Bir Kutuda Gösterir (A4 Direk Ekrana Yayılır)
         with st.container(border=True): 
             components.html(html, height=1200, scrolling=True)
