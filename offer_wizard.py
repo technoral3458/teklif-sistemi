@@ -82,7 +82,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     logo_b64 = get_image_base64(comp_logo)
     header_logo_html = f'<img src="{logo_b64}" style="max-height:70px; width:auto; object-fit:contain;">' if logo_b64 else f'<div style="font-size:22px; font-weight:900; color:#1e293b;">{comp_name}</div>'
 
-    # SİZİN İÇİN DÜZELTİLEN BÖLÜM: Mobil Ekranlar (600px altı) için özel daralma payları eklendi.
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; font-size: 14px; color: #1e293b; background: #ffffff; margin:0; padding:0; display: flex; flex-direction: column; align-items: center; }
@@ -94,13 +93,12 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         .price-box { background: #fffbeb; border: 1px solid #fde68a; padding: 20px; text-align: right; margin-top: 35px; border-radius: 6px; }
         .total-price { font-size: 30px; font-weight: 900; color: #ea580c; word-break: break-all; }
         .elegant-conditions { margin-top: 35px; background: #f8fafc; padding: 20px; border-left: 5px solid #eab308; }
-        .print-btn-container { width: 100%; max-width: 794px; margin: 15px auto; text-align: center; }
+        .print-btn-container { width: 100%; max-width: 794px; margin: 0 auto 40px auto; text-align: center; }
         .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; }
         .footer-info { margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px; }
         
-        /* MOBİL EKRANLAR İÇİN DÜZELTMELER (Görüntülerin üst üste binmesini engeller) */
         @media screen and (max-width: 600px) {
-            .paper { padding: 15px; border-left: none; border-right: none; }
+            .paper { padding: 15px; border-left: none; border-right: none; margin-bottom: 20px; }
             th, td { padding: 8px 4px; font-size: 12px; }
             .section-title { font-size: 12px; padding: 8px 10px; }
             .total-price { font-size: 22px; }
@@ -118,7 +116,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
 
     html = f"""
     <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><body>
-        <div class="no-print print-btn-container"><button class="print-btn" onclick="window.print()">🖨️ PDF OLARAK KAYDET / YAZDIR</button></div>
         <div class="paper">
             {page_header_html}
             <div style="text-align:center; padding: 15px 0;">
@@ -137,7 +134,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             t_spec = parts[0].strip() if len(parts) > 0 else ""
             d_spec = parts[1].strip() if len(parts) > 1 else ""
             img_b64 = get_image_base64(parts[2].strip() if len(parts)>2 else "")
-            # RESİM max-width: 100% YAPILDI. BÖYLECE ASLA YAZIYA TAŞAMAZ.
             img_tag = f'<img src="{img_b64}" style="max-width:100%; max-height:80px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if img_b64 else "<span style='color:#cbd5e1;'>-</span>"
             html += f'<tr><td style="width:25%; text-align:center; vertical-align:middle;">{img_tag}</td><td style="width:75%; vertical-align:middle;"><b>{t_spec}</b><br><small style="color:#64748b; font-size:13px;">{d_spec}</small></td></tr>'
         html += "</table>"
@@ -148,7 +144,6 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             <table><tr style="background:#f8fafc;"><th style="width:25%; text-align:center;">Görsel</th><th style="width:40%;">Açıklama</th><th style="width:10%; text-align:center;">Adet</th><th style="width:25%; text-align:right;">Tutar</th></tr>"""
         for opt in selected_options:
             opt_img_b64 = get_image_base64(opt["i"])
-            # RESİM max-width: 100% YAPILDI. BÖYLECE ASLA YAZIYA TAŞAMAZ.
             opt_img_tag = f'<img src="{opt_img_b64}" style="max-width:100%; max-height:80px; object-fit:contain; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' if opt_img_b64 else "<span style='color:#cbd5e1;'>-</span>"
             html += f"<tr><td style='text-align:center; vertical-align:middle;'>{opt_img_tag}</td><td style='vertical-align:middle;'><b style='color:#2563eb; font-size:14px;'>+ {opt['n']}</b><br><small style='display:block; line-height:1.3; margin-top:4px; color:#475569;'>{opt['d']}</small></td><td style='text-align:center; vertical-align:middle;'>{opt['q']}</td><td style='text-align:right; font-weight:bold; font-size:15px; vertical-align:middle;'>{(opt['p']*opt['q']):,.2f} {m_currency}</td></tr>"
         html += "</table>"
@@ -173,7 +168,11 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
             <div class="total-price">{agreed_price:,.2f} {m_currency}</div>
         </div>
         <div class="footer-info">{comp_adr} | {comp_tel}</div>
-        </div></body></html>"""
+        </div>
+        
+        <div class="no-print print-btn-container"><button class="print-btn" onclick="window.print()">🖨️ PDF KAYDET</button></div>
+        
+        </body></html>"""
     
     return html
 
@@ -186,9 +185,6 @@ def get_index(lst, item, default=None):
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
-    # =====================================================================
-    # 🚀 TAM EKRAN, ÜST BOŞLUK SIFIRLAMA VE GİZLİ MENÜLERİ YOK ETME 🚀
-    # =====================================================================
     st.markdown("""
         <style>
         header[data-testid="stHeader"] { display: none !important; }
@@ -201,7 +197,7 @@ def show_offer_wizard(user_id, is_admin=False):
             max-width: 100% !important; 
         }
 
-        /* Klavyeyi tetikleyen imleci ve yazma özelliğini gizle (Seçim Bozulmaz) */
+        /* Klavyeyi engeller */
         div[data-baseweb="select"] input { 
             caret-color: transparent !important; 
             inputmode: none !important;
@@ -221,7 +217,6 @@ def show_offer_wizard(user_id, is_admin=False):
         </style>
     """, unsafe_allow_html=True)
     
-    # Mobilde ekstra güvenlik için klavye tetikleyicisini nötralize eden ajan
     components.html("""
     <script>
     function disableMobileKeyboard() {
@@ -385,7 +380,7 @@ def show_offer_wizard(user_id, is_admin=False):
                 "discount_pct": disc_p, "is_manual": use_manual
             }
 
-            btn_txt = "💾 TEKLİFİ GÜNCELLE" if is_edit else "💾 TEKLİFİ OLUŞTUR VE ARŞİVLE"
+            btn_txt = "💾 GÜNCELLE" if is_edit else "💾 KAYDET"
             if st.button(btn_txt, type="primary", use_container_width=True):
                 try:
                     tarih = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
