@@ -82,10 +82,11 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     logo_b64 = get_image_base64(comp_logo)
     header_logo_html = f'<img src="{logo_b64}" style="max-height:70px; width:auto; object-fit:contain;">' if logo_b64 else f'<div style="font-size:22px; font-weight:900; color:#1e293b;">{comp_name}</div>'
 
+    # SİZİN İÇİN DÜZELTİLEN BÖLÜM: Arka plan beyaz yapıldı, gölgeler ve boşluklar sıfırlandı, A4 ölçüleri sabitlendi.
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-        body { font-family: 'Inter', sans-serif; font-size: 14px; color: #1e293b; background: #cbd5e1; margin:0; padding:15px; display: flex; flex-direction: column; align-items: center; }
-        .paper { background: #fff; width: 100%; max-width: 850px; min-height: 1120px; padding: 6%; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; margin-bottom: 40px; }
+        body { font-family: 'Inter', sans-serif; font-size: 14px; color: #1e293b; background: #ffffff; margin:0; padding:0; display: flex; flex-direction: column; align-items: center; }
+        .paper { background: #fff; width: 100%; max-width: 794px; min-height: 1123px; padding: 40px; border: 1px solid #e2e8f0; border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; margin: 0 auto 40px auto; }
         .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .section-title { background: #f8fafc; color: #0f172a; padding: 10px 15px; font-weight: 800; font-size: 14px; margin-top: 30px; border-left: 5px solid #2563eb; text-transform: uppercase; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; word-wrap: break-word; }
@@ -93,9 +94,10 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
         .price-box { background: #fffbeb; border: 1px solid #fde68a; padding: 20px; text-align: right; margin-top: 35px; border-radius: 6px; }
         .total-price { font-size: 30px; font-weight: 900; color: #ea580c; word-break: break-all; }
         .elegant-conditions { margin-top: 35px; background: #f8fafc; padding: 20px; border-left: 5px solid #eab308; }
-        .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; max-width: 850px; margin-bottom: 20px; font-weight: bold; }
+        .print-btn-container { width: 100%; max-width: 794px; margin: 15px auto; text-align: center; }
+        .print-btn { background: #10b981; color: white; border: none; padding: 15px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; }
         .footer-info { margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px; }
-        @media print { .no-print { display: none !important; } .paper { box-shadow: none; border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; min-height: auto; } body { background: #fff; padding: 0; } .page-break { page-break-before: always; } }
+        @media print { .no-print { display: none !important; } .paper { border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; min-height: auto; } body { background: #fff; padding: 0; } .page-break { page-break-before: always; } }
     """
 
     page_header_html = f"""
@@ -107,7 +109,7 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
 
     html = f"""
     <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><body>
-        <div class="no-print"><button class="print-btn" onclick="window.print()">🖨️ PDF OLARAK KAYDET / YAZDIR</button></div>
+        <div class="no-print print-btn-container"><button class="print-btn" onclick="window.print()">🖨️ PDF OLARAK KAYDET / YAZDIR</button></div>
         <div class="paper">
             {page_header_html}
             <div style="text-align:center; padding: 15px 0;">
@@ -174,18 +176,26 @@ def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
     # =====================================================================
-    # 🚀 TAM EKRAN VE BOŞLUK SIFIRLAMA CSS & KLAVYE GARDİYANI 🚀
+    # 🚀 TAM EKRAN, ÜST BOŞLUK SIFIRLAMA VE GİZLİ MENÜLERİ YOK ETME 🚀
     # =====================================================================
     st.markdown("""
         <style>
-        /* SİZİN İSTEĞİNİZ: SAĞ VE SOL BOŞLUKLARI SIFIRLA, EKRANI TAM KAPLA */
+        /* 1. Kırmızı ile çizdiğiniz en üstteki devasa boşluğu ve gizli menüyü yok eder */
+        header[data-testid="stHeader"] {
+            display: none !important;
+        }
+        div[data-testid="stToolbar"] {
+            display: none !important;
+        }
         .block-container {
-            padding-left: 0.5rem !important;
-            padding-right: 0.5rem !important;
-            max-width: 100% !important;
+            padding-top: 0rem !important; /* Üst Boşluk Sıfırlandı */
+            padding-bottom: 0rem !important;
+            padding-left: 0.5rem !important; /* Sol Boşluk Neredeyse Sıfırlandı */
+            padding-right: 0.5rem !important; /* Sağ Boşluk Neredeyse Sıfırlandı */
+            max-width: 100% !important; /* Tam Ekran Genişliği */
         }
 
-        /* Klavyeyi tetikleyen imleci ve yazma özelliğini gizle */
+        /* 2. Klavyeyi tetikleyen imleci ve yazma özelliğini gizle (Seçim Bozulmaz) */
         div[data-baseweb="select"] input { 
             caret-color: transparent !important; 
             inputmode: none !important;
@@ -227,7 +237,7 @@ def show_offer_wizard(user_id, is_admin=False):
     is_edit = 'edit_offer_id' in st.session_state
     wd = st.session_state.get('wizard_data', {})
 
-    col_opt, col_prev = st.columns([1.6, 2.4], gap="small") # Gap daraltıldı, önizlemeye yer açıldı
+    col_opt, col_prev = st.columns([1.6, 2.4], gap="small") # Gap daraltıldı, A4 Raporuna geniş yer açıldı
 
     with col_opt:
         if is_edit:
@@ -393,12 +403,14 @@ def show_offer_wizard(user_id, is_admin=False):
                             for item in selected_options_for_db: 
                                 exec_sales("INSERT INTO offer_items (offer_id, option_id, quantity) VALUES (?,?,?)", 
                                            (res_id[0][0], item["id"], item["qty"]))
-                        st.success("Başarıyla Arşivlendi! Tekliflerinizden PDF çıktısını alabilirsiniz.")
+                        st.success("Başarıyla Arşivlendi!")
                     st.balloons()
                 except Exception as e: st.error(f"Kayıt Hatası: {e}")
 
     with col_prev:
         st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 A4 RAPOR ÖNİZLEMESİ</div>", unsafe_allow_html=True)
         html = generate_embedded_html(sel_cust, m_name, m_price*multiplier, m_img, m_specs, engine_options_list, conds, m_curr, user_id)
+        
+        # HTML İçeriğini Scroll Olamayan Bir Kutuda Gösterir (A4 Direk Ekrana Yayılır)
         with st.container(border=True): 
-            components.html(html, height=850, scrolling=True)
+            components.html(html, height=1200, scrolling=True)
