@@ -32,7 +32,6 @@ def get_user_query(query, params=()):
     return res
 
 def init_wizard_tables():
-    # Güvenlik: Eğer customers tablosu veya sütunları yoksa otomatik oluştur
     exec_sales("""CREATE TABLE IF NOT EXISTS customers (
         id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, authorized_person TEXT, phone TEXT, email TEXT, address_full TEXT, user_id INTEGER DEFAULT 1)""")
     exec_sales("""CREATE TABLE IF NOT EXISTS offer_items (
@@ -186,6 +185,9 @@ def generate_embedded_html(customer, model, base_price, machine_img, specs, sele
     
     return html
 
+def get_index(lst, item, default=None):
+    return lst.index(item) if item in lst else default
+
 # =====================================================================
 # ANA SİHİRBAZ EKRANI
 # =====================================================================
@@ -203,14 +205,10 @@ def show_offer_wizard(user_id, is_admin=False):
             padding-right: 0.5rem !important; 
             max-width: 100% !important; 
         }
-
-        /* Klavyeyi engeller */
         div[data-baseweb="select"] input { 
             caret-color: transparent !important; 
             inputmode: none !important;
         }
-        
-        /* Kibar Kutu Tasarımı */
         div.st-emotion-cache-1jicfl2 { 
             border-radius: 12px !important;
             border: 1px solid #e2e8f0 !important;
@@ -228,14 +226,13 @@ def show_offer_wizard(user_id, is_admin=False):
     <script>
     function disableMobileKeyboard() {
         var inputs = window.parent.document.querySelectorAll('div[data-baseweb="select"] input');
-        inputs.forEach(function(inp) {
-            inp.setAttribute('inputmode', 'none'); 
-        });
+        inputs.forEach(function(inp) { inp.setAttribute('inputmode', 'none'); });
     }
     setInterval(disableMobileKeyboard, 300);
     </script>
     """, height=0, width=0)
 
+    # Sistemdeki müşterileri çek
     my_custs = get_sales("SELECT id, company_name FROM customers WHERE user_id=? ORDER BY company_name ASC", (user_id,)) if not is_admin else get_sales("SELECT id, company_name FROM customers ORDER BY company_name ASC")
     if my_custs is None: my_custs = []
 
@@ -262,6 +259,7 @@ def show_offer_wizard(user_id, is_admin=False):
             NEW_CUST_OPT = "➕ YENİ MÜŞTERİ EKLE"
             MACH_PROMPT = "Lütfen Makine Modeli Seçiniz..."
 
+            # MÜŞTERİ LİSTESİNİ OLUŞTURUYORUZ (EN ÜSTTE YENİ MÜŞTERİ EKLE VAR)
             c_names = [CUST_PROMPT, NEW_CUST_OPT] + [c[1] for c in my_custs]
             
             # Yeni müşteri eklendiyse otomatik onu seç
@@ -271,7 +269,8 @@ def show_offer_wizard(user_id, is_admin=False):
             else:
                 idx_c = c_names.index(wd.get("cust_name")) if wd.get("cust_name") in c_names else 0
             
-            sel_cust = st.selectbox("Teklif Verilecek Müşteri", c_names, index=idx_c)
+            # ANAHTAR DEĞİŞTİRİLDİ (CACHE SIFIRLANDI)
+            sel_cust = st.selectbox("Teklif Verilecek Müşteri", options=c_names, index=idx_c, key="customer_select_v_force_new")
 
             # EĞER KULLANICI "YENİ MÜŞTERİ EKLE" SEÇTİYSE MAKİNE SEÇİMİNİ GİZLE VE FORMU AÇ
             if sel_cust == NEW_CUST_OPT:
@@ -302,7 +301,7 @@ def show_offer_wizard(user_id, is_admin=False):
                 # NORMAL AKIŞ: Müşteri seçiliyken Makine Seçimi Açılır
                 cats = ["Tüm Kategoriler"] + [c[0] for c in get_factory("SELECT name FROM categories ORDER BY name ASC")]
                 idx_cat = cats.index(wd.get("category")) if wd.get("category") in cats else 0
-                sel_cat = st.selectbox("Kategori Filtresi", cats, index=idx_cat)
+                sel_cat = st.selectbox("Kategori Filtresi", cats, index=idx_cat, key="cat_filter_force_new")
 
                 m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount, currency FROM models"
                 m_params = []
@@ -318,9 +317,11 @@ def show_offer_wizard(user_id, is_admin=False):
 
                 m_names = [MACH_PROMPT] + [m[1] for m in machines]
                 idx_m = m_names.index(wd.get("m_name")) if wd.get("m_name") in m_names else 0
-                sel_m = st.selectbox("Makine Modeli", m_names, index=idx_m)
                 
-                m_qty = st.number_input("Makine Adedi", 1, 100, wd.get("qty", 1))
+                # ANAHTAR DEĞİŞTİRİLDİ (CACHE SIFIRLANDI)
+                sel_m = st.selectbox("Makine Modeli", options=m_names, index=idx_m, key="machine_select_v_force_new")
+                
+                m_qty = st.number_input("Makine Adedi", 1, 100, wd.get("qty", 1), key="qty_force_new")
 
         # --- YENİ MÜŞTERİ EKLENİYORKEN YANDAKİ A4 RAPORUNU GİZLE ---
         if sel_cust == NEW_CUST_OPT:
