@@ -7,7 +7,7 @@ import pandas as pd
 # =====================================================================
 DICT_DEALER = {
     "tr": {
-        "title": "🏢 Bayi ve Üretici Yönetimi (V2 GÜNCEL)",
+        "title": "🏢 Bayi ve Üretici Yönetimi",
         "search_ph": "🔍 Kullanıcı Ara (Firma Adı, E-Posta veya Telefon ile)",
         "no_user": "Sistemde henüz kayıtlı kullanıcı bulunmuyor.",
         "no_match": "Arama kriterinize uygun kullanıcı bulunamadı.",
@@ -21,7 +21,7 @@ DICT_DEALER = {
         "type_dealer": "Satıcı (Bayi)", "type_prod": "Üretici", "type_admin": "Yönetici",
         "cat_title": "📦 Satıcının Teklif Verebileceği Kategoriler (Filtre):",
         "cat_help": "Satış yapmasına izin verilen makine kategorilerini seçin:",
-        "cat_warn": "💡 SADECE Satıcı (Bayi) rolü için geçerlidir. Yönetici ve Üreticilerde bu ayar dikkate alınmaz.",
+        "cat_warn": "💡 SADECE Satıcı (Bayi) rolü için geçerlidir.",
         "menu_title": "🔑 Kullanıcının Görüntüleyebileceği Sayfa Menüleri:",
         "btn_update": "🔄 BİLGİLERİ VE YETKİLERİ GÜNCELLE",
         "toast_upd": "yetkileri güncellendi!",
@@ -33,7 +33,7 @@ DICT_DEALER = {
         "m_deal": "🏢 Bayi / Kullanıcı Yönetimi", "m_prof": "⚙️ Profil Ayarlarım"
     },
     "en": {
-        "title": "🏢 Dealer and Manufacturer Management (V2 UPDATED)",
+        "title": "🏢 Dealer and Manufacturer Management",
         "search_ph": "🔍 Search User (by Company, Email or Phone)",
         "no_user": "No registered users found in the system.",
         "no_match": "No users match your search criteria.",
@@ -47,7 +47,7 @@ DICT_DEALER = {
         "type_dealer": "Dealer", "type_prod": "Producer", "type_admin": "Admin",
         "cat_title": "📦 Allowed Categories for Dealer (Filter):",
         "cat_help": "Select allowed machine categories for sales:",
-        "cat_warn": "💡 Applies ONLY to Dealers. Ignored for Admins and Producers.",
+        "cat_warn": "💡 Applies ONLY to Dealers.",
         "menu_title": "🔑 Accessible Page Menus for User:",
         "btn_update": "🔄 UPDATE INFO & PERMISSIONS",
         "toast_upd": "permissions updated!",
@@ -59,7 +59,7 @@ DICT_DEALER = {
         "m_deal": "🏢 Dealer / User Management", "m_prof": "⚙️ Profile Settings"
     },
     "zh": {
-        "title": "🏢 经销商和制造商管理 (V2 更新)",
+        "title": "🏢 经销商和制造商管理",
         "search_ph": "🔍 搜索用户 (按公司、电子邮件或电话)",
         "no_user": "系统中尚未找到注册用户。",
         "no_match": "未找到符合搜索条件的用户。",
@@ -73,7 +73,7 @@ DICT_DEALER = {
         "type_dealer": "经销商", "type_prod": "制造商", "type_admin": "管理员",
         "cat_title": "📦 经销商允许的类别 (过滤器):",
         "cat_help": "选择允许销售的机器类别:",
-        "cat_warn": "💡 仅适用于经销商。对管理员和制造商无效。",
+        "cat_warn": "💡 仅适用于经销商。",
         "menu_title": "🔑 用户可访问的页面菜单:",
         "btn_update": "🔄 更新信息和权限",
         "toast_upd": "权限已更新！",
@@ -118,7 +118,6 @@ def show_dealer_management():
     search_query = st.text_input(_m("search_ph"), placeholder=_m("search_ph"))
     st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
     
-    # --- KATEGORİ LİSTESİNİ ÇEK ---
     try:
         conn_fact = sqlite3.connect('factory_data.db')
         c_cats = conn_fact.execute("SELECT name FROM categories ORDER BY name ASC").fetchall()
@@ -127,7 +126,6 @@ def show_dealer_management():
     except Exception as e:
         all_categories = []
 
-    # --- KULLANICI VERİLERİNİ ÇEK ---
     conn = sqlite3.connect('users.db')
     try:
         users = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role, allowed_categories FROM users ORDER BY id DESC").fetchall()
@@ -136,7 +134,6 @@ def show_dealer_management():
         users = [(*u, "") for u in users_old]
     conn.close()
     
-    # --- SATIŞ VERİLERİNİ ÇEK ---
     conn_s = sqlite3.connect('sales_data.db')
     try:
         all_offers = conn_s.execute("SELECT user_id, status, total_price FROM offers").fetchall()
@@ -213,20 +210,21 @@ def show_dealer_management():
                 </div>
             """, unsafe_allow_html=True)
             
-            # --- DÜZENLEME VE YETKİLENDİRME (FORM YAPISI KULLANILDI VE ANAHTAR EKLENDİ) ---
+            # 🚀 ST.FORM KALDIRILDI! ARTIK ANINDA TEPKİ VERECEK 🚀
             with st.expander(_m("edit_auth"), expanded=False):
-                with st.form(key=f"frm_user_{u_id}"):
-                    c1, c2 = st.columns(2)
-                    new_company = c1.text_input(_m("comp_name"), value=u_company, key=f"inp_cmp_{u_id}")
-                    
-                    idx_type = types_internal.index(u_type) if u_type in types_internal else 0
-                    sel_type_disp = c2.selectbox(_m("act_type"), types_display, index=idx_type, key=f"inp_typ_{u_id}")
-                    new_type_internal = types_internal[types_display.index(sel_type_disp)]
-                    
-                    new_email = c1.text_input(_m("email"), value=u_email, key=f"inp_eml_{u_id}")
-                    new_phone = c2.text_input(_m("phone"), value=u_phone if u_phone else "", key=f"inp_phn_{u_id}")
+                c1, c2 = st.columns(2)
+                new_company = c1.text_input(_m("comp_name"), value=u_company, key=f"inp_cmp_{u_id}")
+                
+                idx_type = types_internal.index(u_type) if u_type in types_internal else 0
+                sel_type_disp = c2.selectbox(_m("act_type"), types_display, index=idx_type, key=f"inp_typ_{u_id}")
+                new_type_internal = types_internal[types_display.index(sel_type_disp)]
+                
+                new_email = c1.text_input(_m("email"), value=u_email, key=f"inp_eml_{u_id}")
+                new_phone = c2.text_input(_m("phone"), value=u_phone if u_phone else "", key=f"inp_phn_{u_id}")
 
-                    # KATEGORİ MENÜSÜ HER ZAMAN GÖZÜKÜR
+                new_cats_str = ""
+                # Eğer "Satıcı (Bayi)" seçiliyse menü ANINDA aşağı düşer!
+                if new_type_internal == "Satıcı (Bayi)":
                     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
                     st.markdown(f"<div style='font-size:13px; font-weight:800; color:#ea580c; margin-bottom:5px;'>{_m('cat_title')}</div>", unsafe_allow_html=True)
                     st.caption(_m("cat_warn"))
@@ -234,75 +232,72 @@ def show_dealer_management():
                     current_cats = [x.strip() for x in str(u_allowed_cats).split(",")] if u_allowed_cats else all_categories
                     safe_defaults = [c for c in current_cats if c in all_categories]
                     
-                    # BURASI ÇÖKMEYİ ENGELLEYEN YERDİR (key EKLENDİ)
                     selected_cats = st.multiselect(
                         _m("cat_help"), 
                         options=all_categories,
                         default=safe_defaults,
                         key=f"inp_cat_{u_id}"
                     )
-                    
-                    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-                    st.markdown(f"<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>{_m('menu_title')}</div>", unsafe_allow_html=True)
-                    
-                    menu_options = {
-                        "m_dash": _m("m_dash"), "m_new": _m("m_new"), "m_cust": _m("m_cust"),
-                        "m_past": _m("m_past"), "m_order": _m("m_order"), "m_model": _m("m_model"),
-                        "m_deal": _m("m_deal"), "m_prof": _m("m_prof")
-                    }
-                    current_menus = u_menus.split(',') if u_menus is not None else list(menu_options.keys())
-                    
-                    selected_menus = []
-                    m_cols = st.columns(3)
-                    for idx, (k, v) in enumerate(menu_options.items()):
-                        with m_cols[idx % 3]:
-                            if st.checkbox(v, value=(k in current_menus), key=f"chk_{u_id}_{k}"):
-                                selected_menus.append(k)
-                    
-                    new_menus_str = ",".join(selected_menus)
-                    new_role = "Admin" if new_type_internal == "Yönetici" else ("Producer" if new_type_internal == "Üretici" else "Dealer")
-                    
-                    st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
-                    submit_btn = st.form_submit_button(_m("btn_update"), type="primary", use_container_width=True)
-                    
-                    if submit_btn:
-                        if new_type_internal == "Satıcı (Bayi)": new_cats_str = ",".join(selected_cats)
-                        else: new_cats_str = ""
-
-                        conn_update = sqlite3.connect('users.db')
-                        try:
-                            conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
-                                                (new_company, new_type_internal, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
-                        except:
-                            conn_update.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
-                            conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
-                                                (new_company, new_type_internal, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
-                            
-                        conn_update.commit(); conn_update.close()
-                        st.toast(f"{new_company} {_m('toast_upd')}")
-                        st.rerun()
-                        
-                st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
-                c3, c4 = st.columns(2)
+                    new_cats_str = ",".join(selected_cats)
                 
-                if u_id == st.session_state.get('user_id'):
-                    st.info(_m("err_self"))
-                else:
-                    if u_approved:
-                        if c3.button(_m("btn_sus"), key=f"sus_{u_id}", use_container_width=True):
-                            conn_act = sqlite3.connect('users.db')
-                            conn_act.execute("UPDATE users SET is_approved=0 WHERE id=?", (u_id,))
-                            conn_act.commit(); conn_act.close()
-                            st.rerun()
-                    else:
-                        if c3.button(_m("btn_app"), key=f"app_{u_id}", use_container_width=True):
-                            conn_act = sqlite3.connect('users.db')
-                            conn_act.execute("UPDATE users SET is_approved=1 WHERE id=?", (u_id,))
-                            conn_act.commit(); conn_act.close()
-                            st.rerun()
-                            
-                    if c4.button(_m("btn_del"), key=f"del_{u_id}", use_container_width=True):
+                st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+                st.markdown(f"<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>{_m('menu_title')}</div>", unsafe_allow_html=True)
+                
+                menu_options = {
+                    "m_dash": _m("m_dash"), "m_new": _m("m_new"), "m_cust": _m("m_cust"),
+                    "m_past": _m("m_past"), "m_order": _m("m_order"), "m_model": _m("m_model"),
+                    "m_deal": _m("m_deal"), "m_prof": _m("m_prof")
+                }
+                current_menus = u_menus.split(',') if u_menus is not None else list(menu_options.keys())
+                
+                selected_menus = []
+                m_cols = st.columns(3)
+                for idx, (k, v) in enumerate(menu_options.items()):
+                    with m_cols[idx % 3]:
+                        if st.checkbox(v, value=(k in current_menus), key=f"chk_{u_id}_{k}"):
+                            selected_menus.append(k)
+                
+                new_menus_str = ",".join(selected_menus)
+                new_role = "admin" if new_type_internal == "Yönetici" else ("manufacturer" if new_type_internal == "Üretici" else "dealer")
+                
+                st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
+                
+                # Buton artık Form'a değil, direkt sayfaya bağlı çalışır
+                if st.button(_m("btn_update"), type="primary", use_container_width=True, key=f"btn_save_user_{u_id}"):
+                    conn_update = sqlite3.connect('users.db')
+                    try:
+                        conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
+                                            (new_company, new_type_internal, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
+                    except:
+                        conn_update.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
+                        conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
+                                            (new_company, new_type_internal, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
+                        
+                    conn_update.commit(); conn_update.close()
+                    st.toast(f"{new_company} {_m('toast_upd')}")
+                    st.rerun()
+                        
+            st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
+            c3, c4 = st.columns(2)
+            
+            if u_id == st.session_state.get('user_id'):
+                st.info(_m("err_self"))
+            else:
+                if u_approved:
+                    if c3.button(_m("btn_sus"), key=f"sus_{u_id}", use_container_width=True):
                         conn_act = sqlite3.connect('users.db')
-                        conn_act.execute("DELETE FROM users WHERE id=?", (u_id,))
+                        conn_act.execute("UPDATE users SET is_approved=0 WHERE id=?", (u_id,))
                         conn_act.commit(); conn_act.close()
                         st.rerun()
+                else:
+                    if c3.button(_m("btn_app"), key=f"app_{u_id}", use_container_width=True):
+                        conn_act = sqlite3.connect('users.db')
+                        conn_act.execute("UPDATE users SET is_approved=1 WHERE id=?", (u_id,))
+                        conn_act.commit(); conn_act.close()
+                        st.rerun()
+                        
+                if c4.button(_m("btn_del"), key=f"del_{u_id}", use_container_width=True):
+                    conn_act = sqlite3.connect('users.db')
+                    conn_act.execute("DELETE FROM users WHERE id=?", (u_id,))
+                    conn_act.commit(); conn_act.close()
+                    st.rerun()
