@@ -148,6 +148,7 @@ def repair_factory_db():
         cols_mod = [c[1] for c in get_factory("PRAGMA table_info(models)")]
         if "name_zh" not in cols_mod: exec_factory("ALTER TABLE models ADD COLUMN name_zh TEXT DEFAULT ''")
         if "specs_zh" not in cols_mod: exec_factory("ALTER TABLE models ADD COLUMN specs_zh TEXT DEFAULT ''")
+        if "user_id" not in cols_mod: exec_factory("ALTER TABLE models ADD COLUMN user_id INTEGER DEFAULT 1")
         
         cols_opt = [c[1] for c in get_factory("PRAGMA table_info(options)")]
         if "allow_qty" not in cols_opt: exec_factory("ALTER TABLE options ADD COLUMN allow_qty INTEGER DEFAULT 1")
@@ -218,10 +219,6 @@ def show_product_management():
 # =====================================================================
 def show_list_view(user_role):
 
-    # =====================================================================
-    # 🚀 KESİN ÇÖZÜM: JAVASCRIPT İLE SADECE BUTON SATIRLARINI BULUP YANYANA DİZER
-    # (Ana tabloları ve kart yapılarını ASLA bozmaz)
-    # =====================================================================
     components.html("""
     <script>
     function fixButtonsMobile() {
@@ -233,7 +230,6 @@ def show_list_view(user_role):
             var sibling = container.nextElementSibling;
             var targetRow = null;
             
-            // Markerden hemen sonraki veya içindeki stHorizontalBlock'u bul
             for(var i=0; i<2; i++) {
                 if(sibling && sibling.getAttribute('data-testid') === 'stHorizontalBlock') {
                     targetRow = sibling; break;
@@ -260,7 +256,6 @@ def show_list_view(user_role):
             }
         });
     }
-    // Streamlit ekranı yeniledikçe bozulmasını engellemek için gardiyan görevinde
     fixButtonsMobile();
     setInterval(fixButtonsMobile, 300);
     </script>
@@ -277,7 +272,14 @@ def show_list_view(user_role):
             st.session_state.view_mode = "mod_add"; st.rerun()
 
         st.markdown("---")
-        mods = get_factory("SELECT id, name, category, base_price, currency, image_path, name_zh FROM models ORDER BY category ASC, name ASC")
+        
+        # 🚀 ÜRETİCİ İSE SADECE KENDİSİNİN, DEĞİLSE HERKESİN MAKİNESİNİ ÇEK
+        user_id = st.session_state.get("user_id", 1)
+        if user_role == "manufacturer":
+            mods = get_factory("SELECT id, name, category, base_price, currency, image_path, name_zh FROM models WHERE user_id=? ORDER BY category ASC, name ASC", (user_id,))
+        else:
+            mods = get_factory("SELECT id, name, category, base_price, currency, image_path, name_zh FROM models ORDER BY category ASC, name ASC")
+            
         if mods:
             df_mods = pd.DataFrame(mods, columns=["id", "name", "category", "price", "currency", "image", "name_zh"])
             for cat in df_mods['category'].unique():
@@ -305,7 +307,6 @@ def show_list_view(user_role):
                                         if row['price'] > 0: st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row['price']:,.2f} {row['currency']}</div>", unsafe_allow_html=True)
                                         else: st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('price_wait')}</div>", unsafe_allow_html=True)
                                         
-                                    # CSS Gardiyanı bu gizli noktayı bularak sadece hemen altındaki butonları hizalayacak
                                     st.markdown('<div class="btn-marker" style="display:none;"></div>', unsafe_allow_html=True)
                                     
                                     btn_c1, btn_c2, btn_c3 = st.columns(3)
@@ -314,8 +315,9 @@ def show_list_view(user_role):
                                             st.session_state.edit_mod_id = safe_mod_id; st.session_state.form_loaded = False; st.session_state.view_mode = "mod_edit"; st.rerun()
                                     with btn_c2:
                                         if st.button(_m("btn_copy"), key=f"mc_{safe_mod_id}", use_container_width=True):
+                                            # KOPYALARKEN SAHİPLİĞİ DE (user_id) KOPYALAYAN KİŞİYE ATARIZ
                                             m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos, name_zh, specs_zh FROM models WHERE id=?", (safe_mod_id,))[0]
-                                            exec_factory("""INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos, name_zh, specs_zh) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", (m_data[0] + " (Copy)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9], m_data[10], m_data[11]))
+                                            exec_factory("""INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos, name_zh, specs_zh, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""", (m_data[0] + " (Copy)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9], m_data[10], m_data[11], user_id))
                                             st.success(_m("copied")); st.rerun()
                                     with btn_c3:
                                         if st.button(_m("btn_del"), key=f"md_{safe_mod_id}", use_container_width=True):
@@ -548,6 +550,9 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                 up_main = st.session_state.get("up_main_img")
                 if up_main is not None: st.session_state.f_img = process_image(up_main, prefix="machine", size=(1200, 1200), square=False)
 
+                # Ekleyen kullanıcının ID'sini çekiyoruz
+                user_id = st.session_state.get("user_id", 1)
+
                 if user_role == "manufacturer":
                     final_name_zh = st.session_state.f_name
                     final_name_tr = auto_translate_to_tr(final_name_zh)
@@ -578,13 +583,14 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                 
                 final_opts_str = ",".join(st.session_state.f_opts)
                 
+                # 🚀 YENİ: KAYDEDERKEN SAHİPLİĞİ (user_id) SİSTEME MÜHÜRLE
                 if is_edit:
                     if user_role == "manufacturer":
                         exec_factory("""UPDATE models SET name=?, name_zh=?, category=?, base_price=?, currency=?, specs=?, specs_zh=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?""", (final_name_tr, final_name_zh, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, final_specs_tr, final_specs_zh, final_opts_str, st.session_state.f_disc, st.session_state.f_img, int(mod_id)))
                     else:
                         exec_factory("""UPDATE models SET name=?, category=?, base_price=?, currency=?, specs=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?""", (final_name_tr, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, final_specs_tr, final_opts_str, st.session_state.f_disc, st.session_state.f_img, int(mod_id)))
                 else:
-                    exec_factory("""INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path) VALUES (?,?,?,?,?,?,?,?,?,?)""", (final_name_tr, final_name_zh, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, final_specs_tr, final_specs_zh, final_opts_str, st.session_state.f_disc, st.session_state.f_img))
+                    exec_factory("""INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)""", (final_name_tr, final_name_zh, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, final_specs_tr, final_specs_zh, final_opts_str, st.session_state.f_disc, st.session_state.f_img, user_id))
                 
                 st.session_state.view_mode = "list"; st.rerun()
 
