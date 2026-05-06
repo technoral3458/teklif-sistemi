@@ -21,16 +21,13 @@ DICT_DEALER = {
         "type_dealer": "Satıcı (Bayi)", "type_prod": "Üretici", "type_admin": "Yönetici",
         "cat_title": "📦 Satıcının Teklif Verebileceği Kategoriler (Filtre):",
         "cat_help": "Satış yapmasına izin verilen makine kategorilerini seçin:",
-        "cat_warn": "Eğer hiçbirini seçmezseniz bayi hiçbir makineyi göremez!",
-        "info_admin": "💡 Yönetici tüm kategorileri görebilir, yetki kısıtlamasına gerek yoktur.",
-        "info_prod": "💡 Üretici sadece kendi eklediği makineleri görebilir, kategori kısıtlamasına gerek yoktur.",
+        "cat_warn": "💡 SADECE Satıcı (Bayi) rolü için geçerlidir. Yönetici ve Üreticilerde bu ayar dikkate alınmaz.",
         "menu_title": "🔑 Kullanıcının Görüntüleyebileceği Sayfa Menüleri:",
         "btn_update": "🔄 BİLGİLERİ VE YETKİLERİ GÜNCELLE",
         "toast_upd": "yetkileri güncellendi!",
         "err_self": "💡 Kendi yönetici hesabınızı askıya alamaz veya silemezsiniz.",
         "btn_sus": "🚫 Hesabı Askıya Al", "btn_app": "✅ Hesabı Onayla / Aktifleştir", "btn_del": "🗑️ Tamamen Sil",
         
-        # Menü İsimleri
         "m_dash": "📊 Dashboard", "m_new": "📝 Yeni Teklif Hazırla", "m_cust": "👥 Müşterilerim",
         "m_past": "📋 Geçmiş Tekliflerim", "m_order": "📦 Siparişler", "m_model": "📦 Tüm Modelleri Yönet",
         "m_deal": "🏢 Bayi / Kullanıcı Yönetimi", "m_prof": "⚙️ Profil Ayarlarım"
@@ -50,9 +47,7 @@ DICT_DEALER = {
         "type_dealer": "Dealer", "type_prod": "Producer", "type_admin": "Admin",
         "cat_title": "📦 Allowed Categories for Dealer (Filter):",
         "cat_help": "Select allowed machine categories for sales:",
-        "cat_warn": "If you leave this empty, the dealer won't see any machines!",
-        "info_admin": "💡 Admins can see all categories, no restriction needed.",
-        "info_prod": "💡 Producers only see their own machines, no restriction needed.",
+        "cat_warn": "💡 Applies ONLY to Dealers. Ignored for Admins and Producers.",
         "menu_title": "🔑 Accessible Page Menus for User:",
         "btn_update": "🔄 UPDATE INFO & PERMISSIONS",
         "toast_upd": "permissions updated!",
@@ -78,9 +73,7 @@ DICT_DEALER = {
         "type_dealer": "经销商", "type_prod": "制造商", "type_admin": "管理员",
         "cat_title": "📦 经销商允许的类别 (过滤器):",
         "cat_help": "选择允许销售的机器类别:",
-        "cat_warn": "如果留空，经销商将看不到任何机器！",
-        "info_admin": "💡 管理员可以查看所有类别，无需限制。",
-        "info_prod": "💡 制造商只能看到自己的机器，无需限制。",
+        "cat_warn": "💡 仅适用于经销商。对管理员和制造商无效。",
         "menu_title": "🔑 用户可访问的页面菜单:",
         "btn_update": "🔄 更新信息和权限",
         "toast_upd": "权限已更新！",
@@ -93,11 +86,15 @@ DICT_DEALER = {
     }
 }
 
-# 🚀 DİL MOTORU GÜÇLENDİRİLDİ 🚀
+# 🚀 DİL MOTORU (Garanti Çözüm) 🚀
 def _m(key): 
-    # Sistemin neresinde dil değişirse değişsin anında yakalar
-    lang = st.session_state.get('lang', st.session_state.get('language', 'tr')).lower()
-    if lang not in DICT_DEALER: lang = 'tr'
+    # Dil hem 'language' hem de 'lang' anahtarlarında aranır, yoksa Türkçe kalır
+    lang = "tr"
+    if "language" in st.session_state: lang = st.session_state.language
+    elif "lang" in st.session_state: lang = st.session_state.lang
+    
+    lang = str(lang).lower()
+    if lang not in DICT_DEALER: lang = "tr"
     return DICT_DEALER[lang].get(key, key)
 
 # =====================================================================
@@ -220,23 +217,23 @@ def show_dealer_management():
                 </div>
             """, unsafe_allow_html=True)
             
-            # 🚀 DÜZENLEME ALANI (FORM KALDIRILDI - ANINDA TEPKİ VERİR) 🚀
+            # 🚀 FORMU GERİ GETİRDİK (Açılır kutunun çökmesini engeller) 🚀
             with st.expander(_m("edit_auth"), expanded=False):
-                c1, c2 = st.columns(2)
-                new_company = c1.text_input(_m("comp_name"), value=u_company, key=f"inp_comp_{u_id}")
-                
-                idx_type = types_internal.index(u_type) if u_type in types_internal else 0
-                sel_type_disp = c2.selectbox(_m("act_type"), types_display, index=idx_type, key=f"inp_type_{u_id}")
-                new_type_internal = types_internal[types_display.index(sel_type_disp)]
-                
-                new_email = c1.text_input(_m("email"), value=u_email, key=f"inp_mail_{u_id}")
-                new_phone = c2.text_input(_m("phone"), value=u_phone if u_phone else "", key=f"inp_pho_{u_id}")
+                with st.form(key=f"form_dealer_{u_id}"):
+                    c1, c2 = st.columns(2)
+                    new_company = c1.text_input(_m("comp_name"), value=u_company)
+                    
+                    idx_type = types_internal.index(u_type) if u_type in types_internal else 0
+                    sel_type_disp = c2.selectbox(_m("act_type"), types_display, index=idx_type)
+                    new_type_internal = types_internal[types_display.index(sel_type_disp)]
+                    
+                    new_email = c1.text_input(_m("email"), value=u_email)
+                    new_phone = c2.text_input(_m("phone"), value=u_phone if u_phone else "")
 
-                new_cats_str = ""
-                # Eğer "Satıcı" seçiliyse Kategori Kutusu ANINDA aşağıya düşer
-                if new_type_internal == "Satıcı (Bayi)":
+                    # 🚀 KATEGORİ MENÜSÜ HER ZAMAN GÖRÜNÜR OLACAK 🚀
                     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
                     st.markdown(f"<div style='font-size:13px; font-weight:800; color:#ea580c; margin-bottom:5px;'>{_m('cat_title')}</div>", unsafe_allow_html=True)
+                    st.caption(_m("cat_warn")) # Notu da ekledik
                     
                     current_cats = [x.strip() for x in str(u_allowed_cats).split(",")] if u_allowed_cats else all_categories
                     safe_defaults = [c for c in current_cats if c in all_categories]
@@ -244,54 +241,51 @@ def show_dealer_management():
                     selected_cats = st.multiselect(
                         _m("cat_help"), 
                         options=all_categories,
-                        default=safe_defaults,
-                        help=_m("cat_warn"),
-                        key=f"inp_cats_{u_id}"
+                        default=safe_defaults
                     )
-                    new_cats_str = ",".join(selected_cats)
-                elif new_type_internal == "Yönetici":
-                    st.info(_m("info_admin"))
-                    new_cats_str = ""
-                elif new_type_internal == "Üretici":
-                    st.info(_m("info_prod"))
-                    new_cats_str = ""
-                
-                st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-                st.markdown(f"<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>{_m('menu_title')}</div>", unsafe_allow_html=True)
-                
-                menu_options = {
-                    "m_dash": _m("m_dash"), "m_new": _m("m_new"), "m_cust": _m("m_cust"),
-                    "m_past": _m("m_past"), "m_order": _m("m_order"), "m_model": _m("m_model"),
-                    "m_deal": _m("m_deal"), "m_prof": _m("m_prof")
-                }
-                current_menus = u_menus.split(',') if u_menus is not None else list(menu_options.keys())
-                
-                selected_menus = []
-                m_cols = st.columns(3)
-                for idx, (k, v) in enumerate(menu_options.items()):
-                    with m_cols[idx % 3]:
-                        if st.checkbox(v, value=(k in current_menus), key=f"chk_{u_id}_{k}"):
-                            selected_menus.append(k)
-                
-                new_menus_str = ",".join(selected_menus)
-                new_role = "Admin" if new_type_internal == "Yönetici" else ("Producer" if new_type_internal == "Üretici" else "Dealer")
-                
-                st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
-                
-                # Buton artık Form'a değil, direkt sayfaya bağlı çalışır
-                if st.button(_m("btn_update"), type="primary", use_container_width=True, key=f"btn_save_{u_id}"):
-                    conn_update = sqlite3.connect('users.db')
-                    try:
-                        conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
-                                            (new_company, new_type_internal, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
-                    except:
-                        conn_update.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
-                        conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
-                                            (new_company, new_type_internal, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
-                        
-                    conn_update.commit(); conn_update.close()
-                    st.toast(f"{new_company} {_m('toast_upd')}")
-                    st.rerun()
+                    
+                    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>{_m('menu_title')}</div>", unsafe_allow_html=True)
+                    
+                    menu_options = {
+                        "m_dash": _m("m_dash"), "m_new": _m("m_new"), "m_cust": _m("m_cust"),
+                        "m_past": _m("m_past"), "m_order": _m("m_order"), "m_model": _m("m_model"),
+                        "m_deal": _m("m_deal"), "m_prof": _m("m_prof")
+                    }
+                    current_menus = u_menus.split(',') if u_menus is not None else list(menu_options.keys())
+                    
+                    selected_menus = []
+                    m_cols = st.columns(3)
+                    for idx, (k, v) in enumerate(menu_options.items()):
+                        with m_cols[idx % 3]:
+                            if st.checkbox(v, value=(k in current_menus), key=f"chk_{u_id}_{k}"):
+                                selected_menus.append(k)
+                    
+                    new_menus_str = ",".join(selected_menus)
+                    new_role = "Admin" if new_type_internal == "Yönetici" else ("Producer" if new_type_internal == "Üretici" else "Dealer")
+                    
+                    st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
+                    submit_btn = st.form_submit_button(_m("btn_update"), type="primary", use_container_width=True)
+                    
+                    if submit_btn:
+                        # Eğer Satıcı değilse kategorileri kaydetme (her şeye yetkisi var demektir)
+                        if new_type_internal == "Satıcı (Bayi)":
+                            new_cats_str = ",".join(selected_cats)
+                        else:
+                            new_cats_str = ""
+
+                        conn_update = sqlite3.connect('users.db')
+                        try:
+                            conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
+                                                (new_company, new_type_internal, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
+                        except:
+                            conn_update.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
+                            conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
+                                                (new_company, new_type_internal, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
+                            
+                        conn_update.commit(); conn_update.close()
+                        st.toast(f"{new_company} {_m('toast_upd')}")
+                        st.rerun()
                         
                 st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
                 c3, c4 = st.columns(2)
