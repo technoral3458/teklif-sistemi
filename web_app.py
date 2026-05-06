@@ -136,17 +136,36 @@ def get_system_logo():
     except: pass
     return fallback_url
 
+# 🚀 ACİL ONARIM MOTORU ENTEGRE EDİLDİ 🚀
 def repair_databases():
+    # USERS DB
     conn = sqlite3.connect('users.db')
-    conn.execute("""CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0, user_type TEXT DEFAULT 'Satıcı', phone TEXT, is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT, logo_path TEXT, website TEXT, address_full TEXT, allowed_menus TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0, user_type TEXT DEFAULT 'Satıcı', phone TEXT, is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT, logo_path TEXT, website TEXT, address_full TEXT, allowed_menus TEXT, allowed_categories TEXT)""")
     u_cols = [c[1] for c in conn.execute("PRAGMA table_info(users)").fetchall()]
     if "allowed_menus" not in u_cols: conn.execute("ALTER TABLE users ADD COLUMN allowed_menus TEXT DEFAULT 'm_dash,m_new,m_cust,m_past,m_order,m_prof'")
+    if "role" not in u_cols: conn.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'dealer'")
+    if "allowed_categories" not in u_cols: conn.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
+    
     if not conn.execute("SELECT id FROM users WHERE email='admin@ersanmakina.net'").fetchone():
         conn.execute("INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type, allowed_menus) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici', 'm_dash,m_new,m_cust,m_past,m_order,m_prof,m_deal,m_model')", ("admin@ersanmakina.net", hash_password("20132017")))
     conn.commit(); conn.close()
+    
+    # SALES DB
     conn = sqlite3.connect('sales_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS offers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, model_id INTEGER, total_price REAL DEFAULT 0.0, conditions TEXT DEFAULT '', status TEXT DEFAULT 'Beklemede', user_id INTEGER DEFAULT 1, offer_date TEXT DEFAULT '', order_date TEXT DEFAULT '')""")
+    s_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
+    if "user_id" not in s_cols: conn.execute("ALTER TABLE offers ADD COLUMN user_id INTEGER DEFAULT 1")
+    
     conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1, country TEXT DEFAULT '', city TEXT DEFAULT '', authorized_person TEXT DEFAULT '', email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '')""")
+    c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
+    if "user_id" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 1")
+    conn.commit(); conn.close()
+
+    # FACTORY DB
+    conn = sqlite3.connect('factory_data.db')
+    conn.execute("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_price REAL, image_path TEXT, specs TEXT, currency TEXT DEFAULT 'USD', port_discount REAL DEFAULT 0.0, compatible_options TEXT DEFAULT '', gallery_images TEXT DEFAULT '', category TEXT DEFAULT 'Diğer Makinalar', gallery_videos TEXT DEFAULT '', name_zh TEXT DEFAULT '', specs_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
+    f_cols = [c[1] for c in conn.execute("PRAGMA table_info(models)").fetchall()]
+    if "user_id" not in f_cols: conn.execute("ALTER TABLE models ADD COLUMN user_id INTEGER DEFAULT 1")
     conn.commit(); conn.close()
 
 repair_databases()
@@ -202,7 +221,7 @@ if not st.session_state.logged_in:
     with c3:
         sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=list(lang_opts.keys()).index(st.session_state.lang), key="main_lang_sel", label_visibility="collapsed")
         if sel != st.session_state.lang: st.session_state.lang = sel; st.rerun()
-    
+
     col_l, col_m, col_r = st.columns([1, 1.2, 1])
     with col_m:
         st.markdown(f"<div style='text-align:center; padding:10px 0 20px 0;'><img src='{get_system_logo()}' style='max-width:100%; max-height:80px; object-fit:contain;'></div>", unsafe_allow_html=True)
@@ -231,7 +250,7 @@ if not st.session_state.logged_in:
                             if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone(): st.error(_("email_in_use"))
                             else:
                                 vc = generate_code(); c.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,?,0,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')", (re, hash_password(rpw), rc, rp, rt, vc)); c.commit()
-                                if send_email(re, vc, "Code / 验证"): st.session_state.temp_email, st.session_state.reg_step = re, 2; st.rerun()
+                                if send_email(re, vc, "Code / 验证"): st.session_state.temp_email, st.session_state.reg_step = 2; st.rerun()
                             c.close()
                         else: st.warning(_("req_fields"))
                 elif st.session_state.reg_step == 2:
@@ -250,21 +269,21 @@ with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 15px; padding: 10px 0;'><img src='{get_system_logo()}' style='max-width: 90%; max-height: 55px; object-fit: contain;'></div>", unsafe_allow_html=True)
     r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
     st.markdown(f"<div style='background-color:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:20px; display:flex; align-items:center; gap:10px; overflow-wrap: anywhere;'><div style='background:#2563eb; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold;'>{st.session_state.user_email[0].upper()}</div><div style='overflow:hidden; width:100%;'><div style='font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div><div style='font-size:11px; color:#64748b; font-weight:600;'>{r_text}</div></div></div>", unsafe_allow_html=True)
-    
+
     if st.session_state.user_role == "admin": menu_items = [_("m_dash"), _("m_new"), _("m_cust"), _("m_past"), _("m_order"), _("m_prof"), _("m_deal"), _("m_model")]
     else:
         allowed = st.session_state.allowed_menus.split(',') if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
         v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model"]
         menu_items = [_(k.strip()) for k in allowed if k.strip() in v_keys]
-    
+
     if "active_tab" not in st.session_state or st.session_state.active_tab not in menu_items: st.session_state.active_tab = menu_items[0]
-    
+
     def on_menu_change():
         st.session_state.active_tab = st.session_state.m_radio
         st.session_state.close_sidebar = True # Kapatma sinyalini etkinleştir
-        
+
     st.radio("MENÜ", menu_items, index=menu_items.index(st.session_state.active_tab), key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
-    
+
     st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
     lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
     sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=list(lang_opts.keys()).index(st.session_state.lang), key="sb_lang")
@@ -280,7 +299,7 @@ with st.sidebar:
 if st.session_state.get("close_sidebar", False):
     st.session_state.close_sidebar = False
     import streamlit.components.v1 as components
-    
+
     # UUID ekleyerek Streamlit'i bu kodu her defasında yeni sanıp çalıştırmaya zorluyoruz.
     components.html(f"""
         <script id="trigger-{uuid.uuid4().hex}">
