@@ -205,10 +205,14 @@ def show_offer_wizard(user_id, is_admin=False):
             padding-right: 0.5rem !important; 
             max-width: 100% !important; 
         }
+
+        /* Klavyeyi engeller */
         div[data-baseweb="select"] input { 
             caret-color: transparent !important; 
             inputmode: none !important;
         }
+        
+        /* Kibar Kutu Tasarımı */
         div.st-emotion-cache-1jicfl2 { 
             border-radius: 12px !important;
             border: 1px solid #e2e8f0 !important;
@@ -226,13 +230,14 @@ def show_offer_wizard(user_id, is_admin=False):
     <script>
     function disableMobileKeyboard() {
         var inputs = window.parent.document.querySelectorAll('div[data-baseweb="select"] input');
-        inputs.forEach(function(inp) { inp.setAttribute('inputmode', 'none'); });
+        inputs.forEach(function(inp) {
+            inp.setAttribute('inputmode', 'none'); 
+        });
     }
     setInterval(disableMobileKeyboard, 300);
     </script>
     """, height=0, width=0)
 
-    # Sistemdeki müşterileri çek
     my_custs = get_sales("SELECT id, company_name FROM customers WHERE user_id=? ORDER BY company_name ASC", (user_id,)) if not is_admin else get_sales("SELECT id, company_name FROM customers ORDER BY company_name ASC")
     if my_custs is None: my_custs = []
 
@@ -255,27 +260,12 @@ def show_offer_wizard(user_id, is_admin=False):
         st.markdown("<div style='font-size:14px; font-weight:900; color:#2563eb; margin-bottom:8px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            CUST_PROMPT = "Lütfen Müşteri Seçiniz..."
-            NEW_CUST_OPT = "➕ YENİ MÜŞTERİ EKLE"
-            MACH_PROMPT = "Lütfen Makine Modeli Seçiniz..."
-
-            # MÜŞTERİ LİSTESİNİ OLUŞTURUYORUZ (EN ÜSTTE YENİ MÜŞTERİ EKLE VAR)
-            c_names = [CUST_PROMPT, NEW_CUST_OPT] + [c[1] for c in my_custs]
             
-            # Yeni müşteri eklendiyse otomatik onu seç
-            if "new_added_cust" in st.session_state and st.session_state.new_added_cust in c_names:
-                idx_c = c_names.index(st.session_state.new_added_cust)
-                del st.session_state.new_added_cust
-            else:
-                idx_c = c_names.index(wd.get("cust_name")) if wd.get("cust_name") in c_names else 0
+            # 🔥 YEPYENİ VE KESİN ÇÖZÜM: SWITCH DÜĞMESİ İLE YENİ MÜŞTERİ EKLEME
+            is_new_customer = st.toggle("➕ Müşteri Kayıtlı Değilse Yeni Ekle", key="chk_new_cust")
             
-            # ANAHTAR DEĞİŞTİRİLDİ (CACHE SIFIRLANDI)
-            sel_cust = st.selectbox("Teklif Verilecek Müşteri", options=c_names, index=idx_c, key="customer_select_v_force_new")
-
-            # EĞER KULLANICI "YENİ MÜŞTERİ EKLE" SEÇTİYSE MAKİNE SEÇİMİNİ GİZLE VE FORMU AÇ
-            if sel_cust == NEW_CUST_OPT:
-                st.markdown("<div style='padding-top:10px; border-top:1px solid #e2e8f0; margin-top:10px;'></div>", unsafe_allow_html=True)
-                st.markdown("<div style='font-size:14px; font-weight:900; color:#ea580c; margin-bottom:10px;'>🆕 HIZLI MÜŞTERİ KAYDI</div>", unsafe_allow_html=True)
+            if is_new_customer:
+                st.markdown("<div style='font-size:14px; font-weight:900; color:#ea580c; margin-top:10px; margin-bottom:10px;'>🆕 HIZLI MÜŞTERİ KAYDI</div>", unsafe_allow_html=True)
                 
                 nc_comp = st.text_input("Firma Adı (Zorunlu) *", placeholder="Örn: ABC Makine Ltd. Şti.")
                 nc_auth = st.text_input("Yetkili Kişi", placeholder="Örn: Ahmet Yılmaz")
@@ -286,56 +276,69 @@ def show_offer_wizard(user_id, is_admin=False):
                 
                 nc_addr = st.text_area("Açık Adres", height=80)
                 
-                if st.button("💾 MÜŞTERİYİ KAYDET", type="primary", use_container_width=True):
+                if st.button("💾 MÜŞTERİYİ KAYDET VE DEVAM ET", type="primary", use_container_width=True):
                     if not nc_comp.strip():
                         st.error("Lütfen Firma Adını giriniz!")
                     else:
                         try:
                             exec_sales("INSERT INTO customers (company_name, authorized_person, phone, email, address_full, user_id) VALUES (?,?,?,?,?,?)", 
                                        (nc_comp.strip(), nc_auth.strip(), nc_phone.strip(), nc_email.strip(), nc_addr.strip(), user_id))
+                            
                             st.session_state.new_added_cust = nc_comp.strip()
+                            st.session_state.chk_new_cust = False # Kayıt bitince Düğmeyi Otomatik Kapat
                             st.rerun()
                         except Exception as e:
                             st.error(f"Kayıt Hatası: {e}")
+                
+                # Form açıkken aşağıyı çalıştırma
+                with col_prev:
+                    st.info("💡 Lütfen yandaki formu doldurarak müşteriyi kaydedin.")
+                return
+
+            # --- DÜĞME KAPALIYSA NORMAL AKIŞ ÇALIŞIR ---
+            CUST_PROMPT = "Lütfen Müşteri Seçiniz..."
+            MACH_PROMPT = "Lütfen Makine Modeli Seçiniz..."
+
+            c_names = [CUST_PROMPT] + [c[1] for c in my_custs]
+            
+            # Eğer az önce yeni müşteri eklenmişse otomatik olarak onu bul ve seçili yap
+            if "new_added_cust" in st.session_state and st.session_state.new_added_cust in c_names:
+                idx_c = c_names.index(st.session_state.new_added_cust)
+                del st.session_state.new_added_cust
             else:
-                # NORMAL AKIŞ: Müşteri seçiliyken Makine Seçimi Açılır
-                cats = ["Tüm Kategoriler"] + [c[0] for c in get_factory("SELECT name FROM categories ORDER BY name ASC")]
-                idx_cat = cats.index(wd.get("category")) if wd.get("category") in cats else 0
-                sel_cat = st.selectbox("Kategori Filtresi", cats, index=idx_cat, key="cat_filter_force_new")
+                idx_c = c_names.index(wd.get("cust_name")) if wd.get("cust_name") in c_names else 0
+            
+            sel_cust = st.selectbox("Teklif Verilecek Müşteri", c_names, index=idx_c, key="w_cust_fin")
 
-                m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount, currency FROM models"
-                m_params = []
-                if sel_cat != "Tüm Kategoriler":
-                    m_query += " WHERE category=?"
-                    m_params.append(sel_cat)
-                m_query += " ORDER BY name ASC"
+            cats = ["Tüm Kategoriler"] + [c[0] for c in get_factory("SELECT name FROM categories ORDER BY name ASC")]
+            idx_cat = cats.index(wd.get("category")) if wd.get("category") in cats else 0
+            
+            sel_cat = st.selectbox("Kategori Filtresi", cats, index=idx_cat, key="w_cat_fin")
 
-                machines = get_factory(m_query, tuple(m_params))
-                if not machines:
-                    st.warning("Bu kategoride makine bulunamadı.")
-                    return
+            m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount, currency FROM models"
+            m_params = []
+            if sel_cat != "Tüm Kategoriler":
+                m_query += " WHERE category=?"
+                m_params.append(sel_cat)
+            m_query += " ORDER BY name ASC"
 
-                m_names = [MACH_PROMPT] + [m[1] for m in machines]
-                idx_m = m_names.index(wd.get("m_name")) if wd.get("m_name") in m_names else 0
-                
-                # ANAHTAR DEĞİŞTİRİLDİ (CACHE SIFIRLANDI)
-                sel_m = st.selectbox("Makine Modeli", options=m_names, index=idx_m, key="machine_select_v_force_new")
-                
-                m_qty = st.number_input("Makine Adedi", 1, 100, wd.get("qty", 1), key="qty_force_new")
+            machines = get_factory(m_query, tuple(m_params))
+            if not machines:
+                st.warning("Bu kategoride makine bulunamadı.")
+                return
 
-        # --- YENİ MÜŞTERİ EKLENİYORKEN YANDAKİ A4 RAPORUNU GİZLE ---
-        if sel_cust == NEW_CUST_OPT:
-            with col_prev:
-                st.info("💡 Teklif hazırlamaya devam etmek için lütfen önce yandaki formdan yeni müşteri kaydını tamamlayınız.")
-            return
+            m_names = [MACH_PROMPT] + [m[1] for m in machines]
+            idx_m = m_names.index(wd.get("m_name")) if wd.get("m_name") in m_names else 0
+            
+            sel_m = st.selectbox("Makine Modeli", m_names, index=idx_m, key="w_mach_fin")
+            
+            m_qty = st.number_input("Makine Adedi", 1, 100, wd.get("qty", 1), key="w_qty_fin")
 
-        # --- SEÇİM YOKSA YANDAKİ A4 RAPORUNU GİZLE ---
         if sel_cust == CUST_PROMPT or sel_m == MACH_PROMPT:
             with col_prev:
                 st.info("💡 Teklif detaylarını ve A4 raporunu görmek için lütfen yandaki panelden Müşteri ve Makine seçimi yapınız.")
             return
 
-        # SADECE GERÇEK BİR FİRMA VE MAKİNE SEÇİLİNCE BURADAN AŞAĞISI ÇALIŞIR
         cust_id = [c[0] for c in my_custs if c[1] == sel_cust][0]
         m_info = next(m for m in machines if m[1] == sel_m)
         m_id, m_name, m_price, m_opts_str, m_img, m_specs, m_disc, m_curr = m_info
