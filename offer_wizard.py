@@ -170,11 +170,36 @@ def get_index(lst, item, default=None):
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
-    # ❌ stHeader'ı gizleyen sorunlu CSS kodu buradan kaldırıldı! Menü butonu artık hep görünür olacak.
+    # 🚀 MENÜ BUTONU (HAMBURGER) GİZLEME ENGELİ KALDIRILDI! 🚀
     st.markdown("""
         <style>
+        /* Başlığı ve menü butonunu ZORLA göster */
+        header[data-testid="stHeader"] { 
+            display: flex !important; 
+            visibility: visible !important; 
+            background-color: transparent !important;
+        }
+        /* Menü butonunu şık ve belirgin yap */
+        header[data-testid="stHeader"] button {
+            color: #2563eb !important;
+            background-color: white !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            margin-top: 5px !important;
+            margin-left: 5px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        }
+        /* Sadece sağ üstteki gereksiz 'Deploy' vs. toolbarını gizle */
         div[data-testid="stToolbar"] { display: none !important; }
-        .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; max-width: 100% !important; }
+        
+        /* Menü butonu üstte kalmasın diye sayfayı biraz aşağı itiyoruz */
+        .block-container { 
+            padding-top: 4rem !important; 
+            padding-bottom: 2rem !important; 
+            padding-left: 0.5rem !important; 
+            padding-right: 0.5rem !important; 
+            max-width: 100% !important; 
+        }
         div[data-baseweb="select"] input { caret-color: transparent !important; inputmode: none !important; }
         div.st-emotion-cache-1jicfl2 { border-radius: 12px !important; border: 1px solid #e2e8f0 !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; padding: 1.5rem !important; }
         .stSelectbox label, .stTextInput label, .stNumberInput label, .stTextArea label { font-size: 13px !important; font-weight: 700 !important; color: #475569 !important; margin-bottom:4px !important; }
