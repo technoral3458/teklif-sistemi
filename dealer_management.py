@@ -9,18 +9,36 @@ def show_dealer_management():
     search_query = st.text_input("🔍 Kullanıcı Ara (Firma Adı, E-Posta veya Telefon ile)", placeholder="Aramak istediğiniz kelimeyi yazın...")
     st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
     
+    # --- KATEGORİ LİSTESİNİ ÇEK (Sadece satıcıları yetkilendirmek için factory_data.db'den okuyoruz) ---
+    try:
+        conn_fact = sqlite3.connect('factory_data.db')
+        c_cats = conn_fact.execute("SELECT name FROM categories ORDER BY name ASC").fetchall()
+        all_categories = [c[0] for c in c_cats]
+        conn_fact.close()
+    except Exception as e:
+        all_categories = []
+        st.warning("Kategori listesi okunamadı, factory_data.db kontrol edilmeli.")
+
     # --- KULLANICI VERİLERİNİ ÇEK ---
     conn = sqlite3.connect('users.db')
-    # Bütün kullanıcıları çek (Kendinizi yanlışlıkla silmemeniz için küçük bir uyarı koyacağız)
-    users = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role FROM users ORDER BY id DESC").fetchall()
+    # Bütün kullanıcıları çek (allowed_categories sütununu da dahil ettik)
+    try:
+        users = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role, allowed_categories FROM users ORDER BY id DESC").fetchall()
+    except:
+        # Eğer allowed_categories sütunu eski kodda yoksa, sistemi çökertmeden okusun
+        users_old = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role FROM users ORDER BY id DESC").fetchall()
+        users = [(*u, "") for u in users_old] # allowed_categories yerine boş değer bas
     conn.close()
     
     # --- SATIŞ VERİLERİNİ ÇEK (İstatistikler için) ---
     conn_s = sqlite3.connect('sales_data.db')
-    all_offers = conn_s.execute("SELECT user_id, status, total_price FROM offers").fetchall()
+    try:
+        all_offers = conn_s.execute("SELECT user_id, status, total_price FROM offers").fetchall()
+    except:
+        all_offers = []
     conn_s.close()
     
-    df_offers = pd.DataFrame(all_offers, columns=['user_id', 'status', 'total_price'])
+    df_offers = pd.DataFrame(all_offers, columns=['user_id', 'status', 'total_price']) if all_offers else pd.DataFrame(columns=['user_id', 'status', 'total_price'])
     
     if not users:
         st.info("Sistemde henüz kayıtlı kullanıcı bulunmuyor.")
@@ -35,16 +53,16 @@ def show_dealer_management():
 
     # KULLANICILARI LİSTELE
     for u in users:
-        u_id, u_company, u_email, u_phone, u_type, u_approved, u_menus, u_role = u
+        u_id, u_company, u_email, u_phone, u_type, u_approved, u_menus, u_role, u_allowed_cats = u
         
         # --- İSTATİSTİKLERİ HESAPLA ---
-        dealer_offers = df_offers[df_offers['user_id'] == u_id]
+        dealer_offers = df_offers[df_offers['user_id'] == u_id] if not df_offers.empty else pd.DataFrame()
         t_count = len(dealer_offers)
-        t_vol = dealer_offers['total_price'].sum()
+        t_vol = dealer_offers['total_price'].sum() if t_count > 0 else 0
         
-        conv_offers = dealer_offers[dealer_offers['status'].isin(["Onaylandı", "Siparişe Çevir"])]
+        conv_offers = dealer_offers[dealer_offers['status'].isin(["Onaylandı", "Siparişe Çevir"])] if t_count > 0 else pd.DataFrame()
         c_count = len(conv_offers)
-        c_vol = conv_offers['total_price'].sum()
+        c_vol = conv_offers['total_price'].sum() if c_count > 0 else 0
         
         with st.container(border=True):
             status_color = "#10b981" if u_approved else "#ef4444"
@@ -96,11 +114,32 @@ def show_dealer_management():
                     
                     new_email = c1.text_input("E-Posta Adresi", value=u_email)
                     new_phone = c2.text_input("Telefon", value=u_phone if u_phone else "")
+
+                    # 🚀 YENİ: SADECE BAYİLER İÇİN KATEGORİ SEÇİMİ 🚀
+                    new_cats_str = ""
+                    if new_type == "Satıcı (Bayi)":
+                        st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+                        st.markdown("<div style='font-size:13px; font-weight:800; color:#ea580c; margin-bottom:5px;'>📦 Satıcının Teklif Verebileceği Kategoriler (Filtre):</div>", unsafe_allow_html=True)
+                        
+                        current_cats = [x.strip() for x in str(u_allowed_cats).split(",")] if u_allowed_cats else all_categories
+                        # Multiselect ile satıcının göreceği kategorileri kısıtla
+                        selected_cats = st.multiselect(
+                            "Satış yapmasına izin verilen makine kategorilerini seçin:", 
+                            options=all_categories,
+                            default=[c for c in current_cats if c in all_categories],
+                            help="Eğer hiçbirini seçmezseniz bayi hiçbir makineyi göremez!"
+                        )
+                        new_cats_str = ",".join(selected_cats)
+                    elif new_type == "Yönetici":
+                        st.info("💡 Yönetici tüm kategorileri görebilir, yetki kısıtlamasına gerek yoktur.")
+                        new_cats_str = ""
+                    elif new_type == "Üretici":
+                        st.info("💡 Üretici sadece kendi eklediği makineleri görebilir, kategori kısıtlamasına gerek yoktur.")
+                        new_cats_str = ""
                     
                     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-                    st.markdown("<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>🔑 Kullanıcının Görüntüleyebileceği Menüler:</div>", unsafe_allow_html=True)
+                    st.markdown("<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>🔑 Kullanıcının Görüntüleyebileceği Sayfa Menüleri:</div>", unsafe_allow_html=True)
                     
-                    # Bütün Menüler Eklendi!
                     menu_options = {
                         "m_dash": "📊 Dashboard",
                         "m_new": "📝 Yeni Teklif Hazırla",
@@ -123,15 +162,23 @@ def show_dealer_management():
                     new_menus_str = ",".join(selected_menus)
                     
                     # Seçilen tipe göre arka planda "role" atamasını yapıyoruz
-                    new_role = "admin" if new_type == "Yönetici" else ("manufacturer" if new_type == "Üretici" else "dealer")
+                    # (Satıcı -> Dealer, Üretici -> Producer, Yönetici -> Admin)
+                    new_role = "admin" if new_type == "Yönetici" else ("Producer" if new_type == "Üretici" else "Dealer")
                     
                     st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
                     submit_btn = st.form_submit_button("🔄 BİLGİLERİ VE YETKİLERİ GÜNCELLE", type="primary", use_container_width=True)
                     
                     if submit_btn:
                         conn_update = sqlite3.connect('users.db')
-                        conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=? WHERE id=?", 
-                                            (new_company, new_type, new_email, new_phone, new_menus_str, new_role, u_id))
+                        try:
+                            conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
+                                                (new_company, new_type, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
+                        except:
+                            # Sütun veritabanında henüz yoksa zorla ekle (Sadece 1 kere çalışır)
+                            conn_update.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
+                            conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
+                                                (new_company, new_type, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
+                            
                         conn_update.commit(); conn_update.close()
                         st.toast(f"{new_company} yetkileri güncellendi!")
                         st.rerun()
@@ -139,7 +186,6 @@ def show_dealer_management():
                 st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
                 c3, c4 = st.columns(2)
                 
-                # Kendini askıya almasını veya silmesini engelleyelim
                 if u_id == st.session_state.user_id:
                     st.info("💡 Kendi yönetici hesabınızı askıya alamaz veya silemezsiniz.")
                 else:
