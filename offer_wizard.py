@@ -170,11 +170,11 @@ def get_index(lst, item, default=None):
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
+    # ❌ stHeader'ı gizleyen sorunlu CSS kodu buradan kaldırıldı! Menü butonu artık hep görünür olacak.
     st.markdown("""
         <style>
-        header[data-testid="stHeader"] { display: none !important; }
         div[data-testid="stToolbar"] { display: none !important; }
-        .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; max-width: 100% !important; }
+        .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; max-width: 100% !important; }
         div[data-baseweb="select"] input { caret-color: transparent !important; inputmode: none !important; }
         div.st-emotion-cache-1jicfl2 { border-radius: 12px !important; border: 1px solid #e2e8f0 !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; padding: 1.5rem !important; }
         .stSelectbox label, .stTextInput label, .stNumberInput label, .stTextArea label { font-size: 13px !important; font-weight: 700 !important; color: #475569 !important; margin-bottom:4px !important; }
