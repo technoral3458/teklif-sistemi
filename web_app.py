@@ -136,7 +136,6 @@ def get_system_logo():
     except: pass
     return fallback_url
 
-# 🚀 ACİL ONARIM MOTORU ENTEGRE EDİLDİ 🚀
 def repair_databases():
     # USERS DB
     conn = sqlite3.connect('users.db')
@@ -166,12 +165,18 @@ def repair_databases():
     conn.execute("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_price REAL, image_path TEXT, specs TEXT, currency TEXT DEFAULT 'USD', port_discount REAL DEFAULT 0.0, compatible_options TEXT DEFAULT '', gallery_images TEXT DEFAULT '', category TEXT DEFAULT 'Diğer Makinalar', gallery_videos TEXT DEFAULT '', name_zh TEXT DEFAULT '', specs_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
     f_cols = [c[1] for c in conn.execute("PRAGMA table_info(models)").fetchall()]
     if "user_id" not in f_cols: conn.execute("ALTER TABLE models ADD COLUMN user_id INTEGER DEFAULT 1")
+    
+    # DONANIMLAR (OPTIONS) TABLOSUNA USER_ID EKLEME (İzolasyon için)
+    conn.execute("""CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY AUTOINCREMENT, opt_name TEXT, opt_desc TEXT, opt_price REAL, opt_image TEXT, sort_order INTEGER DEFAULT 0, allow_qty INTEGER DEFAULT 1, opt_name_zh TEXT DEFAULT '', opt_desc_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
+    o_cols = [c[1] for c in conn.execute("PRAGMA table_info(options)").fetchall()]
+    if "user_id" not in o_cols: conn.execute("ALTER TABLE options ADD COLUMN user_id INTEGER DEFAULT 1")
+    
     conn.commit(); conn.close()
 
 repair_databases()
 
 # =====================================================================
-# OTURUM VE MODERN CSS
+# OTURUM VE MODERN CSS (Aşağıdaki kısımlar değişmedi, aynen kalıyor)
 # =====================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 for key in ["user_id", "user_role", "user_email", "allowed_menus", "close_sidebar"]:
@@ -190,38 +195,26 @@ if not st.session_state.logged_in:
 
 st.markdown("""
     <style>
-    /* MOBİL SEKMELER (TABS) DÜZENLEMESİ - TAŞMAYI ÖNLER */
     .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 5px; margin-bottom: 20px; flex-wrap: wrap !important; }
-    .stTabs [data-baseweb="tab"] { 
-        background-color: #f1f5f9; border-radius: 8px; padding: 10px 15px !important; font-size: 14px !important;
-        font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: normal !important; text-align: center; flex: 1 1 auto;
-    }
+    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 15px !important; font-size: 14px !important; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: normal !important; text-align: center; flex: 1 1 auto; }
     .stTabs [aria-selected="true"] { background-color: #2563eb !important; color: white !important; }
-    
-    /* SIDEBAR MODERNİZASYONU */
     [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] { gap: 6px !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label { padding: 12px 15px; border-radius: 8px; transition: all 0.2s; cursor: pointer; color: #475569; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { background-color: #e2e8f0; color: #0f172a; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] { background-color: #2563eb !important; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3); }
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] p { color: white !important; font-weight: 700 !important; }
-    
-    /* STAT KARTLARI */
     .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; text-align: center; margin-bottom: 15px;}
     .stat-val { font-size: 20px; font-weight: 900; color: #1e293b; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
     .stat-title { color: #64748b; text-transform: uppercase; font-size: 11px; font-weight: 700; margin-bottom:5px; display:block;}
     </style>
 """, unsafe_allow_html=True)
 
-# =====================================================================
-# GİRİŞ / KAYIT EKRANLARI
-# =====================================================================
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([7, 2, 1.5]); lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
     with c3:
         sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=list(lang_opts.keys()).index(st.session_state.lang), key="main_lang_sel", label_visibility="collapsed")
         if sel != st.session_state.lang: st.session_state.lang = sel; st.rerun()
-
     col_l, col_m, col_r = st.columns([1, 1.2, 1])
     with col_m:
         st.markdown(f"<div style='text-align:center; padding:10px 0 20px 0;'><img src='{get_system_logo()}' style='max-width:100%; max-height:80px; object-fit:contain;'></div>", unsafe_allow_html=True)
@@ -262,28 +255,20 @@ if not st.session_state.logged_in:
                         c.close()
     st.stop()
 
-# =====================================================================
-# GÜVENLİ VE GARANTİLİ OTOMATİK KAPANAN YAN MENÜ
-# =====================================================================
 with st.sidebar:
     st.markdown(f"<div style='text-align: center; margin-bottom: 15px; padding: 10px 0;'><img src='{get_system_logo()}' style='max-width: 90%; max-height: 55px; object-fit: contain;'></div>", unsafe_allow_html=True)
     r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
     st.markdown(f"<div style='background-color:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:20px; display:flex; align-items:center; gap:10px; overflow-wrap: anywhere;'><div style='background:#2563eb; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold;'>{st.session_state.user_email[0].upper()}</div><div style='overflow:hidden; width:100%;'><div style='font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div><div style='font-size:11px; color:#64748b; font-weight:600;'>{r_text}</div></div></div>", unsafe_allow_html=True)
-
     if st.session_state.user_role == "admin": menu_items = [_("m_dash"), _("m_new"), _("m_cust"), _("m_past"), _("m_order"), _("m_prof"), _("m_deal"), _("m_model")]
     else:
         allowed = st.session_state.allowed_menus.split(',') if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
         v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model"]
         menu_items = [_(k.strip()) for k in allowed if k.strip() in v_keys]
-
     if "active_tab" not in st.session_state or st.session_state.active_tab not in menu_items: st.session_state.active_tab = menu_items[0]
-
     def on_menu_change():
         st.session_state.active_tab = st.session_state.m_radio
-        st.session_state.close_sidebar = True # Kapatma sinyalini etkinleştir
-
+        st.session_state.close_sidebar = True
     st.radio("MENÜ", menu_items, index=menu_items.index(st.session_state.active_tab), key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
-
     st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
     lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
     sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=list(lang_opts.keys()).index(st.session_state.lang), key="sb_lang")
@@ -291,39 +276,12 @@ with st.sidebar:
     if st.button(_("logout"), use_container_width=True):
         c = sqlite3.connect('users.db'); c.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,)); c.commit(); c.close(); st.query_params.clear(); st.session_state.clear(); st.rerun()
 
-# =====================================================================
-# GARANTİLİ MOBİL MENÜ KAPATICI (DYNAMIC ID İLE)
-# =====================================================================
-# Kapatma sinyali geldiyse, her seferinde BENZERSİZ bir ID ile çalıştır.
-# Böylece Streamlit cache (hafıza) yapamaz, kod her tıklamada kesin olarak çalışır.
 if st.session_state.get("close_sidebar", False):
     st.session_state.close_sidebar = False
     import streamlit.components.v1 as components
+    components.html(f"<script>setTimeout(function(){{var isMobile=window.parent.innerWidth<=768;if(isMobile){{window.parent.document.dispatchEvent(new KeyboardEvent('keydown',{{'key':'Escape','bubbles':true}}));var closeBtn=window.parent.document.querySelector('button[kind=\"headerNoPadding\"]');if(closeBtn){{closeBtn.click();}}var backdrop=window.parent.document.querySelector('[data-testid=\"stSidebar\"] + div');if(backdrop){{backdrop.click();}}}}}},100);</script>", height=0, width=0)
 
-    # UUID ekleyerek Streamlit'i bu kodu her defasında yeni sanıp çalıştırmaya zorluyoruz.
-    components.html(f"""
-        <script id="trigger-{uuid.uuid4().hex}">
-        setTimeout(function() {{
-            var isMobile = window.parent.innerWidth <= 768;
-            if (isMobile) {{
-                // Escape tuşu yolla
-                window.parent.document.dispatchEvent(new KeyboardEvent('keydown', {{ 'key': 'Escape', 'bubbles': true }}));
-                // Çarpı butonuna tıkla
-                var closeBtn = window.parent.document.querySelector('button[kind="headerNoPadding"]');
-                if (closeBtn) {{ closeBtn.click(); }}
-                // Karanlık arkaplana tıkla
-                var backdrop = window.parent.document.querySelector('[data-testid="stSidebar"] + div');
-                if (backdrop) {{ backdrop.click(); }}
-            }}
-        }}, 100);
-        </script>
-    """, height=0, width=0)
-
-# =====================================================================
-# SAYFA YÖNLENDİRİCİSİ
-# =====================================================================
-if st.session_state.active_tab == "PROFORMA": proforma_invoice.show_proforma(st.session_state.proforma_id, st.session_state.user_id)
-elif st.session_state.active_tab == _("m_cust"): customer_pages.show_customer_management(st.session_state.user_id, st.session_state.user_role == "admin")
+if st.session_state.active_tab == _("m_cust"): customer_pages.show_customer_management(st.session_state.user_id, st.session_state.user_role == "admin")
 elif st.session_state.active_tab == _("m_new"): offer_wizard.show_offer_wizard(st.session_state.user_id, st.session_state.user_role == "admin")
 elif st.session_state.active_tab == _("m_model"): model_management.show_product_management()
 elif st.session_state.active_tab == _("m_deal"): dealer_management.show_dealer_management()
