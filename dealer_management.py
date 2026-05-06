@@ -7,7 +7,7 @@ import pandas as pd
 # =====================================================================
 DICT_DEALER = {
     "tr": {
-        "title": "🏢 Bayi ve Üretici Yönetimi",
+        "title": "🏢 Bayi ve Üretici Yönetimi (V2 GÜNCEL)",
         "search_ph": "🔍 Kullanıcı Ara (Firma Adı, E-Posta veya Telefon ile)",
         "no_user": "Sistemde henüz kayıtlı kullanıcı bulunmuyor.",
         "no_match": "Arama kriterinize uygun kullanıcı bulunamadı.",
@@ -33,7 +33,7 @@ DICT_DEALER = {
         "m_deal": "🏢 Bayi / Kullanıcı Yönetimi", "m_prof": "⚙️ Profil Ayarlarım"
     },
     "en": {
-        "title": "🏢 Dealer and Manufacturer Management",
+        "title": "🏢 Dealer and Manufacturer Management (V2 UPDATED)",
         "search_ph": "🔍 Search User (by Company, Email or Phone)",
         "no_user": "No registered users found in the system.",
         "no_match": "No users match your search criteria.",
@@ -59,7 +59,7 @@ DICT_DEALER = {
         "m_deal": "🏢 Dealer / User Management", "m_prof": "⚙️ Profile Settings"
     },
     "zh": {
-        "title": "🏢 经销商和制造商管理",
+        "title": "🏢 经销商和制造商管理 (V2 更新)",
         "search_ph": "🔍 搜索用户 (按公司、电子邮件或电话)",
         "no_user": "系统中尚未找到注册用户。",
         "no_match": "未找到符合搜索条件的用户。",
@@ -86,13 +86,10 @@ DICT_DEALER = {
     }
 }
 
-# 🚀 DİL MOTORU (Garanti Çözüm) 🚀
 def _m(key): 
-    # Dil hem 'language' hem de 'lang' anahtarlarında aranır, yoksa Türkçe kalır
     lang = "tr"
     if "language" in st.session_state: lang = st.session_state.language
     elif "lang" in st.session_state: lang = st.session_state.lang
-    
     lang = str(lang).lower()
     if lang not in DICT_DEALER: lang = "tr"
     return DICT_DEALER[lang].get(key, key)
@@ -118,7 +115,6 @@ repair_users_db()
 def show_dealer_management():
     st.header(_m("title"))
     
-    # --- ARAMA ÇUBUĞU ---
     search_query = st.text_input(_m("search_ph"), placeholder=_m("search_ph"))
     st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
     
@@ -136,7 +132,8 @@ def show_dealer_management():
     try:
         users = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role, allowed_categories FROM users ORDER BY id DESC").fetchall()
     except:
-        users = []
+        users_old = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role FROM users ORDER BY id DESC").fetchall()
+        users = [(*u, "") for u in users_old]
     conn.close()
     
     # --- SATIŞ VERİLERİNİ ÇEK ---
@@ -163,7 +160,6 @@ def show_dealer_management():
     types_internal = ["Satıcı (Bayi)", "Üretici", "Yönetici"]
     types_display = [_m("type_dealer"), _m("type_prod"), _m("type_admin")]
 
-    # KULLANICILARI LİSTELE
     for u in users:
         u_id, u_company, u_email, u_phone, u_type, u_approved, u_menus, u_role, u_allowed_cats = u
         
@@ -217,31 +213,33 @@ def show_dealer_management():
                 </div>
             """, unsafe_allow_html=True)
             
-            # 🚀 FORMU GERİ GETİRDİK (Açılır kutunun çökmesini engeller) 🚀
+            # --- DÜZENLEME VE YETKİLENDİRME (FORM YAPISI KULLANILDI VE ANAHTAR EKLENDİ) ---
             with st.expander(_m("edit_auth"), expanded=False):
-                with st.form(key=f"form_dealer_{u_id}"):
+                with st.form(key=f"frm_user_{u_id}"):
                     c1, c2 = st.columns(2)
-                    new_company = c1.text_input(_m("comp_name"), value=u_company)
+                    new_company = c1.text_input(_m("comp_name"), value=u_company, key=f"inp_cmp_{u_id}")
                     
                     idx_type = types_internal.index(u_type) if u_type in types_internal else 0
-                    sel_type_disp = c2.selectbox(_m("act_type"), types_display, index=idx_type)
+                    sel_type_disp = c2.selectbox(_m("act_type"), types_display, index=idx_type, key=f"inp_typ_{u_id}")
                     new_type_internal = types_internal[types_display.index(sel_type_disp)]
                     
-                    new_email = c1.text_input(_m("email"), value=u_email)
-                    new_phone = c2.text_input(_m("phone"), value=u_phone if u_phone else "")
+                    new_email = c1.text_input(_m("email"), value=u_email, key=f"inp_eml_{u_id}")
+                    new_phone = c2.text_input(_m("phone"), value=u_phone if u_phone else "", key=f"inp_phn_{u_id}")
 
-                    # 🚀 KATEGORİ MENÜSÜ HER ZAMAN GÖRÜNÜR OLACAK 🚀
+                    # KATEGORİ MENÜSÜ HER ZAMAN GÖZÜKÜR
                     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
                     st.markdown(f"<div style='font-size:13px; font-weight:800; color:#ea580c; margin-bottom:5px;'>{_m('cat_title')}</div>", unsafe_allow_html=True)
-                    st.caption(_m("cat_warn")) # Notu da ekledik
+                    st.caption(_m("cat_warn"))
                     
                     current_cats = [x.strip() for x in str(u_allowed_cats).split(",")] if u_allowed_cats else all_categories
                     safe_defaults = [c for c in current_cats if c in all_categories]
                     
+                    # BURASI ÇÖKMEYİ ENGELLEYEN YERDİR (key EKLENDİ)
                     selected_cats = st.multiselect(
                         _m("cat_help"), 
                         options=all_categories,
-                        default=safe_defaults
+                        default=safe_defaults,
+                        key=f"inp_cat_{u_id}"
                     )
                     
                     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
@@ -268,11 +266,8 @@ def show_dealer_management():
                     submit_btn = st.form_submit_button(_m("btn_update"), type="primary", use_container_width=True)
                     
                     if submit_btn:
-                        # Eğer Satıcı değilse kategorileri kaydetme (her şeye yetkisi var demektir)
-                        if new_type_internal == "Satıcı (Bayi)":
-                            new_cats_str = ",".join(selected_cats)
-                        else:
-                            new_cats_str = ""
+                        if new_type_internal == "Satıcı (Bayi)": new_cats_str = ",".join(selected_cats)
+                        else: new_cats_str = ""
 
                         conn_update = sqlite3.connect('users.db')
                         try:
