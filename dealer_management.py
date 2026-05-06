@@ -2,14 +2,130 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 
+# =====================================================================
+# 🌍 ÇOKLU DİL SÖZLÜĞÜ (TR - EN - ZH)
+# =====================================================================
+DICT_DEALER = {
+    "tr": {
+        "title": "🏢 Bayi ve Üretici Yönetimi",
+        "search_ph": "🔍 Kullanıcı Ara (Firma Adı, E-Posta veya Telefon ile)",
+        "no_user": "Sistemde henüz kayıtlı kullanıcı bulunmuyor.",
+        "no_match": "Arama kriterinize uygun kullanıcı bulunamadı.",
+        "active": "Aktif", "pending": "Askıda / Onay Bekliyor",
+        "badge_admin": "👑 YÖNETİCİ", "not_spec": "Belirtilmemiş",
+        "tot_offer": "Toplam Teklif", "tot_vol": "Toplam Hacim",
+        "conv_offer": "Siparişe Dönen", "conv_vol": "Sipariş Hacmi",
+        "edit_auth": "✏️ Bilgileri Düzenle ve Yetkileri Yönet",
+        "comp_name": "Firma Adı", "act_type": "Faaliyet Türü / Yetki",
+        "email": "E-Posta Adresi", "phone": "Telefon",
+        "type_dealer": "Satıcı (Bayi)", "type_prod": "Üretici", "type_admin": "Yönetici",
+        "cat_title": "📦 Satıcının Teklif Verebileceği Kategoriler (Filtre):",
+        "cat_help": "Satış yapmasına izin verilen makine kategorilerini seçin:",
+        "cat_warn": "Eğer hiçbirini seçmezseniz bayi hiçbir makineyi göremez!",
+        "info_admin": "💡 Yönetici tüm kategorileri görebilir, yetki kısıtlamasına gerek yoktur.",
+        "info_prod": "💡 Üretici sadece kendi eklediği makineleri görebilir, kategori kısıtlamasına gerek yoktur.",
+        "menu_title": "🔑 Kullanıcının Görüntüleyebileceği Sayfa Menüleri:",
+        "btn_update": "🔄 BİLGİLERİ VE YETKİLERİ GÜNCELLE",
+        "toast_upd": "yetkileri güncellendi!",
+        "err_self": "💡 Kendi yönetici hesabınızı askıya alamaz veya silemezsiniz.",
+        "btn_sus": "🚫 Hesabı Askıya Al", "btn_app": "✅ Hesabı Onayla / Aktifleştir", "btn_del": "🗑️ Tamamen Sil",
+        
+        # Menü İsimleri
+        "m_dash": "📊 Dashboard", "m_new": "📝 Yeni Teklif Hazırla", "m_cust": "👥 Müşterilerim",
+        "m_past": "📋 Geçmiş Tekliflerim", "m_order": "📦 Siparişler", "m_model": "📦 Tüm Modelleri Yönet",
+        "m_deal": "🏢 Bayi / Kullanıcı Yönetimi", "m_prof": "⚙️ Profil Ayarlarım"
+    },
+    "en": {
+        "title": "🏢 Dealer and Manufacturer Management",
+        "search_ph": "🔍 Search User (by Company, Email or Phone)",
+        "no_user": "No registered users found in the system.",
+        "no_match": "No users match your search criteria.",
+        "active": "Active", "pending": "Suspended / Pending",
+        "badge_admin": "👑 ADMIN", "not_spec": "Not Specified",
+        "tot_offer": "Total Offers", "tot_vol": "Total Volume",
+        "conv_offer": "Converted to Order", "conv_vol": "Order Volume",
+        "edit_auth": "✏️ Edit Info & Manage Permissions",
+        "comp_name": "Company Name", "act_type": "Activity Type / Role",
+        "email": "Email Address", "phone": "Phone",
+        "type_dealer": "Dealer", "type_prod": "Producer", "type_admin": "Admin",
+        "cat_title": "📦 Allowed Categories for Dealer (Filter):",
+        "cat_help": "Select allowed machine categories for sales:",
+        "cat_warn": "If you leave this empty, the dealer won't see any machines!",
+        "info_admin": "💡 Admins can see all categories, no restriction needed.",
+        "info_prod": "💡 Producers only see their own machines, no restriction needed.",
+        "menu_title": "🔑 Accessible Page Menus for User:",
+        "btn_update": "🔄 UPDATE INFO & PERMISSIONS",
+        "toast_upd": "permissions updated!",
+        "err_self": "💡 You cannot suspend or delete your own admin account.",
+        "btn_sus": "🚫 Suspend Account", "btn_app": "✅ Approve / Activate Account", "btn_del": "🗑️ Delete Completely",
+        
+        "m_dash": "📊 Dashboard", "m_new": "📝 Create New Offer", "m_cust": "👥 My Customers",
+        "m_past": "📋 My Past Offers", "m_order": "📦 Orders", "m_model": "📦 Manage All Models",
+        "m_deal": "🏢 Dealer / User Management", "m_prof": "⚙️ Profile Settings"
+    },
+    "zh": {
+        "title": "🏢 经销商和制造商管理",
+        "search_ph": "🔍 搜索用户 (按公司、电子邮件或电话)",
+        "no_user": "系统中尚未找到注册用户。",
+        "no_match": "未找到符合搜索条件的用户。",
+        "active": "活跃", "pending": "暂停 / 待批准",
+        "badge_admin": "👑 管理员", "not_spec": "未指定",
+        "tot_offer": "总报价", "tot_vol": "总交易量",
+        "conv_offer": "已转为订单", "conv_vol": "订单量",
+        "edit_auth": "✏️ 编辑信息和管理权限",
+        "comp_name": "公司名称", "act_type": "活动类型/角色",
+        "email": "电子邮件", "phone": "电话",
+        "type_dealer": "经销商", "type_prod": "制造商", "type_admin": "管理员",
+        "cat_title": "📦 经销商允许的类别 (过滤器):",
+        "cat_help": "选择允许销售的机器类别:",
+        "cat_warn": "如果留空，经销商将看不到任何机器！",
+        "info_admin": "💡 管理员可以查看所有类别，无需限制。",
+        "info_prod": "💡 制造商只能看到自己的机器，无需限制。",
+        "menu_title": "🔑 用户可访问的页面菜单:",
+        "btn_update": "🔄 更新信息和权限",
+        "toast_upd": "权限已更新！",
+        "err_self": "💡 您不能暂停或删除自己的管理员帐户。",
+        "btn_sus": "🚫 暂停帐户", "btn_app": "✅ 批准/激活帐户", "btn_del": "🗑️ 完全删除",
+        
+        "m_dash": "📊 仪表板", "m_new": "📝 创建新报价", "m_cust": "👥 我的客户",
+        "m_past": "📋 我的历史报价", "m_order": "📦 订单", "m_model": "📦 管理所有型号",
+        "m_deal": "🏢 经销商/用户管理", "m_prof": "⚙️ 配置文件设置"
+    }
+}
+
+def _m(key): 
+    lang = st.session_state.get('lang', 'tr')
+    return DICT_DEALER.get(lang, DICT_DEALER["tr"]).get(key, key)
+
+# =====================================================================
+# VERİTABANI GÜVENLİ ONARIM (Eksik sütunları sayfa açılmadan ekler)
+# =====================================================================
+def repair_users_db():
+    try:
+        conn = sqlite3.connect('users.db')
+        cols = [c[1] for c in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "role" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'Dealer'")
+        if "allowed_categories" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
+        conn.commit()
+        conn.close()
+    except: pass
+
+# Sayfa yüklenirken veritabanını onar
+repair_users_db()
+
+# =====================================================================
+# ANA SAYFA GÖRÜNÜMÜ
+# =====================================================================
 def show_dealer_management():
-    st.header("🏢 Bayi ve Üretici Yönetimi")
+    st.header(_m("title"))
     
     # --- ARAMA ÇUBUĞU ---
-    search_query = st.text_input("🔍 Kullanıcı Ara (Firma Adı, E-Posta veya Telefon ile)", placeholder="Aramak istediğiniz kelimeyi yazın...")
+    search_query = st.text_input(_m("search_ph"), placeholder=_m("search_ph"))
     st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
     
-    # --- KATEGORİ LİSTESİNİ ÇEK (Sadece satıcıları yetkilendirmek için factory_data.db'den okuyoruz) ---
+    # --- KATEGORİ LİSTESİNİ ÇEK ---
     try:
         conn_fact = sqlite3.connect('factory_data.db')
         c_cats = conn_fact.execute("SELECT name FROM categories ORDER BY name ASC").fetchall()
@@ -17,17 +133,13 @@ def show_dealer_management():
         conn_fact.close()
     except Exception as e:
         all_categories = []
-        st.warning("Kategori listesi okunamadı, factory_data.db kontrol edilmeli.")
 
     # --- KULLANICI VERİLERİNİ ÇEK ---
     conn = sqlite3.connect('users.db')
-    # Bütün kullanıcıları çek (allowed_categories sütununu da dahil ettik)
     try:
         users = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role, allowed_categories FROM users ORDER BY id DESC").fetchall()
     except:
-        # Eğer allowed_categories sütunu eski kodda yoksa, sistemi çökertmeden okusun
-        users_old = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role FROM users ORDER BY id DESC").fetchall()
-        users = [(*u, "") for u in users_old] # allowed_categories yerine boş değer bas
+        users = []
     conn.close()
     
     # --- SATIŞ VERİLERİNİ ÇEK (İstatistikler için) ---
@@ -41,15 +153,19 @@ def show_dealer_management():
     df_offers = pd.DataFrame(all_offers, columns=['user_id', 'status', 'total_price']) if all_offers else pd.DataFrame(columns=['user_id', 'status', 'total_price'])
     
     if not users:
-        st.info("Sistemde henüz kayıtlı kullanıcı bulunmuyor.")
+        st.info(_m("no_user"))
         return
         
     if search_query:
         search_query = search_query.lower()
         users = [u for u in users if search_query in str(u[1]).lower() or search_query in str(u[2]).lower() or search_query in str(u[3]).lower()]
         if not users:
-            st.warning("Arama kriterinize uygun kullanıcı bulunamadı.")
+            st.warning(_m("no_match"))
             return
+
+    # MANTIKSAL TİPLERİ UI (GÖZÜKEN) DİLE ÇEVİRMEK İÇİN HARİTALAMA
+    types_internal = ["Satıcı (Bayi)", "Üretici", "Yönetici"]
+    types_display = [_m("type_dealer"), _m("type_prod"), _m("type_admin")]
 
     # KULLANICILARI LİSTELE
     for u in users:
@@ -66,11 +182,17 @@ def show_dealer_management():
         
         with st.container(border=True):
             status_color = "#10b981" if u_approved else "#ef4444"
-            status_text = "Aktif" if u_approved else "Askıda / Onay Bekliyor"
+            status_text = _m("active") if u_approved else _m("pending")
             
-            # Adminleri belirginleştirelim
-            role_badge = "👑 YÖNETİCİ" if u_role == 'admin' else u_type
+            # Gözüken Rol İsmi
+            try:
+                display_badge = types_display[types_internal.index(u_type)]
+            except:
+                display_badge = u_type
+                
+            role_badge = _m("badge_admin") if u_role == 'admin' else display_badge
             badge_color = "#ea580c" if u_role == 'admin' else "#2563eb"
+            disp_phone = u_phone if u_phone else _m("not_spec")
             
             st.markdown(f"""
                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -78,77 +200,75 @@ def show_dealer_management():
                     <span style="background-color:{status_color}15; color:{status_color}; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:800; border:1px solid {status_color}50;">{status_text}</span>
                 </div>
                 <div style="font-size:14px; color:#64748b; margin-top:5px; margin-bottom:15px;">
-                    <b style="color:{badge_color};">{role_badge}</b> | 📧 {u_email} | 📞 {u_phone if u_phone else 'Belirtilmemiş'}
+                    <b style="color:{badge_color};">{role_badge}</b> | 📧 {u_email} | 📞 {disp_phone}
                 </div>
             """, unsafe_allow_html=True)
             
             st.markdown(f"""
                 <div style="display:flex; gap:10px; margin-bottom:15px;">
                     <div style="flex:1; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; text-align:center;">
-                        <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Toplam Teklif</div>
+                        <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">{_m('tot_offer')}</div>
                         <div style="font-size:18px; color:#0f172a; font-weight:900;">{t_count}</div>
                     </div>
                     <div style="flex:1; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; text-align:center;">
-                        <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Toplam Hacim</div>
+                        <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">{_m('tot_vol')}</div>
                         <div style="font-size:18px; color:#3b82f6; font-weight:900;">{t_vol:,.0f}</div>
                     </div>
                     <div style="flex:1; background:#ecfdf5; padding:10px; border-radius:8px; border:1px solid #a7f3d0; text-align:center;">
-                        <div style="font-size:11px; color:#059669; font-weight:700; text-transform:uppercase;">Siparişe Dönen</div>
+                        <div style="font-size:11px; color:#059669; font-weight:700; text-transform:uppercase;">{_m('conv_offer')}</div>
                         <div style="font-size:18px; color:#10b981; font-weight:900;">{c_count}</div>
                     </div>
                     <div style="flex:1; background:#ecfdf5; padding:10px; border-radius:8px; border:1px solid #a7f3d0; text-align:center;">
-                        <div style="font-size:11px; color:#059669; font-weight:700; text-transform:uppercase;">Sipariş Hacmi</div>
+                        <div style="font-size:11px; color:#059669; font-weight:700; text-transform:uppercase;">{_m('conv_vol')}</div>
                         <div style="font-size:18px; color:#10b981; font-weight:900;">{c_vol:,.0f}</div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
             
             # --- DÜZENLEME VE MENÜ YETKİLENDİRME ALANI ---
-            with st.expander("✏️ Bilgileri Düzenle ve Yetkileri Yönet", expanded=False):
+            with st.expander(_m("edit_auth"), expanded=False):
                 with st.form(key=f"form_dealer_{u_id}"):
                     c1, c2 = st.columns(2)
-                    new_company = c1.text_input("Firma Adı", value=u_company)
+                    new_company = c1.text_input(_m("comp_name"), value=u_company)
                     
-                    types = ["Satıcı (Bayi)", "Üretici", "Yönetici"]
-                    new_type = c2.selectbox("Faaliyet Türü / Yetki", types, index=types.index(u_type) if u_type in types else 0)
+                    idx_type = types_internal.index(u_type) if u_type in types_internal else 0
+                    sel_type_disp = c2.selectbox(_m("act_type"), types_display, index=idx_type)
+                    # Seçilen UI dilindeki stringi veritabanı (Türkçe) standardına geri çevir
+                    new_type_internal = types_internal[types_display.index(sel_type_disp)]
                     
-                    new_email = c1.text_input("E-Posta Adresi", value=u_email)
-                    new_phone = c2.text_input("Telefon", value=u_phone if u_phone else "")
+                    new_email = c1.text_input(_m("email"), value=u_email)
+                    new_phone = c2.text_input(_m("phone"), value=u_phone if u_phone else "")
 
                     # 🚀 YENİ: SADECE BAYİLER İÇİN KATEGORİ SEÇİMİ 🚀
                     new_cats_str = ""
-                    if new_type == "Satıcı (Bayi)":
+                    if new_type_internal == "Satıcı (Bayi)":
                         st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-                        st.markdown("<div style='font-size:13px; font-weight:800; color:#ea580c; margin-bottom:5px;'>📦 Satıcının Teklif Verebileceği Kategoriler (Filtre):</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='font-size:13px; font-weight:800; color:#ea580c; margin-bottom:5px;'>{_m('cat_title')}</div>", unsafe_allow_html=True)
                         
                         current_cats = [x.strip() for x in str(u_allowed_cats).split(",")] if u_allowed_cats else all_categories
-                        # Multiselect ile satıcının göreceği kategorileri kısıtla
+                        safe_defaults = [c for c in current_cats if c in all_categories]
+                        
                         selected_cats = st.multiselect(
-                            "Satış yapmasına izin verilen makine kategorilerini seçin:", 
+                            _m("cat_help"), 
                             options=all_categories,
-                            default=[c for c in current_cats if c in all_categories],
-                            help="Eğer hiçbirini seçmezseniz bayi hiçbir makineyi göremez!"
+                            default=safe_defaults,
+                            help=_m("cat_warn")
                         )
                         new_cats_str = ",".join(selected_cats)
-                    elif new_type == "Yönetici":
-                        st.info("💡 Yönetici tüm kategorileri görebilir, yetki kısıtlamasına gerek yoktur.")
+                    elif new_type_internal == "Yönetici":
+                        st.info(_m("info_admin"))
                         new_cats_str = ""
-                    elif new_type == "Üretici":
-                        st.info("💡 Üretici sadece kendi eklediği makineleri görebilir, kategori kısıtlamasına gerek yoktur.")
+                    elif new_type_internal == "Üretici":
+                        st.info(_m("info_prod"))
                         new_cats_str = ""
                     
                     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-                    st.markdown("<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>🔑 Kullanıcının Görüntüleyebileceği Sayfa Menüleri:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>{_m('menu_title')}</div>", unsafe_allow_html=True)
                     
                     menu_options = {
-                        "m_dash": "📊 Dashboard",
-                        "m_new": "📝 Yeni Teklif Hazırla",
-                        "m_cust": "👥 Müşterilerim",
-                        "m_past": "📋 Geçmiş Tekliflerim",
-                        "m_order": "📦 Siparişler",
-                        "m_model": "📦 Tüm Modelleri Yönet",
-                        "m_deal": "🏢 Bayi / Kullanıcı Yönetimi",
-                        "m_prof": "⚙️ Profil Ayarlarım"
+                        "m_dash": _m("m_dash"), "m_new": _m("m_new"), "m_cust": _m("m_cust"),
+                        "m_past": _m("m_past"), "m_order": _m("m_order"), "m_model": _m("m_model"),
+                        "m_deal": _m("m_deal"), "m_prof": _m("m_prof")
                     }
                     current_menus = u_menus.split(',') if u_menus is not None else list(menu_options.keys())
                     
@@ -162,47 +282,39 @@ def show_dealer_management():
                     new_menus_str = ",".join(selected_menus)
                     
                     # Seçilen tipe göre arka planda "role" atamasını yapıyoruz
-                    # (Satıcı -> Dealer, Üretici -> Producer, Yönetici -> Admin)
-                    new_role = "admin" if new_type == "Yönetici" else ("Producer" if new_type == "Üretici" else "Dealer")
+                    new_role = "Admin" if new_type_internal == "Yönetici" else ("Producer" if new_type_internal == "Üretici" else "Dealer")
                     
                     st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
-                    submit_btn = st.form_submit_button("🔄 BİLGİLERİ VE YETKİLERİ GÜNCELLE", type="primary", use_container_width=True)
+                    submit_btn = st.form_submit_button(_m("btn_update"), type="primary", use_container_width=True)
                     
                     if submit_btn:
                         conn_update = sqlite3.connect('users.db')
-                        try:
-                            conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
-                                                (new_company, new_type, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
-                        except:
-                            # Sütun veritabanında henüz yoksa zorla ekle (Sadece 1 kere çalışır)
-                            conn_update.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
-                            conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
-                                                (new_company, new_type, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
-                            
+                        conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
+                                            (new_company, new_type_internal, new_email, new_phone, new_menus_str, new_role, new_cats_str, u_id))
                         conn_update.commit(); conn_update.close()
-                        st.toast(f"{new_company} yetkileri güncellendi!")
+                        st.toast(f"{new_company} {_m('toast_upd')}")
                         st.rerun()
                         
                 st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
                 c3, c4 = st.columns(2)
                 
-                if u_id == st.session_state.user_id:
-                    st.info("💡 Kendi yönetici hesabınızı askıya alamaz veya silemezsiniz.")
+                if u_id == st.session_state.get('user_id'):
+                    st.info(_m("err_self"))
                 else:
                     if u_approved:
-                        if c3.button("🚫 Hesabı Askıya Al", key=f"sus_{u_id}", use_container_width=True):
+                        if c3.button(_m("btn_sus"), key=f"sus_{u_id}", use_container_width=True):
                             conn_act = sqlite3.connect('users.db')
                             conn_act.execute("UPDATE users SET is_approved=0 WHERE id=?", (u_id,))
                             conn_act.commit(); conn_act.close()
                             st.rerun()
                     else:
-                        if c3.button("✅ Hesabı Onayla / Aktifleştir", key=f"app_{u_id}", use_container_width=True):
+                        if c3.button(_m("btn_app"), key=f"app_{u_id}", use_container_width=True):
                             conn_act = sqlite3.connect('users.db')
                             conn_act.execute("UPDATE users SET is_approved=1 WHERE id=?", (u_id,))
                             conn_act.commit(); conn_act.close()
                             st.rerun()
                             
-                    if c4.button("🗑️ Tamamen Sil", key=f"del_{u_id}", use_container_width=True):
+                    if c4.button(_m("btn_del"), key=f"del_{u_id}", use_container_width=True):
                         conn_act = sqlite3.connect('users.db')
                         conn_act.execute("DELETE FROM users WHERE id=?", (u_id,))
                         conn_act.commit(); conn_act.close()
