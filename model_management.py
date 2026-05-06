@@ -118,11 +118,15 @@ DICT_MODEL = {
 }
 
 def _m(key): 
-    lang = st.session_state.get('lang', 'tr')
-    return DICT_MODEL.get(lang, DICT_MODEL["tr"]).get(key, key)
+    lang = "tr"
+    if "language" in st.session_state: lang = st.session_state.language
+    elif "lang" in st.session_state: lang = st.session_state.lang
+    lang = str(lang).lower()
+    if lang not in DICT_MODEL: lang = "tr"
+    return DICT_MODEL[lang].get(key, key)
 
 # =====================================================================
-# VERİTABANI BAĞLANTILARI
+# VERİTABANI BAĞLANTILARI VE OTOMATİK ONARIM
 # =====================================================================
 def get_factory(query, params=()):
     try:
@@ -144,16 +148,18 @@ def repair_factory_db():
     exec_factory("CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY AUTOINCREMENT, opt_name TEXT, opt_desc TEXT, opt_price REAL, opt_image TEXT, sort_order INTEGER DEFAULT 0)")
     exec_factory("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_price REAL, image_path TEXT, specs TEXT, currency TEXT DEFAULT 'USD', port_discount REAL DEFAULT 0.0, compatible_options TEXT DEFAULT '', gallery_images TEXT DEFAULT '', category TEXT DEFAULT 'Diğer Makinalar', gallery_videos TEXT DEFAULT '')""")
     
-    try:
-        cols_mod = [c[1] for c in get_factory("PRAGMA table_info(models)")]
-        if "name_zh" not in cols_mod: exec_factory("ALTER TABLE models ADD COLUMN name_zh TEXT DEFAULT ''")
-        if "specs_zh" not in cols_mod: exec_factory("ALTER TABLE models ADD COLUMN specs_zh TEXT DEFAULT ''")
-        if "user_id" not in cols_mod: exec_factory("ALTER TABLE models ADD COLUMN user_id INTEGER DEFAULT 1")
-        
-        cols_opt = [c[1] for c in get_factory("PRAGMA table_info(options)")]
-        if "allow_qty" not in cols_opt: exec_factory("ALTER TABLE options ADD COLUMN allow_qty INTEGER DEFAULT 1")
-        if "opt_name_zh" not in cols_opt: exec_factory("ALTER TABLE options ADD COLUMN opt_name_zh TEXT DEFAULT ''")
-        if "opt_desc_zh" not in cols_opt: exec_factory("ALTER TABLE options ADD COLUMN opt_desc_zh TEXT DEFAULT ''")
+    # EKSİK SÜTUNLARI OTOMATİK EKLE
+    try: exec_factory("ALTER TABLE models ADD COLUMN name_zh TEXT DEFAULT ''")
+    except: pass
+    try: exec_factory("ALTER TABLE models ADD COLUMN specs_zh TEXT DEFAULT ''")
+    except: pass
+    try: exec_factory("ALTER TABLE models ADD COLUMN user_id INTEGER DEFAULT 1")
+    except: pass
+    try: exec_factory("ALTER TABLE options ADD COLUMN allow_qty INTEGER DEFAULT 1")
+    except: pass
+    try: exec_factory("ALTER TABLE options ADD COLUMN opt_name_zh TEXT DEFAULT ''")
+    except: pass
+    try: exec_factory("ALTER TABLE options ADD COLUMN opt_desc_zh TEXT DEFAULT ''")
     except: pass
 
 repair_factory_db()
@@ -226,10 +232,8 @@ def show_list_view(user_role):
         markers.forEach(function(m) {
             var container = m.closest('.element-container');
             if(!container) return;
-            
             var sibling = container.nextElementSibling;
             var targetRow = null;
-            
             for(var i=0; i<2; i++) {
                 if(sibling && sibling.getAttribute('data-testid') === 'stHorizontalBlock') {
                     targetRow = sibling; break;
@@ -239,13 +243,11 @@ def show_list_view(user_role):
                 }
                 if(sibling) sibling = sibling.nextElementSibling;
             }
-            
             if(targetRow) {
                 targetRow.style.setProperty('display', 'flex', 'important');
                 targetRow.style.setProperty('flex-direction', 'row', 'important');
                 targetRow.style.setProperty('flex-wrap', 'nowrap', 'important');
                 targetRow.style.setProperty('gap', '4px', 'important');
-                
                 var cols = targetRow.children;
                 for(var i=0; i<cols.length; i++) {
                     cols[i].style.setProperty('width', (100/cols.length) + '%', 'important');
@@ -273,7 +275,6 @@ def show_list_view(user_role):
 
         st.markdown("---")
         
-        # 🚀 ÜRETİCİ İSE SADECE KENDİSİNİN, DEĞİLSE HERKESİN MAKİNESİNİ ÇEK
         user_id = st.session_state.get("user_id", 1)
         if user_role == "manufacturer":
             mods = get_factory("SELECT id, name, category, base_price, currency, image_path, name_zh FROM models WHERE user_id=? ORDER BY category ASC, name ASC", (user_id,))
@@ -315,7 +316,6 @@ def show_list_view(user_role):
                                             st.session_state.edit_mod_id = safe_mod_id; st.session_state.form_loaded = False; st.session_state.view_mode = "mod_edit"; st.rerun()
                                     with btn_c2:
                                         if st.button(_m("btn_copy"), key=f"mc_{safe_mod_id}", use_container_width=True):
-                                            # KOPYALARKEN SAHİPLİĞİ DE (user_id) KOPYALAYAN KİŞİYE ATARIZ
                                             m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos, name_zh, specs_zh FROM models WHERE id=?", (safe_mod_id,))[0]
                                             exec_factory("""INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos, name_zh, specs_zh, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""", (m_data[0] + " (Copy)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9], m_data[10], m_data[11], user_id))
                                             st.success(_m("copied")); st.rerun()
@@ -404,7 +404,6 @@ def show_list_view(user_role):
                                     st.session_state.edit_cat_id = None; st.rerun()
                             else:
                                 st.markdown(f"<div style='text-align:center; padding:15px 0;'><span style='font-size:32px;'>📁</span><br><b style='color:#0f172a; font-size:16px;'>{cname}</b></div>", unsafe_allow_html=True)
-                                
                                 st.markdown('<div class="btn-marker" style="display:none;"></div>', unsafe_allow_html=True)
                                 bc1, bc2 = st.columns(2)
                                 with bc1:
@@ -436,10 +435,8 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
         if is_edit:
             res = get_factory("SELECT name, base_price, currency, category, port_discount, image_path, specs, compatible_options, name_zh, specs_zh FROM models WHERE id=?", (int(mod_id),))
             r = res[0]
-            
             m_name_tr, m_specs_tr, m_name_zh, m_specs_zh = r[0], r[6], r[8], r[9]
             st.session_state.f_name = m_name_zh if user_role == "manufacturer" and m_name_zh else m_name_tr
-            
             st.session_state.f_price, st.session_state.f_curr = float(r[1]), r[2]
             st.session_state.f_cat, st.session_state.f_disc, st.session_state.f_img = r[3], float(r[4]), r[5]
             
@@ -493,10 +490,8 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
         for i in range(len(st.session_state.f_specs)):
             with st.container(border=True):
                 col_t, col_d, col_i, col_x = st.columns([3, 4, 3, 1], vertical_alignment="bottom")
-                
                 st.session_state.f_specs[i]["title"] = col_t.text_input(_m("spec_title"), value=st.session_state.f_specs[i]["title"], key=f"t_{i}", placeholder=_m("spec_title"))
                 st.session_state.f_specs[i]["detail"] = col_d.text_input(_m("spec_det"), value=st.session_state.f_specs[i]["detail"], key=f"d_{i}", placeholder=_m("spec_det"))
-                
                 with col_i:
                     c_prev, c_up = st.columns([1, 2], vertical_alignment="bottom")
                     up_spec = st.session_state.get(f"up_spec_{i}")
@@ -506,9 +501,7 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                         if cur_img:
                             b64 = get_image_base64(cur_img)
                             if b64: c_prev.markdown(f'<img src="{b64}" style="width:40px; height:40px; border-radius:4px; object-fit:contain;">', unsafe_allow_html=True)
-                    
                     c_up.file_uploader(_m("choose_img"), type=['png','jpg','jpeg'], key=f"up_spec_{i}", label_visibility="collapsed")
-                
                 if col_x.button("❌", key=f"del_spec_{i}", use_container_width=True): 
                     st.session_state.f_specs.pop(i); st.rerun()
                     
@@ -523,10 +516,8 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
         for idx, opt in enumerate(opts_avail):
             o_id, o_name, o_price, o_img, o_name_zh = opt
             disp_name = o_name_zh if user_role == "manufacturer" and o_name_zh else o_name
-            
             if user_role == "manufacturer": p_text = ""
             else: p_text = f"(+{o_price:,.0f})" if o_price > 0 else f"({_m('price_wait')})"
-                
             is_checked = str(o_id) in st.session_state.f_opts
             
             with chk_cols[idx % 3]:
@@ -534,7 +525,6 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                     img_b64 = get_image_base64(o_img)
                     if img_b64: st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:80px; object-fit:contain; margin-bottom:10px;"></div>', unsafe_allow_html=True)
                     else: st.markdown(f"<div style='height:80px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:11px; margin-bottom:10px;'>{_m('no_img')}</div>", unsafe_allow_html=True)
-                    
                     if st.checkbox(f"{disp_name} {p_text}".strip(), value=is_checked, key=f"chk_{o_id}"): 
                         new_opts.append(str(o_id))
         st.session_state.f_opts = new_opts
@@ -542,21 +532,17 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
     st.markdown("---")
     btn_save_text = _m("save_changes") if is_edit else _m("add_sys")
     if st.button(btn_save_text, type="primary", use_container_width=True, key="btn_save_machine"):
-        
         if not st.session_state.f_name: st.error(_m("err_name"))
         elif user_role != "manufacturer" and st.session_state.f_price <= 0: st.error(_m("err_price"))
         else:
             with st.spinner(_m("translating")):
                 up_main = st.session_state.get("up_main_img")
                 if up_main is not None: st.session_state.f_img = process_image(up_main, prefix="machine", size=(1200, 1200), square=False)
-
-                # Ekleyen kullanıcının ID'sini çekiyoruz
                 user_id = st.session_state.get("user_id", 1)
 
                 if user_role == "manufacturer":
                     final_name_zh = st.session_state.f_name
                     final_name_tr = auto_translate_to_tr(final_name_zh)
-                    
                     spec_strs_zh = []; spec_strs_tr = []
                     for i, sp in enumerate(st.session_state.f_specs):
                         up_spec = st.session_state.get(f"up_spec_{i}")
@@ -564,26 +550,22 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                         if sp["title"].strip() or sp["detail"].strip(): 
                             spec_strs_zh.append(f"{sp['title']}|{sp['detail']}|{sp['img']}")
                             spec_strs_tr.append(f"{auto_translate_to_tr(sp['title'])}|{auto_translate_to_tr(sp['detail'])}|{sp['img']}")
-                            
                     final_specs_zh = " || ".join(spec_strs_zh) + (" || " if spec_strs_zh else "")
                     final_specs_tr = " || ".join(spec_strs_tr) + (" || " if spec_strs_tr else "")
                 else:
                     final_name_tr = st.session_state.f_name
                     final_name_zh = st.session_state.get('f_name_zh', '') 
-                    
                     spec_strs_tr = []
                     for i, sp in enumerate(st.session_state.f_specs):
                         up_spec = st.session_state.get(f"up_spec_{i}")
                         if up_spec is not None: sp["img"] = process_image(up_spec, prefix="spec", size=(400, 400), square=True)
                         if sp["title"].strip() or sp["detail"].strip(): 
                             spec_strs_tr.append(f"{sp['title']}|{sp['detail']}|{sp['img']}")
-                            
                     final_specs_tr = " || ".join(spec_strs_tr) + (" || " if spec_strs_tr else "")
                     final_specs_zh = st.session_state.get('f_specs_zh', '')
                 
                 final_opts_str = ",".join(st.session_state.f_opts)
                 
-                # 🚀 YENİ: KAYDEDERKEN SAHİPLİĞİ (user_id) SİSTEME MÜHÜRLE
                 if is_edit:
                     if user_role == "manufacturer":
                         exec_factory("""UPDATE models SET name=?, name_zh=?, category=?, base_price=?, currency=?, specs=?, specs_zh=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?""", (final_name_tr, final_name_zh, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, final_specs_tr, final_specs_zh, final_opts_str, st.session_state.f_disc, st.session_state.f_img, int(mod_id)))
@@ -608,13 +590,10 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
         st.session_state.opt_form_loaded = True
         if is_edit:
             r = get_factory("SELECT opt_name, opt_price, opt_desc, opt_image, allow_qty, opt_name_zh, opt_desc_zh FROM options WHERE id=?", (int(opt_id),))[0]
-            
             o_name_tr, o_desc_tr = r[0], r[2] if r[2] else ""
             o_name_zh, o_desc_zh = r[5], r[6] if len(r)>6 and r[6] else ""
-            
             st.session_state.o_name = o_name_zh if user_role == "manufacturer" and o_name_zh else o_name_tr
             st.session_state.o_desc = o_desc_zh if user_role == "manufacturer" and o_desc_zh else o_desc_tr
-            
             st.session_state.o_price = float(r[1])
             st.session_state.o_img = r[3] if r[3] else ""
             st.session_state.o_allow_qty = bool(r[4] if len(r)>4 and r[4] is not None else 1)
@@ -626,7 +605,6 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
         c1, c2 = st.columns([3, 1])
         with c1:
             st.session_state.o_name = st.text_input(_m("opt_name"), value=st.session_state.o_name)
-            
             if user_role == "manufacturer":
                 st.warning(_m("opt_price_lock"))
                 st.session_state.o_price = st.session_state.get('o_price', 0.0)
@@ -647,14 +625,12 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
 
         btn_save_opt_text = _m("save_changes") if is_edit else _m("add_sys")
         if st.button("💾 " + btn_save_opt_text, type="primary", use_container_width=True, key="btn_save_option"):
-            
             if not st.session_state.o_name: st.error(_m("err_opt_name"))
             elif user_role != "manufacturer" and st.session_state.o_price <= 0: st.error(_m("err_price"))
             else:
                 with st.spinner(_m("translating")):
                     up_opt = st.session_state.get("up_opt_img")
                     if up_opt is not None: st.session_state.o_img = process_image(up_opt, prefix="opt", size=(400, 400), square=True)
-                    
                     allow_q = 1 if st.session_state.o_allow_qty else 0
                     
                     if user_role == "manufacturer":
@@ -662,14 +638,11 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
                         final_opt_desc_zh = st.session_state.o_desc
                         final_opt_name_tr = auto_translate_to_tr(final_opt_name_zh)
                         final_opt_desc_tr = auto_translate_to_tr(final_opt_desc_zh)
-                        
                         if is_edit: exec_factory("UPDATE options SET opt_name=?, opt_name_zh=?, opt_desc=?, opt_desc_zh=?, opt_price=?, opt_image=?, allow_qty=? WHERE id=?", (final_opt_name_tr, final_opt_name_zh, final_opt_desc_tr, final_opt_desc_zh, st.session_state.o_price, st.session_state.o_img, allow_q, int(opt_id)))
                         else: exec_factory("INSERT INTO options (opt_name, opt_name_zh, opt_desc, opt_desc_zh, opt_price, opt_image, allow_qty) VALUES (?,?,?,?,?,?,?)", (final_opt_name_tr, final_opt_name_zh, final_opt_desc_tr, final_opt_desc_zh, st.session_state.o_price, st.session_state.o_img, allow_q))
                     else:
                         final_opt_name_tr = st.session_state.o_name
                         final_opt_desc_tr = st.session_state.o_desc
-                        
                         if is_edit: exec_factory("UPDATE options SET opt_name=?, opt_desc=?, opt_price=?, opt_image=?, allow_qty=? WHERE id=?", (final_opt_name_tr, final_opt_desc_tr, st.session_state.o_price, st.session_state.o_img, allow_q, int(opt_id)))
                         else: exec_factory("INSERT INTO options (opt_name, opt_desc, opt_price, opt_image, allow_qty) VALUES (?,?,?,?,?)", (final_opt_name_tr, final_opt_desc_tr, st.session_state.o_price, st.session_state.o_img, allow_q))
-                        
                     st.session_state.view_mode = "list"; st.rerun()
