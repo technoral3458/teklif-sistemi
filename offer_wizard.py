@@ -205,14 +205,10 @@ def show_offer_wizard(user_id, is_admin=False):
             padding-right: 0.5rem !important; 
             max-width: 100% !important; 
         }
-
-        /* Klavyeyi engeller */
         div[data-baseweb="select"] input { 
             caret-color: transparent !important; 
             inputmode: none !important;
         }
-        
-        /* Kibar Kutu Tasarımı */
         div.st-emotion-cache-1jicfl2 { 
             border-radius: 12px !important;
             border: 1px solid #e2e8f0 !important;
@@ -238,6 +234,7 @@ def show_offer_wizard(user_id, is_admin=False):
     </script>
     """, height=0, width=0)
 
+    # Sistemdeki müşterileri çek
     my_custs = get_sales("SELECT id, company_name FROM customers WHERE user_id=? ORDER BY company_name ASC", (user_id,)) if not is_admin else get_sales("SELECT id, company_name FROM customers ORDER BY company_name ASC")
     if my_custs is None: my_custs = []
 
@@ -261,7 +258,10 @@ def show_offer_wizard(user_id, is_admin=False):
         
         with st.container(border=True):
             
-            # 🔥 YEPYENİ VE KESİN ÇÖZÜM: SWITCH DÜĞMESİ İLE YENİ MÜŞTERİ EKLEME
+            # 🔥 HATANIN ÇÖZÜLDÜĞÜ YER: BURADAKİ KİLİT KALDIRILDI! 🔥
+            if len(my_custs) == 0:
+                st.info("Sistemde henüz kayıtlı müşteriniz bulunmuyor. Lütfen aşağıdaki düğmeyi açarak ilk müşterinizi ekleyin.")
+            
             is_new_customer = st.toggle("➕ Müşteri Kayıtlı Değilse Yeni Ekle", key="chk_new_cust")
             
             if is_new_customer:
