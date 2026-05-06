@@ -8,7 +8,7 @@ import pandas as pd
 DICT_DEALER = {
     "tr": {
         "title": "🏢 Bayi ve Üretici Yönetimi",
-        "search_ph": "🔍 Kullanıcı Ara (Firma Adı, E-Posta veya Telefon ile)",
+        "search_ph": "🔍 Kullanıcı Ara (Firma Adı, E-Posta veya Telefon ile5858)",
         "no_user": "Sistemde henüz kayıtlı kullanıcı bulunmuyor.",
         "no_match": "Arama kriterinize uygun kullanıcı bulunamadı.",
         "active": "Aktif", "pending": "Askıda / Onay Bekliyor",
