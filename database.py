@@ -40,7 +40,7 @@ def init_db():
     conn = get_connection()
     c = conn.cursor()
 
-    # 1. MAKİNELER TABLOSU (Geliştirilmiş)
+    # 1. MAKİNELER TABLOSU (Geliştirilmiş ve Sahiplik Eklenmiş)
     c.execute("""CREATE TABLE IF NOT EXISTS models (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         name TEXT, 
@@ -52,7 +52,8 @@ def init_db():
         specs TEXT,
         compatible_options TEXT,
         gallery_images TEXT DEFAULT '',
-        gallery_videos TEXT DEFAULT ''
+        gallery_videos TEXT DEFAULT '',
+        user_id INTEGER DEFAULT 1 -- YENİ: Makineyi ekleyen üreticinin kimliği
     )""")
 
     # 2. DONANIM VE OPSİYON HAVUZU
@@ -79,7 +80,7 @@ def init_db():
         phone TEXT, 
         email TEXT, 
         address TEXT,
-        user_id INTEGER -- Hangi bayiye ait olduğu
+        user_id INTEGER -- Hangi bayiye/üreticiye ait olduğu
     )""")
 
     # 4. TEKLİFLER ANA TABLO
@@ -91,7 +92,7 @@ def init_db():
         total_price REAL,
         status TEXT DEFAULT 'Beklemede', -- Sizin istediğiniz analiz paneli için
         conditions TEXT, -- JSON formatında tüm şartlar (ödeme planı, banka vb.)
-        user_id INTEGER -- Teklifi hazırlayan bayi ID
+        user_id INTEGER -- Teklifi hazırlayan bayi/üretici ID
     )""")
 
     # 5. TEKLİF İÇERİĞİ / SEÇİLEN OPSİYONLAR
@@ -116,6 +117,20 @@ def init_db():
         logo_path TEXT,
         website TEXT,
         footer_text TEXT
+    )""")
+
+    # 8. KULLANICILAR TABLOSU (YENİ: B2B Yetkilendirme Altyapısı)
+    c.execute("""CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        password TEXT,
+        company_name TEXT,
+        logo_path TEXT,
+        website TEXT,
+        address_full TEXT,
+        phone TEXT,
+        role TEXT DEFAULT 'Dealer', -- Seçenekler: 'Admin', 'Producer', 'Dealer'
+        allowed_categories TEXT DEFAULT '' -- Bayiler için izin verilen kategoriler (örn: "CNC,Lazer")
     )""")
 
     conn.commit()
