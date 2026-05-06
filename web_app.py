@@ -136,6 +136,7 @@ def get_system_logo():
     except: pass
     return fallback_url
 
+# 🚀 ACİL ONARIM MOTORU (Eksik Tüm Sütunları Güvence Altına Alır) 🚀
 def repair_databases():
     # USERS DB
     conn = sqlite3.connect('users.db')
@@ -155,9 +156,17 @@ def repair_databases():
     s_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
     if "user_id" not in s_cols: conn.execute("ALTER TABLE offers ADD COLUMN user_id INTEGER DEFAULT 1")
     
-    conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1, country TEXT DEFAULT '', city TEXT DEFAULT '', authorized_person TEXT DEFAULT '', email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '')""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1, country TEXT DEFAULT '', city TEXT DEFAULT '', authorized_person TEXT DEFAULT '', email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '', address_full TEXT DEFAULT '')""")
     c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
-    if "user_id" not in c_cols: conn.execute("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 1")
+    
+    # Eksik Olabilecek Tüm Sütunları Döngü İle Kontrol Edip Ekliyoruz
+    for col in ["user_id", "country", "city", "authorized_person", "email", "phone", "address", "address_full"]:
+        if col not in c_cols:
+            try:
+                col_type = "INTEGER DEFAULT 1" if col == "user_id" else "TEXT DEFAULT ''"
+                conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {col_type}")
+            except: pass
+            
     conn.commit(); conn.close()
 
     # FACTORY DB
@@ -176,7 +185,7 @@ def repair_databases():
 repair_databases()
 
 # =====================================================================
-# OTURUM VE MODERN CSS (Aşağıdaki kısımlar değişmedi, aynen kalıyor)
+# OTURUM VE MODERN CSS
 # =====================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 for key in ["user_id", "user_role", "user_email", "allowed_menus", "close_sidebar"]:
