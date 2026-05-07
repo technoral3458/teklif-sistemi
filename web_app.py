@@ -102,11 +102,7 @@ def _(key): return DICTIONARY.get(st.session_state.lang, DICTIONARY["tr"]).get(k
 def hash_password(password): return hashlib.sha256(str.encode(password)).hexdigest()
 def generate_code(): return str(random.randint(100000, 999999))
 
-# 🚀 YENİ SMS GÖNDERİM MOTORU (ŞU AN TEST MODUNDA, SİYAH EKRANA YAZAR) 🚀
 def send_sms(phone, code):
-    # DİKKAT: Gerçek SMS atabilmeniz için NetGSM veya İletiMerkezi firmasından paket almalısınız.
-    # Paket aldığınızda buraya onların API kodlarını entegre edeceğiz.
-    # Şimdilik siz test edebilin diye doğrulama kodları sunucudaki siyah ekranda (Termius) görünecektir.
     print(f"\n\n{'='*50}")
     print(f"📱 SMS GÖNDERİLİYOR...")
     print(f"Hedef Tel: {phone}")
@@ -114,11 +110,10 @@ def send_sms(phone, code):
     print(f"{'='*50}\n\n")
     return True
 
-# Geriye dönük uyumluluk ve şifre sıfırlama vb. için mail fonksiyonu duruyor
 def send_email(to_email, code, subject="Ersan Makine"):
     SMTP_SERVER = "mail.ersanmakina.net"; SMTP_PORT = 587
     SENDER_EMAIL = "sefa@ersanmakina.net"; SENDER_PASSWORD = "Sev32881-"
-    msg = MIMEMultipart(); msg['From'] = f"Ersan Makine B2B <{SENDER_EMAIL}>"; msg['To'] = to_email; msg['Subject'] = subject
+    msg = MIMEMultipart(); msg['From'] = f"Ersan Makina Sanayi <{SENDER_EMAIL}>"; msg['To'] = to_email; msg['Subject'] = subject
     msg.attach(MIMEText(f"Doğrulama Kodunuz: {code}", 'plain'))
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT); server.starttls(); server.login(SENDER_EMAIL, SENDER_PASSWORD); server.send_message(msg); server.quit()
@@ -199,7 +194,6 @@ if "logged_in" not in st.session_state: st.session_state.logged_in = False
 for key in ["user_id", "user_role", "user_email", "allowed_menus", "close_sidebar"]:
     if key not in st.session_state: st.session_state[key] = None
     
-# SMS İÇİN YENİ ADIM YÖNETİCİLERİ
 if "reg_step" not in st.session_state: st.session_state.reg_step = 1
 if "login_step" not in st.session_state: st.session_state.login_step = 1
 if "forgot_step" not in st.session_state: st.session_state.forgot_step = 1
@@ -216,8 +210,8 @@ if not st.session_state.logged_in:
 st.markdown("""
     <style>
     .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 5px; margin-bottom: 20px; flex-wrap: wrap !important; }
-    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 15px !important; font-size: 14px !important; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: normal !important; text-align: center; flex: 1 1 auto; }
-    .stTabs [aria-selected="true"] { background-color: #2563eb !important; color: white !important; }
+    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 10px 15px !important; font-size: 14px !important; font-weight: 600; color: #475569; border: 1px solid #e2e8f0; white-space: normal !important; text-align: center; flex: 1 1 auto; transition: all 0.3s ease; }
+    .stTabs [aria-selected="true"] { background-color: #2563eb !important; color: white !important; border-color: #2563eb !important; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] { gap: 6px !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label { padding: 12px 15px; border-radius: 8px; transition: all 0.2s; cursor: pointer; color: #475569; }
@@ -231,159 +225,196 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ, KAYIT VE 2FA SMS SİSTEMİ
+# ŞIK GİRİŞ, KAYIT VE 2FA SMS SİSTEMİ
 # =====================================================================
 if not st.session_state.logged_in:
-    c1, c2, c3 = st.columns([7, 2, 1.5]); lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
+    # Arka plan rengini ve formu ortalamayı sağlayan özel CSS
+    st.markdown("""
+        <style>
+        .stApp { background-color: #f4f7f9; }
+        .login-card {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            margin-top: 20px;
+        }
+        .login-subtitle {
+            text-align: center;
+            color: #64748b;
+            font-size: 15px;
+            margin-bottom: 30px;
+            font-weight: 500;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns([8, 1, 1]); lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
     with c3:
         sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=list(lang_opts.keys()).index(st.session_state.lang), key="main_lang_sel", label_visibility="collapsed")
         if sel != st.session_state.lang: st.session_state.lang = sel; st.rerun()
-    col_l, col_m, col_r = st.columns([1, 1.2, 1])
+        
+    # Formu tam ortaya almak için genişlik ayarları
+    col_l, col_m, col_r = st.columns([1, 1.3, 1])
+    
     with col_m:
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        
+        # Logo ve Başlık
         sys_logo = get_system_logo()
-        if sys_logo: st.markdown(f"<div style='text-align:center; padding:10px 0 20px 0;'><img src='{sys_logo}' style='max-width:100%; max-height:80px; object-fit:contain;'></div>", unsafe_allow_html=True)
-        else: st.markdown(f"<div style='text-align:center; padding:10px 0 20px 0; font-size:24px; font-weight:900; color:#1e293b;'>Ersan Makine B2B</div>", unsafe_allow_html=True)
+        if sys_logo: 
+            st.markdown(f"<div style='text-align:center;'><img src='{sys_logo}' style='max-width:100%; max-height:85px; object-fit:contain;'></div>", unsafe_allow_html=True)
+        else: 
+            st.markdown(f"<div style='text-align:center; font-size:28px; font-weight:900; color:#1e293b;'>Ersan Makine B2B</div>", unsafe_allow_html=True)
+            
+        st.markdown('<div class="login-subtitle">Bayi ve Üretici Portalı</div>', unsafe_allow_html=True)
         
         t_login, t_reg, t_forg = st.tabs([_("login_tab"), _("reg_tab"), _("forg_tab")])
         
         # --- GİRİŞ (2FA SMS) ---
         with t_login:
-            with st.container(border=True):
-                if st.session_state.login_step == 1:
-                    le = st.text_input(_("email"), key="l_e").strip().lower()
-                    lp = st.text_input(_("pass"), type="password", key="l_p")
-                    rem = st.checkbox(_("rem"), value=True, key="l_r")
+            st.write("") # Boşluk
+            if st.session_state.login_step == 1:
+                le = st.text_input(_("email"), key="l_e", placeholder="ornek@firma.com").strip().lower()
+                lp = st.text_input(_("pass"), type="password", key="l_p", placeholder="••••••••")
+                rem = st.checkbox(_("rem"), value=True, key="l_r")
+                
+                st.write("")
+                if st.button(_("login_btn"), type="primary", use_container_width=True):
+                    conn = sqlite3.connect('users.db')
+                    user = conn.execute("SELECT id, user_type, is_approved, is_verified, role, allowed_menus, phone FROM users WHERE email=? AND password=?", (le, hash_password(lp))).fetchone()
                     
-                    if st.button(_("login_btn"), type="primary", use_container_width=True):
-                        conn = sqlite3.connect('users.db')
-                        user = conn.execute("SELECT id, user_type, is_approved, is_verified, role, allowed_menus, phone FROM users WHERE email=? AND password=?", (le, hash_password(lp))).fetchone()
-                        
-                        if user:
-                            if user[3] == 0: 
-                                st.warning(_("sys_unver"))
-                            elif user[2] == 0: 
-                                st.warning(_("sys_wait"))
-                            else:
-                                # Admin hesabıysa SMS sormadan direkt girsin
-                                if user[4] == 'admin':
-                                    tok = str(uuid.uuid4())
-                                    conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0]))
-                                    if rem: st.query_params["session_token"] = tok
-                                    st.session_state.logged_in, st.session_state.user_id, st.session_state.user_role, st.session_state.user_email, st.session_state.allowed_menus = True, user[0], 'admin', le, user[5]
-                                    conn.commit(); conn.close()
-                                    st.rerun()
-                                else:
-                                    # Bayi/Üretici ise SMS at
-                                    sms_code = generate_code()
-                                    conn.execute("UPDATE users SET auth_code=? WHERE id=?", (sms_code, user[0]))
-                                    send_sms(user[6], sms_code) # SMS Gönder
-                                    
-                                    st.session_state.temp_login_email = le
-                                    st.session_state.temp_login_rem = rem
-                                    st.session_state.login_step = 2
-                                    conn.commit(); conn.close()
-                                    st.rerun()
-                        else: 
-                            st.error(_("sys_err"))
-                            conn.close()
-                            
-                elif st.session_state.login_step == 2:
-                    st.info(_("code_sent"))
-                    l_code = st.text_input(_("enter_code"), max_chars=6, key="l_code")
-                    if st.button(_("verify_btn"), type="primary", use_container_width=True):
-                        conn = sqlite3.connect('users.db')
-                        user = conn.execute("SELECT id, user_type, role, allowed_menus, auth_code FROM users WHERE email=?", (st.session_state.temp_login_email,)).fetchone()
-                        
-                        if user and user[4] == l_code:
-                            tok = str(uuid.uuid4())
-                            conn.execute("UPDATE users SET session_token=?, auth_code=NULL WHERE id=?", (tok, user[0]))
-                            if st.session_state.temp_login_rem: st.query_params["session_token"] = tok
-                            
-                            st.session_state.logged_in = True
-                            st.session_state.user_id = user[0]
-                            st.session_state.user_role = user[2] if user[2] == 'admin' else ("manufacturer" if user[1] == "Üretici" else "dealer")
-                            st.session_state.user_email = st.session_state.temp_login_email
-                            st.session_state.allowed_menus = user[3]
-                            
-                            st.session_state.login_step = 1 # Reset state
-                            conn.commit(); conn.close()
-                            st.rerun()
+                    if user:
+                        if user[3] == 0: 
+                            st.warning(_("sys_unver"))
+                        elif user[2] == 0: 
+                            st.warning(_("sys_wait"))
                         else:
-                            st.error(_("wrong_code"))
-                            conn.close()
-                    if st.button("İptal / Geri Dön"):
-                        st.session_state.login_step = 1
+                            # Admin hesabıysa SMS sormadan direkt girsin
+                            if user[4] == 'admin':
+                                tok = str(uuid.uuid4())
+                                conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0]))
+                                if rem: st.query_params["session_token"] = tok
+                                st.session_state.logged_in, st.session_state.user_id, st.session_state.user_role, st.session_state.user_email, st.session_state.allowed_menus = True, user[0], 'admin', le, user[5]
+                                conn.commit(); conn.close()
+                                st.rerun()
+                            else:
+                                # Bayi/Üretici ise SMS at
+                                sms_code = generate_code()
+                                conn.execute("UPDATE users SET auth_code=? WHERE id=?", (sms_code, user[0]))
+                                send_sms(user[6], sms_code) # SMS Gönder
+                                
+                                st.session_state.temp_login_email = le
+                                st.session_state.temp_login_rem = rem
+                                st.session_state.login_step = 2
+                                conn.commit(); conn.close()
+                                st.rerun()
+                    else: 
+                        st.error(_("sys_err"))
+                        conn.close()
+                        
+            elif st.session_state.login_step == 2:
+                st.info(_("code_sent"))
+                l_code = st.text_input(_("enter_code"), max_chars=6, key="l_code")
+                if st.button(_("verify_btn"), type="primary", use_container_width=True):
+                    conn = sqlite3.connect('users.db')
+                    user = conn.execute("SELECT id, user_type, role, allowed_menus, auth_code FROM users WHERE email=?", (st.session_state.temp_login_email,)).fetchone()
+                    
+                    if user and user[4] == l_code:
+                        tok = str(uuid.uuid4())
+                        conn.execute("UPDATE users SET session_token=?, auth_code=NULL WHERE id=?", (tok, user[0]))
+                        if st.session_state.temp_login_rem: st.query_params["session_token"] = tok
+                        
+                        st.session_state.logged_in = True
+                        st.session_state.user_id = user[0]
+                        st.session_state.user_role = user[2] if user[2] == 'admin' else ("manufacturer" if user[1] == "Üretici" else "dealer")
+                        st.session_state.user_email = st.session_state.temp_login_email
+                        st.session_state.allowed_menus = user[3]
+                        
+                        st.session_state.login_step = 1 # Reset state
+                        conn.commit(); conn.close()
                         st.rerun()
+                    else:
+                        st.error(_("wrong_code"))
+                        conn.close()
+                if st.button("İptal / Geri Dön", use_container_width=True):
+                    st.session_state.login_step = 1
+                    st.rerun()
 
         # --- KAYIT (SMS) ---
         with t_reg:
-            with st.container(border=True):
-                if st.session_state.reg_step == 1:
-                    rt = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")], key="r_t")
-                    rc = st.text_input(_("comp_name"), key="r_c")
-                    rp = st.text_input(_("phone"), key="r_ph")
-                    re = st.text_input(_("email"), key="r_e").strip().lower()
-                    rpw = st.text_input(_("pass"), type="password", key="r_p")
-                    
-                    if st.button(_("reg_btn"), use_container_width=True):
-                        if all([rc, rp, re, rpw]):
-                            c = sqlite3.connect('users.db')
-                            if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone(): 
-                                st.error(_("email_in_use"))
-                            else:
-                                vc = generate_code()
-                                c.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,?,0,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')", (re, hash_password(rpw), rc, rp, rt, vc))
-                                c.commit()
-                                
-                                # Hem SMS hem Mail atalım, garanti olsun
-                                send_sms(rp, vc) 
-                                send_email(re, vc, "Ersan Makine Doğrulama Kodu") 
-                                
-                                st.session_state.temp_email = re
-                                st.session_state.reg_step = 2
-                                st.rerun()
-                            c.close()
-                        else: 
-                            st.warning(_("req_fields"))
-                            
-                elif st.session_state.reg_step == 2:
-                    st.info(_("code_sent"))
-                    ec = st.text_input(_("enter_code"), max_chars=6, key="r_code")
-                    if st.button(_("verify_btn"), type="primary", use_container_width=True):
+            st.write("")
+            if st.session_state.reg_step == 1:
+                rt = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")], key="r_t")
+                rc = st.text_input(_("comp_name"), key="r_c")
+                rp = st.text_input(_("phone"), key="r_ph", placeholder="+90 5XX...")
+                re = st.text_input(_("email"), key="r_e", placeholder="ornek@firma.com").strip().lower()
+                rpw = st.text_input(_("pass"), type="password", key="r_p")
+                
+                st.write("")
+                if st.button(_("reg_btn"), type="primary", use_container_width=True):
+                    if all([rc, rp, re, rpw]):
                         c = sqlite3.connect('users.db')
-                        db_c = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,)).fetchone()
-                        if db_c and db_c[0] == ec: 
-                            c.execute("UPDATE users SET is_verified=1, auth_code=NULL WHERE email=?", (st.session_state.temp_email,))
+                        if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone(): 
+                            st.error(_("email_in_use"))
+                        else:
+                            vc = generate_code()
+                            c.execute("INSERT INTO users (email, password, company_name, phone, user_type, auth_code, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,?,0,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')", (re, hash_password(rpw), rc, rp, rt, vc))
                             c.commit()
-                            st.session_state.reg_step = 1
-                            st.success(_("ver_success"))
-                        else: 
-                            st.error(_("wrong_code"))
+                            
+                            # Hem SMS hem Mail atalım, garanti olsun
+                            send_sms(rp, vc) 
+                            send_email(re, vc, "Ersan Makine Doğrulama Kodu") 
+                            
+                            st.session_state.temp_email = re
+                            st.session_state.reg_step = 2
+                            st.rerun()
                         c.close()
-                    if st.button("İptal / Geri Dön"):
-                        st.session_state.reg_step = 1
-                        st.rerun()
+                    else: 
+                        st.warning(_("req_fields"))
                         
+            elif st.session_state.reg_step == 2:
+                st.info(_("code_sent"))
+                ec = st.text_input(_("enter_code"), max_chars=6, key="r_code")
+                if st.button(_("verify_btn"), type="primary", use_container_width=True):
+                    c = sqlite3.connect('users.db')
+                    db_c = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_email,)).fetchone()
+                    if db_c and db_c[0] == ec: 
+                        c.execute("UPDATE users SET is_verified=1, auth_code=NULL WHERE email=?", (st.session_state.temp_email,))
+                        c.commit()
+                        st.session_state.reg_step = 1
+                        st.success(_("ver_success"))
+                    else: 
+                        st.error(_("wrong_code"))
+                    c.close()
+                if st.button("İptal / Geri Dön", use_container_width=True):
+                    st.session_state.reg_step = 1
+                    st.rerun()
+                    
         # --- ŞİFRE UNUTTUM ---
         with t_forg:
-            with st.container(border=True):
-                st.info("Şifre sıfırlama işlemi kayıtlı e-posta üzerinden yapılır.")
-                if st.session_state.forgot_step == 1:
-                    fe = st.text_input(_("f_email"), key="f_e").strip().lower()
-                    if st.button(_("send_reset"), use_container_width=True):
-                        c = sqlite3.connect('users.db'); user = c.execute("SELECT id FROM users WHERE email=?", (fe,)).fetchone()
-                        if user:
-                            vc = generate_code(); c.execute("UPDATE users SET auth_code=? WHERE email=?", (vc, fe)); c.commit()
-                            if send_email(fe, vc, "Sifre Sifirlama / Password Reset"): st.session_state.temp_f_email, st.session_state.forgot_step = 2; st.rerun()
-                        else: st.error(_("no_email"))
-                        c.close()
-                elif st.session_state.forgot_step == 2:
-                    fc = st.text_input(_("enter_code"), max_chars=6, key="f_c"); np = st.text_input(_("new_pass"), type="password", key="f_np")
-                    if st.button(_("change_pass"), type="primary", use_container_width=True):
-                        c = sqlite3.connect('users.db'); user = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_f_email,)).fetchone()
-                        if user and user[0] == fc: c.execute("UPDATE users SET password=?, auth_code=NULL WHERE email=?", (hash_password(np), st.session_state.temp_f_email)); c.commit(); st.session_state.forgot_step = 1; st.success(_("pass_changed"))
-                        else: st.error(_("wrong_code"))
-                        c.close()
+            st.write("")
+            st.info("Şifre sıfırlama işlemi kayıtlı e-posta üzerinden yapılır.")
+            if st.session_state.forgot_step == 1:
+                fe = st.text_input(_("f_email"), key="f_e", placeholder="Kayıtlı e-postanız...").strip().lower()
+                st.write("")
+                if st.button(_("send_reset"), type="primary", use_container_width=True):
+                    c = sqlite3.connect('users.db'); user = c.execute("SELECT id FROM users WHERE email=?", (fe,)).fetchone()
+                    if user:
+                        vc = generate_code(); c.execute("UPDATE users SET auth_code=? WHERE email=?", (vc, fe)); c.commit()
+                        if send_email(fe, vc, "Sifre Sifirlama / Password Reset"): st.session_state.temp_f_email, st.session_state.forgot_step = 2; st.rerun()
+                    else: st.error(_("no_email"))
+                    c.close()
+            elif st.session_state.forgot_step == 2:
+                fc = st.text_input(_("enter_code"), max_chars=6, key="f_c"); np = st.text_input(_("new_pass"), type="password", key="f_np")
+                st.write("")
+                if st.button(_("change_pass"), type="primary", use_container_width=True):
+                    c = sqlite3.connect('users.db'); user = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_f_email,)).fetchone()
+                    if user and user[0] == fc: c.execute("UPDATE users SET password=?, auth_code=NULL WHERE email=?", (hash_password(np), st.session_state.temp_f_email)); c.commit(); st.session_state.forgot_step = 1; st.success(_("pass_changed"))
+                    else: st.error(_("wrong_code"))
+                    c.close()
+                    
+        st.markdown('</div>', unsafe_allow_html=True) # Kart div kapatma
     st.stop()
 
 # 🚀 MENÜDEKİ LOGO KIRIK RESİM ÇÖZÜMÜ 🚀
