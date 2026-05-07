@@ -211,10 +211,11 @@ def show_offer_wizard(user_id, is_admin=False):
         </style>
     """, unsafe_allow_html=True)
     
-    # 🚀 HAFIZALI MENÜ BUTONU 🚀
+    # 🚀 %100 ÇALIŞAN HAFIZALI MENÜ BUTONU 🚀
     col_b1, col_b2, col_b3 = st.columns([1, 6, 1])
     if col_b1.button("☰ Menü", use_container_width=True):
         st.session_state.active_tab = "📊 Dashboard"
+        st.session_state.m_radio = "📊 Dashboard" # Düğmenin hafızasını da güncelliyoruz!
         st.rerun()
 
     st.markdown("<hr style='margin-top:5px; margin-bottom:15px;'>", unsafe_allow_html=True)
