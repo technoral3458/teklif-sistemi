@@ -170,11 +170,9 @@ def get_index(lst, item, default=None):
 def show_offer_wizard(user_id, is_admin=False):
     init_wizard_tables()
     
-    # CSS AYARLARI
     st.markdown("""
         <style>
-        /* Orijinal Header'ı ne olursa olsun görünür yapmaya zorluyoruz */
-        header[data-testid="stHeader"] { display: flex !important; visibility: visible !important; background: transparent !important; z-index: 99999 !important; }
+        header[data-testid="stHeader"] { display: flex !important; visibility: visible !important; }
         div[data-testid="stToolbar"] { display: none !important; }
         .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; max-width: 100% !important; }
         div[data-baseweb="select"] input { caret-color: transparent !important; inputmode: none !important; }
@@ -183,28 +181,13 @@ def show_offer_wizard(user_id, is_admin=False):
         </style>
     """, unsafe_allow_html=True)
     
-    # 🚀 KESİN ÇÖZÜM: KENDİ ÖZEL MENÜ BUTONUMUZU EKLİYORUZ 🚀
-    components.html("""
-        <script>
-        function openSidebar() {
-            var btn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
-            if(btn) { 
-                btn.click(); 
-            } else {
-                // Eğer buton hala yoksa, klavye kısayolu ile menüyü açmayı tetikle
-                window.parent.document.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Escape', 'bubbles': true }));
-            }
-        }
-        // Sayfa açıldığında orjinal başlığı zorla görünür yapmaya çalış
-        setTimeout(function(){
-            var h = window.parent.document.querySelector('header[data-testid="stHeader"]');
-            if(h) { h.style.display='flex'; h.style.visibility='visible'; }
-        }, 500);
-        </script>
-        <div onclick="openSidebar()" style="background-color: #f8fafc; color: #0f172a; border: 2px solid #cbd5e1; padding: 10px 15px; border-radius: 8px; font-family: sans-serif; font-weight: 900; font-size: 15px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px;">
-            <span style="font-size: 20px; margin-right: 10px; color:#2563eb;">☰</span> MENÜYÜ AÇ
-        </div>
-    """, height=65)
+    # 🚀 %100 GARANTİLİ GERİ DÖNÜŞ BUTONU (SİLİNEMEZ) 🚀
+    col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
+    if col_b1.button("🔙 ANA MENÜYE DÖN", type="primary", use_container_width=True):
+        st.session_state.active_tab = "📊 Dashboard"
+        st.rerun()
+
+    st.markdown("<hr style='margin-top:5px; margin-bottom:15px;'>", unsafe_allow_html=True)
 
     u_role = 'Dealer'
     u_allowed_cats = []
