@@ -211,11 +211,13 @@ def show_offer_wizard(user_id, is_admin=False):
         </style>
     """, unsafe_allow_html=True)
     
-    # 🚀 %100 ÇALIŞAN HAFIZALI MENÜ BUTONU 🚀
+    # 🚀 %100 ÇALIŞAN VE HATA VERMEYEN MENÜ BUTONU 🚀
     col_b1, col_b2, col_b3 = st.columns([1, 6, 1])
     if col_b1.button("☰ Menü", use_container_width=True):
         st.session_state.active_tab = "📊 Dashboard"
-        st.session_state.m_radio = "📊 Dashboard" # Düğmenin hafızasını da güncelliyoruz!
+        # Hatayı çözmek için widget anahtarını değiştirmiyoruz, doğrudan siliyoruz
+        if "m_radio" in st.session_state:
+            del st.session_state["m_radio"] 
         st.rerun()
 
     st.markdown("<hr style='margin-top:5px; margin-bottom:15px;'>", unsafe_allow_html=True)
@@ -255,7 +257,7 @@ def show_offer_wizard(user_id, is_admin=False):
         st.markdown("<div style='font-size:14px; font-weight:900; color:#2563eb; margin-bottom:8px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            # 🚀 KIRMIZI HATA İÇİN SABİT ANAHTARLI (KEY) TOGGLE ÇÖZÜMÜ 🚀
+            # KIRMIZI HATA İÇİN SABİT ANAHTARLI TOGGLE
             is_new_customer = st.toggle("➕ Yeni Müşteri Ekle", key="toggle_new_cust")
             
             if is_new_customer:
@@ -287,9 +289,8 @@ def show_offer_wizard(user_id, is_admin=False):
                                    (nc_comp.strip(), nc_auth.strip(), nc_phone.strip(), nc_email.strip(), nc_addr.strip(), nc_country, nc_city, nc_tax_office.strip(), nc_tax_id.strip(), user_id))
                         st.session_state.new_added_cust = nc_comp.strip()
                         
-                        # Sistemi kapatarak hatayı engelliyoruz
                         if "toggle_new_cust" in st.session_state:
-                            st.session_state.toggle_new_cust = False 
+                            del st.session_state["toggle_new_cust"] 
                             
                         st.rerun()
                 return
