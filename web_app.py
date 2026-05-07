@@ -149,29 +149,32 @@ def repair_databases():
     s_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
     for col in ["user_id", "total_price", "conditions", "status", "offer_date", "order_date"]:
         if col not in s_cols:
-            try:
-                typ = "REAL DEFAULT 0.0" if col == "total_price" else "INTEGER DEFAULT 1" if col == "user_id" else "TEXT DEFAULT 'Beklemede'" if col == "status" else "TEXT DEFAULT ''"
-                conn.execute(f"ALTER TABLE offers ADD COLUMN {col} {typ}")
+            try: conn.execute(f"ALTER TABLE offers ADD COLUMN {col} {'REAL DEFAULT 0.0' if col == 'total_price' else 'INTEGER DEFAULT 1' if col == 'user_id' else 'TEXT DEFAULT ''Beklemede''' if col == 'status' else 'TEXT DEFAULT ''''}")
             except: pass
             
     conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1, country TEXT DEFAULT '', city TEXT DEFAULT '', authorized_person TEXT DEFAULT '', email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '', address_full TEXT DEFAULT '')""")
     c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
-    for col in ["user_id", "country", "city", "authorized_person", "email", "phone", "address", "address_full"]:
+    for col in ["user_id", "country", "city", "authorized_person", "email", "phone", "address", "address_full", "tax_office", "tax_id"]:
         if col not in c_cols:
-            try:
-                col_type = "INTEGER DEFAULT 1" if col == "user_id" else "TEXT DEFAULT ''"
-                conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {col_type}")
+            try: conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {'INTEGER DEFAULT 1' if col == 'user_id' else 'TEXT DEFAULT ''''}")
             except: pass
     conn.commit(); conn.close()
 
+    # 🚀 ÇİNCE ÇEVİRİ VE EKSİK SÜTUN HATASI İÇİN AGRESIF TAMİR MOTORU 🚀
     conn = sqlite3.connect('factory_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_price REAL, image_path TEXT, specs TEXT, currency TEXT DEFAULT 'USD', port_discount REAL DEFAULT 0.0, compatible_options TEXT DEFAULT '', gallery_images TEXT DEFAULT '', category TEXT DEFAULT 'Diğer Makinalar', gallery_videos TEXT DEFAULT '', name_zh TEXT DEFAULT '', specs_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
     f_cols = [c[1] for c in conn.execute("PRAGMA table_info(models)").fetchall()]
-    if "user_id" not in f_cols: conn.execute("ALTER TABLE models ADD COLUMN user_id INTEGER DEFAULT 1")
+    for col, col_type in [("user_id", "INTEGER DEFAULT 1"), ("name_zh", "TEXT DEFAULT ''"), ("specs_zh", "TEXT DEFAULT ''")]:
+        if col not in f_cols:
+            try: conn.execute(f"ALTER TABLE models ADD COLUMN {col} {col_type}")
+            except: pass
     
     conn.execute("""CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY AUTOINCREMENT, opt_name TEXT, opt_desc TEXT, opt_price REAL, opt_image TEXT, sort_order INTEGER DEFAULT 0, allow_qty INTEGER DEFAULT 1, opt_name_zh TEXT DEFAULT '', opt_desc_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
     o_cols = [c[1] for c in conn.execute("PRAGMA table_info(options)").fetchall()]
-    if "user_id" not in o_cols: conn.execute("ALTER TABLE options ADD COLUMN user_id INTEGER DEFAULT 1")
+    for col, col_type in [("user_id", "INTEGER DEFAULT 1"), ("opt_name_zh", "TEXT DEFAULT ''"), ("opt_desc_zh", "TEXT DEFAULT ''")]:
+        if col not in o_cols:
+            try: conn.execute(f"ALTER TABLE options ADD COLUMN {col} {col_type}")
+            except: pass
     conn.commit(); conn.close()
 
 repair_databases()
@@ -214,7 +217,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# ŞIK VE PROFESYONEL SAAS GİRİŞ EKRANI (SLİDER + FORM - SMS İPTAL EDİLDİ)
+# ŞIK VE PROFESYONEL SAAS GİRİŞ EKRANI (SLİDER + FORM)
 # =====================================================================
 if not st.session_state.logged_in:
     
@@ -323,7 +326,7 @@ if not st.session_state.logged_in:
                         if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone(): 
                             st.error(_("email_in_use"))
                         else:
-                            # is_verified=1 yapıyoruz ki SMS onayı istemeden direkt Admin Onayı (is_approved=0) beklesin
+                            # is_verified=1 yapıyoruz ki direkt onay beklesin
                             c.execute("INSERT INTO users (email, password, company_name, phone, user_type, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,1,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')", (re, hash_password(rpw), rc, rp, rt))
                             c.commit()
                             st.success("Kayıt Başarılı! Sistem yöneticisi onayladıktan sonra giriş yapabilirsiniz.")
