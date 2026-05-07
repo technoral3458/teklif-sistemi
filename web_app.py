@@ -231,39 +231,47 @@ st.markdown("""
 # =====================================================================
 if not st.session_state.logged_in:
     
-    # Sağ üst dil seçimi
     c1, c2, c3 = st.columns([8, 1, 1]); lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
     with c3:
         sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=list(lang_opts.keys()).index(st.session_state.lang), key="main_lang_sel", label_visibility="collapsed")
         if sel != st.session_state.lang: st.session_state.lang = sel; st.rerun()
 
-    st.write("") # Üst boşluk
+    st.write("") 
     st.write("")
     
     # 🚀 MODERN İKİ KOLONLU TASARIM (SLIDER VE FORM) 🚀
     col_slider, col_form = st.columns([1.2, 1], gap="large")
     
     with col_slider:
-        # Görsel hizalama için minik boşluk
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
         
         c_f = sqlite3.connect('factory_data.db')
-        mods = c_f.execute("SELECT name, image_path FROM models WHERE image_path!=''").fetchall()
+        mods = c_f.execute("SELECT name, image_path FROM models").fetchall()
         c_f.close()
         
-        # 🚀 DASHBOARD'DAKİ KURŞUN GEÇİRMEZ SLAYT KODU 🚀
-        s_h = "".join([f'<div class="mySlides fade"><img src="{get_base64_image(m[1])}"><div class="slide-text">{m[0]}</div></div>' for m in mods if get_base64_image(m[1])])
-        
+        s_h = ""
+        if mods:
+            # Sistemdeki tüm makineleri döngüye al
+            for m in mods:
+                # Makinenin resmi varsa al, yoksa sistem/şirket logosunu kullan
+                img_b64 = get_base64_image(m[1]) if m[1] else ""
+                if not img_b64:
+                    img_b64 = get_system_logo()
+                
+                # Hem resim hem logo yoksa bile sadece ismi gösterecek garantili HTML
+                img_tag = f'<img src="{img_b64}">' if img_b64 else '<div style="font-size:80px; margin-top:100px;">⚙️</div>'
+                s_h += f'<div class="mySlides fade">{img_tag}<div class="slide-text">{m[0]}</div></div>'
+
         if s_h:
             slider_html = f"""
             <html><head><style>
             body {{ margin:0; padding:0; background: transparent; overflow:hidden; font-family:sans-serif; }}
-            .slideshow-container {{ position:relative; width:100%; height:450px; border-radius:20px; display:flex; align-items:center; justify-content:center; }}
+            .slideshow-container {{ position:relative; width:100%; height:450px; border-radius:20px; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); box-shadow: inset 0 0 20px rgba(0,0,0,0.02); }}
             .mySlides {{ display:none; text-align:center; width:100%; height:100%; position:relative; }}
-            img {{ max-height:400px; max-width:90%; object-fit:contain; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1)); }}
-            .slide-text {{ color:#0f172a; font-size:18px; font-weight:900; position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.7); padding:8px 20px; border-radius:20px; backdrop-filter:blur(5px); border:1px solid rgba(255,255,255,0.5); }}
-            .fade {{ animation-name:fade; animation-duration:2s; }}
-            @keyframes fade {{ from {{opacity:0.2}} to {{opacity:1}} }}
+            img {{ max-height:380px; max-width:85%; object-fit:contain; position:absolute; top:45%; left:50%; transform:translate(-50%,-50%); filter: drop-shadow(0 15px 20px rgba(0,0,0,0.1)); }}
+            .slide-text {{ color:#0f172a; font-size:16px; font-weight:900; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.85); padding:10px 25px; border-radius:30px; backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.6); box-shadow: 0 4px 6px rgba(0,0,0,0.05); white-space:nowrap; }}
+            .fade {{ animation-name:fade; animation-duration:1.5s; }}
+            @keyframes fade {{ from {{opacity:0.3; transform: scale(0.95);}} to {{opacity:1; transform: scale(1);}} }}
             </style></head><body>
             <div class="slideshow-container">{s_h}</div>
             <script>
@@ -282,18 +290,14 @@ if not st.session_state.logged_in:
             import streamlit.components.v1 as components
             components.html(slider_html, height=480)
         else:
-            # Resim yoksa ekran boş kalmasın diye şık bir arka plan
-            st.markdown("""
-            <div style='height:450px; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border-radius:20px; border: 1px dashed #cbd5e1;'>
-                <h3 style='color:#64748b; font-weight:800;'>Vitrin Görselleri Hazırlanıyor...</h3>
-            </div>
-            """, unsafe_allow_html=True)
+            # Sadece sistemde HİÇBİR makine ekli değilse (sıfır kayıt varsa) bura görünür
+            st.info("Sistemde henüz kayıtlı makine bulunmuyor.")
 
     with col_form:
-        # SADECE ERŞAN MAKİNA SANAYİ YAZISI
+        # SADECE ERŞAN MAKİNA SANAYİ YAZISI (Prestijli Başlık)
         st.markdown(f"<h2 style='text-align:center; color:#0f172a; margin-bottom:30px; font-weight:900;'>Erşan Makina Sanayi</h2>", unsafe_allow_html=True)
         
-        # Native Streamlit Form Container (HTML Hatalarını Önler)
+        # Native Streamlit Form Container
         with st.container(border=True):
             t_login, t_reg, t_forg = st.tabs([_("login_tab"), _("reg_tab"), _("forg_tab")])
             
