@@ -73,7 +73,7 @@ DICTIONARY = {
         "login_tab": "🔑 登录", "reg_tab": "📝 注册", "forg_tab": "❓ 忘记密码",
         "email": "电子邮件地址", "pass": "密码", "rem": "记住我", "login_btn": "登录系统",
         "sys_err": "电子邮件或密码错误！", "sys_unver": "电子邮件未验证！", "sys_wait": "等待帐户批准。",
-        "reg_type": "业务类型", "dealer": "经销商", "manuf": "制造商",
+        "reg_type": "业务类型", "经销商": "经销商", "manuf": "制造商",
         "comp_name": "公司全称 *", "phone": "电话 *", "reg_btn": "注册",
         "req_fields": "(*) 必填字段。", "email_in_use": "电子邮件已被使用！",
         "code_sent": "验证码已发送", "mail_err": "无法发送电子邮件。",
@@ -125,7 +125,7 @@ def get_base64_image(path):
     return ""
 
 def get_system_logo():
-    fallback_url = "https://ersanmakina.net/wp-content/uploads/2023/01/logo-ersan.png"
+    # SİLİNDİ: Ölü linki tamamen kaldırdık. Artık kırık resim hatası vermeyecek.
     try:
         conn = sqlite3.connect('factory_data.db', check_same_thread=False)
         res = conn.execute("SELECT logo_path FROM company_profile WHERE id=1").fetchone()
@@ -134,7 +134,7 @@ def get_system_logo():
             b64 = get_base64_image(res[0])
             if b64: return b64
     except: pass
-    return fallback_url
+    return "" 
 
 def repair_databases():
     conn = sqlite3.connect('users.db')
@@ -148,11 +148,17 @@ def repair_databases():
         conn.execute("INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type, allowed_menus) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici', 'm_dash,m_new,m_cust,m_past,m_order,m_prof,m_deal,m_model')", ("admin@ersanmakina.net", hash_password("20132017")))
     conn.commit(); conn.close()
     
+    # 🚀 SİPARİŞ HATASI ÇÖZÜMÜ: OFFERS TABLOSUNDAKİ EKSİKLERİ GARANTİLİ DOLDURUYORUZ
     conn = sqlite3.connect('sales_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS offers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, model_id INTEGER, total_price REAL DEFAULT 0.0, conditions TEXT DEFAULT '', status TEXT DEFAULT 'Beklemede', user_id INTEGER DEFAULT 1, offer_date TEXT DEFAULT '', order_date TEXT DEFAULT '')""")
     s_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
-    if "user_id" not in s_cols: conn.execute("ALTER TABLE offers ADD COLUMN user_id INTEGER DEFAULT 1")
-    
+    for col in ["user_id", "total_price", "conditions", "status", "offer_date", "order_date"]:
+        if col not in s_cols:
+            try:
+                typ = "REAL DEFAULT 0.0" if col == "total_price" else "INTEGER DEFAULT 1" if col == "user_id" else "TEXT DEFAULT 'Beklemede'" if col == "status" else "TEXT DEFAULT ''"
+                conn.execute(f"ALTER TABLE offers ADD COLUMN {col} {typ}")
+            except: pass
+            
     conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1, country TEXT DEFAULT '', city TEXT DEFAULT '', authorized_person TEXT DEFAULT '', email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '', address_full TEXT DEFAULT '')""")
     c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
     for col in ["user_id", "country", "city", "authorized_person", "email", "phone", "address", "address_full"]:
@@ -255,7 +261,7 @@ if not st.session_state.logged_in:
                         c.close()
     st.stop()
 
-# 🚀 MENÜDEKİ LOGO VE PROFİL GÜZELLEŞTİRMESİ 🚀
+# 🚀 MENÜDEKİ LOGO KIRIK RESİM ÇÖZÜMÜ 🚀
 with st.sidebar:
     c_user = sqlite3.connect('users.db')
     user_data = c_user.execute("SELECT logo_path, company_name FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
@@ -268,14 +274,11 @@ with st.sidebar:
         sidebar_logo = get_base64_image(user_data[0])
         
     if not sidebar_logo:
-        sidebar_logo = get_system_logo() # Kullanıcının logosu yoksa varsayılanı dene
-
-    if sidebar_logo:
-        st.markdown(f"""
-        <div style='text-align: center; margin-bottom: 15px; padding: 10px 0;'>
-            <img src='{sidebar_logo}' style='max-width: 90%; max-height: 55px; object-fit: contain;' onerror="this.onerror=null; this.outerHTML='<div style=\\'font-weight:900; font-size:18px; color:#1e293b;\\'>{sidebar_text}</div>';">
-        </div>
-        """, unsafe_allow_html=True)
+        sidebar_logo = get_system_logo() 
+        
+    # Eğer base64 formatında geçerli bir resmimiz varsa göster, yoksa çirkin ikon yerine firma adını yaz.
+    if sidebar_logo and sidebar_logo.startswith("data:image"):
+        st.markdown(f"<div style='text-align: center; margin-bottom: 15px; padding: 10px 0;'><img src='{sidebar_logo}' style='max-width: 90%; max-height: 55px; object-fit: contain;'></div>", unsafe_allow_html=True)
     else:
         st.markdown(f"<div style='text-align: center; margin-bottom: 15px; padding: 10px 0; font-weight:900; font-size:18px; color:#1e293b;'>{sidebar_text}</div>", unsafe_allow_html=True)
 
@@ -341,7 +344,6 @@ elif st.session_state.active_tab == _("m_dash"):
         components.html(f'<html><head><style>body{{margin:0;}} .slideshow-container{{width:100%; max-width:900px; position:relative; margin:auto; border-radius:12px; border:1px solid #e2e8f0; background:#fff; height:450px; display:flex; align-items:center; justify-content:center;}} .mySlides{{display:none; text-align:center; width:100%; height:100%; position:relative;}} img{{max-height:400px; max-width:90%; object-fit:contain; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);}} .text{{color:#0f172a; font-size:18px; font-weight:800; padding:10px 20px; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.9); border-radius:20px; border:1px solid #cbd5e1;}} .fade{{animation-name:fade; animation-duration:2s;}} @keyframes fade{{from{{opacity:.2}} to{{opacity:1}}}}</style></head><body><div class="slideshow-container">{s_h}</div><script>let sI=0; show(); function show(){{let i; let s=document.getElementsByClassName("mySlides"); if(s.length===0)return; for(i=0;i<s.length;i++)s[i].style.display="none"; sI++; if(sI>s.length)sI=1; s[sI-1].style.display="block"; setTimeout(show,3500);}}</script></body></html>', height=480)
     else: st.info(_("no_image"))
 
-# 🚀 EKSİKSİZ GÖRSEL PROFİL AYARLARI 🚀
 elif st.session_state.active_tab == _("m_prof"):
     st.header(_("m_prof"))
     
