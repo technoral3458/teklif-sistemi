@@ -276,14 +276,17 @@ def show_offer_wizard(user_id, is_admin=False):
                 nc_addr = st.text_area("Açık Adres", height=80, placeholder="Fatura adresi...")
                 
                 if st.button("💾 MÜŞTERİYİ KAYDET VE DEVAM ET", type="primary", use_container_width=True):
-                    # 🚀 Sadece Firma, Yetkili, Ülke ve Şehir Zorunlu (Adres artık opsiyonel) 🚀
                     if not nc_comp.strip() or not nc_auth.strip() or not nc_country or not nc_city:
                         st.error("Lütfen yıldızlı (*) zorunlu alanları (Firma, Yetkili, Ülke, Şehir) eksiksiz doldurunuz!")
                     else:
                         exec_sales("INSERT INTO customers (company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)", 
                                    (nc_comp.strip(), nc_auth.strip(), nc_phone.strip(), nc_email.strip(), nc_addr.strip(), nc_country, nc_city, nc_tax_office.strip(), nc_tax_id.strip(), user_id))
                         st.session_state.new_added_cust = nc_comp.strip()
-                        st.session_state.chk_add_new_cust = False 
+                        
+                        # 🚀 ÇÖZÜM BURADA: Toggle'ı güvenli bir şekilde kapatmak için session state'ten siliyoruz
+                        if "chk_add_new_cust" in st.session_state:
+                            del st.session_state["chk_add_new_cust"]
+                            
                         st.rerun()
                 return
 
