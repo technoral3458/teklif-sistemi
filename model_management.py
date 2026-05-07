@@ -148,7 +148,6 @@ def repair_factory_db():
     exec_factory("CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY AUTOINCREMENT, opt_name TEXT, opt_desc TEXT, opt_price REAL, opt_image TEXT, sort_order INTEGER DEFAULT 0)")
     exec_factory("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_price REAL, image_path TEXT, specs TEXT, currency TEXT DEFAULT 'USD', port_discount REAL DEFAULT 0.0, compatible_options TEXT DEFAULT '', gallery_images TEXT DEFAULT '', category TEXT DEFAULT 'Diğer Makinalar', gallery_videos TEXT DEFAULT '')""")
     
-    # 🚀 EKSİK SÜTUNLARI GARANTİLİ ŞEKİLDE EKLE 🚀
     cols_models = [('name_zh', "TEXT DEFAULT ''"), ('specs_zh', "TEXT DEFAULT ''"), ('user_id', "INTEGER DEFAULT 1")]
     for col, typ in cols_models:
         try: exec_factory(f"ALTER TABLE models ADD COLUMN {col} {typ}")
@@ -321,13 +320,18 @@ def show_list_view(user_role):
     with tab_cat:
         c1, c2 = st.columns([5, 3], vertical_alignment="bottom")
         c1.subheader(_m("cat_mng"))
-        with c2.form("new_cat_form", clear_on_submit=True):
-            cc1, cc2 = st.columns([3, 1])
-            n_cat = cc1.text_input(_m("new_cat"), label_visibility="collapsed", placeholder=_m("new_cat_ph"))
-            if cc2.form_submit_button(_m("btn_add"), use_container_width=True):
-                if n_cat.strip():
-                    try: exec_factory("INSERT INTO categories (name) VALUES (?)", (n_cat.strip(),)); st.rerun()
-                    except: st.error(_m("cat_exists"))
+        
+        # 🚀 SADECE ADMİN KATEGORİ EKLEYEBİLİR 🚀
+        if user_role == "admin":
+            with c2.form("new_cat_form", clear_on_submit=True):
+                cc1, cc2 = st.columns([3, 1])
+                n_cat = cc1.text_input(_m("new_cat"), label_visibility="collapsed", placeholder=_m("new_cat_ph"))
+                if cc2.form_submit_button(_m("btn_add"), use_container_width=True):
+                    if n_cat.strip():
+                        try: exec_factory("INSERT INTO categories (name) VALUES (?)", (n_cat.strip(),)); st.rerun()
+                        except: st.error(_m("cat_exists"))
+        else:
+            c2.write("") # Görsel hizalama için boşluk
 
         st.markdown("---")
         cats = get_factory("SELECT id, name FROM categories ORDER BY name ASC")
@@ -338,7 +342,8 @@ def show_list_view(user_role):
                     if i + j < len(cats):
                         cid, cname = cats[i+j]
                         with cols[j].container(border=True):
-                            if st.session_state.get("edit_cat_id") == cid:
+                            # 🚀 SADECE ADMİN KATEGORİ DÜZENLEYEBİLİR/SİLEBİLİR 🚀
+                            if st.session_state.get("edit_cat_id") == cid and user_role == "admin":
                                 new_cname = st.text_input(_m("new_name"), value=cname, key=f"inp_cat_{cid}", label_visibility="collapsed")
                                 bc1, bc2 = st.columns(2)
                                 if bc1.button(_m("save"), key=f"save_cat_{cid}", use_container_width=True):
@@ -350,13 +355,15 @@ def show_list_view(user_role):
                                     st.session_state.edit_cat_id = None; st.rerun()
                             else:
                                 st.markdown(f"<div style='text-align:center; padding:15px 0;'><span style='font-size:32px;'>📁</span><br><b style='color:#0f172a; font-size:16px;'>{cname}</b></div>", unsafe_allow_html=True)
-                                bc1, bc2 = st.columns(2)
-                                with bc1:
-                                    if st.button(_m("btn_edit_txt"), key=f"ed_cat_{cid}", use_container_width=True):
-                                        st.session_state.edit_cat_id = cid; st.rerun()
-                                with bc2:
-                                    if st.button(_m("btn_del_txt"), key=f"rm_cat_{cid}", use_container_width=True):
-                                        exec_factory("DELETE FROM categories WHERE id=?", (cid,)); st.rerun()
+                                
+                                if user_role == "admin":
+                                    bc1, bc2 = st.columns(2)
+                                    with bc1:
+                                        if st.button(_m("btn_edit_txt"), key=f"ed_cat_{cid}", use_container_width=True):
+                                            st.session_state.edit_cat_id = cid; st.rerun()
+                                    with bc2:
+                                        if st.button(_m("btn_del_txt"), key=f"rm_cat_{cid}", use_container_width=True):
+                                            exec_factory("DELETE FROM categories WHERE id=?", (cid,)); st.rerun()
         else: st.info(_m("no_cat"))
 
 # =====================================================================
