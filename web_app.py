@@ -147,20 +147,31 @@ def repair_databases():
     conn = sqlite3.connect('sales_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS offers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, model_id INTEGER, total_price REAL DEFAULT 0.0, conditions TEXT DEFAULT '', status TEXT DEFAULT 'Beklemede', user_id INTEGER DEFAULT 1, offer_date TEXT DEFAULT '', order_date TEXT DEFAULT '')""")
     s_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
+    
+    # 🚀 TIRNAK HATASININ ÇÖZÜLDÜĞÜ BÖLÜM (OFFERS) 🚀
     for col in ["user_id", "total_price", "conditions", "status", "offer_date", "order_date"]:
         if col not in s_cols:
-            try: conn.execute(f"ALTER TABLE offers ADD COLUMN {col} {'REAL DEFAULT 0.0' if col == 'total_price' else 'INTEGER DEFAULT 1' if col == 'user_id' else 'TEXT DEFAULT ''Beklemede''' if col == 'status' else 'TEXT DEFAULT ''''}")
+            try:
+                typ = "TEXT DEFAULT ''"
+                if col == "total_price": typ = "REAL DEFAULT 0.0"
+                elif col == "user_id": typ = "INTEGER DEFAULT 1"
+                elif col == "status": typ = "TEXT DEFAULT 'Beklemede'"
+                conn.execute(f"ALTER TABLE offers ADD COLUMN {col} {typ}")
             except: pass
             
     conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1, country TEXT DEFAULT '', city TEXT DEFAULT '', authorized_person TEXT DEFAULT '', email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '', address_full TEXT DEFAULT '')""")
     c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
+    
+    # 🚀 TIRNAK HATASININ ÇÖZÜLDÜĞÜ BÖLÜM (CUSTOMERS) 🚀
     for col in ["user_id", "country", "city", "authorized_person", "email", "phone", "address", "address_full", "tax_office", "tax_id"]:
         if col not in c_cols:
-            try: conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {'INTEGER DEFAULT 1' if col == 'user_id' else 'TEXT DEFAULT ''''}")
+            try:
+                typ = "INTEGER DEFAULT 1" if col == "user_id" else "TEXT DEFAULT ''"
+                conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {typ}")
             except: pass
     conn.commit(); conn.close()
 
-    # 🚀 ÇİNCE ÇEVİRİ VE EKSİK SÜTUN HATASI İÇİN AGRESIF TAMİR MOTORU 🚀
+    # ÇİNCE ÇEVİRİ VE EKSİK SÜTUN HATASI İÇİN AGRESIF TAMİR MOTORU
     conn = sqlite3.connect('factory_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_price REAL, image_path TEXT, specs TEXT, currency TEXT DEFAULT 'USD', port_discount REAL DEFAULT 0.0, compatible_options TEXT DEFAULT '', gallery_images TEXT DEFAULT '', category TEXT DEFAULT 'Diğer Makinalar', gallery_videos TEXT DEFAULT '', name_zh TEXT DEFAULT '', specs_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
     f_cols = [c[1] for c in conn.execute("PRAGMA table_info(models)").fetchall()]
@@ -217,7 +228,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# ŞIK VE PROFESYONEL SAAS GİRİŞ EKRANI (SLİDER + FORM)
+# ŞIK VE PROFESYONEL SAAS GİRİŞ EKRANI (SLİDER + FORM - SMS İPTAL EDİLDİ)
 # =====================================================================
 if not st.session_state.logged_in:
     
