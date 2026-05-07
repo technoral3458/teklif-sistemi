@@ -211,7 +211,6 @@ def show_offer_wizard(user_id, is_admin=False):
         </style>
     """, unsafe_allow_html=True)
     
-    # 🚀 ŞIK VE KİBAR MENÜ BUTONU 🚀
     col_b1, col_b2, col_b3 = st.columns([1, 6, 1])
     if col_b1.button("☰ Menü", use_container_width=True):
         st.session_state.active_tab = "📊 Dashboard"
@@ -258,7 +257,6 @@ def show_offer_wizard(user_id, is_admin=False):
             if is_new_customer:
                 st.markdown("<div style='font-size:14px; font-weight:900; color:#ea580c; margin-top:10px; margin-bottom:10px;'>🆕 HIZLI MÜŞTERİ KAYDI</div>", unsafe_allow_html=True)
                 
-                # 🚀 TASARIM DÜZELTİLDİ: PROFESYONEL ZORUNLU (*) İŞARETLERİ 🚀
                 nc_comp = st.text_input("Firma Adı *", placeholder="Örn: ABC Makine Ltd. Şti.")
                 
                 c_tax1, c_tax2 = st.columns(2)
@@ -275,11 +273,12 @@ def show_offer_wizard(user_id, is_admin=False):
                 nc_country = c_ulke.selectbox("Ülke *", options=COUNTRIES, index=None, placeholder="Aramak için yazın...")
                 nc_city = c_sehir.selectbox("Şehir *", options=CITIES, index=None, placeholder="Aramak için yazın...")
                 
-                nc_addr = st.text_area("Açık Adres *", height=80, placeholder="Fatura adresi...")
+                nc_addr = st.text_area("Açık Adres", height=80, placeholder="Fatura adresi...")
                 
                 if st.button("💾 MÜŞTERİYİ KAYDET VE DEVAM ET", type="primary", use_container_width=True):
-                    if not nc_comp.strip() or not nc_auth.strip() or not nc_addr.strip() or not nc_country or not nc_city:
-                        st.error("Lütfen yıldızlı (*) zorunlu alanları (Firma, Yetkili, Ülke, Şehir ve Adres) eksiksiz doldurunuz!")
+                    # 🚀 Sadece Firma, Yetkili, Ülke ve Şehir Zorunlu (Adres artık opsiyonel) 🚀
+                    if not nc_comp.strip() or not nc_auth.strip() or not nc_country or not nc_city:
+                        st.error("Lütfen yıldızlı (*) zorunlu alanları (Firma, Yetkili, Ülke, Şehir) eksiksiz doldurunuz!")
                     else:
                         exec_sales("INSERT INTO customers (company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)", 
                                    (nc_comp.strip(), nc_auth.strip(), nc_phone.strip(), nc_email.strip(), nc_addr.strip(), nc_country, nc_city, nc_tax_office.strip(), nc_tax_id.strip(), user_id))
