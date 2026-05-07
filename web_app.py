@@ -136,9 +136,7 @@ def get_system_logo():
     except: pass
     return fallback_url
 
-# 🚀 ACİL ONARIM MOTORU (Eksik Tüm Sütunları Güvence Altına Alır) 🚀
 def repair_databases():
-    # USERS DB
     conn = sqlite3.connect('users.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, company_name TEXT, role TEXT DEFAULT 'dealer', is_approved INTEGER DEFAULT 0, user_type TEXT DEFAULT 'Satıcı', phone TEXT, is_verified INTEGER DEFAULT 0, auth_code TEXT, session_token TEXT, logo_path TEXT, website TEXT, address_full TEXT, allowed_menus TEXT, allowed_categories TEXT)""")
     u_cols = [c[1] for c in conn.execute("PRAGMA table_info(users)").fetchall()]
@@ -150,7 +148,6 @@ def repair_databases():
         conn.execute("INSERT INTO users (email, password, company_name, role, is_approved, is_verified, user_type, allowed_menus) VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici', 'm_dash,m_new,m_cust,m_past,m_order,m_prof,m_deal,m_model')", ("admin@ersanmakina.net", hash_password("20132017")))
     conn.commit(); conn.close()
     
-    # SALES DB
     conn = sqlite3.connect('sales_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS offers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, model_id INTEGER, total_price REAL DEFAULT 0.0, conditions TEXT DEFAULT '', status TEXT DEFAULT 'Beklemede', user_id INTEGER DEFAULT 1, offer_date TEXT DEFAULT '', order_date TEXT DEFAULT '')""")
     s_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
@@ -158,28 +155,22 @@ def repair_databases():
     
     conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1, country TEXT DEFAULT '', city TEXT DEFAULT '', authorized_person TEXT DEFAULT '', email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '', address_full TEXT DEFAULT '')""")
     c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
-    
-    # Eksik Olabilecek Tüm Sütunları Döngü İle Kontrol Edip Ekliyoruz
     for col in ["user_id", "country", "city", "authorized_person", "email", "phone", "address", "address_full"]:
         if col not in c_cols:
             try:
                 col_type = "INTEGER DEFAULT 1" if col == "user_id" else "TEXT DEFAULT ''"
                 conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {col_type}")
             except: pass
-            
     conn.commit(); conn.close()
 
-    # FACTORY DB
     conn = sqlite3.connect('factory_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_price REAL, image_path TEXT, specs TEXT, currency TEXT DEFAULT 'USD', port_discount REAL DEFAULT 0.0, compatible_options TEXT DEFAULT '', gallery_images TEXT DEFAULT '', category TEXT DEFAULT 'Diğer Makinalar', gallery_videos TEXT DEFAULT '', name_zh TEXT DEFAULT '', specs_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
     f_cols = [c[1] for c in conn.execute("PRAGMA table_info(models)").fetchall()]
     if "user_id" not in f_cols: conn.execute("ALTER TABLE models ADD COLUMN user_id INTEGER DEFAULT 1")
     
-    # DONANIMLAR (OPTIONS) TABLOSUNA USER_ID EKLEME (İzolasyon için)
     conn.execute("""CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY AUTOINCREMENT, opt_name TEXT, opt_desc TEXT, opt_price REAL, opt_image TEXT, sort_order INTEGER DEFAULT 0, allow_qty INTEGER DEFAULT 1, opt_name_zh TEXT DEFAULT '', opt_desc_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
     o_cols = [c[1] for c in conn.execute("PRAGMA table_info(options)").fetchall()]
     if "user_id" not in o_cols: conn.execute("ALTER TABLE options ADD COLUMN user_id INTEGER DEFAULT 1")
-    
     conn.commit(); conn.close()
 
 repair_databases()
@@ -324,15 +315,52 @@ elif st.session_state.active_tab == _("m_dash"):
         import streamlit.components.v1 as components
         components.html(f'<html><head><style>body{{margin:0;}} .slideshow-container{{width:100%; max-width:900px; position:relative; margin:auto; border-radius:12px; border:1px solid #e2e8f0; background:#fff; height:450px; display:flex; align-items:center; justify-content:center;}} .mySlides{{display:none; text-align:center; width:100%; height:100%; position:relative;}} img{{max-height:400px; max-width:90%; object-fit:contain; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);}} .text{{color:#0f172a; font-size:18px; font-weight:800; padding:10px 20px; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.9); border-radius:20px; border:1px solid #cbd5e1;}} .fade{{animation-name:fade; animation-duration:2s;}} @keyframes fade{{from{{opacity:.2}} to{{opacity:1}}}}</style></head><body><div class="slideshow-container">{s_h}</div><script>let sI=0; show(); function show(){{let i; let s=document.getElementsByClassName("mySlides"); if(s.length===0)return; for(i=0;i<s.length;i++)s[i].style.display="none"; sI++; if(sI>s.length)sI=1; s[sI-1].style.display="block"; setTimeout(show,3500);}}</script></body></html>', height=480)
     else: st.info(_("no_image"))
+
+# 🚀 EKSİKSİZ GÖRSEL PROFİL AYARLARI 🚀
 elif st.session_state.active_tab == _("m_prof"):
-    st.header(_("m_prof")); c = sqlite3.connect('users.db'); u = c.execute("SELECT company_name, email, phone, website, address_full, logo_path FROM users WHERE id=?", (st.session_state.user_id,)).fetchone(); c.close()
-    with st.expander("👤", expanded=True):
-        with st.form("p_f"):
-            cc1, cc2 = st.columns(2); pn = cc1.text_input("Company", value=u[0] if u else ""); pw = cc2.text_input("Web", value=u[3] if u and u[3] else ""); pp = cc1.text_input("Phone", value=u[2] if u and u[2] else ""); pa = st.text_area("Address", value=u[4] if u and u[4] else ""); ul = st.file_uploader("Logo", type=['png','jpg','jpeg'])
-            if st.form_submit_button("💾 UPDATE"):
-                fl = u[5] if u else ""
-                if ul:
-                    if not os.path.exists("images"): os.makedirs("images")
-                    fl = f"images/logo_user_{st.session_state.user_id}.png"
-                    with open(fl, "wb") as f: f.write(ul.getbuffer())
-                c = sqlite3.connect('users.db'); c.execute("UPDATE users SET company_name=?, website=?, phone=?, address_full=?, logo_path=? WHERE id=?", (pn, pw, pp, pa, fl, st.session_state.user_id)); c.commit(); c.close(); st.success("Updated!"); st.rerun()
+    st.header(_("m_prof"))
+    
+    c = sqlite3.connect('users.db')
+    u = c.execute("SELECT company_name, email, phone, website, address_full, logo_path FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
+    c.close()
+    
+    with st.expander("👤 Firma ve İletişim Bilgilerim", expanded=True):
+        col_logo, col_form = st.columns([1.5, 3.5])
+        
+        with col_logo:
+            st.markdown("<div style='text-align:center; font-weight:900; font-size:14px; margin-bottom:10px; color:#475569;'>Mevcut Logonuz</div>", unsafe_allow_html=True)
+            current_logo = u[5] if u and len(u) > 5 else ""
+            logo_b64 = get_base64_image(current_logo)
+            
+            if logo_b64:
+                st.markdown(f'<div style="text-align:center; padding:15px; border:2px solid #e2e8f0; border-radius:12px; background:white; box-shadow:0 4px 6px rgba(0,0,0,0.05);"><img src="{logo_b64}" style="max-width:100%; max-height:140px; object-fit:contain;"></div>', unsafe_allow_html=True)
+            else:
+                st.markdown("<div style='text-align:center; padding:40px 10px; border:2px dashed #cbd5e1; border-radius:12px; background:#f8fafc; color:#94a3b8; font-size:13px; font-weight:bold;'>Henüz Logo Yüklenmedi</div>", unsafe_allow_html=True)
+
+        with col_form:
+            with st.form("p_f"):
+                cc1, cc2 = st.columns(2)
+                pn = cc1.text_input("Firma Adı", value=u[0] if u else "")
+                pw = cc2.text_input("Web Sitesi", value=u[3] if u and u[3] else "")
+                pp = cc1.text_input("Telefon", value=u[2] if u and u[2] else "")
+                pa = st.text_area("Açık Adres", value=u[4] if u and u[4] else "", height=100)
+                
+                ul = st.file_uploader("Yeni Logo Yükle (Değiştirmek İstemiyorsanız Boş Bırakın)", type=['png','jpg','jpeg'])
+                
+                if st.form_submit_button("💾 BİLGİLERİ GÜNCELLE", type="primary", use_container_width=True):
+                    fl = current_logo
+                    if ul:
+                        if not os.path.exists("images"): os.makedirs("images")
+                        # 🚀 Tarayıcı çerezlerini atlatmak için resim ismine şifre eklendi
+                        ext = os.path.splitext(ul.name)[1]
+                        if not ext: ext = ".png"
+                        filename = f"logo_user_{st.session_state.user_id}_{uuid.uuid4().hex[:6]}{ext}"
+                        fl = f"images/{filename}"
+                        with open(fl, "wb") as f: f.write(ul.getbuffer())
+                        
+                    c = sqlite3.connect('users.db')
+                    c.execute("UPDATE users SET company_name=?, website=?, phone=?, address_full=?, logo_path=? WHERE id=?", (pn, pw, pp, pa, fl, st.session_state.user_id))
+                    c.commit()
+                    c.close()
+                    st.success("Profil başarıyla güncellendi!")
+                    st.rerun()
