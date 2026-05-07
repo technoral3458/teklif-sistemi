@@ -244,66 +244,52 @@ if not st.session_state.logged_in:
     col_slider, col_form = st.columns([1.2, 1], gap="large")
     
     with col_slider:
+        # Görsel hizalama için minik boşluk
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+        
         c_f = sqlite3.connect('factory_data.db')
         mods = c_f.execute("SELECT name, image_path FROM models WHERE image_path!=''").fetchall()
         c_f.close()
         
-        if mods:
-            # Rastgele en fazla 8 makineyi seç
-            selected_mods = random.sample(mods, min(len(mods), 8))
-            
-            html_slides = ""
-            html_texts = ""
-            
-            for i, m in enumerate(selected_mods):
-                img_b64 = get_base64_image(m[1])
-                if img_b64:
-                    html_slides += f"<img src='{img_b64}' class='slide'>"
-                    html_texts += f"<div class='slide-text'>{m[0]}</div>"
-                    
-            if html_slides:
-                slider_html = f"""
-                <html><head><style>
-                body {{ margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; background: transparent; overflow: hidden; }}
-                .slideshow {{ position: relative; width: 100%; height: 100%; border-radius: 20px; }}
-                .slide {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 1.5s ease-in-out, transform 4.5s ease-in-out; transform: scale(0.95); padding: 15px; box-sizing: border-box; }}
-                .slide.active {{ opacity: 1; transform: scale(1); z-index: 10; }}
-                .slide-text {{ position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.85); padding: 10px 25px; border-radius: 30px; font-family: sans-serif; font-size: 15px; font-weight: 800; color: #0f172a; z-index: 20; box-shadow: 0 4px 15px rgba(0,0,0,0.05); opacity: 0; transition: opacity 1.5s; white-space: nowrap; border: 1px solid #e2e8f0; backdrop-filter: blur(10px); }}
-                .slide-text.active-text {{ opacity: 1; }}
-                </style></head><body>
-                <div class="slideshow" id="slideshow">
-                   {html_slides}
-                   {html_texts}
-                </div>
-                <script>
-                const slides = document.querySelectorAll('.slide');
-                const texts = document.querySelectorAll('.slide-text');
-                let current = 0;
-                if(slides.length > 0) {{
-                    slides[0].classList.add('active');
-                    texts[0].classList.add('active-text');
-                    setInterval(() => {{
-                        slides[current].classList.remove('active');
-                        texts[current].classList.remove('active-text');
-                        current = (current + 1) % slides.length;
-                        slides[current].classList.add('active');
-                        texts[current].classList.add('active-text');
-                    }}, 4000);
-                }}
-                </script>
-                </body></html>
-                """
-                # Şık Slider Bileşeni
-                import streamlit.components.v1 as components
-                components.html(slider_html, height=480)
+        # 🚀 DASHBOARD'DAKİ KURŞUN GEÇİRMEZ SLAYT KODU 🚀
+        s_h = "".join([f'<div class="mySlides fade"><img src="{get_base64_image(m[1])}"><div class="slide-text">{m[0]}</div></div>' for m in mods if get_base64_image(m[1])])
+        
+        if s_h:
+            slider_html = f"""
+            <html><head><style>
+            body {{ margin:0; padding:0; background: transparent; overflow:hidden; font-family:sans-serif; }}
+            .slideshow-container {{ position:relative; width:100%; height:450px; border-radius:20px; display:flex; align-items:center; justify-content:center; }}
+            .mySlides {{ display:none; text-align:center; width:100%; height:100%; position:relative; }}
+            img {{ max-height:400px; max-width:90%; object-fit:contain; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1)); }}
+            .slide-text {{ color:#0f172a; font-size:18px; font-weight:900; position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.7); padding:8px 20px; border-radius:20px; backdrop-filter:blur(5px); border:1px solid rgba(255,255,255,0.5); }}
+            .fade {{ animation-name:fade; animation-duration:2s; }}
+            @keyframes fade {{ from {{opacity:0.2}} to {{opacity:1}} }}
+            </style></head><body>
+            <div class="slideshow-container">{s_h}</div>
+            <script>
+            let sI=0; show();
+            function show(){{
+                let s=document.getElementsByClassName("mySlides");
+                if(s.length===0)return;
+                for(let i=0;i<s.length;i++) s[i].style.display="none";
+                sI++; if(sI>s.length)sI=1;
+                s[sI-1].style.display="block";
+                setTimeout(show,3500);
+            }}
+            </script>
+            </body></html>
+            """
+            import streamlit.components.v1 as components
+            components.html(slider_html, height=480)
         else:
-            st.info("Sistemde henüz vitrin görseli bulunmamaktadır.")
+            # Resim yoksa ekran boş kalmasın diye şık bir arka plan
+            st.markdown("""
+            <div style='height:450px; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border-radius:20px; border: 1px dashed #cbd5e1;'>
+                <h3 style='color:#64748b; font-weight:800;'>Vitrin Görselleri Hazırlanıyor...</h3>
+            </div>
+            """, unsafe_allow_html=True)
 
     with col_form:
-        sys_logo = get_system_logo()
-        if sys_logo: 
-            st.markdown(f"<div style='text-align:center; margin-bottom:15px;'><img src='{sys_logo}' style='max-width:220px; max-height:75px; object-fit:contain;'></div>", unsafe_allow_html=True)
-        
         # SADECE ERŞAN MAKİNA SANAYİ YAZISI
         st.markdown(f"<h2 style='text-align:center; color:#0f172a; margin-bottom:30px; font-weight:900;'>Erşan Makina Sanayi</h2>", unsafe_allow_html=True)
         
