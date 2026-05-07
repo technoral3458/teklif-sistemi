@@ -207,9 +207,9 @@ if not st.session_state.logged_in:
         if valid_user:
             st.session_state.logged_in, st.session_state.user_id, st.session_state.user_role, st.session_state.user_email, st.session_state.allowed_menus = True, valid_user[0], (valid_user[2] if valid_user[2] == 'admin' else ("manufacturer" if valid_user[1] == "Üretici" else "dealer")), valid_user[3], valid_user[4]
 
-# Temiz, Native ve Profesyonel Streamlit CSS'i
 st.markdown("""
     <style>
+    .stApp { background-color: #f8fafc; }
     .stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 8px; margin-bottom: 20px; }
     .stTabs [data-baseweb="tab"] { background-color: transparent; border-radius: 6px; padding: 10px 20px !important; font-size: 14px !important; font-weight: 600; color: #64748b; border: 1px solid transparent; transition: all 0.2s ease; }
     .stTabs [data-baseweb="tab"]:hover { color: #0f172a; background-color: #f1f5f9; }
@@ -220,11 +220,14 @@ st.markdown("""
     [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { background-color: #e2e8f0; color: #0f172a; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] { background-color: #2563eb !important; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3); }
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] p { color: white !important; font-weight: 700 !important; }
+    .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; text-align: center; margin-bottom: 15px;}
+    .stat-val { font-size: 20px; font-weight: 900; color: #1e293b; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+    .stat-title { color: #64748b; text-transform: uppercase; font-size: 11px; font-weight: 700; margin-bottom:5px; display:block;}
     </style>
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# ŞIK GİRİŞ VE KAYIT EKRANI (TEMİZ VE ORİJİNAL)
+# ŞIK VE PROFESYONEL SAAS GİRİŞ EKRANI (SLİDER + FORM)
 # =====================================================================
 if not st.session_state.logged_in:
     
@@ -234,23 +237,77 @@ if not st.session_state.logged_in:
         sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=list(lang_opts.keys()).index(st.session_state.lang), key="main_lang_sel", label_visibility="collapsed")
         if sel != st.session_state.lang: st.session_state.lang = sel; st.rerun()
 
-    # Formu ortaya almak için kolonlar
-    col_l, col_m, col_r = st.columns([1, 1.2, 1])
+    st.write("") # Üst boşluk
+    st.write("")
     
-    with col_m:
-        st.write("") # Üstten boşluk
-        st.write("")
+    # 🚀 MODERN İKİ KOLONLU TASARIM (SLIDER VE FORM) 🚀
+    col_slider, col_form = st.columns([1.2, 1], gap="large")
+    
+    with col_slider:
+        c_f = sqlite3.connect('factory_data.db')
+        mods = c_f.execute("SELECT name, image_path FROM models WHERE image_path!=''").fetchall()
+        c_f.close()
         
-        # Logo ve Başlık (Html Kutusu Kullanılmadan, Direkt Streamlit İçinde)
+        if mods:
+            # Rastgele en fazla 8 makineyi seç
+            selected_mods = random.sample(mods, min(len(mods), 8))
+            
+            html_slides = ""
+            html_texts = ""
+            
+            for i, m in enumerate(selected_mods):
+                img_b64 = get_base64_image(m[1])
+                if img_b64:
+                    html_slides += f"<img src='{img_b64}' class='slide'>"
+                    html_texts += f"<div class='slide-text'>{m[0]}</div>"
+                    
+            if html_slides:
+                slider_html = f"""
+                <html><head><style>
+                body {{ margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; background: transparent; overflow: hidden; }}
+                .slideshow {{ position: relative; width: 100%; height: 100%; border-radius: 20px; }}
+                .slide {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 1.5s ease-in-out, transform 4.5s ease-in-out; transform: scale(0.95); padding: 15px; box-sizing: border-box; }}
+                .slide.active {{ opacity: 1; transform: scale(1); z-index: 10; }}
+                .slide-text {{ position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.85); padding: 10px 25px; border-radius: 30px; font-family: sans-serif; font-size: 15px; font-weight: 800; color: #0f172a; z-index: 20; box-shadow: 0 4px 15px rgba(0,0,0,0.05); opacity: 0; transition: opacity 1.5s; white-space: nowrap; border: 1px solid #e2e8f0; backdrop-filter: blur(10px); }}
+                .slide-text.active-text {{ opacity: 1; }}
+                </style></head><body>
+                <div class="slideshow" id="slideshow">
+                   {html_slides}
+                   {html_texts}
+                </div>
+                <script>
+                const slides = document.querySelectorAll('.slide');
+                const texts = document.querySelectorAll('.slide-text');
+                let current = 0;
+                if(slides.length > 0) {{
+                    slides[0].classList.add('active');
+                    texts[0].classList.add('active-text');
+                    setInterval(() => {{
+                        slides[current].classList.remove('active');
+                        texts[current].classList.remove('active-text');
+                        current = (current + 1) % slides.length;
+                        slides[current].classList.add('active');
+                        texts[current].classList.add('active-text');
+                    }}, 4000);
+                }}
+                </script>
+                </body></html>
+                """
+                # Şık Slider Bileşeni
+                import streamlit.components.v1 as components
+                components.html(slider_html, height=480)
+        else:
+            st.info("Sistemde henüz vitrin görseli bulunmamaktadır.")
+
+    with col_form:
         sys_logo = get_system_logo()
         if sys_logo: 
-            st.markdown(f"<div style='text-align:center; margin-bottom:10px;'><img src='{sys_logo}' style='max-width:220px; max-height:80px; object-fit:contain;'></div>", unsafe_allow_html=True)
-        else: 
-            st.markdown(f"<h2 style='text-align:center; color:#0f172a; margin-bottom:5px; font-weight:900;'>Ersan Makine B2B</h2>", unsafe_allow_html=True)
-            
-        st.markdown("<p style='text-align:center; color:#64748b; font-size:15px; font-weight:500; margin-bottom:30px;'>Bayi ve Üretici Portalı</p>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; margin-bottom:15px;'><img src='{sys_logo}' style='max-width:220px; max-height:75px; object-fit:contain;'></div>", unsafe_allow_html=True)
         
-        # Orijinal Streamlit Bordered Container
+        # SADECE ERŞAN MAKİNA SANAYİ YAZISI
+        st.markdown(f"<h2 style='text-align:center; color:#0f172a; margin-bottom:30px; font-weight:900;'>Erşan Makina Sanayi</h2>", unsafe_allow_html=True)
+        
+        # Native Streamlit Form Container (HTML Hatalarını Önler)
         with st.container(border=True):
             t_login, t_reg, t_forg = st.tabs([_("login_tab"), _("reg_tab"), _("forg_tab")])
             
