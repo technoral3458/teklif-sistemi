@@ -10,6 +10,28 @@ import ntpath
 import posixpath
 
 # =====================================================================
+# SABİT LİSTELER (ÜLKE VE ŞEHİRLER)
+# =====================================================================
+COUNTRIES = [
+    "Türkiye", "Almanya", "Amerika Birleşik Devletleri", "Azerbaycan", "Birleşik Arap Emirlikleri", 
+    "Birleşik Krallık", "Bulgaristan", "Çin", "Fransa", "Gürcistan", "Irak", "İngiltere", 
+    "İran", "İspanya", "İtalya", "Japonya", "Katar", "Kosova", "Kuzey Makedonya", "Mısır", 
+    "Özbekistan", "Romanya", "Rusya", "Sırbistan", "Suudi Arabistan", "Yunanistan", "Yurtdışı (Diğer)"
+]
+
+CITIES = [
+    "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya", "Ankara", "Antalya", "Ardahan", 
+    "Artvin", "Aydın", "Balıkesir", "Bartın", "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", 
+    "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce", "Edirne", 
+    "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", 
+    "Iğdır", "Isparta", "İstanbul", "İzmir", "Kahramanmaraş", "Karabük", "Karaman", "Kars", "Kastamonu", 
+    "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir", "Kilis", "Kocaeli", "Konya", "Kütahya", "Malatya", 
+    "Manisa", "Mardin", "Mersin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", 
+    "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Şanlıurfa", "Şırnak", "Tekirdağ", "Tokat", "Trabzon", 
+    "Tunceli", "Uşak", "Van", "Yalova", "Yozgat", "Zonguldak", "Yurtdışı Şehri (Diğer)"
+]
+
+# =====================================================================
 # VERİTABANI BAĞLANTI MOTORLARI VE ONARIM
 # =====================================================================
 def get_factory(query, params=()):
@@ -43,6 +65,10 @@ def init_wizard_tables():
     try: exec_sales("ALTER TABLE offers ADD COLUMN user_id INTEGER DEFAULT 1")
     except: pass
     try: exec_sales("ALTER TABLE customers ADD COLUMN user_id INTEGER DEFAULT 1")
+    except: pass
+    try: exec_sales("ALTER TABLE customers ADD COLUMN country TEXT DEFAULT ''")
+    except: pass
+    try: exec_sales("ALTER TABLE customers ADD COLUMN city TEXT DEFAULT ''")
     except: pass
 
 # =====================================================================
@@ -181,7 +207,6 @@ def show_offer_wizard(user_id, is_admin=False):
         </style>
     """, unsafe_allow_html=True)
     
-    # 🚀 %100 GARANTİLİ GERİ DÖNÜŞ BUTONU (SİLİNEMEZ) 🚀
     col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
     if col_b1.button("🔙 ANA MENÜYE DÖN", type="primary", use_container_width=True):
         st.session_state.active_tab = "📊 Dashboard"
@@ -226,18 +251,26 @@ def show_offer_wizard(user_id, is_admin=False):
         with st.container(border=True):
             is_new_customer = st.toggle("➕ Yeni Müşteri Ekle", key="chk_add_new_cust")
             if is_new_customer:
+                # 🚀 DİNAMİK VE ZORUNLU YENİ MÜŞTERİ FORMU 🚀
                 st.markdown("<div style='font-size:14px; font-weight:900; color:#ea580c; margin-top:10px; margin-bottom:10px;'>🆕 HIZLI MÜŞTERİ KAYDI</div>", unsafe_allow_html=True)
                 nc_comp = st.text_input("Firma Adı (Zorunlu) *", placeholder="Örn: ABC Makine Ltd. Şti.")
-                nc_auth = st.text_input("Yetkili Kişi")
+                nc_auth = st.text_input("Yetkili Kişi (Zorunlu) *", placeholder="Ad Soyad giriniz...")
                 c_tel, c_mail = st.columns(2)
-                nc_phone = c_tel.text_input("Telefon")
-                nc_email = c_mail.text_input("E-Posta")
-                nc_addr = st.text_area("Açık Adres", height=80)
+                nc_phone = c_tel.text_input("Telefon (Zorunlu) *", placeholder="+90 5XX...")
+                nc_email = c_mail.text_input("E-Posta (Zorunlu) *", placeholder="info@firma.com")
+                
+                c_ulke, c_sehir = st.columns(2)
+                nc_country = c_ulke.selectbox("Ülke (Zorunlu) *", options=COUNTRIES, index=None, placeholder="Aramak için yazın...")
+                nc_city = c_sehir.selectbox("Şehir (Zorunlu) *", options=CITIES, index=None, placeholder="Aramak için yazın...")
+                
+                nc_addr = st.text_area("Açık Adres (Zorunlu) *", height=80, placeholder="Fatura adresi...")
                 
                 if st.button("💾 MÜŞTERİYİ KAYDET VE DEVAM ET", type="primary", use_container_width=True):
-                    if not nc_comp.strip(): st.error("Lütfen Firma Adını giriniz!")
+                    if not nc_comp.strip() or not nc_auth.strip() or not nc_phone.strip() or not nc_email.strip() or not nc_addr.strip() or not nc_country or not nc_city:
+                        st.error("Lütfen tüm zorunlu alanları (Firma, Yetkili, Tel, E-Posta, Ülke, Şehir, Adres) eksiksiz doldurunuz!")
                     else:
-                        exec_sales("INSERT INTO customers (company_name, authorized_person, phone, email, address_full, user_id) VALUES (?,?,?,?,?,?)", (nc_comp.strip(), nc_auth.strip(), nc_phone.strip(), nc_email.strip(), nc_addr.strip(), user_id))
+                        exec_sales("INSERT INTO customers (company_name, authorized_person, phone, email, address_full, country, city, user_id) VALUES (?,?,?,?,?,?,?,?)", 
+                                   (nc_comp.strip(), nc_auth.strip(), nc_phone.strip(), nc_email.strip(), nc_addr.strip(), nc_country, nc_city, user_id))
                         st.session_state.new_added_cust = nc_comp.strip()
                         st.session_state.chk_add_new_cust = False 
                         st.rerun()
