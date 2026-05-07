@@ -1,1 +1,3 @@
-
+images/
+*.db
+__pycache__/
