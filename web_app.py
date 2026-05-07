@@ -255,11 +255,11 @@ if not st.session_state.logged_in:
                 s_h += f'<div class="mySlides fade">{img_tag}<div class="slide-text">{m[0]}</div></div>'
 
         if s_h:
-            # 🚀 ARKA PLAN BEMBEYAZ YAPILDI (background: #ffffff;) 🚀
+            # 🚀 ARKA PLAN BEMBEYAZ YAPILDI (background: #ffffff;) VE KÖŞELERİ DÜZELTİLDİ 🚀
             slider_html = f"""
             <html><head><style>
             body {{ margin:0; padding:0; background: transparent; overflow:hidden; font-family:sans-serif; }}
-            .slideshow-container {{ position:relative; width:100%; height:450px; border-radius:20px; display:flex; align-items:center; justify-content:center; background: #ffffff; box-shadow: inset 0 0 20px rgba(0,0,0,0.02); }}
+            .slideshow-container {{ position:relative; width:100%; height:450px; border-radius:20px; display:flex; align-items:center; justify-content:center; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }}
             .mySlides {{ display:none; text-align:center; width:100%; height:100%; position:relative; }}
             img {{ max-height:380px; max-width:85%; object-fit:contain; position:absolute; top:45%; left:50%; transform:translate(-50%,-50%); filter: drop-shadow(0 15px 20px rgba(0,0,0,0.1)); }}
             .slide-text {{ color:#0f172a; font-size:16px; font-weight:900; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.85); padding:10px 25px; border-radius:30px; backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.6); box-shadow: 0 4px 6px rgba(0,0,0,0.05); white-space:nowrap; }}
