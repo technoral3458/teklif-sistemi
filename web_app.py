@@ -255,19 +255,44 @@ if not st.session_state.logged_in:
                         c.close()
     st.stop()
 
+# 🚀 MENÜDEKİ LOGO VE PROFİL GÜZELLEŞTİRMESİ 🚀
 with st.sidebar:
-    st.markdown(f"<div style='text-align: center; margin-bottom: 15px; padding: 10px 0;'><img src='{get_system_logo()}' style='max-width: 90%; max-height: 55px; object-fit: contain;'></div>", unsafe_allow_html=True)
+    c_user = sqlite3.connect('users.db')
+    user_data = c_user.execute("SELECT logo_path, company_name FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
+    c_user.close()
+    
+    sidebar_logo = ""
+    sidebar_text = user_data[1] if user_data and user_data[1] else "B2B Portal"
+    
+    if user_data and user_data[0]:
+        sidebar_logo = get_base64_image(user_data[0])
+        
+    if not sidebar_logo:
+        sidebar_logo = get_system_logo() # Kullanıcının logosu yoksa varsayılanı dene
+
+    if sidebar_logo:
+        st.markdown(f"""
+        <div style='text-align: center; margin-bottom: 15px; padding: 10px 0;'>
+            <img src='{sidebar_logo}' style='max-width: 90%; max-height: 55px; object-fit: contain;' onerror="this.onerror=null; this.outerHTML='<div style=\\'font-weight:900; font-size:18px; color:#1e293b;\\'>{sidebar_text}</div>';">
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div style='text-align: center; margin-bottom: 15px; padding: 10px 0; font-weight:900; font-size:18px; color:#1e293b;'>{sidebar_text}</div>", unsafe_allow_html=True)
+
     r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
     st.markdown(f"<div style='background-color:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:20px; display:flex; align-items:center; gap:10px; overflow-wrap: anywhere;'><div style='background:#2563eb; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold;'>{st.session_state.user_email[0].upper()}</div><div style='overflow:hidden; width:100%;'><div style='font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div><div style='font-size:11px; color:#64748b; font-weight:600;'>{r_text}</div></div></div>", unsafe_allow_html=True)
+    
     if st.session_state.user_role == "admin": menu_items = [_("m_dash"), _("m_new"), _("m_cust"), _("m_past"), _("m_order"), _("m_prof"), _("m_deal"), _("m_model")]
     else:
         allowed = st.session_state.allowed_menus.split(',') if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
         v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model"]
         menu_items = [_(k.strip()) for k in allowed if k.strip() in v_keys]
     if "active_tab" not in st.session_state or st.session_state.active_tab not in menu_items: st.session_state.active_tab = menu_items[0]
+    
     def on_menu_change():
         st.session_state.active_tab = st.session_state.m_radio
         st.session_state.close_sidebar = True
+        
     st.radio("MENÜ", menu_items, index=menu_items.index(st.session_state.active_tab), key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
     st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
     lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
@@ -351,7 +376,6 @@ elif st.session_state.active_tab == _("m_prof"):
                     fl = current_logo
                     if ul:
                         if not os.path.exists("images"): os.makedirs("images")
-                        # 🚀 Tarayıcı çerezlerini atlatmak için resim ismine şifre eklendi
                         ext = os.path.splitext(ul.name)[1]
                         if not ext: ext = ".png"
                         filename = f"logo_user_{st.session_state.user_id}_{uuid.uuid4().hex[:6]}{ext}"
