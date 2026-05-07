@@ -211,6 +211,7 @@ def show_offer_wizard(user_id, is_admin=False):
         </style>
     """, unsafe_allow_html=True)
     
+    # 🚀 HAFIZALI MENÜ BUTONU 🚀
     col_b1, col_b2, col_b3 = st.columns([1, 6, 1])
     if col_b1.button("☰ Menü", use_container_width=True):
         st.session_state.active_tab = "📊 Dashboard"
@@ -253,7 +254,9 @@ def show_offer_wizard(user_id, is_admin=False):
         st.markdown("<div style='font-size:14px; font-weight:900; color:#2563eb; margin-bottom:8px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            is_new_customer = st.toggle("➕ Yeni Müşteri Ekle", key="chk_add_new_cust")
+            # 🚀 KIRMIZI HATA İÇİN SABİT ANAHTARLI (KEY) TOGGLE ÇÖZÜMÜ 🚀
+            is_new_customer = st.toggle("➕ Yeni Müşteri Ekle", key="toggle_new_cust")
+            
             if is_new_customer:
                 st.markdown("<div style='font-size:14px; font-weight:900; color:#ea580c; margin-top:10px; margin-bottom:10px;'>🆕 HIZLI MÜŞTERİ KAYDI</div>", unsafe_allow_html=True)
                 
@@ -283,9 +286,9 @@ def show_offer_wizard(user_id, is_admin=False):
                                    (nc_comp.strip(), nc_auth.strip(), nc_phone.strip(), nc_email.strip(), nc_addr.strip(), nc_country, nc_city, nc_tax_office.strip(), nc_tax_id.strip(), user_id))
                         st.session_state.new_added_cust = nc_comp.strip()
                         
-                        # 🚀 ÇÖZÜM BURADA: Toggle'ı güvenli bir şekilde kapatmak için session state'ten siliyoruz
-                        if "chk_add_new_cust" in st.session_state:
-                            del st.session_state["chk_add_new_cust"]
+                        # Sistemi kapatarak hatayı engelliyoruz
+                        if "toggle_new_cust" in st.session_state:
+                            st.session_state.toggle_new_cust = False 
                             
                         st.rerun()
                 return
