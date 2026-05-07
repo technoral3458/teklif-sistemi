@@ -106,7 +106,6 @@ def show_list(user_id, is_admin):
         return
 
     # 🎨 DARALTILMIŞ (KOMPAKT) KART TASARIMI 🎨
-    # Gereksiz paddingleri kısmak için küçük bir CSS müdahalesi
     st.markdown("<style>div[data-testid='stVerticalBlock'] {gap: 0.3rem !important;}</style>", unsafe_allow_html=True)
 
     for index, row in df.iterrows():
@@ -120,7 +119,6 @@ def show_list(user_id, is_admin):
         with st.container(border=True):
             col1, col2, col3, col4 = st.columns([3, 2.5, 2, 1.5], vertical_alignment="center")
             
-            # Firma ve Yetkili Sütunu (Daraltıldı)
             col1.markdown(f"""
                 <div style='line-height:1.2;'>
                     <div style='font-size:15px; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{comp}'>🏢 {comp}</div>
@@ -128,7 +126,6 @@ def show_list(user_id, is_admin):
                 </div>
             """, unsafe_allow_html=True)
             
-            # İletişim Sütunu (Daraltıldı)
             col2.markdown(f"""
                 <div style='line-height:1.3; font-size:12px; color:#475569;'>
                     📞 {phone}<br>
@@ -136,7 +133,6 @@ def show_list(user_id, is_admin):
                 </div>
             """, unsafe_allow_html=True)
             
-            # Konum Sütunu (Daraltıldı)
             col3.markdown(f"""
                 <div style='line-height:1.3; font-size:12px; color:#334155;'>
                     🌍 <b>{country}</b><br>
@@ -144,7 +140,6 @@ def show_list(user_id, is_admin):
                 </div>
             """, unsafe_allow_html=True)
             
-            # Aksiyon Butonları (Tek satırda sıkı)
             with col4:
                 bc1, bc2, bc3 = st.columns(3)
                 if bc1.button("👁️", key=f"v_{row['ID']}", help="Detay"):
@@ -160,10 +155,11 @@ def show_list(user_id, is_admin):
                     st.rerun()
 
 def show_detail(user_id, cust_id, is_admin):
+    # ADMİN İSE TÜM MÜŞTERİLERİN DETAYINI GÖREBİLME İZNİ + VERGİ BİLGİLERİ EKLENDİ
     if is_admin:
-        c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city FROM customers WHERE id=?", (cust_id,))
+        c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id FROM customers WHERE id=?", (cust_id,))
     else:
-        c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city FROM customers WHERE id=? AND user_id=?", (cust_id, user_id))
+        c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id FROM customers WHERE id=? AND user_id=?", (cust_id, user_id))
         
     if not c_data:
         st.error("Müşteri bulunamadı!")
@@ -182,12 +178,15 @@ def show_detail(user_id, cust_id, is_admin):
     col_title.header(f"🏢 {c_info[0]}")
     st.markdown("---")
     
+    # 🎨 ŞIK PROFİL KARTI
     st.markdown("<div style='font-size:14px; font-weight:800; color:#2563eb; margin-bottom:10px;'>MÜŞTERİ BİLGİ KARTI</div>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1.container(border=True):
         st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>YETKİLİ KİŞİ</div><div style='font-size:16px; font-weight:700; color:#0f172a; margin-bottom:15px;'>{c_info[1] or '-'}</div>", unsafe_allow_html=True)
         st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>TELEFON</div><div style='font-size:15px; color:#1e293b; margin-bottom:15px;'>📞 {c_info[2] or '-'}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>E-POSTA</div><div style='font-size:15px; color:#1e293b;'>✉️ {c_info[3] or '-'}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>E-POSTA</div><div style='font-size:15px; color:#1e293b; margin-bottom:15px;'>✉️ {c_info[3] or '-'}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>VERGİ BİLGİLERİ</div><div style='font-size:15px; color:#1e293b;'>🏢 {c_info[7] or '-'} / {c_info[8] or '-'}</div>", unsafe_allow_html=True)
+
     with c2.container(border=True):
         st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>LOKASYON</div><div style='font-size:15px; font-weight:700; color:#0f172a; margin-bottom:15px;'>🌍 {c_info[5] or '-'} / {c_info[6] or '-'}</div>", unsafe_allow_html=True)
         st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>AÇIK ADRES</div><div style='font-size:14px; color:#334155; line-height:1.5;'>{c_info[4] or 'Adres girilmemiş.'}</div>", unsafe_allow_html=True)
@@ -214,30 +213,35 @@ def show_form(user_id, mode="add", cust_id=None, is_admin=False):
     
     if mode == "edit" and cust_id:
         if is_admin:
-            c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city FROM customers WHERE id=?", (cust_id,))
+            c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id FROM customers WHERE id=?", (cust_id,))
         else:
-            c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city FROM customers WHERE id=? AND user_id=?", (cust_id, user_id))
+            c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id FROM customers WHERE id=? AND user_id=?", (cust_id, user_id))
         
         if not c_data:
             st.error("Müşteri bulunamadı!")
             return
         c_info = c_data[0]
     else:
-        c_info = ["", "", "", "", "", "", ""]
+        c_info = ["", "", "", "", "", "", "", "", ""]
         
     with st.form("cust_form"):
         st.markdown("<div style='font-size:14px; font-weight:800; color:#2563eb; margin-bottom:15px;'>MÜŞTERİ İLETİŞİM BİLGİLERİ</div>", unsafe_allow_html=True)
+        
         c1, c2 = st.columns(2)
-        f_comp = c1.text_input("Firma Adı (Zorunlu) *", value=c_info[0], placeholder="Örn: Ersan Makine A.Ş.")
-        f_auth = c2.text_input("Yekili Kişi Adı Soyadı", value=c_info[1], placeholder="Örn: Sefa Bey")
-        f_phone = c1.text_input("Telefon Numarası", value=c_info[2], placeholder="+90 5XX XXX XX XX")
-        f_email = c2.text_input("E-Posta Adresi", value=c_info[3], placeholder="info@firma.com")
+        f_comp = c1.text_input("Firma Adı *", value=c_info[0], placeholder="Örn: ABC Makine Ltd. Şti.")
+        f_auth = c2.text_input("Yetkili Kişi *", value=c_info[1], placeholder="Ad Soyad giriniz...")
+        
+        c_tax1, c_tax2 = st.columns(2)
+        f_tax_office = c_tax1.text_input("Vergi Dairesi", value=c_info[7], placeholder="Örn: İlyasbey V.D.")
+        f_tax_id = c_tax2.text_input("Vergi Numarası / TC", value=c_info[8], placeholder="Örn: 1234567890")
+        
+        c3, c4 = st.columns(2)
+        f_phone = c3.text_input("Telefon", value=c_info[2], placeholder="+90 5XX...")
+        f_email = c4.text_input("E-Posta", value=c_info[3], placeholder="info@firma.com")
         
         st.markdown("<div style='font-size:14px; font-weight:800; color:#2563eb; margin-top:20px; margin-bottom:15px;'>LOKASYON BİLGİLERİ</div>", unsafe_allow_html=True)
-        c3, c4 = st.columns(2)
+        c5, c6 = st.columns(2)
         
-        # 🚀 ZORUNLU VE ARAMA YAPILABİLEN SEÇİM KUTULARI 🚀
-        # Eğer veritabanındaki değer listelerimizde yoksa (eski kayıtsa), listeye geçici olarak ekleyelim ki hata vermesin
         c_opts = list(COUNTRIES)
         if c_info[5] and c_info[5] not in c_opts: c_opts.insert(0, c_info[5])
         
@@ -247,25 +251,23 @@ def show_form(user_id, mode="add", cust_id=None, is_admin=False):
         idx_c = c_opts.index(c_info[5]) if c_info[5] in c_opts else None
         idx_city = city_opts.index(c_info[6]) if c_info[6] in city_opts else None
 
-        f_country = c3.selectbox("Ülke (Zorunlu) *", options=c_opts, index=idx_c, placeholder="Aramak için yazın veya seçin...")
-        f_city = c4.selectbox("Şehir (Zorunlu) *", options=city_opts, index=idx_city, placeholder="Aramak için yazın veya seçin...")
+        f_country = c5.selectbox("Ülke *", options=c_opts, index=idx_c, placeholder="Aramak için yazın veya seçin...")
+        f_city = c6.selectbox("Şehir *", options=city_opts, index=idx_city, placeholder="Aramak için yazın veya seçin...")
         
         f_addr = st.text_area("Açık Adres", value=c_info[4], height=100, placeholder="Faturada görünecek tam adres...")
         
         st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
         if st.form_submit_button("💾 BİLGİLERİ KAYDET", type="primary", use_container_width=True):
-            if not f_comp.strip():
-                st.error("Lütfen Firma Adını giriniz. Bu alan zorunludur!")
-            elif not f_country or not f_city:
-                st.error("Lütfen Ülke ve Şehir seçimlerini yapınız. Bu alanlar zorunludur!")
+            if not f_comp.strip() or not f_auth.strip() or not f_country or not f_city:
+                st.error("Lütfen yıldızlı (*) zorunlu alanları (Firma, Yetkili, Ülke, Şehir) eksiksiz doldurunuz!")
             else:
                 if mode == "add":
-                    exec_sales("INSERT INTO customers (company_name, authorized_person, phone, email, address_full, country, city, user_id) VALUES (?,?,?,?,?,?,?,?)", 
-                              (f_comp.strip(), f_auth.strip(), f_phone.strip(), f_email.strip(), f_addr.strip(), f_country, f_city, user_id))
+                    exec_sales("INSERT INTO customers (company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)", 
+                              (f_comp.strip(), f_auth.strip(), f_phone.strip(), f_email.strip(), f_addr.strip(), f_country, f_city, f_tax_office.strip(), f_tax_id.strip(), user_id))
                     st.success("Müşteri başarıyla eklendi!")
                 else:
-                    exec_sales("UPDATE customers SET company_name=?, authorized_person=?, phone=?, email=?, address_full=?, country=?, city=? WHERE id=?", 
-                              (f_comp.strip(), f_auth.strip(), f_phone.strip(), f_email.strip(), f_addr.strip(), f_country, f_city, cust_id))
+                    exec_sales("UPDATE customers SET company_name=?, authorized_person=?, phone=?, email=?, address_full=?, country=?, city=?, tax_office=?, tax_id=? WHERE id=?", 
+                              (f_comp.strip(), f_auth.strip(), f_phone.strip(), f_email.strip(), f_addr.strip(), f_country, f_city, f_tax_office.strip(), f_tax_id.strip(), cust_id))
                     st.success("Müşteri bilgileri güncellendi!")
                 st.session_state.cust_view = "list"
                 st.rerun()
