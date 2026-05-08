@@ -6,6 +6,9 @@ import base64
 import ntpath
 import posixpath
 
+# =====================================================================
+# VERİTABANI VE GÖRSEL YARDIMCILARI
+# =====================================================================
 def get_factory(query, params=()):
     try:
         conn = sqlite3.connect('factory_data.db', check_same_thread=False)
@@ -42,8 +45,11 @@ def get_image_base64(path):
             except: pass
     return ""
 
+# =====================================================================
+# A4 PROFORMA ÖNİZLEME VE YAZDIRMA (HTML) MODÜLÜ
+# =====================================================================
 def render_proforma(offer_id, date, c_name, m_id, m_name, t_price, curr, conds, dealer_id):
-    # 1. Makine Özelliklerini Çek
+    # 1. MAKİNE BİLGİLERİNİ ÇEK
     m_info_full = get_factory("SELECT image_path, specs FROM models WHERE id=?", (m_id,))
     m_img = m_info_full[0][0] if m_info_full else ""
     raw_specs = m_info_full[0][1] if m_info_full else ""
@@ -54,8 +60,8 @@ def render_proforma(offer_id, date, c_name, m_id, m_name, t_price, curr, conds, 
             if item.strip():
                 parts = item.split("|")
                 parsed_specs.append({"title": parts[0].strip() if len(parts)>0 else "", "detail": parts[1].strip() if len(parts)>1 else "", "img": parts[2].strip() if len(parts)>2 else ""})
-    
-    # 2. Ekstra Donanımları Çek
+                
+    # 2. EKSTRA DONANIMLARI ÇEK
     parsed_opts = []
     items = get_sales("SELECT option_id, quantity FROM offer_items WHERE offer_id=?", (offer_id,))
     if items:
@@ -63,7 +69,7 @@ def render_proforma(offer_id, date, c_name, m_id, m_name, t_price, curr, conds, 
             opt_info = get_factory("SELECT opt_name, opt_price, opt_image FROM options WHERE id=?", (opt_id,))
             if opt_info: parsed_opts.append({"name": opt_info[0][0], "price": opt_info[0][1], "qty": o_qty, "img": opt_info[0][2]})
 
-    # 3. Bayi/Satıcı Bilgilerini Çek
+    # 3. KULLANICI/FİRMA BİLGİLERİNİ ÇEK
     u_info = get_users("SELECT company_name, logo_path, website, address_full, phone FROM users WHERE id=?", (dealer_id,))
     comp_name = u_info[0][0] if u_info and u_info[0][0] else "ERSAN MAKİNE"
     comp_logo = u_info[0][1] if u_info and u_info[0][1] else ""
@@ -80,7 +86,7 @@ def render_proforma(offer_id, date, c_name, m_id, m_name, t_price, curr, conds, 
 
     qty = conds.get("machine_qty", 1)
 
-    # 4. Tasarım (CSS)
+    # 4. TASARIM (CSS)
     css = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; font-size: 14px; color: #1e293b; background: #f8fafc; margin:0; padding:10px; display: flex; flex-direction: column; align-items: center; }
@@ -103,7 +109,7 @@ def render_proforma(offer_id, date, c_name, m_id, m_name, t_price, curr, conds, 
         }
     """
 
-    # 5. HTML İçerik
+    # 5. HTML OLUŞTURMA
     html = f"""
     <html><head><meta charset="utf-8"><style>{css}</style></head><body>
         <div class="paper">
@@ -152,4 +158,5 @@ def render_proforma(offer_id, date, c_name, m_id, m_name, t_price, curr, conds, 
         <div class="no-print print-btn-container"><button class="print-btn" onclick="window.print()">🖨️ PDF YAZDIR / İNDİR</button></div>
         </body></html>"""
     
+    # Kodu sayfaya yansıt
     components.html(html, height=800, scrolling=True)
