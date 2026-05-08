@@ -129,9 +129,19 @@ def show_offer_management(user_id, user_role):
                             st.session_state[f"adm_act_{o_id}"] = "reject"
                             st.rerun()
                     elif status == "Onaylandı":
-                        st.markdown("<div style='background:#dcfce7; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:13px;'>✅ ONAYLANDI (Siparişe Dönüştü)</div>", unsafe_allow_html=True)
+                        # YÖNETİCİ İÇİN GERİ ALMA (REVERT) BUTONU EKLENDİ
+                        ca1, ca2 = st.columns([2.5, 1.5])
+                        ca1.markdown("<div style='background:#dcfce7; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:12px; white-space:nowrap;'>✅ ONAYLANDI</div>", unsafe_allow_html=True)
+                        if ca2.button("↩️ Geri", key=f"btn_rev_{o_id}", help="Onayı iptal edip beklemeye al", use_container_width=True):
+                            exec_sales("UPDATE offers SET status=? WHERE id=?", ("Beklemede", o_id))
+                            st.rerun()
                     else:
-                        st.markdown("<div style='background:#fee2e2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:13px;'>❌ İPTAL EDİLDİ / REDDEDİLDİ</div>", unsafe_allow_html=True)
+                        # YÖNETİCİ İÇİN REDDİ GERİ ALMA BUTONU EKLENDİ
+                        ca1, ca2 = st.columns([2.5, 1.5])
+                        ca1.markdown("<div style='background:#fee2e2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:12px; white-space:nowrap;'>❌ RED / İPTAL</div>", unsafe_allow_html=True)
+                        if ca2.button("↩️ Geri", key=f"btn_rev2_{o_id}", help="Reddi iptal edip beklemeye al", use_container_width=True):
+                            exec_sales("UPDATE offers SET status=? WHERE id=?", ("Beklemede", o_id))
+                            st.rerun()
 
                 else:
                     # SATICI (BAYİ) ARAYÜZÜ
