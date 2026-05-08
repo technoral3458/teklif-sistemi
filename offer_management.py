@@ -55,7 +55,7 @@ def get_image_base64(path):
     return ""
 
 # =====================================================================
-# A4 PROFORMA ÖNİZLEME OLUŞTURUCU (HTML)
+# A4 PROFORMA ÖNİZLEME OLUŞTURUCU VE YAZDIRMA (HTML)
 # =====================================================================
 def generate_proforma_html(offer_id, date, c_name, m_name, m_img, specs, opts, t_price, curr, conds, dealer_id):
     u_info = get_users("SELECT company_name, logo_path, website, address_full, phone FROM users WHERE id=?", (dealer_id,))
@@ -86,6 +86,14 @@ def generate_proforma_html(offer_id, date, c_name, m_name, m_img, specs, opts, t
         .total-price { font-size: 30px; font-weight: 900; color: #ea580c; word-break: break-all; }
         .elegant-conditions { margin-top: 35px; background: #f8fafc; padding: 20px; border-left: 5px solid #eab308; }
         .footer-info { margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px; }
+        .print-btn-container { width: 100%; max-width: 794px; margin: 20px auto 0 auto; text-align: center; }
+        .print-btn { background: #ea580c; color: white; border: none; padding: 15px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width:100%; transition: 0.2s;}
+        .print-btn:hover { background: #c2410c; }
+        @media print {
+            .no-print { display: none !important; }
+            .paper { border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; box-shadow: none; border-top: 8px solid #2563eb; }
+            body { background: #fff; padding: 0; }
+        }
     """
 
     html = f"""
@@ -133,6 +141,7 @@ def generate_proforma_html(offer_id, date, c_name, m_name, m_img, specs, opts, t
         </div>
         <div class="footer-info">{comp_adr} | {comp_tel}</div>
         </div>
+        <div class="no-print print-btn-container"><button class="print-btn" onclick="window.print()">🖨️ PDF YAZDIR / İNDİR</button></div>
         </body></html>"""
     return html
 
@@ -214,7 +223,6 @@ def show_offer_management(user_id, user_role):
                 if act == "approve":
                     st.markdown("<div style='background:#eff6ff; padding:15px; border-radius:8px; border:1px solid #bfdbfe;'><h4 style='color:#1e40af; margin-top:0;'>🔍 Ayrıntılı Teklif Formu Önizlemesi</h4>", unsafe_allow_html=True)
                     
-                    # Önizleme İçin Verileri Topla
                     m_info_full = get_factory("SELECT image_path, specs FROM models WHERE id=?", (m_id,))
                     m_img = m_info_full[0][0] if m_info_full else ""
                     raw_specs = m_info_full[0][1] if m_info_full else ""
@@ -316,11 +324,47 @@ def show_offer_management(user_id, user_role):
                     st.session_state.active_tab = "📝 Yeni Teklif Hazırla"
                     st.rerun()
                     
+                # PROFORMA BUTONU MANTIĞI
                 if c_prof.button("📄 Proforma", key=f"btn_p_{o_id}", use_container_width=True):
-                    st.session_state.proforma_offer_id = o_id
-                    st.info("Proforma PDF hazırlık aşamasında. Çok yakında buradan çıktı alabileceksiniz.")
+                    st.session_state[f"show_prof_{o_id}"] = not st.session_state.get(f"show_prof_{o_id}", False)
+                    # Proforma açılıyorsa admin onay panelini kapa (çakışma olmasın)
+                    if f"adm_act_{o_id}" in st.session_state: del st.session_state[f"adm_act_{o_id}"]
+                    st.rerun()
                     
                 if c_del.button("🗑️ Sil", key=f"btn_d_{o_id}", use_container_width=True, disabled=(status in ["Onaylandı", "Onay Bekliyor"])):
                     exec_sales("DELETE FROM offers WHERE id=?", (o_id,))
                     exec_sales("DELETE FROM offer_items WHERE offer_id=?", (o_id,))
                     st.rerun()
+            
+            # --- BAĞIMSIZ PROFORMA GÖSTERİCİ ---
+            if st.session_state.get(f"show_prof_{o_id}", False):
+                st.markdown("<div style='background:#f8fafc; padding:15px; border-radius:8px; border:1px solid #e2e8f0; margin-top:15px;'>", unsafe_allow_html=True)
+                
+                c_p1, c_p2 = st.columns([5, 1])
+                c_p1.markdown("<h4 style='color:#0f172a; margin-top:0;'>📄 Proforma Teklif Formu</h4>", unsafe_allow_html=True)
+                if c_p2.button("❌ Kapat", key=f"close_prof_{o_id}", use_container_width=True):
+                    st.session_state[f"show_prof_{o_id}"] = False
+                    st.rerun()
+                    
+                m_info_full = get_factory("SELECT image_path, specs FROM models WHERE id=?", (m_id,))
+                m_img = m_info_full[0][0] if m_info_full else ""
+                raw_specs = m_info_full[0][1] if m_info_full else ""
+                
+                parsed_specs = []
+                if raw_specs:
+                    for item in str(raw_specs).split("||"):
+                        if item.strip():
+                            parts = item.split("|")
+                            parsed_specs.append({"title": parts[0].strip() if len(parts)>0 else "", "detail": parts[1].strip() if len(parts)>1 else "", "img": parts[2].strip() if len(parts)>2 else ""})
+                
+                parsed_opts = []
+                items = get_sales("SELECT option_id, quantity FROM offer_items WHERE offer_id=?", (o_id,))
+                if items:
+                    for opt_id, o_qty in items:
+                        opt_info = get_factory("SELECT opt_name, opt_price, opt_image FROM options WHERE id=?", (opt_id,))
+                        if opt_info: parsed_opts.append({"name": opt_info[0][0], "price": opt_info[0][1], "qty": o_qty, "img": opt_info[0][2]})
+
+                html_content = generate_proforma_html(o_id, o_date, c_name, m_name, m_img, parsed_specs, parsed_opts, t_price, m_curr, conds_json, o_user_id)
+                components.html(html_content, height=800, scrolling=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
