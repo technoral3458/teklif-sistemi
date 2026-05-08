@@ -114,6 +114,68 @@ repair_users_db()
 # ANA SAYFA GÖRÜNÜMÜ
 # =====================================================================
 def show_dealer_management():
+    # 🎨 MODERN, BÜTÜNLEŞİK TASARIM CSS KODLARI 🎨
+    st.markdown("""
+    <style>
+    .stats-bar {
+        background-color: #f1f5f9; 
+        border-radius: 8px; 
+        display: flex; 
+        padding: 15px 0; 
+        margin-bottom: 15px;
+        border: 1px solid #e2e8f0;
+    }
+    .stat-box {
+        flex: 1; 
+        text-align: center; 
+        border-right: 1px solid #cbd5e1;
+    }
+    .stat-box:last-child {
+        border-right: none;
+    }
+    .stat-lbl {
+        font-size: 11px; 
+        font-weight: 800; 
+        color: #64748b; 
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+    .stat-val {
+        font-size: 20px; 
+        font-weight: 900; 
+        color: #0f172a;
+    }
+    .stat-val.blue { color: #2563eb; }
+    .stat-val.green { color: #10b981; }
+    
+    div[data-baseweb="input"] > div {
+        background-color: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .badge-active {
+        background:#ecfdf5; 
+        color:#10b981; 
+        padding:4px 12px; 
+        border-radius:20px; 
+        font-size:12px; 
+        font-weight:bold; 
+        border:1px solid #a7f3d0;
+    }
+    .badge-suspended {
+        background:#fef2f2; 
+        color:#ef4444; 
+        padding:4px 12px; 
+        border-radius:20px; 
+        font-size:12px; 
+        font-weight:bold; 
+        border:1px solid #fecaca;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.header(_m("title"))
     
     search_query = st.text_input(_m("search_ph"), placeholder=_m("search_ph"))
@@ -173,8 +235,8 @@ def show_dealer_management():
         c_vol = conv_offers['total_price'].sum() if c_count > 0 else 0
         
         with st.container(border=True):
-            status_color = "#10b981" if u_approved else "#ef4444"
             status_text = _m("active") if u_approved else _m("pending")
+            badge_html = f"<span class='badge-active'>🟢 {status_text}</span>" if u_approved else f"<span class='badge-suspended'>🔴 {status_text}</span>"
             
             try: display_badge = types_display[types_internal.index(u_type)]
             except: display_badge = u_type
@@ -186,30 +248,28 @@ def show_dealer_management():
             st.markdown(f"""
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <h3 style="margin:0; color:#0f172a;">{u_company}</h3>
-                    <span style="background-color:{status_color}15; color:{status_color}; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:800; border:1px solid {status_color}50;">{status_text}</span>
+                    {badge_html}
                 </div>
                 <div style="font-size:14px; color:#64748b; margin-top:5px; margin-bottom:15px;">
                     <b style="color:{badge_color};">{role_badge}</b> | 📧 {u_email} | 📞 {disp_phone}
                 </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-                <div style="display:flex; gap:10px; margin-bottom:15px;">
-                    <div style="flex:1; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; text-align:center;">
-                        <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">{_m('tot_offer')}</div>
-                        <div style="font-size:18px; color:#0f172a; font-weight:900;">{t_count}</div>
+                
+                <div class='stats-bar'>
+                    <div class='stat-box'>
+                        <div class='stat-lbl'>{_m('tot_offer')}</div>
+                        <div class='stat-val'>{t_count}</div>
                     </div>
-                    <div style="flex:1; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; text-align:center;">
-                        <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">{_m('tot_vol')}</div>
-                        <div style="font-size:18px; color:#3b82f6; font-weight:900;">{t_vol:,.0f}</div>
+                    <div class='stat-box'>
+                        <div class='stat-lbl'>{_m('tot_vol')}</div>
+                        <div class='stat-val blue'>{t_vol:,.0f}</div>
                     </div>
-                    <div style="flex:1; background:#ecfdf5; padding:10px; border-radius:8px; border:1px solid #a7f3d0; text-align:center;">
-                        <div style="font-size:11px; color:#059669; font-weight:700; text-transform:uppercase;">{_m('conv_offer')}</div>
-                        <div style="font-size:18px; color:#10b981; font-weight:900;">{c_count}</div>
+                    <div class='stat-box'>
+                        <div class='stat-lbl'>{_m('conv_offer')}</div>
+                        <div class='stat-val'>{c_count}</div>
                     </div>
-                    <div style="flex:1; background:#ecfdf5; padding:10px; border-radius:8px; border:1px solid #a7f3d0; text-align:center;">
-                        <div style="font-size:11px; color:#059669; font-weight:700; text-transform:uppercase;">{_m('conv_vol')}</div>
-                        <div style="font-size:18px; color:#10b981; font-weight:900;">{c_vol:,.0f}</div>
+                    <div class='stat-box'>
+                        <div class='stat-lbl'>{_m('conv_vol')}</div>
+                        <div class='stat-val green'>{c_vol:,.0f}</div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
