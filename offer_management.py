@@ -81,15 +81,13 @@ def show_offer_management(user_id, user_role):
         
     st.markdown(f"<div style='font-size:13px; font-weight:bold; color:#64748b; margin-bottom:15px;'>TOPLAM {len(offers)} TEKLİF BULUNDU</div>", unsafe_allow_html=True)
     
-    # 4. KARTLARI LİSTELE (SADE VE NET TASARIM)
+    # 4. KARTLARI LİSTELE
     for o in offers:
         o_id, c_id, m_id, t_price, o_date, status, o_user_id, conds_str = o
         
-        # JSON'u güvenle çöz
         try: conds_json = json.loads(conds_str) if conds_str else {}
         except: conds_json = {}
         
-        # Müşteri ve Makine Bilgileri
         c_info = get_sales("SELECT company_name FROM customers WHERE id=?", (c_id,))
         c_name = c_info[0][0] if c_info else "Bilinmeyen Müşteri"
         
@@ -107,90 +105,19 @@ def show_offer_management(user_id, user_role):
             
             col_price.markdown(f"<div style='text-align:right; font-size:22px; font-weight:900; color:#ea580c;'>{t_price:,.2f} {m_curr}</div>", unsafe_allow_html=True)
             
-            # Ret notu varsa satıcıya göster
             rejection_note = conds_json.get("rejection_note", "")
             if (status in ["İptal Edildi", "Reddedildi"]) and rejection_note:
                 st.markdown(f"<div style='margin-top:10px; padding:10px; background-color:#fef2f2; border-left:4px solid #ef4444; color:#991b1b; font-size:13px;'><b>Yönetici Notu:</b> {rejection_note}</div>", unsafe_allow_html=True)
 
             st.markdown("<hr style='margin:12px 0 15px 0; border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
             
-            # --- ALT KISIM: AKSİYONLAR VE BUTONLAR ---
-            c_stat, c_edit, c_prof, c_del = st.columns([2.5, 1, 1, 1], vertical_alignment="center")
+            # --- ALT KISIM: DİNAMİK ARAYÜZ ---
+            act = st.session_state.get(f"adm_act_{o_id}")
             
-            # A. DURUM YÖNETİMİ
-            with c_stat:
-                if u_role == "admin":
-                    if status in ["Beklemede", "Onay Bekliyor"]:
-                        ca1, ca2 = st.columns(2)
-                        if ca1.button("✅ Onayla", key=f"btn_app_{o_id}", type="primary", use_container_width=True):
-                            st.session_state[f"adm_act_{o_id}"] = "approve"
-                            st.rerun()
-                        if ca2.button("❌ Reddet", key=f"btn_rej_{o_id}", use_container_width=True):
-                            st.session_state[f"adm_act_{o_id}"] = "reject"
-                            st.rerun()
-                    elif status == "Onaylandı":
-                        # YÖNETİCİ İÇİN GERİ ALMA (REVERT) BUTONU EKLENDİ
-                        ca1, ca2 = st.columns([2.5, 1.5])
-                        ca1.markdown("<div style='background:#dcfce7; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:12px; white-space:nowrap;'>✅ ONAYLANDI</div>", unsafe_allow_html=True)
-                        if ca2.button("↩️ Geri", key=f"btn_rev_{o_id}", help="Onayı iptal edip beklemeye al", use_container_width=True):
-                            exec_sales("UPDATE offers SET status=? WHERE id=?", ("Beklemede", o_id))
-                            st.rerun()
-                    else:
-                        # YÖNETİCİ İÇİN REDDİ GERİ ALMA BUTONU EKLENDİ
-                        ca1, ca2 = st.columns([2.5, 1.5])
-                        ca1.markdown("<div style='background:#fee2e2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:12px; white-space:nowrap;'>❌ RED / İPTAL</div>", unsafe_allow_html=True)
-                        if ca2.button("↩️ Geri", key=f"btn_rev2_{o_id}", help="Reddi iptal edip beklemeye al", use_container_width=True):
-                            exec_sales("UPDATE offers SET status=? WHERE id=?", ("Beklemede", o_id))
-                            st.rerun()
-
-                else:
-                    # SATICI (BAYİ) ARAYÜZÜ
-                    if status == "Onaylandı":
-                        st.markdown("<div style='background:#dcfce7; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:13px;'>✅ ONAYLANDI (Siparişe Dönüştü)</div>", unsafe_allow_html=True)
-                    elif status == "Onay Bekliyor":
-                        cb1, cb2 = st.columns([2, 1])
-                        cb1.markdown("<div style='background:#fef08a; color:#b45309; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:13px;'>⏳ YÖNETİCİ ONAYI BEKLENİYOR</div>", unsafe_allow_html=True)
-                        if cb2.button("Geri Çek", key=f"btn_dlr_pull_{o_id}", use_container_width=True):
-                            exec_sales("UPDATE offers SET status=? WHERE id=?", ("Beklemede", o_id))
-                            st.rerun()
-                    elif status in ["İptal Edildi", "Reddedildi"]:
-                        st.markdown("<div style='background:#fee2e2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:13px;'>❌ REDDEDİLDİ / İPTAL</div>", unsafe_allow_html=True)
-                    else:
-                        # Teklif Beklemede ise
-                        cd1, cd2 = st.columns(2)
-                        if cd1.button("🚀 Onaya Gönder", key=f"btn_dlr_snd_{o_id}", type="primary", use_container_width=True):
-                            exec_sales("UPDATE offers SET status=? WHERE id=?", ("Onay Bekliyor", o_id))
-                            st.rerun()
-                        if cd2.button("❌ İptal Et", key=f"btn_dlr_cncl_{o_id}", use_container_width=True):
-                            exec_sales("UPDATE offers SET status=? WHERE id=?", ("İptal Edildi", o_id))
-                            st.rerun()
-
-            # B. BUTONLAR
-            # Düzenle butonu sadece Beklemede iken veya Reddedilmişse aktiftir. Onaya giden teklif değiştirilemez!
-            if c_edit.button("✏️ Düzenle", key=f"btn_e_{o_id}", use_container_width=True, disabled=(status in ["Onaylandı", "Onay Bekliyor"])):
-                st.session_state.edit_offer_id = o_id
-                st.session_state.active_tab = "📝 Yeni Teklif Hazırla"
-                st.rerun()
-                
-            if c_prof.button("📄 Proforma", key=f"btn_p_{o_id}", use_container_width=True):
-                st.session_state.proforma_offer_id = o_id
-                st.info("Proforma PDF hazırlık aşamasında. Çok yakında buradan çıktı alabileceksiniz.")
-                
-            # Silme işlemi onaylanan veya onayda olan teklife uygulanamaz
-            if c_del.button("🗑️ Sil", key=f"btn_d_{o_id}", use_container_width=True, disabled=(status in ["Onaylandı", "Onay Bekliyor"])):
-                exec_sales("DELETE FROM offers WHERE id=?", (o_id,))
-                exec_sales("DELETE FROM offer_items WHERE offer_id=?", (o_id,))
-                st.rerun()
-
-            # =========================================================
-            # YÖNETİCİ ONAY / RET PENCERESİ (Dinamik Açılır Alan)
-            # =========================================================
-            if u_role == "admin":
-                act = st.session_state.get(f"adm_act_{o_id}")
-                
-                # ONAY ÖNİZLEME EKRANI
+            # EĞER YÖNETİCİ BİR İŞLEM SEÇTİYSE SADECE O KUTUYU GÖSTER (BUTONLARI GİZLE)
+            if u_role == "admin" and act in ["approve", "reject"]:
                 if act == "approve":
-                    st.markdown("""<div style='margin-top:15px; padding:15px; border:1px solid #3b82f6; border-radius:8px; background:#eff6ff;'>
+                    st.markdown("""<div style='padding:15px; border:1px solid #3b82f6; border-radius:8px; background:#eff6ff;'>
                         <h4 style='color:#1e3a8a; margin-top:0;'>🔍 Teklif Onay Önizlemesi</h4>
                         Lütfen siparişe dönüştürmeden önce detayları kontrol edin.
                     </div>""", unsafe_allow_html=True)
@@ -205,7 +132,6 @@ def show_offer_management(user_id, user_role):
                         del st.session_state[f"adm_act_{o_id}"]
                         st.rerun()
                         
-                # RET NOTU EKRANI
                 elif act == "reject":
                     with st.container(border=True):
                         st.markdown("<b style='color:#ef4444;'>❌ Reddetme Sebebi (Satıcıya İletilecek):</b>", unsafe_allow_html=True)
@@ -221,3 +147,63 @@ def show_offer_management(user_id, user_role):
                         if cr2.button("Vazgeç", key=f"btn_canc_rej_{o_id}", use_container_width=True):
                             del st.session_state[f"adm_act_{o_id}"]
                             st.rerun()
+                            
+            # NORMAL DURUM (İŞLEM SEÇİLMEDİYSE BUTONLARI GÖSTER)
+            else:
+                c_stat, c_edit, c_prof, c_del = st.columns([2.5, 1, 1, 1], vertical_alignment="center")
+                
+                with c_stat:
+                    if u_role == "admin":
+                        if status in ["Beklemede", "Onay Bekliyor"]:
+                            ca1, ca2 = st.columns(2)
+                            if ca1.button("✅ Onayla", key=f"btn_app_{o_id}", type="primary", use_container_width=True):
+                                st.session_state[f"adm_act_{o_id}"] = "approve"
+                                st.rerun()
+                            if ca2.button("❌ Reddet", key=f"btn_rej_{o_id}", use_container_width=True):
+                                st.session_state[f"adm_act_{o_id}"] = "reject"
+                                st.rerun()
+                        elif status == "Onaylandı":
+                            ca1, ca2 = st.columns([2.5, 1.5])
+                            ca1.markdown("<div style='background:#dcfce7; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:12px; white-space:nowrap;'>✅ ONAYLANDI</div>", unsafe_allow_html=True)
+                            if ca2.button("↩️ Geri", key=f"btn_rev_{o_id}", help="Onayı iptal edip beklemeye al", use_container_width=True):
+                                exec_sales("UPDATE offers SET status=? WHERE id=?", ("Beklemede", o_id))
+                                st.rerun()
+                        else:
+                            ca1, ca2 = st.columns([2.5, 1.5])
+                            ca1.markdown("<div style='background:#fee2e2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:12px; white-space:nowrap;'>❌ RED / İPTAL</div>", unsafe_allow_html=True)
+                            if ca2.button("↩️ Geri", key=f"btn_rev2_{o_id}", help="Reddi iptal edip beklemeye al", use_container_width=True):
+                                exec_sales("UPDATE offers SET status=? WHERE id=?", ("Beklemede", o_id))
+                                st.rerun()
+                    else:
+                        if status == "Onaylandı":
+                            st.markdown("<div style='background:#dcfce7; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:13px;'>✅ ONAYLANDI (Siparişe Dönüştü)</div>", unsafe_allow_html=True)
+                        elif status == "Onay Bekliyor":
+                            cb1, cb2 = st.columns([2, 1])
+                            cb1.markdown("<div style='background:#fef08a; color:#b45309; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:13px;'>⏳ YÖNETİCİ ONAYI BEKLENİYOR</div>", unsafe_allow_html=True)
+                            if cb2.button("Geri Çek", key=f"btn_dlr_pull_{o_id}", use_container_width=True):
+                                exec_sales("UPDATE offers SET status=? WHERE id=?", ("Beklemede", o_id))
+                                st.rerun()
+                        elif status in ["İptal Edildi", "Reddedildi"]:
+                            st.markdown("<div style='background:#fee2e2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:13px;'>❌ REDDEDİLDİ / İPTAL</div>", unsafe_allow_html=True)
+                        else:
+                            cd1, cd2 = st.columns(2)
+                            if cd1.button("🚀 Onaya Gönder", key=f"btn_dlr_snd_{o_id}", type="primary", use_container_width=True):
+                                exec_sales("UPDATE offers SET status=? WHERE id=?", ("Onay Bekliyor", o_id))
+                                st.rerun()
+                            if cd2.button("❌ İptal Et", key=f"btn_dlr_cncl_{o_id}", use_container_width=True):
+                                exec_sales("UPDATE offers SET status=? WHERE id=?", ("İptal Edildi", o_id))
+                                st.rerun()
+
+                if c_edit.button("✏️ Düzenle", key=f"btn_e_{o_id}", use_container_width=True, disabled=(status in ["Onaylandı", "Onay Bekliyor"])):
+                    st.session_state.edit_offer_id = o_id
+                    st.session_state.active_tab = "📝 Yeni Teklif Hazırla"
+                    st.rerun()
+                    
+                if c_prof.button("📄 Proforma", key=f"btn_p_{o_id}", use_container_width=True):
+                    st.session_state.proforma_offer_id = o_id
+                    st.info("Proforma PDF hazırlık aşamasında. Çok yakında buradan çıktı alabileceksiniz.")
+                    
+                if c_del.button("🗑️ Sil", key=f"btn_d_{o_id}", use_container_width=True, disabled=(status in ["Onaylandı", "Onay Bekliyor"])):
+                    exec_sales("DELETE FROM offers WHERE id=?", (o_id,))
+                    exec_sales("DELETE FROM offer_items WHERE offer_id=?", (o_id,))
+                    st.rerun()
