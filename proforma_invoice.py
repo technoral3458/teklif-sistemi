@@ -1,96 +1,155 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import sqlite3
-import datetime
-import base64
-import json
 import os
+import base64
+import ntpath
+import posixpath
 
-def get_db_data(db_name, query, params=()):
-    conn = sqlite3.connect(db_name, check_same_thread=False)
-    res = conn.execute(query, params).fetchall()
-    conn.close()
-    return res
+def get_factory(query, params=()):
+    try:
+        conn = sqlite3.connect('factory_data.db', check_same_thread=False)
+        c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
+        return res
+    except: return []
 
-def get_image_base64(img_path):
-    if not img_path: return ""
-    paths = [img_path, f"images/{img_path}", f"../images/{img_path}"]
-    for p in paths:
+def get_sales(query, params=()):
+    try:
+        conn = sqlite3.connect('sales_data.db', check_same_thread=False)
+        c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
+        return res
+    except: return []
+
+def get_users(query, params=()):
+    try:
+        conn = sqlite3.connect('users.db', check_same_thread=False)
+        c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
+        return res
+    except: return []
+
+def get_image_base64(path):
+    if not path: return ""
+    if str(path).startswith("http"): return path
+    base_name = posixpath.basename(ntpath.basename(path))
+    paths_to_try = [path, f"images/{path}", f"../images/{path}", base_name, f"images/{base_name}"]
+    for p in paths_to_try:
         if os.path.exists(p) and os.path.isfile(p):
-            with open(p, "rb") as f: return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+            try:
+                with open(p, "rb") as f:
+                    ext = os.path.splitext(p)[1].lower().replace('.', '')
+                    if not ext: ext = 'png'
+                    return f"data:image/{ext};base64,{base64.b64encode(f.read()).decode()}"
+            except: pass
     return ""
 
-def show_proforma(offer_id, bayi_id):
-    col1, col2 = st.columns([1, 5])
-    if col1.button("🔙 Cari Sayfaya Dön"):
-        st.session_state.active_tab = ":busts_in_silhouette: Müşterilerim"
-        st.rerun()
+def render_proforma(offer_id, date, c_name, m_id, m_name, t_price, curr, conds, dealer_id):
+    # 1. Makine Özelliklerini Çek
+    m_info_full = get_factory("SELECT image_path, specs FROM models WHERE id=?", (m_id,))
+    m_img = m_info_full[0][0] if m_info_full else ""
+    raw_specs = m_info_full[0][1] if m_info_full else ""
     
-    off = get_db_data('sales_data.db', "SELECT customer_id, model_id, total_price, conditions FROM offers WHERE id=?", (offer_id,))[0]
-    cust = get_db_data('sales_data.db', "SELECT company_name, address, phone FROM customers WHERE id=?", (off[0],))[0]
-    mod = get_db_data('factory_data.db', "SELECT name, currency FROM models WHERE id=?", (off[1],))[0]
-    try:
-        bayi = get_db_data('users.db', "SELECT company_name, logo_path, website, address_full, phone FROM users WHERE id=?", (bayi_id,))[0]
-    except:
-        bayi = ["ERSAN MAKİNE", "", "www.ersanmakina.net", "Türkiye", ""]
+    parsed_specs = []
+    if raw_specs:
+        for item in str(raw_specs).split("||"):
+            if item.strip():
+                parts = item.split("|")
+                parsed_specs.append({"title": parts[0].strip() if len(parts)>0 else "", "detail": parts[1].strip() if len(parts)>1 else "", "img": parts[2].strip() if len(parts)>2 else ""})
+    
+    # 2. Ekstra Donanımları Çek
+    parsed_opts = []
+    items = get_sales("SELECT option_id, quantity FROM offer_items WHERE offer_id=?", (offer_id,))
+    if items:
+        for opt_id, o_qty in items:
+            opt_info = get_factory("SELECT opt_name, opt_price, opt_image FROM options WHERE id=?", (opt_id,))
+            if opt_info: parsed_opts.append({"name": opt_info[0][0], "price": opt_info[0][1], "qty": o_qty, "img": opt_info[0][2]})
 
-    conds = json.loads(off[3]) if off[3] else {}
+    # 3. Bayi/Satıcı Bilgilerini Çek
+    u_info = get_users("SELECT company_name, logo_path, website, address_full, phone FROM users WHERE id=?", (dealer_id,))
+    comp_name = u_info[0][0] if u_info and u_info[0][0] else "ERSAN MAKİNE"
+    comp_logo = u_info[0][1] if u_info and u_info[0][1] else ""
+    comp_web = u_info[0][2] if u_info and u_info[0][2] else "www.ersanmakina.net"
+    comp_adr = u_info[0][3] if u_info and u_info[0][3] else ""
+    comp_tel = u_info[0][4] if u_info and u_info[0][4] else ""
 
-    logo_b64 = get_image_base64(bayi[1])
-    if not logo_b64:
-        try:
-            sys_logo = get_db_data('factory_data.db', "SELECT logo_path FROM company_profile WHERE id=1")[0][0]
-            logo_b64 = get_image_base64(sys_logo)
-        except: pass
+    if not comp_logo:
+        fac_logo = get_factory("SELECT logo_path FROM company_profile WHERE id=1")
+        if fac_logo and fac_logo[0][0]: comp_logo = fac_logo[0][0]
 
-    header_logo = f'<img src="{logo_b64}" style="max-height:80px;">' if logo_b64 else f'<h2>{bayi[0]}</h2>'
+    logo_b64 = get_image_base64(comp_logo)
+    header_logo_html = f'<img src="{logo_b64}" style="max-height:70px; width:auto; object-fit:contain;">' if logo_b64 else f'<div style="font-size:22px; font-weight:900; color:#1e293b;">{comp_name}</div>'
 
-    # Donanımları Çek
-    opt_items = get_db_data('sales_data.db', "SELECT option_id, quantity FROM offer_items WHERE offer_id=?", (offer_id,))
-    opts_html = ""
-    for op_id, qty in opt_items:
-        o_data = get_db_data('factory_data.db', "SELECT opt_name, opt_price FROM options WHERE id=?", (op_id,))
-        if o_data:
-            opts_html += f"<tr><td style='padding:12px; border-bottom:1px solid #ddd;'>+ {o_data[0][0]}</td><td style='padding:12px; border-bottom:1px solid #ddd; text-align:center;'>{qty}</td><td style='padding:12px; border-bottom:1px solid #ddd; text-align:right;'>Dahil</td></tr>"
+    qty = conds.get("machine_qty", 1)
 
-    html = f"""
-    <html><body style="font-family:sans-serif; padding:30px; border:1px solid #eee; max-width:800px; margin:auto;">
-        <div style="display:flex; justify-content:space-between; border-bottom:5px solid #10b981; padding-bottom:20px;">
-            <div>{header_logo}</div>
-            <div style="text-align:right;">
-                <h1 style="color:#10b981; margin:0;">PROFORMA INVOICE</h1>
-                <p>Tarih: {datetime.datetime.now().strftime("%d.%m.%Y")}<br>No: PRF-{offer_id}</p>
-            </div>
-        </div>
-        <div style="margin:30px 0; display:flex; justify-content:space-between; gap:20px;">
-            <div style="flex:1;"><b>ALICI (CUSTOMER):</b><br>{cust[0]}<br>{cust[1]}<br>Tel: {cust[2]}</div>
-            <div style="flex:1; text-align:right;"><b>SATICI (SELLER):</b><br>{bayi[0]}<br>{bayi[3]}<br>Tel: {bayi[4]}<br>{bayi[2]}</div>
-        </div>
-        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
-            <tr style="background:#f4f4f4;">
-                <th style="padding:12px; border:1px solid #ddd; text-align:left;">Açıklama</th>
-                <th style="padding:12px; border:1px solid #ddd; text-align:center;">Adet</th>
-                <th style="padding:12px; border:1px solid #ddd; text-align:right;">Tutar</th>
-            </tr>
-            <tr>
-                <td style="padding:12px; border:1px solid #ddd; font-weight:bold;">{mod[0]} (Standart Donanım)</td>
-                <td style="padding:12px; border:1px solid #ddd; text-align:center; font-weight:bold;">{conds.get('machine_qty',1)}</td>
-                <td style="padding:12px; border:1px solid #ddd; text-align:right; font-weight:bold;">Ana Fiyat</td>
-            </tr>
-            {opts_html}
-        </table>
-        <div style="text-align:right; font-size:22px; font-weight:bold; color:#10b981;">GENEL TOPLAM: {off[2]:,.2f} {mod[1]}</div>
-        <div style="margin-top:40px; font-size:12px; border-top:1px solid #ddd; padding-top:20px; color:#475569;">
-            <b>Ödeme Şartı:</b> {conds.get('payment_plan_text','')}<br><br>
-            <b>Teslimat Süresi:</b> {conds.get('delivery_time','')}<br><br>
-            <b>Banka Bilgileri:</b><br>{conds.get('bank','')}
-        </div>
-        <div style="margin-top:50px; display:flex; justify-content:space-between; text-align:center;">
-            <div><br><br>____________________<br><b>ALICI ONAYI</b><br>Kaşe / İmza</div>
-            <div><br><br>____________________<br><b>SATICI ONAYI</b><br>Kaşe / İmza</div>
-        </div>
-        <button class="no-print" style="margin-top:40px; padding:15px; background:#10b981; color:white; border:none; width:100%; cursor:pointer; font-weight:bold; border-radius:5px;" onclick="window.print()">🖨️ YAZDIR / PDF KAYDET</button>
-        <style>@media print {{ .no-print {{ display:none; }} }}</style>
-    </body></html>
+    # 4. Tasarım (CSS)
+    css = """
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body { font-family: 'Inter', sans-serif; font-size: 14px; color: #1e293b; background: #f8fafc; margin:0; padding:10px; display: flex; flex-direction: column; align-items: center; }
+        .paper { background: #fff; width: 100%; max-width: 794px; padding: 40px; border: 1px solid #e2e8f0; border-top: 8px solid #2563eb; box-sizing: border-box; overflow: hidden; margin: 0 auto; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .section-title { background: #f8fafc; color: #0f172a; padding: 10px 15px; font-weight: 800; font-size: 14px; margin-top: 30px; border-left: 5px solid #2563eb; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border-bottom: 1px solid #f1f5f9; padding: 12px; text-align: left; vertical-align: middle; word-wrap: break-word; }
+        .price-box { background: #fffbeb; border: 1px solid #fde68a; padding: 20px; text-align: right; margin-top: 35px; border-radius: 6px; }
+        .total-price { font-size: 30px; font-weight: 900; color: #ea580c; word-break: break-all; }
+        .elegant-conditions { margin-top: 35px; background: #f8fafc; padding: 20px; border-left: 5px solid #eab308; }
+        .footer-info { margin-top:30px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:15px; }
+        .print-btn-container { width: 100%; max-width: 794px; margin: 20px auto 0 auto; text-align: center; }
+        .print-btn { background: #ea580c; color: white; border: none; padding: 15px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width:100%; transition: 0.2s;}
+        .print-btn:hover { background: #c2410c; }
+        @media print {
+            .no-print { display: none !important; }
+            .paper { border: none; padding: 0; margin: 0; width: 100%; max-width: 100%; box-shadow: none; border-top: 8px solid #2563eb; }
+            body { background: #fff; padding: 0; }
+        }
     """
-    components.html(html, height=1000, scrolling=True)
+
+    # 5. HTML İçerik
+    html = f"""
+    <html><head><meta charset="utf-8"><style>{css}</style></head><body>
+        <div class="paper">
+            <div class="header"><div>{header_logo_html}</div><div style="text-align:right; font-size: 12px; color: #64748b;"><b>{comp_web}</b><br>Tarih: {date}<br>Teklif No: TR-{offer_id:04d}</div></div>
+            <div style="text-align:center; padding: 15px 0;">
+                <img src="{get_image_base64(m_img)}" style="max-width:100%; max-height:300px; object-fit:contain; display:block; margin:0 auto;"><br>
+                <h2 style="color:#0f172a; margin:15px 0; font-size:24px; font-weight:900;">MODEL: {m_name}</h2>
+                <div style="display:inline-block; background:#f1f5f9; padding: 8px 20px; border-radius: 20px; font-size:15px; color:#475569;">
+                    Sayın Yetkili: <b style="color:#0f172a;">{c_name}</b> | Adet: <b style="color:#ea580c;">{qty}</b>
+                </div>
+            </div>
+    """
+
+    if parsed_specs:
+        html += '<div class="section-title">🔍 MAKİNE STANDART ÖZELLİKLERİ</div><table>'
+        for s in parsed_specs:
+            img_b64 = get_image_base64(s['img'])
+            img_tag = f'<img src="{img_b64}" style="max-width:100%; max-height:80px; object-fit:contain; border-radius:6px;">' if img_b64 else "-"
+            html += f'<tr><td style="width:25%; text-align:center;">{img_tag}</td><td><b>{s["title"]}</b><br><small style="color:#64748b;">{s["detail"]}</small></td></tr>'
+        html += "</table>"
+
+    if parsed_opts:
+        html += f"""<div class="section-title">📦 SEÇİLEN EKSTRA DONANIMLAR</div><table><tr style="background:#f8fafc;"><th style="width:25%; text-align:center;">Görsel</th><th style="width:40%;">Açıklama</th><th style="width:10%; text-align:center;">Adet</th><th style="width:25%; text-align:right;">Tutar</th></tr>"""
+        for o in parsed_opts:
+            opt_img_b64 = get_image_base64(o["img"])
+            opt_img_tag = f'<img src="{opt_img_b64}" style="max-width:100%; max-height:80px; object-fit:contain; border-radius:6px;">' if opt_img_b64 else "-"
+            html += f"<tr><td style='text-align:center;'>{opt_img_tag}</td><td><b style='color:#2563eb;'>+ {o['name']}</b></td><td style='text-align:center; font-weight:bold;'>{o['qty']}</td><td style='text-align:right; font-weight:bold;'>{(o['price']*o['qty']):,.2f} {curr}</td></tr>"
+        html += "</table>"
+
+    html += f"""
+        <div class="elegant-conditions">
+            <div style="font-size: 15px; font-weight: bold; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 12px;">📌 Ticari ve Teknik Şartlar</div>
+            <table>
+                <tr><td style="width:35%;"><b>Teslimat Şekli:</b></td><td style="color:#ea580c; font-weight:bold;">{conds.get('delivery_type','')}</td></tr>
+                <tr><td><b>Teslim Süresi:</b></td><td>{conds.get('delivery_time','')}</td></tr>
+                <tr><td><b>Nakliye:</b></td><td>{conds.get('shipping','')}</td></tr>
+                <tr><td><b>Ödeme Planı:</b></td><td>{conds.get('payment_plan_text','')}</td></tr>
+            </table>
+        </div>
+        <div class="price-box">
+            <div style="font-size:14px; font-weight:bold; color:#ea580c;">GENEL TOPLAM (Nihai Fiyat)</div>
+            <div class="total-price">{t_price:,.2f} {curr}</div>
+        </div>
+        <div class="footer-info">{comp_adr} | {comp_tel}</div>
+        </div>
+        <div class="no-print print-btn-container"><button class="print-btn" onclick="window.print()">🖨️ PDF YAZDIR / İNDİR</button></div>
+        </body></html>"""
+    
+    components.html(html, height=800, scrolling=True)
