@@ -7,7 +7,7 @@ import pandas as pd
 # =====================================================================
 DICT_DEALER = {
     "tr": {
-        "title": "🏢 Bayi ve Üretici Yönetimi (V2 GÜNCEL)",
+        "title": "🏢 Bayi ve Üretici Yönetimi",
         "search_ph": "🔍 Kullanıcı Ara (Firma Adı, E-Posta veya Telefon ile)",
         "no_user": "Sistemde henüz kayıtlı kullanıcı bulunmuyor.",
         "no_match": "Arama kriterinize uygun kullanıcı bulunamadı.",
@@ -23,17 +23,17 @@ DICT_DEALER = {
         "cat_help": "Satış yapmasına izin verilen makine kategorilerini seçin:",
         "cat_warn": "💡 SADECE Satıcı (Bayi) rolü için geçerlidir. Yönetici ve Üreticilerde bu ayar dikkate alınmaz.",
         "menu_title": "🔑 Kullanıcının Görüntüleyebileceği Sayfa Menüleri:",
-        "btn_update": "🔄 BİLGİLERİ VE YETKİLERİ GÜNCELLE",
+        "btn_update": "💾 BİLGİLERİ GÜNCELLE",
         "toast_upd": "yetkileri güncellendi!",
         "err_self": "💡 Kendi yönetici hesabınızı askıya alamaz veya silemezsiniz.",
-        "btn_sus": "🚫 Hesabı Askıya Al", "btn_app": "✅ Hesabı Onayla / Aktifleştir", "btn_del": "🗑️ Tamamen Sil",
+        "btn_sus": "🚫 Askıya Al", "btn_app": "✅ Onayla", "btn_del": "🗑️ Sil",
         
-        "m_dash": "📊 Dashboard", "m_new": "📝 Yeni Teklif Hazırla", "m_cust": "👥 Müşterilerim",
-        "m_past": "📋 Geçmiş Tekliflerim", "m_order": "📦 Siparişler", "m_model": "📦 Tüm Modelleri Yönet",
-        "m_deal": "🏢 Bayi / Kullanıcı Yönetimi", "m_prof": "⚙️ Profil Ayarlarım"
+        "m_dash": "📊 Dashboard", "m_new": "📝 Yeni Teklif", "m_cust": "👥 Müşteriler",
+        "m_past": "📋 Geçmiş Teklifler", "m_order": "📦 Siparişler", "m_model": "📦 Modeller",
+        "m_deal": "🏢 Bayi Yönetimi", "m_prof": "⚙️ Profil Ayarları"
     },
     "en": {
-        "title": "🏢 Dealer and Manufacturer Management (V2 UPDATED)",
+        "title": "🏢 Dealer and Manufacturer Management",
         "search_ph": "🔍 Search User (by Company, Email or Phone)",
         "no_user": "No registered users found in the system.",
         "no_match": "No users match your search criteria.",
@@ -49,17 +49,17 @@ DICT_DEALER = {
         "cat_help": "Select allowed machine categories for sales:",
         "cat_warn": "💡 Applies ONLY to Dealers. Ignored for Admins and Producers.",
         "menu_title": "🔑 Accessible Page Menus for User:",
-        "btn_update": "🔄 UPDATE INFO & PERMISSIONS",
+        "btn_update": "💾 UPDATE INFO",
         "toast_upd": "permissions updated!",
         "err_self": "💡 You cannot suspend or delete your own admin account.",
-        "btn_sus": "🚫 Suspend Account", "btn_app": "✅ Approve / Activate Account", "btn_del": "🗑️ Delete Completely",
+        "btn_sus": "🚫 Suspend", "btn_app": "✅ Approve", "btn_del": "🗑️ Delete",
         
-        "m_dash": "📊 Dashboard", "m_new": "📝 Create New Offer", "m_cust": "👥 My Customers",
-        "m_past": "📋 My Past Offers", "m_order": "📦 Orders", "m_model": "📦 Manage All Models",
-        "m_deal": "🏢 Dealer / User Management", "m_prof": "⚙️ Profile Settings"
+        "m_dash": "📊 Dashboard", "m_new": "📝 New Offer", "m_cust": "👥 Customers",
+        "m_past": "📋 Past Offers", "m_order": "📦 Orders", "m_model": "📦 Manage Models",
+        "m_deal": "🏢 Dealer Management", "m_prof": "⚙️ Profile Settings"
     },
     "zh": {
-        "title": "🏢 经销商和制造商管理 (V2 更新)",
+        "title": "🏢 经销商和制造商管理",
         "search_ph": "🔍 搜索用户 (按公司、电子邮件或电话)",
         "no_user": "系统中尚未找到注册用户。",
         "no_match": "未找到符合搜索条件的用户。",
@@ -75,14 +75,14 @@ DICT_DEALER = {
         "cat_help": "选择允许销售的机器类别:",
         "cat_warn": "💡 仅适用于经销商。对管理员和制造商无效。",
         "menu_title": "🔑 用户可访问的页面菜单:",
-        "btn_update": "🔄 更新信息和权限",
+        "btn_update": "💾 更新信息",
         "toast_upd": "权限已更新！",
         "err_self": "💡 您不能暂停或删除自己的管理员帐户。",
-        "btn_sus": "🚫 暂停帐户", "btn_app": "✅ 批准/激活帐户", "btn_del": "🗑️ 完全删除",
+        "btn_sus": "🚫 暂停", "btn_app": "✅ 批准", "btn_del": "🗑️ 删除",
         
-        "m_dash": "📊 仪表板", "m_new": "📝 创建新报价", "m_cust": "👥 我的客户",
-        "m_past": "📋 我的历史报价", "m_order": "📦 订单", "m_model": "📦 管理所有型号",
-        "m_deal": "🏢 经销商/用户管理", "m_prof": "⚙️ 配置文件设置"
+        "m_dash": "📊 仪表板", "m_new": "📝 新报价", "m_cust": "👥 客户",
+        "m_past": "📋 历史报价", "m_order": "📦 订单", "m_model": "📦 管理型号",
+        "m_deal": "🏢 经销商管理", "m_prof": "⚙️ 配置文件"
     }
 }
 
@@ -95,7 +95,7 @@ def _m(key):
     return DICT_DEALER[lang].get(key, key)
 
 # =====================================================================
-# VERİTABANI GÜVENLİ ONARIM (Hataları Engelleyen Kısım)
+# VERİTABANI GÜVENLİ ONARIM
 # =====================================================================
 def repair_users_db():
     try:
@@ -111,24 +111,26 @@ def repair_users_db():
 repair_users_db()
 
 # =====================================================================
-# ANA SAYFA GÖRÜNÜMÜ
+# ANA SAYFA GÖRÜNÜMÜ (MİNİMALİST BEYAZ TASARIM)
 # =====================================================================
 def show_dealer_management():
-    # 🎨 MODERN, BÜTÜNLEŞİK TASARIM CSS KODLARI 🎨
+    # 🎨 BEMBEYAZ, FERAH VE SADE CSS KODLARI 🎨
     st.markdown("""
     <style>
+    /* Bembeyaz, gölgeli ve zarif istatistik çubuğu */
     .stats-bar {
-        background-color: #f1f5f9; 
-        border-radius: 8px; 
+        background-color: #ffffff; 
+        border-radius: 12px; 
         display: flex; 
-        padding: 15px 0; 
-        margin-bottom: 15px;
-        border: 1px solid #e2e8f0;
+        padding: 20px 0; 
+        margin: 15px 0;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
     }
     .stat-box {
         flex: 1; 
         text-align: center; 
-        border-right: 1px solid #cbd5e1;
+        border-right: 1px solid #f1f5f9;
     }
     .stat-box:last-child {
         border-right: none;
@@ -136,42 +138,35 @@ def show_dealer_management():
     .stat-lbl {
         font-size: 11px; 
         font-weight: 800; 
-        color: #64748b; 
+        color: #94a3b8; 
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-bottom: 4px;
     }
     .stat-val {
-        font-size: 20px; 
+        font-size: 22px; 
         font-weight: 900; 
-        color: #0f172a;
+        color: #1e293b;
     }
-    .stat-val.blue { color: #2563eb; }
+    .stat-val.blue { color: #3b82f6; }
     .stat-val.green { color: #10b981; }
     
+    /* Arama Çubuğu */
     div[data-baseweb="input"] > div {
-        background-color: #f8fafc;
+        background-color: #ffffff;
         border-radius: 8px;
         border: 1px solid #e2e8f0;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
     }
     
+    /* İnce Rozetler */
     .badge-active {
-        background:#ecfdf5; 
-        color:#10b981; 
-        padding:4px 12px; 
-        border-radius:20px; 
-        font-size:12px; 
-        font-weight:bold; 
-        border:1px solid #a7f3d0;
+        background:#ecfdf5; color:#10b981; padding:4px 14px; 
+        border-radius:20px; font-size:12px; font-weight:800; border:1px solid #a7f3d0;
     }
     .badge-suspended {
-        background:#fef2f2; 
-        color:#ef4444; 
-        padding:4px 12px; 
-        border-radius:20px; 
-        font-size:12px; 
-        font-weight:bold; 
-        border:1px solid #fecaca;
+        background:#fef2f2; color:#ef4444; padding:4px 14px; 
+        border-radius:20px; font-size:12px; font-weight:800; border:1px solid #fecaca;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -242,16 +237,17 @@ def show_dealer_management():
             except: display_badge = u_type
                 
             role_badge = _m("badge_admin") if u_role == 'admin' else display_badge
-            badge_color = "#ea580c" if u_role == 'admin' else "#2563eb"
+            badge_color = "#ea580c" if u_role == 'admin' else "#3b82f6"
             disp_phone = u_phone if u_phone else _m("not_spec")
             
+            # ÜST BİLGİ VE İSTATİSTİKLER
             st.markdown(f"""
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="margin:0; color:#0f172a;">{u_company}</h3>
+                    <h3 style="margin:0; color:#0f172a; font-weight:900;">{u_company}</h3>
                     {badge_html}
                 </div>
-                <div style="font-size:14px; color:#64748b; margin-top:5px; margin-bottom:15px;">
-                    <b style="color:{badge_color};">{role_badge}</b> | 📧 {u_email} | 📞 {disp_phone}
+                <div style="font-size:14px; color:#64748b; margin-top:6px; font-weight:500;">
+                    <b style="color:{badge_color};">{role_badge}</b> &nbsp;|&nbsp; 📧 {u_email} &nbsp;|&nbsp; 📞 {disp_phone}
                 </div>
                 
                 <div class='stats-bar'>
@@ -274,7 +270,7 @@ def show_dealer_management():
                 </div>
             """, unsafe_allow_html=True)
             
-            # --- DÜZENLEME ALANI (FORM YOKTUR, ANINDA AÇILIR) ---
+            # DÜZENLEME ALANI
             with st.expander(_m("edit_auth"), expanded=False):
                 c1, c2 = st.columns(2)
                 new_company = c1.text_input(_m("comp_name"), value=u_company, key=f"inp_cmp_{u_id}")
@@ -287,9 +283,8 @@ def show_dealer_management():
                 new_phone = c2.text_input(_m("phone"), value=u_phone if u_phone else "", key=f"inp_phn_{u_id}")
 
                 new_cats_str = ""
-                # Eğer Seçilen Tür "Satıcı" ise kategori filtresini anında göster
                 if new_type_internal == "Satıcı (Bayi)":
-                    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin:10px 0; border-top:1px dashed #e2e8f0;'>", unsafe_allow_html=True)
                     st.markdown(f"<div style='font-size:13px; font-weight:800; color:#ea580c; margin-bottom:5px;'>{_m('cat_title')}</div>", unsafe_allow_html=True)
                     st.caption(_m("cat_warn"))
                     
@@ -304,7 +299,7 @@ def show_dealer_management():
                     )
                     new_cats_str = ",".join(selected_cats)
                 
-                st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin:10px 0; border-top:1px dashed #e2e8f0;'>", unsafe_allow_html=True)
                 st.markdown(f"<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>{_m('menu_title')}</div>", unsafe_allow_html=True)
                 
                 menu_options = {
@@ -315,9 +310,9 @@ def show_dealer_management():
                 current_menus = u_menus.split(',') if u_menus is not None else list(menu_options.keys())
                 
                 selected_menus = []
-                m_cols = st.columns(3)
+                m_cols = st.columns(4)
                 for idx, (k, v) in enumerate(menu_options.items()):
-                    with m_cols[idx % 3]:
+                    with m_cols[idx % 4]:
                         if st.checkbox(v, value=(k in current_menus), key=f"chk_{u_id}_{k}"):
                             selected_menus.append(k)
                 
@@ -326,8 +321,9 @@ def show_dealer_management():
                 
                 st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
                 
-                # BİLGİLERİ GÜNCELLE BUTONU
-                if st.button(_m("btn_update"), type="primary", use_container_width=True, key=f"btn_save_user_{u_id}"):
+                # BİLGİLERİ GÜNCELLE BUTONU (Kibar boyutta)
+                col_space, col_save = st.columns([3, 2])
+                if col_save.button(_m("btn_update"), type="primary", use_container_width=True, key=f"btn_save_user_{u_id}"):
                     conn_update = sqlite3.connect('users.db')
                     try:
                         conn_update.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", 
@@ -341,28 +337,30 @@ def show_dealer_management():
                     conn_update.commit(); conn_update.close()
                     st.toast(f"{new_company} {_m('toast_upd')}")
                     st.rerun()
-                        
+
+            # --- SADELEŞTİRİLMİŞ, KİBAR AKSİYON BUTONLARI ---
+            # Butonları sağa yaslamak için boşluk kolonları kullanıyoruz
             st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
-            c3, c4 = st.columns(2)
             
             if u_id == st.session_state.get('user_id'):
                 st.info(_m("err_self"))
             else:
-                if u_approved:
-                    if c3.button(_m("btn_sus"), key=f"sus_{u_id}", use_container_width=True):
+                c_empty, c_action, c_delete = st.columns([3, 1, 1])
+                
+                with c_action:
+                    if u_approved:
+                        if st.button(_m("btn_sus"), key=f"sus_{u_id}", use_container_width=True):
+                            conn_act = sqlite3.connect('users.db')
+                            conn_act.execute("UPDATE users SET is_approved=0 WHERE id=?", (u_id,))
+                            conn_act.commit(); conn_act.close(); st.rerun()
+                    else:
+                        if st.button(_m("btn_app"), key=f"app_{u_id}", type="primary", use_container_width=True):
+                            conn_act = sqlite3.connect('users.db')
+                            conn_act.execute("UPDATE users SET is_approved=1 WHERE id=?", (u_id,))
+                            conn_act.commit(); conn_act.close(); st.rerun()
+                            
+                with c_delete:
+                    if st.button(_m("btn_del"), key=f"del_{u_id}", use_container_width=True):
                         conn_act = sqlite3.connect('users.db')
-                        conn_act.execute("UPDATE users SET is_approved=0 WHERE id=?", (u_id,))
-                        conn_act.commit(); conn_act.close()
-                        st.rerun()
-                else:
-                    if c3.button(_m("btn_app"), key=f"app_{u_id}", use_container_width=True):
-                        conn_act = sqlite3.connect('users.db')
-                        conn_act.execute("UPDATE users SET is_approved=1 WHERE id=?", (u_id,))
-                        conn_act.commit(); conn_act.close()
-                        st.rerun()
-                        
-                if c4.button(_m("btn_del"), key=f"del_{u_id}", use_container_width=True):
-                    conn_act = sqlite3.connect('users.db')
-                    conn_act.execute("DELETE FROM users WHERE id=?", (u_id,))
-                    conn_act.commit(); conn_act.close()
-                    st.rerun()
+                        conn_act.execute("DELETE FROM users WHERE id=?", (u_id,))
+                        conn_act.commit(); conn_act.close(); st.rerun()
