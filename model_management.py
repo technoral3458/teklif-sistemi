@@ -9,7 +9,137 @@ FACTORY_DB = "factory_data.db"
 
 
 # ============================================================
-# VERİTABANI YARDIMCILARI
+# MOBİL + MASAÜSTÜ OTOMATİK TASARIM
+# ============================================================
+def inject_responsive_css():
+    st.markdown("""
+    <style>
+    .block-container {
+        padding-top: 1.5rem;
+    }
+
+    .mobile-card-title {
+        font-size: 16px;
+        font-weight: 900;
+        color: #0f172a;
+        margin-bottom: 6px;
+    }
+
+    .mobile-card-sub {
+        font-size: 12px;
+        color: #64748b;
+        margin-bottom: 10px;
+    }
+
+    .product-card {
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 14px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+
+    .product-price {
+        color: #ea580c;
+        font-size: 17px;
+        font-weight: 900;
+    }
+
+    .soft-info-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 14px;
+    }
+
+    @media (max-width: 768px) {
+        .block-container {
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+            padding-top: 10px !important;
+        }
+
+        h1, h2, h3 {
+            font-size: 22px !important;
+            line-height: 1.25 !important;
+        }
+
+        .stTabs [data-baseweb="tab-list"] {
+            overflow-x: auto !important;
+            white-space: nowrap !important;
+            gap: 6px !important;
+            padding-bottom: 8px !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            min-width: max-content !important;
+            padding: 10px 14px !important;
+            font-size: 14px !important;
+            border-radius: 12px !important;
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+
+        .stTabs [aria-selected="true"] {
+            background: #2563eb !important;
+            color: white !important;
+            border-color: #2563eb !important;
+        }
+
+        div[data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+        }
+
+        input, textarea {
+            font-size: 16px !important;
+        }
+
+        button {
+            min-height: 46px !important;
+            border-radius: 13px !important;
+            font-weight: 800 !important;
+        }
+
+        div[data-testid="stNumberInput"] {
+            width: 100% !important;
+        }
+
+        div[data-testid="stSelectbox"] {
+            width: 100% !important;
+        }
+
+        div[data-testid="stFileUploader"] {
+            width: 100% !important;
+        }
+
+        section[data-testid="stSidebar"] {
+            width: 86vw !important;
+        }
+
+        .product-card {
+            padding: 12px !important;
+            border-radius: 14px !important;
+        }
+
+        .desktop-only {
+            display: none !important;
+        }
+
+        .mobile-full-btn button {
+            width: 100% !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+# ============================================================
+# VERİTABANI
 # ============================================================
 def get_connection():
     conn = sqlite3.connect(FACTORY_DB, check_same_thread=False)
@@ -142,14 +272,14 @@ def ensure_database_schema():
         ("image_path", "TEXT DEFAULT ''"),
     ]
 
-    for col, col_type in model_cols:
-        ensure_column("models", col, col_type)
+    for col, typ in model_cols:
+        ensure_column("models", col, typ)
 
-    for col, col_type in option_cols:
-        ensure_column("options", col, col_type)
+    for col, typ in option_cols:
+        ensure_column("options", col, typ)
 
-    for col, col_type in category_cols:
-        ensure_column("categories", col, col_type)
+    for col, typ in category_cols:
+        ensure_column("categories", col, typ)
 
 
 def safe_float(value, default=0.0):
@@ -172,11 +302,8 @@ def get_safe(row, key, default=""):
     return default
 
 
-ensure_database_schema()
-
-
 # ============================================================
-# GÖRSEL YARDIMCILARI
+# GÖRSEL
 # ============================================================
 def ensure_images_folder():
     if not os.path.exists("images"):
@@ -249,7 +376,7 @@ def process_image(uploaded_file, prefix="img", size=(1200, 1200), square=False):
 
 
 # ============================================================
-# OPSİYON / TEKNİK ÖZELLİK PARSE
+# TEKNİK ÖZELLİK
 # ============================================================
 def parse_specs(specs_text):
     result = []
@@ -304,6 +431,7 @@ def get_category_list():
 # ANA GİRİŞ
 # ============================================================
 def show_product_management():
+    inject_responsive_css()
     ensure_database_schema()
 
     if "view_mode" not in st.session_state:
@@ -325,10 +453,15 @@ def show_product_management():
 
 
 # ============================================================
-# LİSTE EKRANI
+# LİSTE
 # ============================================================
 def show_list_view():
     st.header("📦 Fabrika Veritabanı Yönetimi")
+    st.markdown(
+        "<div class='soft-info-box'>Makine, donanım ve kategori yönetimini buradan yapabilirsiniz. "
+        "Telefon ekranında sayfa otomatik olarak tek kolonlu mobil düzene geçer.</div>",
+        unsafe_allow_html=True,
+    )
 
     tab_models, tab_options, tab_categories = st.tabs([
         "📦 Modeller",
@@ -350,7 +483,7 @@ def show_models_list():
     col1, col2 = st.columns([4, 1], vertical_alignment="bottom")
     col1.subheader("Kayıtlı Makineler")
 
-    if col2.button("➕ Yeni Makine Ekle", type="primary", use_container_width=True):
+    if col2.button("➕ Yeni Makine", type="primary", use_container_width=True):
         st.session_state.view_mode = "model_add"
         st.rerun()
 
@@ -387,14 +520,15 @@ def show_models_list():
                     model = cat_models[i + j]
                     model_id = safe_int(model.get("id"))
 
-                    with cols[j].container(border=True):
-                        img_b64 = get_image_base64(model.get("image_path"))
+                    with cols[j]:
+                        st.markdown("<div class='product-card'>", unsafe_allow_html=True)
 
+                        img_b64 = get_image_base64(model.get("image_path"))
                         if img_b64:
                             st.markdown(
                                 f"""
                                 <div style="text-align:center;">
-                                    <img src="{img_b64}" style="width:100%; height:150px; object-fit:contain; margin-bottom:10px;">
+                                    <img src="{img_b64}" style="width:100%; height:150px; object-fit:contain; margin-bottom:10px; border-radius:12px;">
                                 </div>
                                 """,
                                 unsafe_allow_html=True,
@@ -402,7 +536,7 @@ def show_models_list():
                         else:
                             st.markdown(
                                 """
-                                <div style="height:150px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:6px; color:#94a3b8; margin-bottom:10px;">
+                                <div style="height:150px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:12px; color:#94a3b8; margin-bottom:10px;">
                                     Görsel Yok
                                 </div>
                                 """,
@@ -411,15 +545,9 @@ def show_models_list():
 
                         st.markdown(
                             f"""
-                            <div style="font-weight:800; font-size:15px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                {model.get("name", "İsimsiz Makine")}
-                            </div>
-                            <div style="font-size:12px; color:#64748b; margin-bottom:8px;">
-                                ID: {model_id}
-                            </div>
-                            <div style="font-weight:900; color:#ea580c; font-size:16px;">
-                                {safe_float(model.get("base_price")):,.2f} {model.get("currency", "USD")}
-                            </div>
+                            <div class="mobile-card-title">{model.get("name", "İsimsiz Makine")}</div>
+                            <div class="mobile-card-sub">ID: {model_id} · {model.get("category", "Diğer Makinalar")}</div>
+                            <div class="product-price">{safe_float(model.get("base_price")):,.2f} {model.get("currency", "USD")}</div>
                             """,
                             unsafe_allow_html=True,
                         )
@@ -440,12 +568,14 @@ def show_models_list():
                             st.success("Makine silindi.")
                             st.rerun()
 
+                        st.markdown("</div>", unsafe_allow_html=True)
+
 
 def show_options_list():
     col1, col2 = st.columns([4, 1], vertical_alignment="bottom")
     col1.subheader("Ekstra Donanımlar")
 
-    if col2.button("➕ Yeni Donanım Ekle", type="primary", use_container_width=True):
+    if col2.button("➕ Yeni Donanım", type="primary", use_container_width=True):
         st.session_state.view_mode = "option_add"
         st.rerun()
 
@@ -475,14 +605,15 @@ def show_options_list():
             opt = options[i + j]
             opt_id = safe_int(opt.get("id"))
 
-            with cols[j].container(border=True):
-                img_b64 = get_image_base64(opt.get("opt_image"))
+            with cols[j]:
+                st.markdown("<div class='product-card'>", unsafe_allow_html=True)
 
+                img_b64 = get_image_base64(opt.get("opt_image"))
                 if img_b64:
                     st.markdown(
                         f"""
                         <div style="text-align:center;">
-                            <img src="{img_b64}" style="width:100%; height:120px; object-fit:contain; margin-bottom:10px;">
+                            <img src="{img_b64}" style="width:100%; height:120px; object-fit:contain; margin-bottom:10px; border-radius:12px;">
                         </div>
                         """,
                         unsafe_allow_html=True,
@@ -490,7 +621,7 @@ def show_options_list():
                 else:
                     st.markdown(
                         """
-                        <div style="height:120px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:6px; color:#94a3b8; margin-bottom:10px;">
+                        <div style="height:120px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:12px; color:#94a3b8; margin-bottom:10px;">
                             Görsel Yok
                         </div>
                         """,
@@ -499,15 +630,9 @@ def show_options_list():
 
                 st.markdown(
                     f"""
-                    <div style="font-weight:800; font-size:15px; color:#0f172a;">
-                        {opt.get("opt_name", "İsimsiz Donanım")}
-                    </div>
-                    <div style="font-size:12px; color:#64748b; margin-bottom:8px;">
-                        ID: {opt_id}
-                    </div>
-                    <div style="font-weight:900; color:#ea580c; font-size:16px;">
-                        +{safe_float(opt.get("opt_price")):,.2f} USD
-                    </div>
+                    <div class="mobile-card-title">{opt.get("opt_name", "İsimsiz Donanım")}</div>
+                    <div class="mobile-card-sub">ID: {opt_id}</div>
+                    <div class="product-price">+{safe_float(opt.get("opt_price")):,.2f} USD</div>
                     """,
                     unsafe_allow_html=True,
                 )
@@ -531,12 +656,14 @@ def show_options_list():
                     st.success("Donanım silindi.")
                     st.rerun()
 
+                st.markdown("</div>", unsafe_allow_html=True)
+
 
 def show_categories_list():
     st.subheader("Kategori Yönetimi")
 
     with st.container(border=True):
-        new_cat = st.text_input("Yeni kategori adı", placeholder="Örn: Kenar Bantlama Makineleri")
+        new_cat = st.text_input("Yeni kategori adı", placeholder="Örn: CNC İşleme Merkezleri")
 
         if st.button("➕ Kategori Ekle", type="primary", use_container_width=True):
             if not new_cat.strip():
@@ -657,17 +784,18 @@ def copy_option(option_id):
 def show_model_form(mode="add", model_id=None):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
 
-    if col_back.button("🔙 Listeye Dön", use_container_width=True):
+    if col_back.button("🔙", use_container_width=True):
         clear_model_form_state()
         st.session_state.view_mode = "list"
         st.rerun()
 
-    if mode == "edit":
-        col_title.header("✏️ Makine Düzenle")
-    else:
-        col_title.header("✨ Yeni Makine Ekle")
+    col_title.header("✏️ Makine Düzenle" if mode == "edit" else "✨ Yeni Makine Ekle")
 
-    st.markdown("---")
+    st.markdown(
+        "<div class='soft-info-box'>Mobilde alanlar otomatik olarak alt alta dizilir. "
+        "Bilgisayarda geniş ekran düzeni korunur.</div>",
+        unsafe_allow_html=True,
+    )
 
     model = {}
 
@@ -680,7 +808,6 @@ def show_model_form(mode="add", model_id=None):
 
         if not rows:
             st.error(f"Kayıt veritabanında bulunamadı. Aranan makine ID: {model_id}")
-            st.info("Bu hata artık gerçek veritabanı hatasını gizlemez. Yukarıda başka hata varsa onu da kontrol edin.")
             st.stop()
 
         model = rows[0]
@@ -721,7 +848,6 @@ def show_model_form(mode="add", model_id=None):
                 name = st.text_input("Makine Adı *", value=current_name)
 
                 cats = get_category_list()
-
                 if current_category not in cats:
                     cats.append(current_category)
 
@@ -736,7 +862,9 @@ def show_model_form(mode="add", model_id=None):
                 currency = c_currency.selectbox(
                     "Para Birimi",
                     ["USD", "EUR", "TRY", "CNY"],
-                    index=["USD", "EUR", "TRY", "CNY"].index(current_currency) if current_currency in ["USD", "EUR", "TRY", "CNY"] else 0,
+                    index=["USD", "EUR", "TRY", "CNY"].index(current_currency)
+                    if current_currency in ["USD", "EUR", "TRY", "CNY"]
+                    else 0,
                 )
                 discount = c_discount.number_input("İskonto (%)", value=current_discount, step=1.0)
 
@@ -755,7 +883,7 @@ def show_model_form(mode="add", model_id=None):
                     img_b64 = get_image_base64(current_image)
                     if img_b64:
                         st.markdown(
-                            f'<img src="{img_b64}" style="width:100%; border-radius:8px;">',
+                            f'<img src="{img_b64}" style="width:100%; border-radius:14px;">',
                             unsafe_allow_html=True,
                         )
                     else:
@@ -783,11 +911,10 @@ def show_model_form(mode="add", model_id=None):
                     key=f"spec_detail_{session_key}_{i}",
                 )
 
-                upload_key = f"spec_img_{session_key}_{i}"
                 spec_upload = c3.file_uploader(
                     "Görsel",
                     type=["png", "jpg", "jpeg"],
-                    key=upload_key,
+                    key=f"spec_img_{session_key}_{i}",
                 )
 
                 if spec_upload:
@@ -799,7 +926,7 @@ def show_model_form(mode="add", model_id=None):
                     img_b64 = get_image_base64(spec.get("img"))
                     if img_b64:
                         c3.markdown(
-                            f'<img src="{img_b64}" style="width:50px; height:50px; object-fit:contain;">',
+                            f'<img src="{img_b64}" style="width:55px; height:55px; object-fit:contain; border-radius:8px;">',
                             unsafe_allow_html=True,
                         )
 
@@ -835,7 +962,7 @@ def show_model_form(mode="add", model_id=None):
 
                         if img_b64:
                             st.markdown(
-                                f'<img src="{img_b64}" style="width:100%; height:80px; object-fit:contain;">',
+                                f'<img src="{img_b64}" style="width:100%; height:90px; object-fit:contain; border-radius:10px;">',
                                 unsafe_allow_html=True,
                             )
 
@@ -934,16 +1061,11 @@ def clear_model_form_state():
 def show_option_form(mode="add", option_id=None):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
 
-    if col_back.button("🔙 Listeye Dön", use_container_width=True):
+    if col_back.button("🔙", use_container_width=True):
         st.session_state.view_mode = "list"
         st.rerun()
 
-    if mode == "edit":
-        col_title.header("✏️ Donanım Düzenle")
-    else:
-        col_title.header("✨ Yeni Donanım Ekle")
-
-    st.markdown("---")
+    col_title.header("✏️ Donanım Düzenle" if mode == "edit" else "✨ Yeni Donanım Ekle")
 
     option = {}
 
@@ -1005,7 +1127,7 @@ def show_option_form(mode="add", option_id=None):
                 img_b64 = get_image_base64(current_image)
                 if img_b64:
                     st.markdown(
-                        f'<img src="{img_b64}" style="width:100%; border-radius:8px;">',
+                        f'<img src="{img_b64}" style="width:100%; border-radius:14px;">',
                         unsafe_allow_html=True,
                     )
                 else:
@@ -1019,7 +1141,7 @@ def show_option_form(mode="add", option_id=None):
                 var_b64 = get_image_base64(current_variant_img)
                 if var_b64:
                     st.markdown(
-                        f'<img src="{var_b64}" style="width:100%; border-radius:8px;">',
+                        f'<img src="{var_b64}" style="width:100%; border-radius:14px;">',
                         unsafe_allow_html=True,
                     )
                 else:
