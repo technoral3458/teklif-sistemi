@@ -1,9 +1,11 @@
-import streamlit as st
-import customer_pages, model_management, offer_wizard, dealer_management, proforma_invoice, orders_page, offer_management, profile_settings
+iimport streamlit as st
 import sqlite3, pandas as pd, hashlib, random, smtplib, uuid, os, base64, datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import ntpath, posixpath
+
+# DİKKAT: Sayfa modülleri burada içeri aktarılıyor. Hepsinin klasörde olduğundan emin olun.
+import customer_pages, model_management, offer_wizard, dealer_management, proforma_invoice, orders_page, offer_management, profile_settings
 
 # --- SİSTEM AYARLARI ---
 st.set_page_config(page_title="Ersan Makine B2B Portalı", page_icon="⚙️", layout="wide", initial_sidebar_state="expanded")
@@ -12,7 +14,7 @@ def hash_password(password): return hashlib.sha256(str.encode(password)).hexdige
 def generate_code(): return str(random.randint(100000, 999999))
 
 # =====================================================================
-# 🛠️ MERKEZİ VERİTABANI OTO-ONARIM (TÜM SÜTUNLAR EKSİKSİZ)
+# 🛠️ MERKEZİ VERİTABANI OTO-ONARIM
 # =====================================================================
 def repair_databases():
     # 1. USERS DB
@@ -42,7 +44,7 @@ def repair_databases():
     conn.execute("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, user_id INTEGER DEFAULT 1, country TEXT DEFAULT '', city TEXT DEFAULT '', authorized_person TEXT DEFAULT '', email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '', address_full TEXT DEFAULT '', tax_office TEXT DEFAULT '', tax_id TEXT DEFAULT '')""")
     conn.commit(); conn.close()
 
-    # 3. FACTORY DB (KRİTİK ONARIM: MODELLER VE OPSİYONLAR TABLOLARI EKSİKSİZ)
+    # 3. FACTORY DB
     conn = sqlite3.connect('factory_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE)""")
     
@@ -143,8 +145,7 @@ if not st.session_state.logged_in:
         sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x], index=list(lang_opts.keys()).index(st.session_state.lang), label_visibility="collapsed")
         if sel != st.session_state.lang: st.session_state.lang = sel; st.rerun()
 
-    st.write("") 
-    st.write("")
+    st.write(""); st.write("")
     
     col_slider, col_form = st.columns([1.2, 1], gap="large")
     
