@@ -1,356 +1,1360 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-import math
+import hashlib
+import os
+import base64
+import ntpath
+import posixpath
+import datetime
+import uuid
+import html
 
 # =====================================================================
-# 🌍 ÇOKLU DİL SÖZLÜĞÜ (TR - EN - ZH)
+# BAYİ / ÜRETİCİ YÖNETİMİ
+# dealer_management.py
 # =====================================================================
-DICT_DEALER = {
-    "tr": {
-        "title": "🏢 Bayi ve Üretici Yönetimi",
-        "search_ph": "🔍 Firma Adı, E-Posta veya Telefon ile ara...",
-        "no_user": "Sistemde henüz kayıtlı kullanıcı bulunmuyor.",
-        "no_match": "Arama kriterinize uygun kullanıcı bulunamadı.",
-        "active": "Aktif", "pending": "Askıda",
-        "badge_admin": "👑 YÖNETİCİ", "not_spec": "Belirtilmemiş",
-        "tot_offer": "Toplam Teklif", "tot_vol": "Toplam Hacim",
-        "conv_offer": "Siparişe Dönen", "conv_vol": "Sipariş Hacmi",
-        "comp_name": "Firma Adı", "act_type": "Faaliyet Türü",
-        "email": "E-Posta Adresi", "phone": "Telefon",
-        "type_dealer": "Satıcı (Bayi)", "type_prod": "Üretici", "type_admin": "Yönetici",
-        "cat_title": "📦 Kategoriler (Filtre):",
-        "cat_help": "Satış izni verilen kategoriler:",
-        "cat_warn": "💡 Sadece Satıcı (Bayi) için geçerlidir.",
-        "menu_title": "🔑 Menü İzinleri:",
-        "btn_update": "💾 BİLGİLERİ GÜNCELLE",
-        "toast_upd": "kullanıcısının bilgileri güncellendi!",
-        "err_self": "Kendi yönetici hesabınızı askıya alamaz veya silemezsiniz.",
-        "btn_sus": "🚫 Askıya Al", "btn_app": "✅ Onayla", "btn_del": "🗑️ Sil",
-        "btn_manage": "⚙️ Yönet", "btn_back": "⬅️ Listeye Dön", "page": "Sayfa",
-        
-        "m_dash": "📊 Dashboard", "m_new": "📝 Yeni Teklif", "m_cust": "👥 Müşteriler",
-        "m_past": "📋 Geçmiş Teklifler", "m_order": "📦 Siparişler", "m_model": "📦 Modeller",
-        "m_deal": "🏢 Bayiler", "m_prof": "⚙️ Ayarlar"
-    },
-    "en": {
-        "title": "🏢 Dealer and Manufacturer Management",
-        "search_ph": "🔍 Search by Company, Email or Phone...",
-        "no_user": "No registered users found in the system.",
-        "no_match": "No users match your search criteria.",
-        "active": "Active", "pending": "Suspended",
-        "badge_admin": "👑 ADMIN", "not_spec": "Not Specified",
-        "tot_offer": "Total Offers", "tot_vol": "Total Volume",
-        "conv_offer": "Converted Orders", "conv_vol": "Order Volume",
-        "comp_name": "Company Name", "act_type": "Role",
-        "email": "Email Address", "phone": "Phone",
-        "type_dealer": "Dealer", "type_prod": "Producer", "type_admin": "Admin",
-        "cat_title": "📦 Allowed Categories:",
-        "cat_help": "Select allowed categories:",
-        "cat_warn": "💡 Applies ONLY to Dealers.",
-        "menu_title": "🔑 Menu Access:",
-        "btn_update": "💾 UPDATE INFO",
-        "toast_upd": "permissions updated!",
-        "err_self": "You cannot suspend or delete your own account.",
-        "btn_sus": "🚫 Suspend", "btn_app": "✅ Approve", "btn_del": "🗑️ Delete",
-        "btn_manage": "⚙️ Manage", "btn_back": "⬅️ Back to List", "page": "Page",
-        
-        "m_dash": "📊 Dashboard", "m_new": "📝 New Offer", "m_cust": "👥 Customers",
-        "m_past": "📋 Past Offers", "m_order": "📦 Orders", "m_model": "📦 Models",
-        "m_deal": "🏢 Dealers", "m_prof": "⚙️ Settings"
-    },
-    "zh": {
-        "title": "🏢 经销商和制造商管理",
-        "search_ph": "🔍 按公司、电子邮件或电话搜索...",
-        "no_user": "系统中尚未找到注册用户。",
-        "no_match": "未找到符合搜索条件的用户。",
-        "active": "活跃", "pending": "暂停",
-        "badge_admin": "👑 管理员", "not_spec": "未指定",
-        "tot_offer": "总报价", "tot_vol": "总交易量",
-        "conv_offer": "已转换订单", "conv_vol": "订单量",
-        "comp_name": "公司名称", "act_type": "角色",
-        "email": "电子邮件", "phone": "电话",
-        "type_dealer": "经销商", "type_prod": "制造商", "type_admin": "管理员",
-        "cat_title": "📦 允许的类别:",
-        "cat_help": "选择允许的类别:",
-        "cat_warn": "💡 仅适用于经销商。",
-        "menu_title": "🔑 菜单访问:",
-        "btn_update": "💾 更新信息",
-        "toast_upd": "权限已更新！",
-        "err_self": "您不能暂停或删除自己的帐户。",
-        "btn_sus": "🚫 暂停", "btn_app": "✅ 批准", "btn_del": "🗑️ 删除",
-        "btn_manage": "⚙️ 管理", "btn_back": "⬅️ 返回列表", "page": "页",
-        
-        "m_dash": "📊 仪表板", "m_new": "📝 新报价", "m_cust": "👥 客户",
-        "m_past": "📋 历史报价", "m_order": "📦 订单", "m_model": "📦 型号",
-        "m_deal": "🏢 经销商", "m_prof": "⚙️ 设置"
+
+USERS_DB = "users.db"
+FACTORY_DB = "factory_data.db"
+
+MENU_OPTIONS = [
+    ("m_dash", "📊 Dashboard"),
+    ("m_order", "📦 Siparişler"),
+    ("m_new", "📝 Yeni Teklif"),
+    ("m_model", "📦 Modeller"),
+    ("m_cust", "👥 Müşteriler"),
+    ("m_deal", "🏢 Bayiler"),
+    ("m_past", "📋 Geçmiş Teklifler"),
+    ("m_prof", "⚙️ Ayarlar"),
+]
+
+DEFAULT_DEALER_MENUS = "m_dash,m_new,m_cust,m_past,m_order,m_prof"
+
+
+# =====================================================================
+# YARDIMCI FONKSİYONLAR
+# =====================================================================
+def hash_password(password):
+    return hashlib.sha256(str(password).encode()).hexdigest()
+
+
+def get_conn(db_path):
+    return sqlite3.connect(db_path, check_same_thread=False)
+
+
+def get_base64_image(path):
+    if not path:
+        return ""
+
+    if str(path).startswith("http"):
+        return path
+
+    base_name = posixpath.basename(ntpath.basename(str(path)))
+    paths_to_try = [
+        path,
+        f"images/{path}",
+        f"../images/{path}",
+        base_name,
+        f"images/{base_name}",
+    ]
+
+    for p in paths_to_try:
+        if os.path.exists(p) and os.path.isfile(p):
+            try:
+                ext = os.path.splitext(p)[1].lower().replace(".", "")
+                if not ext:
+                    ext = "png"
+                if ext == "jpg":
+                    ext = "jpeg"
+
+                with open(p, "rb") as f:
+                    return f"data:image/{ext};base64,{base64.b64encode(f.read()).decode()}"
+            except Exception:
+                pass
+
+    return ""
+
+
+def ensure_users_table():
+    conn = get_conn(USERS_DB)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE,
+            password TEXT,
+            company_name TEXT,
+            role TEXT DEFAULT 'dealer',
+            is_approved INTEGER DEFAULT 0,
+            user_type TEXT DEFAULT 'Satıcı',
+            phone TEXT,
+            is_verified INTEGER DEFAULT 0,
+            auth_code TEXT,
+            session_token TEXT,
+            logo_path TEXT,
+            website TEXT,
+            address_full TEXT,
+            allowed_menus TEXT,
+            allowed_categories TEXT
+        )
+    """)
+
+    cols = [c[1] for c in conn.execute("PRAGMA table_info(users)").fetchall()]
+
+    add_cols = {
+        "email": "TEXT UNIQUE",
+        "password": "TEXT",
+        "company_name": "TEXT",
+        "role": "TEXT DEFAULT 'dealer'",
+        "is_approved": "INTEGER DEFAULT 0",
+        "user_type": "TEXT DEFAULT 'Satıcı'",
+        "phone": "TEXT",
+        "is_verified": "INTEGER DEFAULT 0",
+        "auth_code": "TEXT",
+        "session_token": "TEXT",
+        "logo_path": "TEXT DEFAULT ''",
+        "website": "TEXT DEFAULT ''",
+        "address_full": "TEXT DEFAULT ''",
+        "allowed_menus": f"TEXT DEFAULT '{DEFAULT_DEALER_MENUS}'",
+        "allowed_categories": "TEXT DEFAULT ''",
     }
-}
 
-def _m(key): 
-    lang = "tr"
-    if "language" in st.session_state: lang = st.session_state.language
-    elif "lang" in st.session_state: lang = st.session_state.lang
-    lang = str(lang).lower()
-    if lang not in DICT_DEALER: lang = "tr"
-    return DICT_DEALER[lang].get(key, key)
+    for col, col_type in add_cols.items():
+        if col not in cols:
+            try:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass
 
-# =====================================================================
-# VERİTABANI İŞLEMLERİ
-# =====================================================================
-def repair_users_db():
-    try:
-        conn = sqlite3.connect('users.db')
-        try: conn.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'Dealer'")
-        except: pass
-        try: conn.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
-        except: pass
-        conn.commit(); conn.close()
-    except: pass
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS admin_login_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id INTEGER,
+            admin_email TEXT,
+            target_user_id INTEGER,
+            target_email TEXT,
+            target_company TEXT,
+            token TEXT,
+            created_at TEXT
+        )
+    """)
 
-repair_users_db()
-
-def get_db_data():
-    try:
-        conn_f = sqlite3.connect('factory_data.db')
-        all_cats = [c[0] for c in conn_f.execute("SELECT name FROM categories ORDER BY name ASC").fetchall()]
-        conn_f.close()
-    except: all_cats = []
-
-    conn = sqlite3.connect('users.db')
-    try: users = conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role, allowed_categories FROM users ORDER BY id DESC").fetchall()
-    except: users = [(*u, "") for u in conn.execute("SELECT id, company_name, email, phone, user_type, is_approved, allowed_menus, role FROM users ORDER BY id DESC").fetchall()]
+    conn.commit()
     conn.close()
-    
-    conn_s = sqlite3.connect('sales_data.db')
-    try: all_offs = conn_s.execute("SELECT user_id, status, total_price FROM offers").fetchall()
-    except: all_offs = []
-    conn_s.close()
-    
-    df_o = pd.DataFrame(all_offs, columns=['user_id', 'status', 'total_price']) if all_offs else pd.DataFrame(columns=['user_id', 'status', 'total_price'])
-    return users, all_cats, df_o
 
-# =====================================================================
-# ANA YÖNETİM MODÜLÜ (LİSTE & DETAY MANTIKLI)
-# =====================================================================
-def show_dealer_management():
-    # 🎨 SAAS LİSTE VE DETAY CSS KODLARI 🎨
+
+def ensure_factory_tables():
+    conn = get_conn(FACTORY_DB)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE,
+            image_path TEXT DEFAULT ''
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS models (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            base_price REAL,
+            image_path TEXT,
+            specs TEXT,
+            currency TEXT DEFAULT 'USD',
+            port_discount REAL DEFAULT 0.0,
+            compatible_options TEXT DEFAULT '',
+            gallery_images TEXT DEFAULT '',
+            category TEXT DEFAULT 'Diğer Makinalar',
+            gallery_videos TEXT DEFAULT '',
+            name_zh TEXT DEFAULT '',
+            specs_zh TEXT DEFAULT '',
+            user_id INTEGER DEFAULT 1
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def get_app_base_url():
+    try:
+        host = st.context.headers.get("Host", "")
+        proto = st.context.headers.get("X-Forwarded-Proto", "https")
+
+        if host:
+            return f"{proto}://{host}"
+    except Exception:
+        pass
+
+    return ""
+
+
+def create_admin_login_token(target_user_id):
+    ensure_users_table()
+
+    token = str(uuid.uuid4())
+    admin_id = st.session_state.get("user_id")
+    admin_email = st.session_state.get("user_email", "")
+
+    conn = get_conn(USERS_DB)
+
+    target = conn.execute("""
+        SELECT email, company_name
+        FROM users
+        WHERE id=? AND IFNULL(role, '') != 'admin'
+    """, (target_user_id,)).fetchone()
+
+    if not target:
+        conn.close()
+        return ""
+
+    target_email = target[0] or ""
+    target_company = target[1] or ""
+
+    conn.execute("""
+        UPDATE users
+        SET session_token=?
+        WHERE id=? AND IFNULL(role, '') != 'admin'
+    """, (token, target_user_id))
+
+    conn.execute("""
+        INSERT INTO admin_login_logs (
+            admin_id,
+            admin_email,
+            target_user_id,
+            target_email,
+            target_company,
+            token,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        admin_id,
+        admin_email,
+        target_user_id,
+        target_email,
+        target_company,
+        token,
+        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return token
+
+
+def get_or_create_admin_login_url(target_user_id):
+    key = f"admin_login_token_{target_user_id}"
+
+    if key not in st.session_state or not st.session_state[key]:
+        st.session_state[key] = create_admin_login_token(target_user_id)
+
+    token = st.session_state.get(key, "")
+
+    if not token:
+        return ""
+
+    base_url = get_app_base_url()
+
+    if base_url:
+        return f"{base_url}/?session_token={token}&admin_login=1"
+
+    return f"/?session_token={token}&admin_login=1"
+
+
+def refresh_admin_login_token(target_user_id):
+    key = f"admin_login_token_{target_user_id}"
+    st.session_state[key] = create_admin_login_token(target_user_id)
+
+
+def get_all_categories():
+    ensure_factory_tables()
+
+    conn = get_conn(FACTORY_DB)
+
+    categories = []
+
+    try:
+        rows = conn.execute("""
+            SELECT name
+            FROM categories
+            WHERE name IS NOT NULL AND TRIM(name) != ''
+            ORDER BY name
+        """).fetchall()
+
+        categories.extend([r[0] for r in rows if r and r[0]])
+    except Exception:
+        pass
+
+    try:
+        rows = conn.execute("""
+            SELECT DISTINCT category
+            FROM models
+            WHERE category IS NOT NULL AND TRIM(category) != ''
+            ORDER BY category
+        """).fetchall()
+
+        categories.extend([r[0] for r in rows if r and r[0]])
+    except Exception:
+        pass
+
+    conn.close()
+
+    clean_categories = []
+    for c in categories:
+        c = str(c).strip()
+        if c and c not in clean_categories:
+            clean_categories.append(c)
+
+    return clean_categories
+
+
+def get_users(search_text="", status_filter="Tümü", type_filter="Tümü"):
+    ensure_users_table()
+
+    conn = get_conn(USERS_DB)
+
+    query = """
+        SELECT
+            id,
+            company_name,
+            email,
+            phone,
+            user_type,
+            role,
+            is_approved,
+            is_verified,
+            website,
+            address_full,
+            allowed_menus,
+            allowed_categories,
+            logo_path
+        FROM users
+        WHERE IFNULL(role, '') != 'admin'
+    """
+
+    params = []
+
+    if search_text:
+        query += """
+            AND (
+                LOWER(IFNULL(company_name, '')) LIKE ?
+                OR LOWER(IFNULL(email, '')) LIKE ?
+                OR LOWER(IFNULL(phone, '')) LIKE ?
+            )
+        """
+        s = f"%{search_text.lower().strip()}%"
+        params.extend([s, s, s])
+
+    if status_filter == "Aktif":
+        query += " AND IFNULL(is_approved, 0) = 1"
+    elif status_filter == "Onay Bekliyor":
+        query += " AND IFNULL(is_approved, 0) = 0"
+    elif status_filter == "Askıda":
+        query += " AND IFNULL(is_approved, 0) = -1"
+
+    if type_filter == "Satıcı":
+        query += " AND IFNULL(user_type, '') LIKE '%Satıcı%'"
+    elif type_filter == "Üretici":
+        query += " AND IFNULL(user_type, '') LIKE '%Üretici%'"
+
+    query += " ORDER BY id DESC"
+
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+
+    return rows
+
+
+def get_user_by_id(user_id):
+    ensure_users_table()
+
+    conn = get_conn(USERS_DB)
+    row = conn.execute("""
+        SELECT
+            id,
+            company_name,
+            email,
+            phone,
+            user_type,
+            role,
+            is_approved,
+            is_verified,
+            website,
+            address_full,
+            allowed_menus,
+            allowed_categories,
+            logo_path
+        FROM users
+        WHERE id=?
+    """, (user_id,)).fetchone()
+    conn.close()
+
+    return row
+
+
+def update_user_info(
+    user_id,
+    company_name,
+    email,
+    phone,
+    user_type,
+    role,
+    is_approved,
+    is_verified,
+    website,
+    address_full,
+    allowed_menus,
+    allowed_categories,
+    logo_path,
+):
+    ensure_users_table()
+
+    conn = get_conn(USERS_DB)
+
+    try:
+        conn.execute("""
+            UPDATE users
+            SET
+                company_name=?,
+                email=?,
+                phone=?,
+                user_type=?,
+                role=?,
+                is_approved=?,
+                is_verified=?,
+                website=?,
+                address_full=?,
+                allowed_menus=?,
+                allowed_categories=?,
+                logo_path=?
+            WHERE id=?
+        """, (
+            company_name,
+            email,
+            phone,
+            user_type,
+            role,
+            is_approved,
+            is_verified,
+            website,
+            address_full,
+            allowed_menus,
+            allowed_categories,
+            logo_path,
+            user_id,
+        ))
+
+        conn.commit()
+        conn.close()
+        return True, "Bilgiler başarıyla güncellendi."
+
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False, "Bu e-posta adresi başka bir kullanıcıda kayıtlı."
+
+    except Exception as e:
+        conn.close()
+        return False, f"Güncelleme sırasında hata oluştu: {e}"
+
+
+def create_user(company_name, email, phone, password, user_type):
+    ensure_users_table()
+
+    role = "manufacturer" if user_type == "Üretici" else "dealer"
+
+    conn = get_conn(USERS_DB)
+
+    try:
+        conn.execute("""
+            INSERT INTO users (
+                company_name,
+                email,
+                phone,
+                password,
+                user_type,
+                role,
+                is_approved,
+                is_verified,
+                allowed_menus,
+                allowed_categories,
+                logo_path,
+                website,
+                address_full
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, '', '', '', '')
+        """, (
+            company_name,
+            email,
+            phone,
+            hash_password(password),
+            user_type,
+            role,
+            DEFAULT_DEALER_MENUS,
+        ))
+
+        conn.commit()
+        conn.close()
+        return True, "Yeni bayi / üretici başarıyla oluşturuldu."
+
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False, "Bu e-posta adresi zaten kayıtlı."
+
+    except Exception as e:
+        conn.close()
+        return False, f"Kayıt oluşturulamadı: {e}"
+
+
+def suspend_user(user_id):
+    ensure_users_table()
+
+    conn = get_conn(USERS_DB)
+    conn.execute("UPDATE users SET is_approved=-1, session_token=NULL WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def activate_user(user_id):
+    ensure_users_table()
+
+    conn = get_conn(USERS_DB)
+    conn.execute("UPDATE users SET is_approved=1, is_verified=1 WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def delete_user(user_id):
+    ensure_users_table()
+
+    conn = get_conn(USERS_DB)
+    conn.execute("DELETE FROM users WHERE id=? AND IFNULL(role, '') != 'admin'", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def change_user_password(user_id, new_password):
+    ensure_users_table()
+
+    conn = get_conn(USERS_DB)
+    conn.execute(
+        "UPDATE users SET password=? WHERE id=?",
+        (hash_password(new_password), user_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def normalize_allowed_menus(selected_labels):
+    selected_codes = []
+
+    for code, label in MENU_OPTIONS:
+        if label in selected_labels:
+            selected_codes.append(code)
+
+    return ",".join(selected_codes)
+
+
+def labels_from_allowed_menus(allowed_menus):
+    allowed_codes = []
+    if allowed_menus:
+        allowed_codes = [x.strip() for x in str(allowed_menus).split(",") if x.strip()]
+
+    labels = []
+    for code, label in MENU_OPTIONS:
+        if code in allowed_codes:
+            labels.append(label)
+
+    return labels
+
+
+def categories_from_allowed(allowed_categories, all_categories):
+    if not allowed_categories:
+        return all_categories
+
+    allowed = [x.strip() for x in str(allowed_categories).split(",") if x.strip()]
+    return [x for x in all_categories if x in allowed]
+
+
+def status_text(value):
+    try:
+        value = int(value)
+    except Exception:
+        value = 0
+
+    if value == 1:
+        return "✅ Aktif"
+    if value == -1:
+        return "⛔ Askıda"
+    return "⏳ Onay Bekliyor"
+
+
+def status_plain(value):
+    try:
+        value = int(value)
+    except Exception:
+        value = 0
+
+    if value == 1:
+        return "Aktif"
+    if value == -1:
+        return "Askıda"
+    return "Onay Bekliyor"
+
+
+def inject_css():
     st.markdown("""
     <style>
-    /* Liste Satır Tasarımı */
-    .list-row {
-        background-color: #ffffff;
+    .dealer-hero {
+        background: linear-gradient(135deg, #0f172a, #dc2626);
+        color: white;
+        padding: 28px;
+        border-radius: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 14px 32px rgba(15,23,42,.16);
+    }
+
+    .dealer-hero h1 {
+        margin: 0;
+        font-size: 34px;
+        font-weight: 950;
+        letter-spacing: -0.5px;
+    }
+
+    .dealer-hero p {
+        margin: 8px 0 0 0;
+        color: #fee2e2;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .dealer-card {
+        background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 12px 15px;
-        margin-bottom: 8px;
+        border-radius: 22px;
+        padding: 20px;
+        box-shadow: 0 10px 24px rgba(15,23,42,.06);
+        margin-bottom: 18px;
+    }
+
+    .dealer-section-title {
+        font-size: 19px;
+        font-weight: 950;
+        color: #0f172a;
+        margin: 0 0 14px 0;
+    }
+
+    .dealer-small-text {
+        color: #64748b;
+        font-size: 13px;
+        font-weight: 700;
+        margin-top: -5px;
+        margin-bottom: 14px;
+    }
+
+    .dealer-user-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+
+    .dealer-user-name {
+        color: #0f172a;
+        font-size: 16px;
+        font-weight: 950;
+        margin-bottom: 4px;
+    }
+
+    .dealer-user-meta {
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.5;
+    }
+
+    .dealer-status-active {
+        display: inline-block;
+        background: #dcfce7;
+        color: #166534;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 900;
+        margin-top: 8px;
+    }
+
+    .dealer-status-wait {
+        display: inline-block;
+        background: #fef3c7;
+        color: #92400e;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 900;
+        margin-top: 8px;
+    }
+
+    .dealer-status-suspended {
+        display: inline-block;
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 900;
+        margin-top: 8px;
+    }
+
+    .dealer-preview {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 18px;
+        padding: 16px;
+        margin-top: 8px;
+        margin-bottom: 14px;
+    }
+
+    .dealer-preview-title {
+        color: #0f172a;
+        font-size: 15px;
+        font-weight: 950;
+        margin-bottom: 5px;
+    }
+
+    .dealer-preview-line {
+        color: #475569;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.55;
+    }
+
+    .impersonate-link {
         display: flex;
+        width: 100%;
+        min-height: 52px;
         align-items: center;
-        justify-content: space-between;
-        transition: all 0.2s;
+        justify-content: center;
+        box-sizing: border-box;
+        padding: 13px 18px;
+        border-radius: 15px;
+        background: linear-gradient(135deg, #0f172a, #2563eb);
+        color: #ffffff !important;
+        text-decoration: none !important;
+        font-size: 15px;
+        font-weight: 950;
+        text-align: center;
+        box-shadow: 0 12px 26px rgba(37, 99, 235, 0.24);
+        margin-bottom: 10px;
     }
-    .list-row:hover {
-        border-color: #cbd5e1;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+
+    .impersonate-link:hover {
+        filter: brightness(1.05);
+        transform: translateY(-1px);
     }
-    .list-col { display: flex; flex-direction: column; justify-content: center; }
-    
-    /* İstatistik Çubuğu (Detay Sayfası İçin) */
-    .stats-bar {
-        background-color: #ffffff; border-radius: 12px; display: flex; 
-        padding: 20px 0; margin: 20px 0; border: 1px solid #f1f5f9;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+
+    .impersonate-note {
+        background: #eff6ff;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
+        border-radius: 14px;
+        padding: 11px 13px;
+        font-size: 12px;
+        font-weight: 750;
+        line-height: 1.45;
+        margin-bottom: 14px;
     }
-    .stat-box { flex: 1; text-align: center; border-right: 1px solid #f1f5f9; }
-    .stat-box:last-child { border-right: none; }
-    .stat-lbl { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
-    .stat-val { font-size: 24px; font-weight: 900; color: #1e293b; }
-    .stat-val.blue { color: #3b82f6; }
-    .stat-val.green { color: #10b981; }
-    
-    /* Rozetler */
-    .badge-active { background:#ecfdf5; color:#10b981; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:800; border:1px solid #a7f3d0; }
-    .badge-suspended { background:#fef2f2; color:#ef4444; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:800; border:1px solid #fecaca; }
-    .role-admin { color:#ea580c; font-weight:bold; font-size:12px; }
-    .role-user { color:#3b82f6; font-weight:bold; font-size:12px; }
+
+    @media (max-width: 768px) {
+        .dealer-hero {
+            padding: 22px;
+            border-radius: 22px;
+            margin-bottom: 18px;
+        }
+
+        .dealer-hero h1 {
+            font-size: 27px;
+            line-height: 1.15;
+        }
+
+        .dealer-hero p {
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .dealer-card {
+            padding: 16px;
+            border-radius: 20px;
+        }
+
+        .dealer-section-title {
+            font-size: 18px;
+        }
+
+        [data-testid="stCheckbox"] label {
+            min-height: 44px !important;
+            display: flex !important;
+            align-items: center !important;
+            font-size: 17px !important;
+        }
+
+        [data-testid="stCheckbox"] p {
+            font-size: 18px !important;
+            font-weight: 700 !important;
+        }
+
+        button {
+            min-height: 48px !important;
+            border-radius: 14px !important;
+            font-weight: 900 !important;
+        }
+
+        .impersonate-link {
+            min-height: 54px;
+            font-size: 15px;
+        }
+    }
     </style>
     """, unsafe_allow_html=True)
 
-    # Oturum Yönetimi
-    if "manage_dealer_id" not in st.session_state:
-        st.session_state.manage_dealer_id = None
-    if "dealer_page" not in st.session_state:
-        st.session_state.dealer_page = 1
 
-    users, all_categories, df_offers = get_db_data()
-    types_internal = ["Satıcı (Bayi)", "Üretici", "Yönetici"]
-    types_display = [_m("type_dealer"), _m("type_prod"), _m("type_admin")]
+def render_flash_messages():
+    if "dealer_flash_success" in st.session_state and st.session_state.dealer_flash_success:
+        msg = st.session_state.dealer_flash_success
+        st.success(msg)
+        try:
+            st.toast(msg, icon="✅")
+        except Exception:
+            pass
+        st.session_state.dealer_flash_success = ""
 
-    # =========================================================
-    # GÖRÜNÜM 2: DETAY VE YÖNETİM SAYFASI (PROFİL İÇİ)
-    # =========================================================
-    if st.session_state.manage_dealer_id:
-        target_u = [u for u in users if u[0] == st.session_state.manage_dealer_id]
-        if not target_u:
-            st.session_state.manage_dealer_id = None
+    if "dealer_flash_error" in st.session_state and st.session_state.dealer_flash_error:
+        msg = st.session_state.dealer_flash_error
+        st.error(msg)
+        try:
+            st.toast(msg, icon="❌")
+        except Exception:
+            pass
+        st.session_state.dealer_flash_error = ""
+
+
+# =====================================================================
+# ANA SAYFA
+# =====================================================================
+def show_dealer_management():
+    ensure_users_table()
+    ensure_factory_tables()
+    inject_css()
+
+    if st.session_state.get("user_role") != "admin":
+        st.error("Bu sayfaya yalnızca sistem yöneticisi erişebilir.")
+        return
+
+    render_flash_messages()
+
+    st.markdown("""
+    <div class="dealer-hero">
+        <h1>🏢 Bayi Yönetimi</h1>
+        <p>Bayi ve üretici bilgilerini, menü izinlerini, kategori yetkilerini ve yönetici girişlerini yönetin.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    tabs = st.tabs(["👥 Bayi / Üretici Listesi", "➕ Yeni Kayıt"])
+
+    # =================================================================
+    # BAYİ LİSTESİ
+    # =================================================================
+    with tabs[0]:
+        filter_col1, filter_col2, filter_col3 = st.columns([2, 1, 1])
+
+        with filter_col1:
+            search_text = st.text_input(
+                "🔎 Ara",
+                placeholder="Firma adı, e-posta veya telefon ara...",
+                key="dealer_search_text"
+            )
+
+        with filter_col2:
+            status_filter = st.selectbox(
+                "Durum",
+                ["Tümü", "Aktif", "Onay Bekliyor", "Askıda"],
+                key="dealer_status_filter"
+            )
+
+        with filter_col3:
+            type_filter = st.selectbox(
+                "Tür",
+                ["Tümü", "Satıcı", "Üretici"],
+                key="dealer_type_filter"
+            )
+
+        users = get_users(search_text, status_filter, type_filter)
+
+        if not users:
+            st.info("Kayıtlı bayi veya üretici bulunamadı.")
+            return
+
+        user_options = {}
+        for u in users:
+            user_id = u[0]
+            company = u[1] or "İsimsiz Firma"
+            email = u[2] or "E-posta yok"
+            user_type = u[4] or "Satıcı"
+            approved = u[6]
+            label = f"{company} | {email} | {user_type} | {status_plain(approved)}"
+            user_options[label] = user_id
+
+        if "selected_dealer_id" not in st.session_state:
+            st.session_state.selected_dealer_id = users[0][0]
+
+        available_ids = [u[0] for u in users]
+        if st.session_state.selected_dealer_id not in available_ids:
+            st.session_state.selected_dealer_id = users[0][0]
+
+        current_label = None
+        for label, user_id in user_options.items():
+            if user_id == st.session_state.selected_dealer_id:
+                current_label = label
+                break
+
+        if current_label is None:
+            current_label = list(user_options.keys())[0]
+
+        selected_label = st.selectbox(
+            "Düzenlenecek bayi / üretici",
+            list(user_options.keys()),
+            index=list(user_options.keys()).index(current_label),
+            key="dealer_select_box"
+        )
+
+        selected_user_id = user_options[selected_label]
+
+        if selected_user_id != st.session_state.selected_dealer_id:
+            st.session_state.selected_dealer_id = selected_user_id
             st.rerun()
-            
-        u_id, u_company, u_email, u_phone, u_type, u_approved, u_menus, u_role, u_allowed_cats = target_u[0]
-        
-        st.button(_m("btn_back"), on_click=lambda: st.session_state.update(manage_dealer_id=None))
-        st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-        
-        # İstatistik Hesaplama
-        d_offers = df_offers[df_offers['user_id'] == u_id] if not df_offers.empty else pd.DataFrame()
-        t_count = len(d_offers); t_vol = d_offers['total_price'].sum() if t_count > 0 else 0
-        c_offers = d_offers[d_offers['status'].isin(["Onaylandı", "Siparişe Çevir"])] if t_count > 0 else pd.DataFrame()
-        c_count = len(c_offers); c_vol = c_offers['total_price'].sum() if c_count > 0 else 0
-        
-        status_text = _m("active") if u_approved else _m("pending")
-        badge_html = f"<span class='badge-active'>🟢 {status_text}</span>" if u_approved else f"<span class='badge-suspended'>🔴 {status_text}</span>"
-        try: display_badge = types_display[types_internal.index(u_type)]
-        except: display_badge = u_type
-        r_badge = _m("badge_admin") if u_role == 'admin' else display_badge
-        b_color = "role-admin" if u_role == 'admin' else "role-user"
-        disp_phone = u_phone if u_phone else _m("not_spec")
 
-        # ÜST BAŞLIK VE İSTATİSTİKLER
+        selected_user = get_user_by_id(st.session_state.selected_dealer_id)
+
+        if not selected_user:
+            st.error("Seçili kayıt bulunamadı.")
+            return
+
+        (
+            user_id,
+            company_name,
+            email,
+            phone,
+            user_type,
+            role,
+            is_approved,
+            is_verified,
+            website,
+            address_full,
+            allowed_menus,
+            allowed_categories,
+            logo_path,
+        ) = selected_user
+
+        status_css = "dealer-status-active"
+        if int(is_approved or 0) == 0:
+            status_css = "dealer-status-wait"
+        elif int(is_approved or 0) == -1:
+            status_css = "dealer-status-suspended"
+
         st.markdown(f"""
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; color:#0f172a; font-weight:900;">{u_company}</h2>
-                {badge_html}
-            </div>
-            <div style="font-size:15px; color:#64748b; margin-top:5px;">
-                <span class="{b_color}">{r_badge}</span> &nbsp;|&nbsp; 📧 {u_email} &nbsp;|&nbsp; 📞 {disp_phone}
-            </div>
-            <div class='stats-bar'>
-                <div class='stat-box'><div class='stat-lbl'>{_m('tot_offer')}</div><div class='stat-val'>{t_count}</div></div>
-                <div class='stat-box'><div class='stat-lbl'>{_m('tot_vol')}</div><div class='stat-val blue'>{t_vol:,.0f}</div></div>
-                <div class='stat-box'><div class='stat-lbl'>{_m('conv_offer')}</div><div class='stat-val'>{c_count}</div></div>
-                <div class='stat-box'><div class='stat-lbl'>{_m('conv_vol')}</div><div class='stat-val green'>{c_vol:,.0f}</div></div>
-            </div>
+        <div class="dealer-user-box">
+            <div class="dealer-user-name">{html.escape(company_name or "İsimsiz Firma")}</div>
+            <div class="dealer-user-meta">{html.escape(email or "")}</div>
+            <div class="dealer-user-meta">{html.escape(phone or "")}</div>
+            <div class="{status_css}">{status_text(is_approved)}</div>
+        </div>
         """, unsafe_allow_html=True)
 
-        # BİLGİLERİ DÜZENLE FORMU
-        with st.container(border=True):
-            st.markdown(f"<h4 style='margin-top:0; color:#1e293b;'>{_m('edit_auth')}</h4>", unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            n_comp = c1.text_input(_m("comp_name"), value=u_company)
-            idx_type = types_internal.index(u_type) if u_type in types_internal else 0
-            sel_type = c2.selectbox(_m("act_type"), types_display, index=idx_type)
-            n_type_int = types_internal[types_display.index(sel_type)]
-            
-            n_email = c1.text_input(_m("email"), value=u_email)
-            n_phone = c2.text_input(_m("phone"), value=u_phone if u_phone else "")
+        edit_col, action_col = st.columns([2, 1], gap="large")
 
-            n_cats_str = ""
-            if n_type_int == "Satıcı (Bayi)":
-                st.markdown("<hr style='margin:15px 0; border-top:1px dashed #e2e8f0;'>", unsafe_allow_html=True)
-                st.markdown(f"<div style='font-size:13px; font-weight:800; color:#ea580c; margin-bottom:5px;'>{_m('cat_title')}</div>", unsafe_allow_html=True)
-                cur_cats = [x.strip() for x in str(u_allowed_cats).split(",")] if u_allowed_cats else all_categories
-                sel_cats = st.multiselect(_m("cat_help"), options=all_categories, default=[c for c in cur_cats if c in all_categories])
-                n_cats_str = ",".join(sel_cats)
-            
-            st.markdown("<hr style='margin:15px 0; border-top:1px dashed #e2e8f0;'>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;'>{_m('menu_title')}</div>", unsafe_allow_html=True)
-            menu_options = {"m_dash": _m("m_dash"), "m_new": _m("m_new"), "m_cust": _m("m_cust"), "m_past": _m("m_past"), "m_order": _m("m_order"), "m_model": _m("m_model"), "m_deal": _m("m_deal"), "m_prof": _m("m_prof")}
-            cur_menus = u_menus.split(',') if u_menus is not None else list(menu_options.keys())
-            
-            sel_menus = []
-            m_cols = st.columns(4)
-            for idx, (k, v) in enumerate(menu_options.items()):
-                with m_cols[idx % 4]:
-                    if st.checkbox(v, value=(k in cur_menus), key=f"chk_{k}"): sel_menus.append(k)
-            
-            n_menus_str = ",".join(sel_menus)
-            n_role = "admin" if n_type_int == "Yönetici" else ("manufacturer" if n_type_int == "Üretici" else "dealer")
-            
-            st.write("")
-            col_space, col_save = st.columns([3, 2])
-            if col_save.button(_m("btn_update"), type="primary", use_container_width=True):
-                conn_u = sqlite3.connect('users.db')
-                conn_u.execute("UPDATE users SET company_name=?, user_type=?, email=?, phone=?, allowed_menus=?, role=?, allowed_categories=? WHERE id=?", (n_comp, n_type_int, n_email, n_phone, n_menus_str, n_role, n_cats_str, u_id))
-                conn_u.commit(); conn_u.close()
-                st.toast(f"{n_comp} {_m('toast_upd')}"); st.rerun()
+        # =============================================================
+        # BİLGİ DÜZENLEME
+        # =============================================================
+        with edit_col:
+            st.markdown("""
+            <div class="dealer-card">
+                <div class="dealer-section-title">📌 Bayi / Üretici Bilgileri</div>
+                <div class="dealer-small-text">Buradaki bilgiler güncellendiğinde veritabanına kaydedilir ve ekran yenilenir.</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # HESAP AKSİYONLARI (ASKIYA AL / SİL)
-        st.write("")
-        if u_id == st.session_state.get('user_id'):
-            st.info(_m("err_self"))
-        else:
-            ca1, ca2, ca3 = st.columns([2, 1, 1])
-            with ca2:
-                if u_approved:
-                    if st.button(_m("btn_sus"), use_container_width=True):
-                        conn_a = sqlite3.connect('users.db'); conn_a.execute("UPDATE users SET is_approved=0 WHERE id=?", (u_id,)); conn_a.commit(); conn_a.close(); st.rerun()
+            company_name_input = st.text_input(
+                "Firma Adı",
+                value=company_name or "",
+                key=f"company_name_{user_id}"
+            )
+
+            email_input = st.text_input(
+                "E-posta",
+                value=email or "",
+                key=f"email_{user_id}"
+            )
+
+            phone_input = st.text_input(
+                "Telefon",
+                value=phone or "",
+                key=f"phone_{user_id}"
+            )
+
+            type_values = ["Satıcı", "Üretici"]
+            current_type = "Üretici" if str(user_type).strip() == "Üretici" else "Satıcı"
+
+            user_type_input = st.selectbox(
+                "Kullanıcı Türü",
+                type_values,
+                index=type_values.index(current_type),
+                key=f"user_type_{user_id}"
+            )
+
+            status_values = ["Aktif", "Onay Bekliyor", "Askıda"]
+
+            if int(is_approved or 0) == 1:
+                current_status = "Aktif"
+            elif int(is_approved or 0) == -1:
+                current_status = "Askıda"
+            else:
+                current_status = "Onay Bekliyor"
+
+            status_input = st.selectbox(
+                "Hesap Durumu",
+                status_values,
+                index=status_values.index(current_status),
+                key=f"status_{user_id}"
+            )
+
+            is_verified_input = st.checkbox(
+                "E-posta doğrulanmış kabul edilsin",
+                value=bool(is_verified),
+                key=f"verified_{user_id}"
+            )
+
+            website_input = st.text_input(
+                "Web Sitesi",
+                value=website or "",
+                placeholder="https://www.firma.com",
+                key=f"website_{user_id}"
+            )
+
+            address_input = st.text_area(
+                "Adres",
+                value=address_full or "",
+                height=110,
+                key=f"address_{user_id}"
+            )
+
+            logo_path_input = st.text_input(
+                "Logo Dosya Yolu",
+                value=logo_path or "",
+                placeholder="images/logo.png",
+                key=f"logo_path_{user_id}"
+            )
+
+            logo_preview = get_base64_image(logo_path_input)
+            if logo_preview and logo_preview.startswith("data:image"):
+                st.image(logo_preview, caption="Logo Önizleme", width=220)
+
+            st.markdown("""
+            <div class="dealer-preview">
+                <div class="dealer-preview-title">Anlık Bilgi Önizleme</div>
+            """, unsafe_allow_html=True)
+
+            st.markdown(f"""
+                <div class="dealer-preview-line"><b>Firma:</b> {html.escape(company_name_input or "-")}</div>
+                <div class="dealer-preview-line"><b>E-posta:</b> {html.escape(email_input or "-")}</div>
+                <div class="dealer-preview-line"><b>Telefon:</b> {html.escape(phone_input or "-")}</div>
+                <div class="dealer-preview-line"><b>Tür:</b> {html.escape(user_type_input)}</div>
+                <div class="dealer-preview-line"><b>Durum:</b> {html.escape(status_input)}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("### 🔑 Menü İzinleri")
+
+            current_menu_labels = labels_from_allowed_menus(allowed_menus)
+            selected_menu_labels = []
+
+            menu_cols = st.columns(2)
+
+            for i, (code, label) in enumerate(MENU_OPTIONS):
+                with menu_cols[i % 2]:
+                    checked = label in current_menu_labels
+                    if st.checkbox(label, value=checked, key=f"menu_{user_id}_{code}"):
+                        selected_menu_labels.append(label)
+
+            if not selected_menu_labels:
+                st.warning("En az bir menü izni seçilmelidir.")
+
+            st.markdown("### 🗂️ Kategori İzinleri")
+
+            all_categories = get_all_categories()
+
+            selected_categories = []
+
+            if all_categories:
+                current_categories = categories_from_allowed(allowed_categories, all_categories)
+
+                cat_all = st.checkbox(
+                    "Tüm kategorilere izin ver",
+                    value=(not allowed_categories or len(current_categories) == len(all_categories)),
+                    key=f"all_categories_{user_id}"
+                )
+
+                if cat_all:
+                    selected_categories = all_categories
+                    st.info("Bu kullanıcı tüm ürün kategorilerini görebilir.")
                 else:
-                    if st.button(_m("btn_app"), type="primary", use_container_width=True):
-                        conn_a = sqlite3.connect('users.db'); conn_a.execute("UPDATE users SET is_approved=1 WHERE id=?", (u_id,)); conn_a.commit(); conn_a.close(); st.rerun()
-            with ca3:
-                if st.button(_m("btn_del"), use_container_width=True):
-                    conn_a = sqlite3.connect('users.db'); conn_a.execute("DELETE FROM users WHERE id=?", (u_id,)); conn_a.commit(); conn_a.close()
-                    st.session_state.manage_dealer_id = None; st.rerun()
+                    cat_cols = st.columns(2)
 
-    # =========================================================
-    # GÖRÜNÜM 1: LİSTE SAYFASI (1 SAYFADA 10 BAYİ)
-    # =========================================================
-    else:
-        st.header(_m("title"))
-        search_query = st.text_input(_m("search_ph"))
-        st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
-        
-        if not users: st.info(_m("no_user")); return
-            
-        if search_query:
-            search_query = search_query.lower()
-            users = [u for u in users if search_query in str(u[1]).lower() or search_query in str(u[2]).lower() or search_query in str(u[3]).lower()]
-            if not users: st.warning(_m("no_match")); return
+                    for i, cat in enumerate(all_categories):
+                        with cat_cols[i % 2]:
+                            checked = cat in current_categories
+                            if st.checkbox(cat, value=checked, key=f"cat_{user_id}_{cat}"):
+                                selected_categories.append(cat)
+            else:
+                st.info("Sistemde kategori bulunmadığı için kategori izni seçilemiyor.")
 
-        # SAYFALAMA (PAGINATION) MANTIĞI
-        ITEMS_PER_PAGE = 10
-        total_pages = math.ceil(len(users) / ITEMS_PER_PAGE)
-        
-        if st.session_state.dealer_page > total_pages: st.session_state.dealer_page = total_pages
-        if st.session_state.dealer_page < 1: st.session_state.dealer_page = 1
-            
-        start_idx = (st.session_state.dealer_page - 1) * ITEMS_PER_PAGE
-        end_idx = start_idx + ITEMS_PER_PAGE
-        current_users = users[start_idx:end_idx]
+            save_clicked = st.button(
+                "💾 BİLGİLERİ GÜNCELLE",
+                type="primary",
+                use_container_width=True,
+                key=f"save_dealer_{user_id}"
+            )
 
-        # LİSTE BAŞLIKLARI
-        cl1, cl2, cl3, cl4 = st.columns([3, 3, 2, 2])
-        cl1.caption("FİRMA BİLGİSİ"); cl2.caption("İLETİŞİM"); cl3.caption("DURUM"); cl4.caption("İŞLEM")
-        st.markdown("<hr style='margin:0 0 10px 0; border-top:2px solid #e2e8f0;'>", unsafe_allow_html=True)
-
-        # LİSTE SATIRLARI
-        for u in current_users:
-            u_id, u_company, u_email, u_phone, u_type, u_approved, u_menus, u_role, u_allowed_cats = u
-            
-            try: display_badge = types_display[types_internal.index(u_type)]
-            except: display_badge = u_type
-            r_badge = _m("badge_admin") if u_role == 'admin' else display_badge
-            b_color = "role-admin" if u_role == 'admin' else "role-user"
-            
-            s_text = _m("active") if u_approved else _m("pending")
-            b_html = f"<span class='badge-active'>🟢 {s_text}</span>" if u_approved else f"<span class='badge-suspended'>🔴 {s_text}</span>"
-
-            with st.container():
-                c1, c2, c3, c4 = st.columns([3, 3, 2, 2], vertical_alignment="center")
-                c1.markdown(f"<div class='list-col'><b style='color:#0f172a; font-size:15px;'>{u_company}</b><span class='{b_color}'>{r_badge}</span></div>", unsafe_allow_html=True)
-                c2.markdown(f"<div class='list-col' style='font-size:13px; color:#475569;'>{u_email}<br>{u_phone if u_phone else '-'}</div>", unsafe_allow_html=True)
-                c3.markdown(f"<div class='list-col'>{b_html}</div>", unsafe_allow_html=True)
-                if c4.button(_m("btn_manage"), key=f"manage_{u_id}", use_container_width=True):
-                    st.session_state.manage_dealer_id = u_id
+            if save_clicked:
+                if not company_name_input.strip():
+                    st.session_state.dealer_flash_error = "Firma adı boş bırakılamaz."
                     st.rerun()
-                st.markdown("<hr style='margin:5px 0; border-top:1px solid #f1f5f9;'>", unsafe_allow_html=True)
 
-        # SAYFALAMA KONTROLLERİ (ALT KISIM)
-        if total_pages > 1:
-            st.write("")
-            cp1, cp2, cp3 = st.columns([1, 2, 1])
-            with cp2:
-                page_opts = [i for i in range(1, total_pages + 1)]
-                new_page = st.selectbox(f"{_m('page')} Seçimi (Toplam: {total_pages})", options=page_opts, index=(st.session_state.dealer_page - 1), label_visibility="collapsed")
-                if new_page != st.session_state.dealer_page:
-                    st.session_state.dealer_page = new_page
+                if not email_input.strip():
+                    st.session_state.dealer_flash_error = "E-posta boş bırakılamaz."
                     st.rerun()
+
+                if not selected_menu_labels:
+                    st.session_state.dealer_flash_error = "En az bir menü izni seçmelisiniz."
+                    st.rerun()
+
+                new_role = "manufacturer" if user_type_input == "Üretici" else "dealer"
+
+                if status_input == "Aktif":
+                    new_status = 1
+                elif status_input == "Askıda":
+                    new_status = -1
+                else:
+                    new_status = 0
+
+                new_allowed_menus = normalize_allowed_menus(selected_menu_labels)
+                new_allowed_categories = ",".join(selected_categories) if selected_categories else ""
+
+                ok, msg = update_user_info(
+                    user_id=user_id,
+                    company_name=company_name_input.strip(),
+                    email=email_input.strip().lower(),
+                    phone=phone_input.strip(),
+                    user_type=user_type_input,
+                    role=new_role,
+                    is_approved=new_status,
+                    is_verified=1 if is_verified_input else 0,
+                    website=website_input.strip(),
+                    address_full=address_input.strip(),
+                    allowed_menus=new_allowed_menus,
+                    allowed_categories=new_allowed_categories,
+                    logo_path=logo_path_input.strip(),
+                )
+
+                if ok:
+                    st.session_state.selected_dealer_id = user_id
+                    st.session_state.dealer_flash_success = "✅ Bilgiler güncellendi ve kayıt ekranda yenilendi."
+                    refresh_admin_login_token(user_id)
+                else:
+                    st.session_state.dealer_flash_error = msg
+
+                st.rerun()
+
+        # =============================================================
+        # SAĞ İŞLEMLER
+        # =============================================================
+        with action_col:
+            st.markdown("""
+            <div class="dealer-card">
+                <div class="dealer-section-title">⚙️ Hızlı İşlemler</div>
+                <div class="dealer-small-text">Hesabı onaylayabilir, askıya alabilir, silebilir veya bu hesapla sisteme giriş yapabilirsiniz.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if int(is_approved or 0) == 1:
+                st.success("Bu hesap aktif.")
+            elif int(is_approved or 0) == -1:
+                st.error("Bu hesap askıda.")
+            else:
+                st.warning("Bu hesap onay bekliyor.")
+
+            # =========================================================
+            # ADMIN OLARAK BAYİ / ÜRETİCİ HESABINA GİRİŞ
+            # =========================================================
+            st.markdown("#### 🔑 Hesaba Gir")
+
+            admin_login_url = get_or_create_admin_login_url(user_id)
+
+            if admin_login_url:
+                login_label = "Bu Üretici Olarak Sisteme Gir" if str(user_type).strip() == "Üretici" else "Bu Bayi Olarak Sisteme Gir"
+
+                st.markdown(f"""
+                <a
+                    class="impersonate-link"
+                    href="{html.escape(admin_login_url)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    🔑 {html.escape(login_label)}
+                </a>
+                """, unsafe_allow_html=True)
+
+                st.markdown("""
+                <div class="impersonate-note">
+                    Bu buton yeni sekme açar. Açılan sekmede seçili bayi / üretici hesabıyla giriş yapılır.
+                    Mevcut yönetici ekranınız kapanmaz.
+                </div>
+                """, unsafe_allow_html=True)
+
+                if st.button("🔄 Giriş Linkini Yenile", use_container_width=True, key=f"refresh_admin_login_{user_id}"):
+                    refresh_admin_login_token(user_id)
+                    st.session_state.dealer_flash_success = "🔄 Yeni giriş linki oluşturuldu."
+                    st.rerun()
+            else:
+                st.error("Bu kullanıcı için giriş linki oluşturulamadı.")
+
+            st.markdown("---")
+
+            if st.button("✅ Aktif Et / Onayla", use_container_width=True, key=f"activate_{user_id}"):
+                activate_user(user_id)
+                refresh_admin_login_token(user_id)
+                st.session_state.dealer_flash_success = "✅ Hesap aktif edildi."
+                st.rerun()
+
+            if st.button("🚫 Askıya Al", use_container_width=True, key=f"suspend_{user_id}"):
+                suspend_user(user_id)
+                st.session_state.dealer_flash_success = "🚫 Hesap askıya alındı."
+                st.rerun()
+
+            st.markdown("---")
+
+            st.markdown("#### 🔐 Şifre Değiştir")
+
+            new_password = st.text_input(
+                "Yeni Şifre",
+                type="password",
+                key=f"password_{user_id}",
+                placeholder="Yeni şifre girin"
+            )
+
+            if st.button("🔐 ŞİFREYİ GÜNCELLE", use_container_width=True, key=f"change_password_{user_id}"):
+                if len(new_password.strip()) < 4:
+                    st.session_state.dealer_flash_error = "Şifre en az 4 karakter olmalıdır."
+                else:
+                    change_user_password(user_id, new_password.strip())
+                    refresh_admin_login_token(user_id)
+                    st.session_state.dealer_flash_success = "🔐 Şifre başarıyla güncellendi."
+                st.rerun()
+
+            st.markdown("---")
+
+            confirm_delete = st.checkbox(
+                "Bu kaydı silmek istediğimi onaylıyorum",
+                key=f"confirm_delete_{user_id}"
+            )
+
+            if st.button("🗑️ Sil", use_container_width=True, key=f"delete_{user_id}"):
+                if confirm_delete:
+                    delete_user(user_id)
+                    st.session_state.selected_dealer_id = None
+                    st.session_state.dealer_flash_success = "🗑️ Kayıt silindi."
+                    st.rerun()
+                else:
+                    st.session_state.dealer_flash_error = "Silmek için önce onay kutusunu işaretleyin."
+                    st.rerun()
+
+        # =============================================================
+        # TABLO ÖZETİ
+        # =============================================================
+        st.markdown("---")
+        st.markdown("### 📋 Kayıt Özeti")
+
+        refreshed_users = get_users(search_text, status_filter, type_filter)
+
+        table_rows = []
+        for u in refreshed_users:
+            table_rows.append({
+                "ID": u[0],
+                "Firma": u[1] or "",
+                "E-posta": u[2] or "",
+                "Telefon": u[3] or "",
+                "Tür": u[4] or "",
+                "Durum": status_plain(u[6]),
+                "Web": u[8] or "",
+            })
+
+        df = pd.DataFrame(table_rows)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+    # =================================================================
+    # YENİ KAYIT
+    # =================================================================
+    with tabs[1]:
+        st.markdown("""
+        <div class="dealer-card">
+            <div class="dealer-section-title">➕ Yeni Bayi / Üretici Oluştur</div>
+            <div class="dealer-small-text">Yeni kayıt aktif ve doğrulanmış olarak oluşturulur.</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        new_col1, new_col2 = st.columns(2)
+
+        with new_col1:
+            new_company = st.text_input("Firma Adı *", key="new_dealer_company")
+            new_email = st.text_input("E-posta *", key="new_dealer_email")
+            new_phone = st.text_input("Telefon", key="new_dealer_phone")
+
+        with new_col2:
+            new_type = st.selectbox("Kullanıcı Türü", ["Satıcı", "Üretici"], key="new_dealer_type")
+            new_password = st.text_input("Geçici Şifre *", type="password", key="new_dealer_password")
+            new_password_again = st.text_input("Geçici Şifre Tekrar *", type="password", key="new_dealer_password_again")
+
+        if st.button("➕ YENİ KAYIT OLUŞTUR", type="primary", use_container_width=True):
+            if not new_company.strip():
+                st.session_state.dealer_flash_error = "Firma adı zorunludur."
+                st.rerun()
+
+            if not new_email.strip():
+                st.session_state.dealer_flash_error = "E-posta zorunludur."
+                st.rerun()
+
+            if not new_password.strip():
+                st.session_state.dealer_flash_error = "Şifre zorunludur."
+                st.rerun()
+
+            if new_password != new_password_again:
+                st.session_state.dealer_flash_error = "Şifreler eşleşmiyor."
+                st.rerun()
+
+            ok, msg = create_user(
+                company_name=new_company.strip(),
+                email=new_email.strip().lower(),
+                phone=new_phone.strip(),
+                password=new_password.strip(),
+                user_type=new_type
+            )
+
+            if ok:
+                st.session_state.dealer_flash_success = "✅ Yeni kayıt oluşturuldu."
+            else:
+                st.session_state.dealer_flash_error = msg
+
+            st.rerun()
