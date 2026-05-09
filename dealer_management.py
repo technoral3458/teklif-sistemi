@@ -20,13 +20,13 @@ FACTORY_DB = "factory_data.db"
 
 MENU_OPTIONS = [
     ("m_dash", "📊 Dashboard"),
+    ("m_new", "📝 Yeni Teklif Hazırla"),
+    ("m_cust", "👥 Müşterilerim"),
+    ("m_past", "📋 Geçmiş Tekliflerim"),
     ("m_order", "📦 Siparişler"),
-    ("m_new", "📝 Yeni Teklif"),
-    ("m_model", "📦 Modeller"),
-    ("m_cust", "👥 Müşteriler"),
-    ("m_deal", "🏢 Bayiler"),
-    ("m_past", "📋 Geçmiş Teklifler"),
-    ("m_prof", "⚙️ Ayarlar"),
+    ("m_prof", "⚙️ Profil Ayarlarım"),
+    ("m_deal", "🏢 Bayi Yönetimi"),
+    ("m_model", "📦 Tüm Modelleri Yönet"),
 ]
 
 DEFAULT_DEALER_MENUS = "m_dash,m_new,m_cust,m_past,m_order,m_prof"
@@ -35,12 +35,12 @@ DEFAULT_DEALER_MENUS = "m_dash,m_new,m_cust,m_past,m_order,m_prof"
 # =====================================================================
 # YARDIMCI FONKSİYONLAR
 # =====================================================================
-def hash_password(password):
-    return hashlib.sha256(str(password).encode()).hexdigest()
-
-
 def get_conn(db_path):
     return sqlite3.connect(db_path, check_same_thread=False)
+
+
+def hash_password(password):
+    return hashlib.sha256(str(password).encode()).hexdigest()
 
 
 def get_base64_image(path):
@@ -181,7 +181,10 @@ def ensure_factory_tables():
 def get_app_base_url():
     try:
         host = st.context.headers.get("Host", "")
-        proto = st.context.headers.get("X-Forwarded-Proto", "https")
+        proto = st.context.headers.get("X-Forwarded-Proto", "")
+
+        if not proto:
+            proto = "https"
 
         if host:
             return f"{proto}://{host}"
@@ -195,6 +198,7 @@ def create_admin_login_token(target_user_id):
     ensure_users_table()
 
     token = str(uuid.uuid4())
+
     admin_id = st.session_state.get("user_id")
     admin_email = st.session_state.get("user_email", "")
 
@@ -304,6 +308,7 @@ def get_all_categories():
     conn.close()
 
     clean_categories = []
+
     for c in categories:
         c = str(c).strip()
         if c and c not in clean_categories:
@@ -373,6 +378,7 @@ def get_user_by_id(user_id):
     ensure_users_table()
 
     conn = get_conn(USERS_DB)
+
     row = conn.execute("""
         SELECT
             id,
@@ -391,6 +397,7 @@ def get_user_by_id(user_id):
         FROM users
         WHERE id=?
     """, (user_id,)).fetchone()
+
     conn.close()
 
     return row
@@ -450,6 +457,7 @@ def update_user_info(
 
         conn.commit()
         conn.close()
+
         return True, "Bilgiler başarıyla güncellendi."
 
     except sqlite3.IntegrityError:
@@ -498,6 +506,7 @@ def create_user(company_name, email, phone, password, user_type):
 
         conn.commit()
         conn.close()
+
         return True, "Yeni bayi / üretici başarıyla oluşturuldu."
 
     except sqlite3.IntegrityError:
@@ -560,10 +569,12 @@ def normalize_allowed_menus(selected_labels):
 
 def labels_from_allowed_menus(allowed_menus):
     allowed_codes = []
+
     if allowed_menus:
         allowed_codes = [x.strip() for x in str(allowed_menus).split(",") if x.strip()]
 
     labels = []
+
     for code, label in MENU_OPTIONS:
         if code in allowed_codes:
             labels.append(label)
@@ -589,6 +600,7 @@ def status_text(value):
         return "✅ Aktif"
     if value == -1:
         return "⛔ Askıda"
+
     return "⏳ Onay Bekliyor"
 
 
@@ -602,6 +614,7 @@ def status_plain(value):
         return "Aktif"
     if value == -1:
         return "Askıda"
+
     return "Onay Bekliyor"
 
 
@@ -629,6 +642,17 @@ def inject_css():
         color: #fee2e2;
         font-size: 14px;
         font-weight: 600;
+    }
+
+    .dealer-version {
+        background: #ecfeff;
+        color: #155e75;
+        border: 1px solid #a5f3fc;
+        border-radius: 14px;
+        padding: 10px 14px;
+        font-size: 12px;
+        font-weight: 800;
+        margin-bottom: 16px;
     }
 
     .dealer-card {
@@ -826,19 +850,23 @@ def render_flash_messages():
     if "dealer_flash_success" in st.session_state and st.session_state.dealer_flash_success:
         msg = st.session_state.dealer_flash_success
         st.success(msg)
+
         try:
             st.toast(msg, icon="✅")
         except Exception:
             pass
+
         st.session_state.dealer_flash_success = ""
 
     if "dealer_flash_error" in st.session_state and st.session_state.dealer_flash_error:
         msg = st.session_state.dealer_flash_error
         st.error(msg)
+
         try:
             st.toast(msg, icon="❌")
         except Exception:
             pass
+
         st.session_state.dealer_flash_error = ""
 
 
@@ -863,10 +891,16 @@ def show_dealer_management():
     </div>
     """, unsafe_allow_html=True)
 
+    st.markdown("""
+    <div class="dealer-version">
+        ✅ Güncel dealer_management.py çalışıyor. Bu sürümde “Bu Bayi / Üretici Olarak Sisteme Gir” butonu vardır.
+    </div>
+    """, unsafe_allow_html=True)
+
     tabs = st.tabs(["👥 Bayi / Üretici Listesi", "➕ Yeni Kayıt"])
 
     # =================================================================
-    # BAYİ LİSTESİ
+    # BAYİ / ÜRETİCİ LİSTESİ
     # =================================================================
     with tabs[0]:
         filter_col1, filter_col2, filter_col3 = st.columns([2, 1, 1])
@@ -899,6 +933,7 @@ def show_dealer_management():
             return
 
         user_options = {}
+
         for u in users:
             user_id = u[0]
             company = u[1] or "İsimsiz Firma"
@@ -912,10 +947,12 @@ def show_dealer_management():
             st.session_state.selected_dealer_id = users[0][0]
 
         available_ids = [u[0] for u in users]
+
         if st.session_state.selected_dealer_id not in available_ids:
             st.session_state.selected_dealer_id = users[0][0]
 
         current_label = None
+
         for label, user_id in user_options.items():
             if user_id == st.session_state.selected_dealer_id:
                 current_label = label
@@ -960,6 +997,7 @@ def show_dealer_management():
         ) = selected_user
 
         status_css = "dealer-status-active"
+
         if int(is_approved or 0) == 0:
             status_css = "dealer-status-wait"
         elif int(is_approved or 0) == -1:
@@ -977,7 +1015,7 @@ def show_dealer_management():
         edit_col, action_col = st.columns([2, 1], gap="large")
 
         # =============================================================
-        # BİLGİ DÜZENLEME
+        # SOL TARAF: BİLGİ DÜZENLEME
         # =============================================================
         with edit_col:
             st.markdown("""
@@ -1059,6 +1097,7 @@ def show_dealer_management():
             )
 
             logo_preview = get_base64_image(logo_path_input)
+
             if logo_preview and logo_preview.startswith("data:image"):
                 st.image(logo_preview, caption="Logo Önizleme", width=220)
 
@@ -1086,6 +1125,7 @@ def show_dealer_management():
             for i, (code, label) in enumerate(MENU_OPTIONS):
                 with menu_cols[i % 2]:
                     checked = label in current_menu_labels
+
                     if st.checkbox(label, value=checked, key=f"menu_{user_id}_{code}"):
                         selected_menu_labels.append(label)
 
@@ -1095,7 +1135,6 @@ def show_dealer_management():
             st.markdown("### 🗂️ Kategori İzinleri")
 
             all_categories = get_all_categories()
-
             selected_categories = []
 
             if all_categories:
@@ -1116,6 +1155,7 @@ def show_dealer_management():
                     for i, cat in enumerate(all_categories):
                         with cat_cols[i % 2]:
                             checked = cat in current_categories
+
                             if st.checkbox(cat, value=checked, key=f"cat_{user_id}_{cat}"):
                                 selected_categories.append(cat)
             else:
@@ -1171,15 +1211,15 @@ def show_dealer_management():
 
                 if ok:
                     st.session_state.selected_dealer_id = user_id
-                    st.session_state.dealer_flash_success = "✅ Bilgiler güncellendi ve kayıt ekranda yenilendi."
                     refresh_admin_login_token(user_id)
+                    st.session_state.dealer_flash_success = "✅ Bilgiler güncellendi ve kayıt ekranda yenilendi."
                 else:
                     st.session_state.dealer_flash_error = msg
 
                 st.rerun()
 
         # =============================================================
-        # SAĞ İŞLEMLER
+        # SAĞ TARAF: HIZLI İŞLEMLER
         # =============================================================
         with action_col:
             st.markdown("""
@@ -1196,9 +1236,6 @@ def show_dealer_management():
             else:
                 st.warning("Bu hesap onay bekliyor.")
 
-            # =========================================================
-            # ADMIN OLARAK BAYİ / ÜRETİCİ HESABINA GİRİŞ
-            # =========================================================
             st.markdown("#### 🔑 Hesaba Gir")
 
             admin_login_url = get_or_create_admin_login_url(user_id)
@@ -1219,7 +1256,7 @@ def show_dealer_management():
 
                 st.markdown("""
                 <div class="impersonate-note">
-                    Bu buton yeni sekme açar. Açılan sekmede seçili bayi / üretici hesabıyla giriş yapılır.
+                    Bu buton yeni sekme açar. Açılan sekmede seçili bayi / üretici hesabıyla otomatik giriş yapılır.
                     Mevcut yönetici ekranınız kapanmaz.
                 </div>
                 """, unsafe_allow_html=True)
@@ -1262,6 +1299,7 @@ def show_dealer_management():
                     change_user_password(user_id, new_password.strip())
                     refresh_admin_login_token(user_id)
                     st.session_state.dealer_flash_success = "🔐 Şifre başarıyla güncellendi."
+
                 st.rerun()
 
             st.markdown("---")
@@ -1290,6 +1328,7 @@ def show_dealer_management():
         refreshed_users = get_users(search_text, status_filter, type_filter)
 
         table_rows = []
+
         for u in refreshed_users:
             table_rows.append({
                 "ID": u[0],
