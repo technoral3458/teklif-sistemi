@@ -1,45 +1,294 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+import html
 
 # =====================================================================
-# SABİT LİSTELER (ÜLKE VE ŞEHİRLER)
+# SABİT LİSTELER
 # =====================================================================
 COUNTRIES = [
-    "Türkiye", "Almanya", "Amerika Birleşik Devletleri", "Azerbaycan", "Birleşik Arap Emirlikleri", 
-    "Birleşik Krallık", "Bulgaristan", "Çin", "Fransa", "Gürcistan", "Irak", "İngiltere", 
-    "İran", "İspanya", "İtalya", "Japonya", "Katar", "Kosova", "Kuzey Makedonya", "Mısır", 
-    "Özbekistan", "Romanya", "Rusya", "Sırbistan", "Suudi Arabistan", "Yunanistan", "Yurtdışı (Diğer)"
+    "Türkiye", "Almanya", "Amerika Birleşik Devletleri", "Azerbaycan",
+    "Birleşik Arap Emirlikleri", "Birleşik Krallık", "Bulgaristan", "Çin",
+    "Fransa", "Gürcistan", "Irak", "İngiltere", "İran", "İspanya", "İtalya",
+    "Japonya", "Katar", "Kosova", "Kuzey Makedonya", "Mısır", "Özbekistan",
+    "Romanya", "Rusya", "Sırbistan", "Suudi Arabistan", "Yunanistan",
+    "Yurtdışı (Diğer)"
 ]
 
 CITIES = [
-    "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya", "Ankara", "Antalya", "Ardahan", 
-    "Artvin", "Aydın", "Balıkesir", "Bartın", "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", 
-    "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce", "Edirne", 
-    "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", 
-    "Iğdır", "Isparta", "İstanbul", "İzmir", "Kahramanmaraş", "Karabük", "Karaman", "Kars", "Kastamonu", 
-    "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir", "Kilis", "Kocaeli", "Konya", "Kütahya", "Malatya", 
-    "Manisa", "Mardin", "Mersin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", 
-    "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Şanlıurfa", "Şırnak", "Tekirdağ", "Tokat", "Trabzon", 
-    "Tunceli", "Uşak", "Van", "Yalova", "Yozgat", "Zonguldak", "Yurtdışı Şehri (Diğer)"
+    "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya",
+    "Ankara", "Antalya", "Ardahan", "Artvin", "Aydın", "Balıkesir", "Bartın",
+    "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur",
+    "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır",
+    "Düzce", "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir",
+    "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Iğdır",
+    "Isparta", "İstanbul", "İzmir", "Kahramanmaraş", "Karabük", "Karaman",
+    "Kars", "Kastamonu", "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir",
+    "Kilis", "Kocaeli", "Konya", "Kütahya", "Malatya", "Manisa", "Mardin",
+    "Mersin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Osmaniye",
+    "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Şanlıurfa",
+    "Şırnak", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Uşak", "Van",
+    "Yalova", "Yozgat", "Zonguldak", "Yurtdışı Şehri (Diğer)"
 ]
 
-def get_sales(query, params=()):
-    conn = sqlite3.connect('sales_data.db', check_same_thread=False)
-    c = conn.cursor()
-    c.execute(query, params)
-    res = c.fetchall()
-    conn.close()
-    return res
 
-def exec_sales(query, params=()):
-    conn = sqlite3.connect('sales_data.db', check_same_thread=False)
-    c = conn.cursor()
-    c.execute(query, params)
+# =====================================================================
+# CSS
+# =====================================================================
+def inject_customer_css():
+    st.markdown("""
+    <style>
+    .crm-hero {
+        background: linear-gradient(135deg, #0f172a, #2563eb);
+        color: white;
+        border-radius: 24px;
+        padding: 24px;
+        margin-bottom: 18px;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+    }
+
+    .crm-hero h1 {
+        margin: 0;
+        font-size: 30px;
+        font-weight: 900;
+        letter-spacing: -0.5px;
+    }
+
+    .crm-hero p {
+        margin: 8px 0 0 0;
+        color: #dbeafe;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .crm-filter-box {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        padding: 18px;
+        margin-bottom: 16px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+    }
+
+    .crm-count {
+        color: #94a3b8;
+        font-size: 13px;
+        text-align: right;
+        font-weight: 700;
+        margin: 8px 0 12px 0;
+    }
+
+    .crm-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        padding: 18px;
+        margin-bottom: 12px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+    }
+
+    .crm-company {
+        font-size: 18px;
+        font-weight: 900;
+        color: #0f172a;
+        line-height: 1.2;
+        word-break: break-word;
+    }
+
+    .crm-person {
+        font-size: 13px;
+        font-weight: 800;
+        color: #64748b;
+        margin-top: 5px;
+    }
+
+    .crm-line {
+        font-size: 13px;
+        color: #334155;
+        font-weight: 650;
+        line-height: 1.55;
+    }
+
+    .crm-badge {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        font-size: 12px;
+        font-weight: 900;
+        margin-top: 8px;
+    }
+
+    .crm-section-title {
+        font-size: 13px;
+        font-weight: 900;
+        color: #64748b;
+        letter-spacing: .4px;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+    }
+
+    .crm-detail-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+        margin-bottom: 14px;
+    }
+
+    .crm-detail-label {
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+
+    .crm-detail-value {
+        color: #0f172a;
+        font-size: 15px;
+        font-weight: 750;
+        margin-bottom: 14px;
+        word-break: break-word;
+    }
+
+    @media (max-width: 768px) {
+        .crm-hero {
+            padding: 20px;
+            border-radius: 22px;
+        }
+
+        .crm-hero h1 {
+            font-size: 25px !important;
+        }
+
+        .crm-filter-box {
+            padding: 16px;
+            border-radius: 18px;
+        }
+
+        .crm-card {
+            padding: 18px;
+            border-radius: 18px;
+        }
+
+        .crm-company {
+            font-size: 20px;
+        }
+
+        .crm-count {
+            text-align: left;
+            margin-top: 10px;
+        }
+
+        div[data-testid="column"] {
+            width: 100% !important;
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+
+        button {
+            min-height: 46px !important;
+            border-radius: 14px !important;
+            font-weight: 800 !important;
+        }
+
+        input, textarea {
+            font-size: 16px !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+# =====================================================================
+# VERİTABANI
+# =====================================================================
+def ensure_customer_schema():
+    conn = sqlite3.connect("sales_data.db", check_same_thread=False)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_name TEXT,
+            user_id INTEGER DEFAULT 1,
+            country TEXT DEFAULT '',
+            city TEXT DEFAULT '',
+            authorized_person TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            address TEXT DEFAULT '',
+            address_full TEXT DEFAULT '',
+            tax_office TEXT DEFAULT '',
+            tax_id TEXT DEFAULT ''
+        )
+    """)
+
+    cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
+    required_cols = {
+        "company_name": "TEXT DEFAULT ''",
+        "user_id": "INTEGER DEFAULT 1",
+        "country": "TEXT DEFAULT ''",
+        "city": "TEXT DEFAULT ''",
+        "authorized_person": "TEXT DEFAULT ''",
+        "email": "TEXT DEFAULT ''",
+        "phone": "TEXT DEFAULT ''",
+        "address": "TEXT DEFAULT ''",
+        "address_full": "TEXT DEFAULT ''",
+        "tax_office": "TEXT DEFAULT ''",
+        "tax_id": "TEXT DEFAULT ''",
+    }
+
+    for col, typ in required_cols.items():
+        if col not in cols:
+            try:
+                conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {typ}")
+            except Exception:
+                pass
+
     conn.commit()
     conn.close()
 
+
+def get_sales(query, params=()):
+    try:
+        conn = sqlite3.connect("sales_data.db", check_same_thread=False)
+        c = conn.cursor()
+        c.execute(query, params)
+        res = c.fetchall()
+        conn.close()
+        return res
+    except Exception as e:
+        st.error(f"Veritabanı okuma hatası: {e}")
+        return []
+
+
+def exec_sales(query, params=()):
+    try:
+        conn = sqlite3.connect("sales_data.db", check_same_thread=False)
+        c = conn.cursor()
+        c.execute(query, params)
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Veritabanı işlem hatası: {e}")
+        return False
+
+
+def esc(value):
+    return html.escape(str(value if value is not None else ""))
+
+
+# =====================================================================
+# ANA FONKSİYON
+# =====================================================================
 def show_customer_management(user_id, is_admin=False):
+    inject_customer_css()
+    ensure_customer_schema()
+
     if "cust_view" not in st.session_state:
         st.session_state.cust_view = "list"
     if "edit_cust_id" not in st.session_state:
@@ -50,224 +299,322 @@ def show_customer_management(user_id, is_admin=False):
     if st.session_state.cust_view == "list":
         show_list(user_id, is_admin)
     elif st.session_state.cust_view == "add":
-        show_form(user_id, mode="add")
+        show_form(user_id, mode="add", is_admin=is_admin)
     elif st.session_state.cust_view == "edit":
         show_form(user_id, mode="edit", cust_id=st.session_state.edit_cust_id, is_admin=is_admin)
     elif st.session_state.cust_view == "detail":
         show_detail(user_id, st.session_state.detail_cust_id, is_admin)
 
+
+# =====================================================================
+# LİSTE SAYFASI
+# =====================================================================
 def show_list(user_id, is_admin):
-    # Üst Başlık ve Ekleme Butonu
-    c1, c2 = st.columns([4, 1], vertical_alignment="bottom")
-    c1.header("👥 Müşteri Yönetimi (CRM)")
-    if c2.button("➕ YENİ MÜŞTERİ", type="primary", use_container_width=True):
+    st.markdown("""
+    <div class="crm-hero">
+        <h1>👥 Müşteri Yönetimi</h1>
+        <p>Müşterilerinizi daha sade, hızlı ve mobil uyumlu kart yapısıyla yönetin.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if st.button("➕ YENİ MÜŞTERİ EKLE", type="primary", use_container_width=True):
         st.session_state.cust_view = "add"
         st.rerun()
-        
-    st.markdown("---")
-    
-    # Verileri Çekme
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     if is_admin:
-        custs = get_sales("SELECT id, company_name, authorized_person, phone, email, city, country FROM customers ORDER BY id DESC")
+        custs = get_sales("""
+            SELECT id, company_name, authorized_person, phone, email, city, country
+            FROM customers
+            ORDER BY id DESC
+        """)
     else:
-        custs = get_sales("SELECT id, company_name, authorized_person, phone, email, city, country FROM customers WHERE user_id=? ORDER BY id DESC", (user_id,))
-        
+        custs = get_sales("""
+            SELECT id, company_name, authorized_person, phone, email, city, country
+            FROM customers
+            WHERE user_id=?
+            ORDER BY id DESC
+        """, (user_id,))
+
     if not custs:
-        st.info("Sistemde henüz kayıtlı müşteriniz bulunmuyor. Sağ üstten yeni müşteri ekleyebilirsiniz.")
+        st.info("Henüz kayıtlı müşteri bulunmuyor. Yeni müşteri ekleyerek başlayabilirsiniz.")
         return
-        
+
     df = pd.DataFrame(custs, columns=["ID", "Firma Adı", "Yetkili", "Telefon", "E-Posta", "Şehir", "Ülke"])
-    
-    # 🚀 DİNAMİK 3'LÜ FİLTRELEME BÖLÜMÜ 🚀
-    st.markdown("<div style='font-size:13px; font-weight:bold; color:#64748b; margin-bottom:5px;'>HIZLI FİLTRELEME</div>", unsafe_allow_html=True)
-    f_col1, f_col2, f_col3 = st.columns(3)
-    
-    search_term = f_col1.text_input("🔍 Kelime İle Ara", placeholder="Firma veya Yetkili Adı...")
-    
-    # Sadece veritabanında olan benzersiz ülke ve şehirleri filtreye ekle
-    unique_countries = ["Tümü"] + sorted([c for c in df['Ülke'].unique() if c])
-    unique_cities = ["Tümü"] + sorted([c for c in df['Şehir'].unique() if c])
-    
-    selected_country = f_col2.selectbox("🌍 Ülke", options=unique_countries)
-    selected_city = f_col3.selectbox("🏙️ Şehir", options=unique_cities)
 
-    # Filtreleri Uygula
+    st.markdown("<div class='crm-filter-box'>", unsafe_allow_html=True)
+    st.markdown("<div class='crm-section-title'>Hızlı Filtreleme</div>", unsafe_allow_html=True)
+
+    f1, f2, f3 = st.columns(3)
+    search_term = f1.text_input("🔍 Kelime ile ara", placeholder="Firma, yetkili, telefon veya e-posta...")
+    unique_countries = ["Tümü"] + sorted([str(c) for c in df["Ülke"].dropna().unique() if str(c).strip()])
+    unique_cities = ["Tümü"] + sorted([str(c) for c in df["Şehir"].dropna().unique() if str(c).strip()])
+    selected_country = f2.selectbox("🌍 Ülke", options=unique_countries)
+    selected_city = f3.selectbox("🏙️ Şehir", options=unique_cities)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
     if search_term:
-        df = df[df['Firma Adı'].str.contains(search_term, case=False, na=False) | df['Yetkili'].str.contains(search_term, case=False, na=False)]
-    if selected_country != "Tümü":
-        df = df[df['Ülke'] == selected_country]
-    if selected_city != "Tümü":
-        df = df[df['Şehir'] == selected_city]
+        s = search_term.lower().strip()
+        df = df[
+            df["Firma Adı"].astype(str).str.lower().str.contains(s, na=False) |
+            df["Yetkili"].astype(str).str.lower().str.contains(s, na=False) |
+            df["Telefon"].astype(str).str.lower().str.contains(s, na=False) |
+            df["E-Posta"].astype(str).str.lower().str.contains(s, na=False)
+        ]
 
-    st.markdown(f"<div style='font-size:12px; color:#94a3b8; text-align:right; margin-bottom:10px;'>Toplam <b>{len(df)}</b> müşteri listeleniyor.</div>", unsafe_allow_html=True)
+    if selected_country != "Tümü":
+        df = df[df["Ülke"] == selected_country]
+
+    if selected_city != "Tümü":
+        df = df[df["Şehir"] == selected_city]
+
+    st.markdown(f"<div class='crm-count'>Toplam <b>{len(df)}</b> müşteri listeleniyor.</div>", unsafe_allow_html=True)
 
     if df.empty:
         st.warning("Seçtiğiniz filtrelere uygun müşteri bulunamadı.")
         return
 
-    # 🎨 DARALTILMIŞ (KOMPAKT) KART TASARIMI 🎨
-    st.markdown("<style>div[data-testid='stVerticalBlock'] {gap: 0.3rem !important;}</style>", unsafe_allow_html=True)
+    for _, row in df.iterrows():
+        cust_id = int(row["ID"])
+        comp = esc(row["Firma Adı"] or "İsimsiz Firma")
+        auth = esc(row["Yetkili"] or "-")
+        phone = esc(row["Telefon"] or "-")
+        email = esc(row["E-Posta"] or "-")
+        country = esc(row["Ülke"] or "-")
+        city = esc(row["Şehir"] or "-")
 
-    for index, row in df.iterrows():
-        comp = row['Firma Adı'] if row['Firma Adı'] else "İsimsiz Firma"
-        auth = row['Yetkili'] if row['Yetkili'] else "-"
-        phone = row['Telefon'] if row['Telefon'] else "-"
-        email = row['E-Posta'] if row['E-Posta'] else "-"
-        country = row['Ülke'] if row['Ülke'] else "-"
-        city = row['Şehir'] if row['Şehir'] else "-"
+        st.markdown("<div class='crm-card'>", unsafe_allow_html=True)
 
-        with st.container(border=True):
-            col1, col2, col3, col4 = st.columns([3, 2.5, 2, 1.5], vertical_alignment="center")
-            
-            col1.markdown(f"""
-                <div style='line-height:1.2;'>
-                    <div style='font-size:15px; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='{comp}'>🏢 {comp}</div>
-                    <div style='font-size:12px; font-weight:600; color:#64748b; margin-top:2px;'>👤 {auth}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            col2.markdown(f"""
-                <div style='line-height:1.3; font-size:12px; color:#475569;'>
-                    📞 {phone}<br>
-                    ✉️ {email}
-                </div>
-            """, unsafe_allow_html=True)
-            
-            col3.markdown(f"""
-                <div style='line-height:1.3; font-size:12px; color:#334155;'>
-                    🌍 <b>{country}</b><br>
-                    🏙️ {city}
-                </div>
-            """, unsafe_allow_html=True)
-            
-            with col4:
-                bc1, bc2, bc3 = st.columns(3)
-                if bc1.button("👁️", key=f"v_{row['ID']}", help="Detay"):
-                    st.session_state.detail_cust_id = row['ID']
-                    st.session_state.cust_view = "detail"
-                    st.rerun()
-                if bc2.button("✏️", key=f"e_{row['ID']}", help="Düzenle"):
-                    st.session_state.edit_cust_id = row['ID']
-                    st.session_state.cust_view = "edit"
-                    st.rerun()
-                if bc3.button("🗑️", key=f"d_{row['ID']}", help="Sil"):
-                    exec_sales("DELETE FROM customers WHERE id=?", (row['ID'],))
-                    st.rerun()
+        c1, c2 = st.columns([3, 1], vertical_alignment="center")
 
+        with c1:
+            st.markdown(f"""
+                <div class="crm-company">🏢 {comp}</div>
+                <div class="crm-person">👤 {auth}</div>
+                <div class="crm-badge">🌍 {country} / {city}</div>
+                <div style="height:10px;"></div>
+                <div class="crm-line">📞 {phone}</div>
+                <div class="crm-line">✉️ {email}</div>
+            """, unsafe_allow_html=True)
+
+        with c2:
+            b1, b2, b3 = st.columns(3)
+            if b1.button("👁️", key=f"view_customer_{cust_id}", help="Detay", use_container_width=True):
+                st.session_state.detail_cust_id = cust_id
+                st.session_state.cust_view = "detail"
+                st.rerun()
+
+            if b2.button("✏️", key=f"edit_customer_{cust_id}", help="Düzenle", use_container_width=True):
+                st.session_state.edit_cust_id = cust_id
+                st.session_state.cust_view = "edit"
+                st.rerun()
+
+            if b3.button("🗑️", key=f"delete_customer_{cust_id}", help="Sil", use_container_width=True):
+                exec_sales("DELETE FROM customers WHERE id=?", (cust_id,))
+                st.success("Müşteri silindi.")
+                st.rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =====================================================================
+# DETAY SAYFASI
+# =====================================================================
 def show_detail(user_id, cust_id, is_admin):
-    # ADMİN İSE TÜM MÜŞTERİLERİN DETAYINI GÖREBİLME İZNİ + VERGİ BİLGİLERİ EKLENDİ
     if is_admin:
-        c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id FROM customers WHERE id=?", (cust_id,))
+        c_data = get_sales("""
+            SELECT company_name, authorized_person, phone, email, address_full,
+                   country, city, tax_office, tax_id
+            FROM customers
+            WHERE id=?
+        """, (cust_id,))
     else:
-        c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id FROM customers WHERE id=? AND user_id=?", (cust_id, user_id))
-        
+        c_data = get_sales("""
+            SELECT company_name, authorized_person, phone, email, address_full,
+                   country, city, tax_office, tax_id
+            FROM customers
+            WHERE id=? AND user_id=?
+        """, (cust_id, user_id))
+
     if not c_data:
-        st.error("Müşteri bulunamadı!")
+        st.error("Müşteri bulunamadı.")
         if st.button("🔙 Listeye Dön", type="primary"):
             st.session_state.cust_view = "list"
             st.rerun()
         return
-        
+
     c_info = c_data[0]
-    
-    col_back, col_title = st.columns([1, 5], vertical_alignment="center")
-    if col_back.button("🔙 Listeye Dön", use_container_width=True):
+
+    if st.button("🔙 Listeye Dön", use_container_width=True):
         st.session_state.cust_view = "list"
         st.rerun()
-        
-    col_title.header(f"🏢 {c_info[0]}")
-    st.markdown("---")
-    
-    # 🎨 ŞIK PROFİL KARTI
-    st.markdown("<div style='font-size:14px; font-weight:800; color:#2563eb; margin-bottom:10px;'>MÜŞTERİ BİLGİ KARTI</div>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1.container(border=True):
-        st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>YETKİLİ KİŞİ</div><div style='font-size:16px; font-weight:700; color:#0f172a; margin-bottom:15px;'>{c_info[1] or '-'}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>TELEFON</div><div style='font-size:15px; color:#1e293b; margin-bottom:15px;'>📞 {c_info[2] or '-'}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>E-POSTA</div><div style='font-size:15px; color:#1e293b; margin-bottom:15px;'>✉️ {c_info[3] or '-'}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>VERGİ BİLGİLERİ</div><div style='font-size:15px; color:#1e293b;'>🏢 {c_info[7] or '-'} / {c_info[8] or '-'}</div>", unsafe_allow_html=True)
 
-    with c2.container(border=True):
-        st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>LOKASYON</div><div style='font-size:15px; font-weight:700; color:#0f172a; margin-bottom:15px;'>🌍 {c_info[5] or '-'} / {c_info[6] or '-'}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='color:#64748b; font-size:12px; font-weight:bold;'>AÇIK ADRES</div><div style='font-size:14px; color:#334155; line-height:1.5;'>{c_info[4] or 'Adres girilmemiş.'}</div>", unsafe_allow_html=True)
-        
-    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:14px; font-weight:800; color:#ea580c; margin-bottom:10px;'>📋 BU MÜŞTERİYE AİT TEKLİFLER</div>", unsafe_allow_html=True)
-    
-    offers = get_sales("SELECT id, total_price, status, offer_date FROM offers WHERE customer_id=? ORDER BY id DESC", (cust_id,))
+    company = esc(c_info[0] or "İsimsiz Firma")
+
+    st.markdown(f"""
+    <div class="crm-hero">
+        <h1>🏢 {company}</h1>
+        <p>Müşteri bilgi kartı ve geçmiş teklif kayıtları.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    d1, d2 = st.columns(2)
+
+    with d1:
+        st.markdown("<div class='crm-detail-card'>", unsafe_allow_html=True)
+        detail_item("Yetkili Kişi", f"👤 {c_info[1] or '-'}")
+        detail_item("Telefon", f"📞 {c_info[2] or '-'}")
+        detail_item("E-Posta", f"✉️ {c_info[3] or '-'}")
+        detail_item("Vergi Bilgileri", f"🏢 {c_info[7] or '-'} / {c_info[8] or '-'}")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with d2:
+        st.markdown("<div class='crm-detail-card'>", unsafe_allow_html=True)
+        detail_item("Lokasyon", f"🌍 {c_info[5] or '-'} / {c_info[6] or '-'}")
+        detail_item("Açık Adres", c_info[4] or "Adres girilmemiş.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='crm-section-title'>📋 Bu müşteriye ait teklifler</div>", unsafe_allow_html=True)
+
+    offers = get_sales("""
+        SELECT id, total_price, status, offer_date
+        FROM offers
+        WHERE customer_id=?
+        ORDER BY id DESC
+    """, (cust_id,))
+
     if offers:
-        df_offers = pd.DataFrame(offers, columns=["Teklif No", "Tutar (USD/EUR/TL)", "Durum", "Tarih"])
+        df_offers = pd.DataFrame(offers, columns=["Teklif No", "Tutar", "Durum", "Tarih"])
         df_offers["Teklif No"] = df_offers["Teklif No"].apply(lambda x: f"TR-{x}")
         st.dataframe(df_offers, use_container_width=True, hide_index=True)
     else:
         st.info("Bu müşteriye ait geçmiş teklif veya sipariş kaydı bulunmuyor.")
 
+
+def detail_item(label, value):
+    st.markdown(f"""
+        <div class="crm-detail-label">{esc(label)}</div>
+        <div class="crm-detail-value">{esc(value)}</div>
+    """, unsafe_allow_html=True)
+
+
+# =====================================================================
+# EKLE / DÜZENLE FORMU
+# =====================================================================
 def show_form(user_id, mode="add", cust_id=None, is_admin=False):
-    col_back, col_title = st.columns([1, 5], vertical_alignment="center")
-    if col_back.button("🔙 Listeye Dön", use_container_width=True):
+    if st.button("🔙 Listeye Dön", use_container_width=True):
         st.session_state.cust_view = "list"
         st.rerun()
-        
-    col_title.header("✏️ Müşteri Kartını Düzenle" if mode=="edit" else "➕ Sisteme Yeni Müşteri Ekle")
-    st.markdown("---")
-    
+
+    title = "✏️ Müşteri Kartını Düzenle" if mode == "edit" else "➕ Yeni Müşteri Ekle"
+
+    st.markdown(f"""
+    <div class="crm-hero">
+        <h1>{title}</h1>
+        <p>Firma, iletişim, vergi ve lokasyon bilgilerini düzenleyin.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
     if mode == "edit" and cust_id:
         if is_admin:
-            c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id FROM customers WHERE id=?", (cust_id,))
+            c_data = get_sales("""
+                SELECT company_name, authorized_person, phone, email, address_full,
+                       country, city, tax_office, tax_id
+                FROM customers
+                WHERE id=?
+            """, (cust_id,))
         else:
-            c_data = get_sales("SELECT company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id FROM customers WHERE id=? AND user_id=?", (cust_id, user_id))
-        
+            c_data = get_sales("""
+                SELECT company_name, authorized_person, phone, email, address_full,
+                       country, city, tax_office, tax_id
+                FROM customers
+                WHERE id=? AND user_id=?
+            """, (cust_id, user_id))
+
         if not c_data:
-            st.error("Müşteri bulunamadı!")
+            st.error("Müşteri bulunamadı.")
             return
-        c_info = c_data[0]
+
+        c_info = list(c_data[0])
     else:
         c_info = ["", "", "", "", "", "", "", "", ""]
-        
-    with st.form("cust_form"):
-        st.markdown("<div style='font-size:14px; font-weight:800; color:#2563eb; margin-bottom:15px;'>MÜŞTERİ İLETİŞİM BİLGİLERİ</div>", unsafe_allow_html=True)
-        
+
+    with st.form("customer_form"):
+        st.markdown("<div class='crm-section-title'>Firma Bilgileri</div>", unsafe_allow_html=True)
+
         c1, c2 = st.columns(2)
-        f_comp = c1.text_input("Firma Adı *", value=c_info[0], placeholder="Örn: ABC Makine Ltd. Şti.")
-        f_auth = c2.text_input("Yetkili Kişi *", value=c_info[1], placeholder="Ad Soyad giriniz...")
-        
-        c_tax1, c_tax2 = st.columns(2)
-        f_tax_office = c_tax1.text_input("Vergi Dairesi", value=c_info[7], placeholder="Örn: İlyasbey V.D.")
-        f_tax_id = c_tax2.text_input("Vergi Numarası / TC", value=c_info[8], placeholder="Örn: 1234567890")
-        
+        f_comp = c1.text_input("Firma Adı *", value=c_info[0] or "", placeholder="Örn: ABC Makine Ltd. Şti.")
+        f_auth = c2.text_input("Yetkili Kişi *", value=c_info[1] or "", placeholder="Ad Soyad")
+
         c3, c4 = st.columns(2)
-        f_phone = c3.text_input("Telefon", value=c_info[2], placeholder="+90 5XX...")
-        f_email = c4.text_input("E-Posta", value=c_info[3], placeholder="info@firma.com")
-        
-        st.markdown("<div style='font-size:14px; font-weight:800; color:#2563eb; margin-top:20px; margin-bottom:15px;'>LOKASYON BİLGİLERİ</div>", unsafe_allow_html=True)
+        f_tax_office = c3.text_input("Vergi Dairesi", value=c_info[7] or "", placeholder="Örn: İlyasbey V.D.")
+        f_tax_id = c4.text_input("Vergi Numarası / TC", value=c_info[8] or "", placeholder="Örn: 1234567890")
+
+        st.markdown("<div class='crm-section-title'>İletişim Bilgileri</div>", unsafe_allow_html=True)
+
         c5, c6 = st.columns(2)
-        
-        c_opts = list(COUNTRIES)
-        if c_info[5] and c_info[5] not in c_opts: c_opts.insert(0, c_info[5])
-        
-        city_opts = list(CITIES)
-        if c_info[6] and c_info[6] not in city_opts: city_opts.insert(0, c_info[6])
+        f_phone = c5.text_input("Telefon", value=c_info[2] or "", placeholder="+90 5XX...")
+        f_email = c6.text_input("E-Posta", value=c_info[3] or "", placeholder="info@firma.com")
 
-        idx_c = c_opts.index(c_info[5]) if c_info[5] in c_opts else None
-        idx_city = city_opts.index(c_info[6]) if c_info[6] in city_opts else None
+        st.markdown("<div class='crm-section-title'>Lokasyon Bilgileri</div>", unsafe_allow_html=True)
 
-        f_country = c5.selectbox("Ülke *", options=c_opts, index=idx_c, placeholder="Aramak için yazın veya seçin...")
-        f_city = c6.selectbox("Şehir *", options=city_opts, index=idx_city, placeholder="Aramak için yazın veya seçin...")
-        
-        f_addr = st.text_area("Açık Adres", value=c_info[4], height=100, placeholder="Faturada görünecek tam adres...")
-        
-        st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
-        if st.form_submit_button("💾 BİLGİLERİ KAYDET", type="primary", use_container_width=True):
+        country_options = list(COUNTRIES)
+        city_options = list(CITIES)
+
+        if c_info[5] and c_info[5] not in country_options:
+            country_options.insert(0, c_info[5])
+
+        if c_info[6] and c_info[6] not in city_options:
+            city_options.insert(0, c_info[6])
+
+        country_index = country_options.index(c_info[5]) if c_info[5] in country_options else 0
+        city_index = city_options.index(c_info[6]) if c_info[6] in city_options else 0
+
+        c7, c8 = st.columns(2)
+        f_country = c7.selectbox("Ülke *", options=country_options, index=country_index)
+        f_city = c8.selectbox("Şehir *", options=city_options, index=city_index)
+
+        f_addr = st.text_area("Açık Adres", value=c_info[4] or "", height=110, placeholder="Faturada görünecek tam adres...")
+
+        submitted = st.form_submit_button("💾 BİLGİLERİ KAYDET", type="primary", use_container_width=True)
+
+        if submitted:
             if not f_comp.strip() or not f_auth.strip() or not f_country or not f_city:
-                st.error("Lütfen yıldızlı (*) zorunlu alanları (Firma, Yetkili, Ülke, Şehir) eksiksiz doldurunuz!")
+                st.error("Firma, yetkili, ülke ve şehir alanları zorunludur.")
+                return
+
+            if mode == "add":
+                ok = exec_sales("""
+                    INSERT INTO customers (
+                        company_name, authorized_person, phone, email, address_full,
+                        country, city, tax_office, tax_id, user_id
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    f_comp.strip(), f_auth.strip(), f_phone.strip(), f_email.strip(),
+                    f_addr.strip(), f_country, f_city, f_tax_office.strip(),
+                    f_tax_id.strip(), user_id
+                ))
+
+                if ok:
+                    st.success("Müşteri başarıyla eklendi.")
+
             else:
-                if mode == "add":
-                    exec_sales("INSERT INTO customers (company_name, authorized_person, phone, email, address_full, country, city, tax_office, tax_id, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)", 
-                              (f_comp.strip(), f_auth.strip(), f_phone.strip(), f_email.strip(), f_addr.strip(), f_country, f_city, f_tax_office.strip(), f_tax_id.strip(), user_id))
-                    st.success("Müşteri başarıyla eklendi!")
-                else:
-                    exec_sales("UPDATE customers SET company_name=?, authorized_person=?, phone=?, email=?, address_full=?, country=?, city=?, tax_office=?, tax_id=? WHERE id=?", 
-                              (f_comp.strip(), f_auth.strip(), f_phone.strip(), f_email.strip(), f_addr.strip(), f_country, f_city, f_tax_office.strip(), f_tax_id.strip(), cust_id))
-                    st.success("Müşteri bilgileri güncellendi!")
-                st.session_state.cust_view = "list"
-                st.rerun()
+                ok = exec_sales("""
+                    UPDATE customers
+                    SET company_name=?, authorized_person=?, phone=?, email=?,
+                        address_full=?, country=?, city=?, tax_office=?, tax_id=?
+                    WHERE id=?
+                """, (
+                    f_comp.strip(), f_auth.strip(), f_phone.strip(), f_email.strip(),
+                    f_addr.strip(), f_country, f_city, f_tax_office.strip(),
+                    f_tax_id.strip(), cust_id
+                ))
+
+                if ok:
+                    st.success("Müşteri bilgileri güncellendi.")
+
+            st.session_state.cust_view = "list"
+            st.rerun()
