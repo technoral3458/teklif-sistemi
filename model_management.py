@@ -5,436 +5,1092 @@ import base64
 import uuid
 from PIL import Image
 
-# =====================================================================
-# 🛠️ ÖLÜMSÜZ VERİTABANI MOTORU (SADE VE NET)
-# =====================================================================
+FACTORY_DB = "factory_data.db"
+
+
+# ============================================================
+# VERİTABANI YARDIMCILARI
+# ============================================================
+def get_connection():
+    conn = sqlite3.connect(FACTORY_DB, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 def db_query(query, params=()):
     try:
-        conn = sqlite3.connect('factory_data.db', check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute(query, params)
-        res = c.fetchall()
-        conn.close()
-        return [dict(row) for row in res]
-    except:
+        with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            return [dict(row) for row in rows]
+    except Exception as e:
+        st.error(f"Veritabanı okuma hatası: {e}")
         return []
+
 
 def exec_factory(query, params=()):
     try:
-        conn = sqlite3.connect('factory_data.db')
-        c = conn.cursor(); c.execute(query, params); conn.commit(); conn.close()
+        with sqlite3.connect(FACTORY_DB, check_same_thread=False) as conn:
+            cur = conn.cursor()
+            cur.execute(query, params)
+            conn.commit()
         return True
     except Exception as e:
-        st.error(f"İşlem Hatası: {e}")
+        st.error(f"Veritabanı işlem hatası: {e}")
         return False
+
+
+def ensure_column(table_name, column_name, column_type):
+    try:
+        with sqlite3.connect(FACTORY_DB, check_same_thread=False) as conn:
+            cur = conn.cursor()
+            cols = [c[1] for c in cur.execute(f"PRAGMA table_info({table_name})").fetchall()]
+            if column_name not in cols:
+                cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+                conn.commit()
+    except Exception as e:
+        st.error(f"Kolon onarım hatası ({table_name}.{column_name}): {e}")
+
+
+def ensure_database_schema():
+    try:
+        with sqlite3.connect(FACTORY_DB, check_same_thread=False) as conn:
+            cur = conn.cursor()
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE,
+                    image_path TEXT DEFAULT ''
+                )
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS models (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT,
+                    base_price REAL DEFAULT 0.0,
+                    image_path TEXT DEFAULT '',
+                    specs TEXT DEFAULT '',
+                    currency TEXT DEFAULT 'USD',
+                    port_discount REAL DEFAULT 0.0,
+                    compatible_options TEXT DEFAULT '',
+                    gallery_images TEXT DEFAULT '',
+                    category TEXT DEFAULT 'Diğer Makinalar',
+                    gallery_videos TEXT DEFAULT '',
+                    name_zh TEXT DEFAULT '',
+                    specs_zh TEXT DEFAULT '',
+                    user_id INTEGER DEFAULT 1
+                )
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS options (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    opt_name TEXT,
+                    opt_desc TEXT DEFAULT '',
+                    opt_price REAL DEFAULT 0.0,
+                    opt_image TEXT DEFAULT '',
+                    sort_order INTEGER DEFAULT 0,
+                    allow_qty INTEGER DEFAULT 1,
+                    opt_name_zh TEXT DEFAULT '',
+                    opt_desc_zh TEXT DEFAULT '',
+                    opt_suffix TEXT DEFAULT '',
+                    opt_variant_image TEXT DEFAULT '',
+                    user_id INTEGER DEFAULT 1
+                )
+            """)
+
+            conn.commit()
+
+    except Exception as e:
+        st.error(f"Veritabanı tablo onarım hatası: {e}")
+
+    model_cols = [
+        ("name", "TEXT DEFAULT ''"),
+        ("base_price", "REAL DEFAULT 0.0"),
+        ("image_path", "TEXT DEFAULT ''"),
+        ("specs", "TEXT DEFAULT ''"),
+        ("currency", "TEXT DEFAULT 'USD'"),
+        ("port_discount", "REAL DEFAULT 0.0"),
+        ("compatible_options", "TEXT DEFAULT ''"),
+        ("gallery_images", "TEXT DEFAULT ''"),
+        ("category", "TEXT DEFAULT 'Diğer Makinalar'"),
+        ("gallery_videos", "TEXT DEFAULT ''"),
+        ("name_zh", "TEXT DEFAULT ''"),
+        ("specs_zh", "TEXT DEFAULT ''"),
+        ("user_id", "INTEGER DEFAULT 1"),
+    ]
+
+    option_cols = [
+        ("opt_name", "TEXT DEFAULT ''"),
+        ("opt_desc", "TEXT DEFAULT ''"),
+        ("opt_price", "REAL DEFAULT 0.0"),
+        ("opt_image", "TEXT DEFAULT ''"),
+        ("sort_order", "INTEGER DEFAULT 0"),
+        ("allow_qty", "INTEGER DEFAULT 1"),
+        ("opt_name_zh", "TEXT DEFAULT ''"),
+        ("opt_desc_zh", "TEXT DEFAULT ''"),
+        ("opt_suffix", "TEXT DEFAULT ''"),
+        ("opt_variant_image", "TEXT DEFAULT ''"),
+        ("user_id", "INTEGER DEFAULT 1"),
+    ]
+
+    category_cols = [
+        ("name", "TEXT DEFAULT ''"),
+        ("image_path", "TEXT DEFAULT ''"),
+    ]
+
+    for col, col_type in model_cols:
+        ensure_column("models", col, col_type)
+
+    for col, col_type in option_cols:
+        ensure_column("options", col, col_type)
+
+    for col, col_type in category_cols:
+        ensure_column("categories", col, col_type)
+
+
+def safe_float(value, default=0.0):
+    try:
+        return float(value if value is not None else default)
+    except Exception:
+        return default
+
+
+def safe_int(value, default=0):
+    try:
+        return int(value if value is not None else default)
+    except Exception:
+        return default
+
 
 def get_safe(row, key, default=""):
     if row and key in row and row[key] is not None:
         return row[key]
     return default
 
-# =====================================================================
-# RESİM YARDIMCILARI
-# =====================================================================
+
+ensure_database_schema()
+
+
+# ============================================================
+# GÖRSEL YARDIMCILARI
+# ============================================================
+def ensure_images_folder():
+    if not os.path.exists("images"):
+        os.makedirs("images")
+
+
 def get_image_base64(img_path):
-    if not img_path: return ""
-    paths = [img_path, f"images/{img_path}"]
-    for p in paths:
-        if os.path.exists(p) and os.path.isfile(p):
-            with open(p, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-                ext = os.path.splitext(p)[1].lower().replace('.', '')
-                return f"data:image/{ext if ext else 'png'};base64,{b64}"
+    if not img_path:
+        return ""
+
+    img_path = str(img_path).strip()
+    possible_paths = [
+        img_path,
+        os.path.join("images", img_path),
+        os.path.basename(img_path),
+        os.path.join("images", os.path.basename(img_path)),
+    ]
+
+    for path in possible_paths:
+        if os.path.exists(path) and os.path.isfile(path):
+            try:
+                with open(path, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode()
+
+                ext = os.path.splitext(path)[1].lower().replace(".", "")
+                if not ext:
+                    ext = "png"
+                if ext == "jpg":
+                    ext = "jpeg"
+
+                return f"data:image/{ext};base64,{b64}"
+            except Exception as e:
+                st.warning(f"Görsel okunamadı: {e}")
+                return ""
+
     return ""
 
-def process_image(uploaded_file, prefix="img", size=(1200, 1200), square=True):
-    if not os.path.exists("images"): os.makedirs("images")
+
+def process_image(uploaded_file, prefix="img", size=(1200, 1200), square=False):
+    if uploaded_file is None:
+        return ""
+
+    ensure_images_folder()
+
     try:
         img = Image.open(uploaded_file)
-        if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+
         if square:
-            width, height = img.size; new_size = min(width, height)
-            img = img.crop(((width - new_size)/2, (height - new_size)/2, (width + new_size)/2, (height + new_size)/2)).resize(size, Image.Resampling.LANCZOS)
-        else: img.thumbnail(size, Image.Resampling.LANCZOS)
-        filename = f"{prefix}_{uuid.uuid4().hex[:8]}.jpg"
-        img.save(os.path.join("images", filename), "JPEG", quality=95)
-        return filename
-    except: return ""
-
-# =====================================================================
-# ÇOKLU DİL
-# =====================================================================
-try:
-    from deep_translator import GoogleTranslator
-    TRANSLATOR_READY = True
-except ImportError:
-    TRANSLATOR_READY = False
-
-def auto_translate_to_tr(text):
-    if not TRANSLATOR_READY or not text or not str(text).strip(): return text
-    try: return GoogleTranslator(source='auto', target='tr').translate(str(text))
-    except: return text
-
-DICT_MODEL = {
-    "tr": {
-        "m_title": "📦 Fabrika Veritabanı Yönetimi", "t_mod": "📦 Modeller (Vitrin)", "t_opt": "⚙️ Donanımlar", "t_cat": "📂 Kategoriler",
-        "reg_mach": "Kayıtlı Makineler", "add_mach": "➕ YENİ MAKİNE EKLE", "no_img": "Görsel Yok", "price_wait": "Fiyat Bekleniyor", "no_auth_price": "🔒 Fiyat Gizli",
-        "opt_showcase": "Ekstra Donanımlar", "add_opt": "➕ YENİ DONANIM EKLE", "cat_mng": "Kategori Yönetimi", "new_cat": "Yeni Kategori Adı...", "btn_add": "➕ Ekle",
-        "back_list": "🔙 Listeye Dön", "edit_mach": "✏️ Makine Düzenleyici", "new_mach": "✨ Makine Kartı Oluştur",
-        "tab_gen": "📄 Genel Bilgiler", "tab_tech": "⚙️ Teknik Özellikler", "tab_comp": "🔌 Uyumlu Donanımlar",
-        "m_name": "Makine Adı *", "m_cat": "Kategori", "dom_price": "Fiyat *", "currency": "Para Birimi", "port_disc": "İskonto (%)",
-        "main_img": "Ana Görsel", "img_prev": "**Görsel Önizleme**", "spec_title": "Özellik Başlığı", "spec_det": "Özellik Detayı", "choose_img": "Resim Seç",
-        "add_spec": "➕ YENİ ÖZELLİK SATIRI EKLE", "save_changes": "💾 DEĞİŞİKLİKLERİ KAYDET", "add_sys": "💾 SİSTEME EKLE",
-        "edit_opt_title": "✏️ Donanım Düzenle", "new_opt_title": "✨ Yeni Donanım Ekle",
-        "opt_name": "Donanım Adı *", "opt_price": "Fiyat *", "allow_qty": "Bu donanım için adet seçilebilir", "opt_desc": "Açıklama", "opt_img_up": "Donanım Görseli",
-        "opt_suffix": "Model Adı Eki (Suffix)", "opt_v_img": "Varyasyon Ana Resmi", "opt_suffix_help": "💡 Örn: L, -PRO vb."
-    }
-}
-def _m(key): return DICT_MODEL.get(st.session_state.get("lang", "tr").lower(), DICT_MODEL["tr"]).get(key, key)
-
-# =====================================================================
-# YÖNLENDİRME
-# =====================================================================
-def show_product_management():
-    if "view_mode" not in st.session_state: st.session_state.view_mode = "list"
-    user_role = st.session_state.get("user_role", "dealer")
-    
-    if st.session_state.view_mode == "list": show_list_view(user_role)
-    elif st.session_state.view_mode == "mod_add": show_form_view("add", None, user_role)
-    elif st.session_state.view_mode == "mod_edit": show_form_view("edit", st.session_state.get("edit_mod_id"), user_role)
-    elif st.session_state.view_mode == "opt_add": show_opt_form_view("add", None, user_role)
-    elif st.session_state.view_mode == "opt_edit": show_opt_form_view("edit", st.session_state.get("edit_opt_id"), user_role)
-
-# =====================================================================
-# LİSTELEME EKRANI (PANDAS KALDIRILDI, KOPYALA BUTONU EKLENDİ)
-# =====================================================================
-def show_list_view(user_role):
-    st.header(_m("m_title"))
-    tab_mod, tab_opt, tab_cat = st.tabs([_m("t_mod"), _m("t_opt"), _m("t_cat")])
-    user_id = st.session_state.get("user_id", 1)
-    
-    with tab_mod:
-        c1, c2 = st.columns([5, 3])
-        c1.subheader(_m("reg_mach"))
-        if c2.button(_m("add_mach"), type="primary", use_container_width=True):
-            st.session_state.view_mode = "mod_add"; st.rerun()
-
-        q_ext = " WHERE user_id=?" if user_role == "manufacturer" else ""
-        p_ext = (user_id,) if user_role == "manufacturer" else ()
-        
-        mods = db_query("SELECT * FROM models" + q_ext + " ORDER BY category ASC, name ASC", p_ext)
-            
-        if mods:
-            # Saf Python Gruplama (Hataya yer yok)
-            cats_dict = {}
-            for m in mods:
-                c = m.get('category')
-                if not c: c = "Diğer Makinalar"
-                if c not in cats_dict: cats_dict[c] = []
-                cats_dict[c].append(m)
-
-            for cat, cat_mods in cats_dict.items():
-                with st.expander(f"📁 {cat}", expanded=True):
-                    for i in range(0, len(cat_mods), 4):
-                        cols = st.columns(4)
-                        for j in range(4):
-                            if i + j < len(cat_mods):
-                                row = cat_mods[i + j]
-                                d_name = row.get('name_zh') if user_role == "manufacturer" and row.get('name_zh') else row.get('name')
-                                m_id = int(row.get('id'))
-                                
-                                with cols[j].container(border=True):
-                                    img_b64 = get_image_base64(row.get('image_path'))
-                                    if img_b64: st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:150px; object-fit:contain; margin-bottom:15px;"></div>', unsafe_allow_html=True)
-                                    else: st.markdown(f"<div style='height:150px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>{_m('no_img')}</div>", unsafe_allow_html=True)
-                                    
-                                    st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{d_name}</h4>", unsafe_allow_html=True)
-                                    
-                                    if user_role == "manufacturer": st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('no_auth_price')}</div>", unsafe_allow_html=True)
-                                    else: st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row.get('base_price',0):,.2f} {row.get('currency','USD')}</div>", unsafe_allow_html=True)
-                                        
-                                    bc1, bc2, bc3 = st.columns(3)
-                                    if bc1.button("✏️", key=f"me_{m_id}", use_container_width=True, help="Düzenle"):
-                                        st.session_state.edit_mod_id = m_id; st.session_state.view_mode = "mod_edit"; st.rerun()
-                                    if bc2.button("📄", key=f"mc_{m_id}", use_container_width=True, help="Kopyala"):
-                                        c_data = db_query("SELECT * FROM models WHERE id=?", (m_id,))
-                                        if c_data:
-                                            cd = c_data[0]
-                                            exec_factory("""INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path, user_id) 
-                                                            VALUES (?,?,?,?,?,?,?,?,?,?,?)""", 
-                                                         (get_safe(cd,'name','') + " (Kopya)", get_safe(cd,'name_zh',''), get_safe(cd,'category',''), get_safe(cd,'base_price',0.0), get_safe(cd,'currency','USD'), get_safe(cd,'specs',''), get_safe(cd,'specs_zh',''), get_safe(cd,'compatible_options',''), get_safe(cd,'port_discount',0.0), get_safe(cd,'image_path',''), user_id))
-                                        st.rerun()
-                                    if bc3.button("🗑️", key=f"md_{m_id}", use_container_width=True, help="Sil"):
-                                        exec_factory("DELETE FROM models WHERE id=?", (m_id,))
-                                        st.rerun()
-        else: st.info("Sistemde makine bulunmuyor.")
-
-    with tab_opt:
-        c1, c2 = st.columns([5, 3])
-        c1.subheader(_m("opt_showcase"))
-        if c2.button(_m("add_opt"), type="primary", use_container_width=True):
-            st.session_state.view_mode = "opt_add"; st.rerun()
-        
-        opts = db_query("SELECT * FROM options" + q_ext + " ORDER BY id DESC", p_ext)
-            
-        if opts:
-            for i in range(0, len(opts), 4):
-                cols = st.columns(4)
-                for j in range(4):
-                    if i + j < len(opts):
-                        o = opts[i+j]
-                        o_id = int(o.get('id'))
-                        d_name = o.get('opt_name_zh') if user_role == "manufacturer" and o.get('opt_name_zh') else o.get('opt_name')
-                        with cols[j].container(border=True):
-                            img_b64 = get_image_base64(o.get('opt_image'))
-                            if img_b64: st.markdown(f'<img src="{img_b64}" style="width:100%; height:120px; object-fit:contain; margin-bottom:10px;">', unsafe_allow_html=True)
-                            else: st.markdown(f"<div style='height:120px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:12px; margin-bottom:15px;'>{_m('no_img')}</div>", unsafe_allow_html=True)
-                            
-                            st.markdown(f"<b style='color:#0f172a;'>{d_name}</b>", unsafe_allow_html=True)
-                            if o.get('opt_suffix') or o.get('opt_variant_image'):
-                                st.markdown(f"<div style='font-size:11px; color:#2563eb; font-weight:bold; margin-top:3px;'>✨ Akıllı Varyasyon</div>", unsafe_allow_html=True)
-                            
-                            if user_role == "manufacturer": st.caption(_m("no_auth_price"))
-                            else: st.markdown(f"<div style='color:#ea580c; font-weight:bold; margin-top:5px;'>+{o.get('opt_price',0):,.0f} USD</div>", unsafe_allow_html=True)
-                            
-                            bc1, bc2, bc3 = st.columns(3)
-                            if bc1.button("✏️", key=f"oe_{o_id}", use_container_width=True, help="Düzenle"):
-                                st.session_state.edit_opt_id = o_id; st.session_state.view_mode = "opt_edit"; st.rerun()
-                            if bc2.button("📄", key=f"oc_{o_id}", use_container_width=True, help="Kopyala"):
-                                c_data = db_query("SELECT * FROM options WHERE id=?", (o_id,))
-                                if c_data:
-                                    cd = c_data[0]
-                                    exec_factory("""INSERT INTO options (opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty, opt_name_zh, opt_desc_zh, opt_suffix, opt_variant_image, user_id) 
-                                                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""", 
-                                                 (get_safe(cd,'opt_name','') + " (Kopya)", get_safe(cd,'opt_desc',''), get_safe(cd,'opt_price',0.0), get_safe(cd,'opt_image',''), get_safe(cd,'sort_order',0), get_safe(cd,'allow_qty',1), get_safe(cd,'opt_name_zh',''), get_safe(cd,'opt_desc_zh',''), get_safe(cd,'opt_suffix',''), get_safe(cd,'opt_variant_image',''), user_id))
-                                st.rerun()
-                            if bc3.button("🗑️", key=f"od_{o_id}", use_container_width=True, help="Sil"):
-                                exec_factory("DELETE FROM options WHERE id=?", (o_id,))
-                                st.rerun()
-        else: st.info("Sistemde donanım bulunmuyor.")
-
-    with tab_cat:
-        st.subheader(_m("cat_mng"))
-        with st.form("new_cat_form", clear_on_submit=True):
-            n_cat = st.text_input(_m("new_cat"))
-            if st.form_submit_button(_m("btn_add")) and n_cat.strip():
-                exec_factory("INSERT INTO categories (name) VALUES (?)", (n_cat.strip(),)); st.rerun()
-        cats = db_query("SELECT * FROM categories ORDER BY name ASC")
-        for c in cats:
-            with st.container(border=True):
-                c1, c2 = st.columns([4, 1])
-                c1.write(f"📁 {c.get('name')}")
-                if c2.button("🗑️ Sil", key=f"del_cat_{c.get('id')}", use_container_width=True):
-                    exec_factory("DELETE FROM categories WHERE id=?", (c.get('id'),)); st.rerun()
-
-# =====================================================================
-# MAKİNE DÜZENLEME FORMU 
-# =====================================================================
-def show_form_view(mode="add", mod_id=None, user_role="dealer"):
-    col_back, col_title = st.columns([1, 5], vertical_alignment="center")
-    if col_back.button(_m("back_list"), use_container_width=True): st.session_state.view_mode = "list"; st.rerun()
-    st.header(_m("edit_mach") if mode == "edit" else _m("new_mach"))
-    st.markdown("---")
-
-    cats_db_raw = db_query("SELECT name FROM categories")
-    cats_db = [c.get('name') for c in cats_db_raw] if cats_db_raw else ["Diğer Makinalar"]
-
-    r = {}
-    if mode == "edit" and mod_id is not None:
-        r_list = db_query("SELECT * FROM models WHERE id=?", (int(mod_id),))
-        if not r_list: st.error("Kayıt veritabanında bulunamadı."); st.stop()
-        r = r_list[0]
-
-    f_name = r.get("name_zh", "") if user_role == "manufacturer" and r.get("name_zh") else r.get("name", "")
-    f_price = float(r.get("base_price", 0.0) or 0.0)
-    f_curr = r.get("currency", "USD") or "USD"
-    f_cat = r.get("category", cats_db[0]) or cats_db[0]
-    f_disc = float(r.get("port_discount", 0.0) or 0.0)
-    f_img = r.get("image_path", "") or ""
-    
-    f_opts_raw = str(r.get("compatible_options", ""))
-    f_opts = [x.strip() for x in f_opts_raw.split(",") if x.strip()]
-    
-    s_list = []
-    t_specs = str(r.get("specs_zh", "") if user_role == "manufacturer" and r.get("specs_zh") else r.get("specs", ""))
-    if t_specs:
-        for item in t_specs.split("||"):
-            if item.strip():
-                p = item.split("|")
-                s_t = p[0].strip() if len(p) > 0 else ""
-                s_d = p[1].strip() if len(p) > 1 else ""
-                s_i = p[2].strip() if len(p) > 2 else ""
-                s_list.append({"title": s_t, "detail": s_d, "img": s_i})
-    if not s_list: s_list = [{"title": "", "detail": "", "img": ""}]
-    
-    if "f_specs" not in st.session_state or st.session_state.get("cur_mod_id") != mod_id:
-        st.session_state.f_specs = s_list
-        st.session_state.cur_mod_id = mod_id
-
-    t1, t2, t3 = st.tabs([_m("tab_gen"), _m("tab_tech"), _m("tab_comp")])
-    
-    with t1:
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            new_name = st.text_input(_m("m_name"), value=f_name)
-            new_cat = st.selectbox(_m("m_cat"), cats_db, index=cats_db.index(f_cat) if f_cat in cats_db else 0)
-            
-            cp1, cp2 = st.columns([3, 1])
-            new_price = cp1.number_input(_m("dom_price"), value=f_price, step=100.0)
-            new_curr = cp2.selectbox(_m("currency"), ["USD", "EUR", "TRY"], index=["USD", "EUR", "TRY"].index(f_curr) if f_curr in ["USD", "EUR", "TRY"] else 0)
-            new_disc = st.number_input(_m("port_disc"), value=f_disc, max_value=100.0)
-            new_img_up = st.file_uploader(_m("main_img"), type=['png','jpg','jpeg'])
-            
-        with c2:
-            st.markdown(_m("img_prev"))
-            if new_img_up: st.image(new_img_up, use_container_width=True)
-            else:
-                prev_img = get_image_base64(f_img)
-                if prev_img: st.markdown(f'<img src="{prev_img}" style="width:100%; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-
-    with t2:
-        for i in range(len(st.session_state.f_specs)):
-            with st.container(border=True):
-                col_t, col_d, col_i, col_x = st.columns([3, 4, 3, 1], vertical_alignment="bottom")
-                st.session_state.f_specs[i]["title"] = col_t.text_input(_m("spec_title"), value=st.session_state.f_specs[i]["title"], key=f"t_{i}")
-                st.session_state.f_specs[i]["detail"] = col_d.text_input(_m("spec_det"), value=st.session_state.f_specs[i]["detail"], key=f"d_{i}")
-                
-                with col_i:
-                    c_prev, c_up = st.columns([1, 2], vertical_alignment="bottom")
-                    up_spec = st.session_state.get(f"up_spec_{i}")
-                    if up_spec: c_prev.image(up_spec, width=40)
-                    else:
-                        cur_img = st.session_state.f_specs[i].get("img", "")
-                        if cur_img:
-                            b64 = get_image_base64(cur_img)
-                            if b64: c_prev.markdown(f'<img src="{b64}" style="width:40px; height:40px; border-radius:4px; object-fit:contain;">', unsafe_allow_html=True)
-                    c_up.file_uploader(_m("choose_img"), type=['png','jpg','jpeg'], key=f"up_spec_{i}", label_visibility="collapsed")
-                    
-                if col_x.button("❌", key=f"del_spec_{i}", use_container_width=True): 
-                    st.session_state.f_specs.pop(i); st.rerun()
-                    
-        st.write("")
-        if st.button(_m("add_spec"), use_container_width=True):
-            st.session_state.f_specs.append({"title": "", "detail": "", "img": ""}); st.rerun()
-
-    with t3:
-        opts_avail = db_query("SELECT * FROM options ORDER BY opt_price DESC")
-        sel_opts = []
-        chk_cols = st.columns(3)
-        for idx, opt in enumerate(opts_avail):
-            o_id = str(opt.get("id"))
-            o_name = opt.get("opt_name_zh") if user_role == "manufacturer" and opt.get("opt_name_zh") else opt.get("opt_name", "Bilinmeyen")
-            o_price = opt.get("opt_price", 0.0)
-            
-            with chk_cols[idx % 3]:
-                with st.container(border=True):
-                    img_b64 = get_image_base64(opt.get("opt_image"))
-                    if img_b64: st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:80px; object-fit:contain; margin-bottom:10px;"></div>', unsafe_allow_html=True)
-                    if st.checkbox(f"{o_name} (+{o_price:,.0f})", value=(o_id in f_opts), key=f"chk_{o_id}"): sel_opts.append(o_id)
-
-    st.markdown("---")
-    if st.button(_m("save_changes"), type="primary", use_container_width=True):
-        if not new_name: st.error(_m("err_name"))
+            width, height = img.size
+            crop_size = min(width, height)
+            left = int((width - crop_size) / 2)
+            top = int((height - crop_size) / 2)
+            img = img.crop((left, top, left + crop_size, top + crop_size))
+            img = img.resize(size, Image.Resampling.LANCZOS)
         else:
-            with st.spinner("İşleniyor..."):
-                final_img = f_img
-                if new_img_up: final_img = process_image(new_img_up, "machine", square=False)
-                uid = st.session_state.get("user_id", 1)
+            img.thumbnail(size, Image.Resampling.LANCZOS)
 
-                n_zh = new_name if user_role == "manufacturer" else r.get('name_zh', '')
-                n_tr = auto_translate_to_tr(new_name) if user_role == "manufacturer" else new_name
-                
-                s_zh, s_tr = [], []
-                for i, sp in enumerate(st.session_state.f_specs):
-                    up_s = st.session_state.get(f"up_spec_{i}")
-                    if up_s is not None: sp["img"] = process_image(up_s, "spec", square=True)
-                    if sp["title"].strip() or sp["detail"].strip(): 
-                        if user_role == "manufacturer":
-                            s_zh.append(f"{sp['title']}|{sp['detail']}|{sp['img']}")
-                            s_tr.append(f"{auto_translate_to_tr(sp['title'])}|{auto_translate_to_tr(sp['detail'])}|{sp['img']}")
+        filename = f"{prefix}_{uuid.uuid4().hex[:10]}.jpg"
+        filepath = os.path.join("images", filename)
+        img.save(filepath, "JPEG", quality=92)
+
+        return filename
+
+    except Exception as e:
+        st.error(f"Görsel işleme hatası: {e}")
+        return ""
+
+
+# ============================================================
+# OPSİYON / TEKNİK ÖZELLİK PARSE
+# ============================================================
+def parse_specs(specs_text):
+    result = []
+
+    if not specs_text:
+        return result
+
+    for item in str(specs_text).split("||"):
+        item = item.strip()
+        if not item:
+            continue
+
+        parts = item.split("|")
+        title = parts[0].strip() if len(parts) > 0 else ""
+        detail = parts[1].strip() if len(parts) > 1 else ""
+        img = parts[2].strip() if len(parts) > 2 else ""
+
+        result.append({
+            "title": title,
+            "detail": detail,
+            "img": img,
+        })
+
+    return result
+
+
+def build_specs(spec_list):
+    rows = []
+
+    for item in spec_list:
+        title = str(item.get("title", "")).strip()
+        detail = str(item.get("detail", "")).strip()
+        img = str(item.get("img", "")).strip()
+
+        if title or detail or img:
+            rows.append(f"{title}|{detail}|{img}")
+
+    return " || ".join(rows)
+
+
+def get_category_list():
+    cats = db_query("SELECT name FROM categories ORDER BY name ASC")
+    result = [c["name"] for c in cats if c.get("name")]
+
+    if "Diğer Makinalar" not in result:
+        result.append("Diğer Makinalar")
+
+    return result
+
+
+# ============================================================
+# ANA GİRİŞ
+# ============================================================
+def show_product_management():
+    ensure_database_schema()
+
+    if "view_mode" not in st.session_state:
+        st.session_state.view_mode = "list"
+
+    if st.session_state.view_mode == "list":
+        show_list_view()
+    elif st.session_state.view_mode == "model_add":
+        show_model_form(mode="add")
+    elif st.session_state.view_mode == "model_edit":
+        show_model_form(mode="edit", model_id=st.session_state.get("edit_model_id"))
+    elif st.session_state.view_mode == "option_add":
+        show_option_form(mode="add")
+    elif st.session_state.view_mode == "option_edit":
+        show_option_form(mode="edit", option_id=st.session_state.get("edit_option_id"))
+    else:
+        st.session_state.view_mode = "list"
+        st.rerun()
+
+
+# ============================================================
+# LİSTE EKRANI
+# ============================================================
+def show_list_view():
+    st.header("📦 Fabrika Veritabanı Yönetimi")
+
+    tab_models, tab_options, tab_categories = st.tabs([
+        "📦 Modeller",
+        "⚙️ Donanımlar",
+        "📂 Kategoriler",
+    ])
+
+    with tab_models:
+        show_models_list()
+
+    with tab_options:
+        show_options_list()
+
+    with tab_categories:
+        show_categories_list()
+
+
+def show_models_list():
+    col1, col2 = st.columns([4, 1], vertical_alignment="bottom")
+    col1.subheader("Kayıtlı Makineler")
+
+    if col2.button("➕ Yeni Makine Ekle", type="primary", use_container_width=True):
+        st.session_state.view_mode = "model_add"
+        st.rerun()
+
+    search = st.text_input("🔍 Makine ara", placeholder="Makine adı veya kategori yazın...")
+
+    models = db_query("SELECT * FROM models ORDER BY id DESC")
+
+    if search:
+        s = search.lower()
+        models = [
+            m for m in models
+            if s in str(m.get("name", "")).lower()
+            or s in str(m.get("category", "")).lower()
+        ]
+
+    if not models:
+        st.info("Henüz kayıtlı makine bulunmuyor.")
+        return
+
+    grouped = {}
+    for model in models:
+        cat = model.get("category") or "Diğer Makinalar"
+        grouped.setdefault(cat, []).append(model)
+
+    for cat_name, cat_models in grouped.items():
+        with st.expander(f"📁 {cat_name} ({len(cat_models)})", expanded=True):
+            for i in range(0, len(cat_models), 4):
+                cols = st.columns(4)
+
+                for j in range(4):
+                    if i + j >= len(cat_models):
+                        continue
+
+                    model = cat_models[i + j]
+                    model_id = safe_int(model.get("id"))
+
+                    with cols[j].container(border=True):
+                        img_b64 = get_image_base64(model.get("image_path"))
+
+                        if img_b64:
+                            st.markdown(
+                                f"""
+                                <div style="text-align:center;">
+                                    <img src="{img_b64}" style="width:100%; height:150px; object-fit:contain; margin-bottom:10px;">
+                                </div>
+                                """,
+                                unsafe_allow_html=True,
+                            )
                         else:
-                            s_tr.append(f"{sp['title']}|{sp['detail']}|{sp['img']}")
-                            
-                specs_zh = " || ".join(s_zh) if user_role == "manufacturer" else r.get('specs_zh', '')
-                specs_tr = " || ".join(s_tr)
-                opt_str = ",".join(sel_opts)
-                
-                if mode == "edit":
-                    exec_factory("UPDATE models SET name=?, name_zh=?, category=?, base_price=?, currency=?, specs=?, specs_zh=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?", (n_tr, n_zh, new_cat, new_price, new_curr, specs_tr, specs_zh, opt_str, new_disc, final_img, int(mod_id)))
+                            st.markdown(
+                                """
+                                <div style="height:150px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:6px; color:#94a3b8; margin-bottom:10px;">
+                                    Görsel Yok
+                                </div>
+                                """,
+                                unsafe_allow_html=True,
+                            )
+
+                        st.markdown(
+                            f"""
+                            <div style="font-weight:800; font-size:15px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                {model.get("name", "İsimsiz Makine")}
+                            </div>
+                            <div style="font-size:12px; color:#64748b; margin-bottom:8px;">
+                                ID: {model_id}
+                            </div>
+                            <div style="font-weight:900; color:#ea580c; font-size:16px;">
+                                {safe_float(model.get("base_price")):,.2f} {model.get("currency", "USD")}
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+                        b1, b2, b3 = st.columns(3)
+
+                        if b1.button("✏️", key=f"edit_model_{model_id}", help="Düzenle", use_container_width=True):
+                            st.session_state.edit_model_id = model_id
+                            st.session_state.view_mode = "model_edit"
+                            st.rerun()
+
+                        if b2.button("📄", key=f"copy_model_{model_id}", help="Kopyala", use_container_width=True):
+                            copy_model(model_id)
+                            st.rerun()
+
+                        if b3.button("🗑️", key=f"delete_model_{model_id}", help="Sil", use_container_width=True):
+                            exec_factory("DELETE FROM models WHERE id=?", (model_id,))
+                            st.success("Makine silindi.")
+                            st.rerun()
+
+
+def show_options_list():
+    col1, col2 = st.columns([4, 1], vertical_alignment="bottom")
+    col1.subheader("Ekstra Donanımlar")
+
+    if col2.button("➕ Yeni Donanım Ekle", type="primary", use_container_width=True):
+        st.session_state.view_mode = "option_add"
+        st.rerun()
+
+    search = st.text_input("🔍 Donanım ara", placeholder="Donanım adı yazın...")
+
+    options = db_query("SELECT * FROM options ORDER BY id DESC")
+
+    if search:
+        s = search.lower()
+        options = [
+            o for o in options
+            if s in str(o.get("opt_name", "")).lower()
+            or s in str(o.get("opt_desc", "")).lower()
+        ]
+
+    if not options:
+        st.info("Henüz kayıtlı donanım bulunmuyor.")
+        return
+
+    for i in range(0, len(options), 4):
+        cols = st.columns(4)
+
+        for j in range(4):
+            if i + j >= len(options):
+                continue
+
+            opt = options[i + j]
+            opt_id = safe_int(opt.get("id"))
+
+            with cols[j].container(border=True):
+                img_b64 = get_image_base64(opt.get("opt_image"))
+
+                if img_b64:
+                    st.markdown(
+                        f"""
+                        <div style="text-align:center;">
+                            <img src="{img_b64}" style="width:100%; height:120px; object-fit:contain; margin-bottom:10px;">
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
                 else:
-                    exec_factory("INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (n_tr, n_zh, new_cat, new_price, new_curr, specs_tr, specs_zh, opt_str, new_disc, final_img, uid))
-                
-                st.session_state.view_mode = "list"; st.rerun()
+                    st.markdown(
+                        """
+                        <div style="height:120px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:6px; color:#94a3b8; margin-bottom:10px;">
+                            Görsel Yok
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
-# =====================================================================
-# DONANIM DÜZENLEME FORMU
-# =====================================================================
-def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
-    col_back, col_title = st.columns([1, 5], vertical_alignment="center")
-    if col_back.button(_m("back_list"), use_container_width=True): st.session_state.view_mode = "list"; st.rerun()
-    st.header(_m("edit_opt_title") if mode == "edit" else _m("new_opt_title"))
-    st.markdown("---")
+                st.markdown(
+                    f"""
+                    <div style="font-weight:800; font-size:15px; color:#0f172a;">
+                        {opt.get("opt_name", "İsimsiz Donanım")}
+                    </div>
+                    <div style="font-size:12px; color:#64748b; margin-bottom:8px;">
+                        ID: {opt_id}
+                    </div>
+                    <div style="font-weight:900; color:#ea580c; font-size:16px;">
+                        +{safe_float(opt.get("opt_price")):,.2f} USD
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-    r = {}
-    if mode == "edit" and opt_id is not None:
-        r_list = db_query("SELECT * FROM options WHERE id=?", (int(opt_id),))
-        if not r_list: st.error("Kayıt bulunamadı."); st.stop()
-        r = r_list[0]
+                if opt.get("opt_suffix") or opt.get("opt_variant_image"):
+                    st.caption("✨ Varyasyon bilgisi var")
 
-    o_name = r.get("opt_name_zh", "") if user_role == "manufacturer" and r.get("opt_name_zh") else r.get("opt_name", "")
-    o_desc = r.get("opt_desc_zh", "") if user_role == "manufacturer" and r.get("opt_desc_zh") else r.get("opt_desc", "")
-    o_price = float(r.get("opt_price", 0.0) or 0.0)
-    o_qty = bool(r.get("allow_qty", 1))
-    o_img = r.get("opt_image", "") or ""
-    o_suffix = r.get("opt_suffix", "") or ""
-    o_v_img = r.get("opt_variant_image", "") or ""
+                b1, b2, b3 = st.columns(3)
+
+                if b1.button("✏️", key=f"edit_option_{opt_id}", help="Düzenle", use_container_width=True):
+                    st.session_state.edit_option_id = opt_id
+                    st.session_state.view_mode = "option_edit"
+                    st.rerun()
+
+                if b2.button("📄", key=f"copy_option_{opt_id}", help="Kopyala", use_container_width=True):
+                    copy_option(opt_id)
+                    st.rerun()
+
+                if b3.button("🗑️", key=f"delete_option_{opt_id}", help="Sil", use_container_width=True):
+                    exec_factory("DELETE FROM options WHERE id=?", (opt_id,))
+                    st.success("Donanım silindi.")
+                    st.rerun()
+
+
+def show_categories_list():
+    st.subheader("Kategori Yönetimi")
 
     with st.container(border=True):
-        c1, c2 = st.columns([3, 1])
+        new_cat = st.text_input("Yeni kategori adı", placeholder="Örn: Kenar Bantlama Makineleri")
+
+        if st.button("➕ Kategori Ekle", type="primary", use_container_width=True):
+            if not new_cat.strip():
+                st.warning("Kategori adı boş bırakılamaz.")
+            else:
+                ok = exec_factory(
+                    "INSERT OR IGNORE INTO categories (name) VALUES (?)",
+                    (new_cat.strip(),),
+                )
+                if ok:
+                    st.success("Kategori eklendi.")
+                    st.rerun()
+
+    cats = db_query("SELECT * FROM categories ORDER BY name ASC")
+
+    if not cats:
+        st.info("Henüz kategori yok.")
+        return
+
+    for cat in cats:
+        cat_id = safe_int(cat.get("id"))
+        cat_name = cat.get("name", "")
+
+        c1, c2 = st.columns([5, 1], vertical_alignment="center")
+        c1.markdown(f"📁 **{cat_name}**")
+
+        if c2.button("🗑️", key=f"delete_cat_{cat_id}", use_container_width=True):
+            exec_factory("DELETE FROM categories WHERE id=?", (cat_id,))
+            st.success("Kategori silindi.")
+            st.rerun()
+
+
+# ============================================================
+# KOPYALAMA
+# ============================================================
+def copy_model(model_id):
+    rows = db_query("SELECT * FROM models WHERE id=?", (model_id,))
+
+    if not rows:
+        st.error(f"Kopyalanacak makine bulunamadı. ID: {model_id}")
+        return False
+
+    m = rows[0]
+
+    ok = exec_factory(
+        """
+        INSERT INTO models (
+            name, base_price, image_path, specs, currency, port_discount,
+            compatible_options, gallery_images, category, gallery_videos,
+            name_zh, specs_zh, user_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            f"{get_safe(m, 'name', 'Makine')} (Kopya)",
+            safe_float(m.get("base_price")),
+            get_safe(m, "image_path"),
+            get_safe(m, "specs"),
+            get_safe(m, "currency", "USD"),
+            safe_float(m.get("port_discount")),
+            get_safe(m, "compatible_options"),
+            get_safe(m, "gallery_images"),
+            get_safe(m, "category", "Diğer Makinalar"),
+            get_safe(m, "gallery_videos"),
+            get_safe(m, "name_zh"),
+            get_safe(m, "specs_zh"),
+            st.session_state.get("user_id", 1),
+        ),
+    )
+
+    if ok:
+        st.success("Makine kopyalandı.")
+
+    return ok
+
+
+def copy_option(option_id):
+    rows = db_query("SELECT * FROM options WHERE id=?", (option_id,))
+
+    if not rows:
+        st.error(f"Kopyalanacak donanım bulunamadı. ID: {option_id}")
+        return False
+
+    o = rows[0]
+
+    ok = exec_factory(
+        """
+        INSERT INTO options (
+            opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty,
+            opt_name_zh, opt_desc_zh, opt_suffix, opt_variant_image, user_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            f"{get_safe(o, 'opt_name', 'Donanım')} (Kopya)",
+            get_safe(o, "opt_desc"),
+            safe_float(o.get("opt_price")),
+            get_safe(o, "opt_image"),
+            safe_int(o.get("sort_order")),
+            safe_int(o.get("allow_qty"), 1),
+            get_safe(o, "opt_name_zh"),
+            get_safe(o, "opt_desc_zh"),
+            get_safe(o, "opt_suffix"),
+            get_safe(o, "opt_variant_image"),
+            st.session_state.get("user_id", 1),
+        ),
+    )
+
+    if ok:
+        st.success("Donanım kopyalandı.")
+
+    return ok
+
+
+# ============================================================
+# MAKİNE FORMU
+# ============================================================
+def show_model_form(mode="add", model_id=None):
+    col_back, col_title = st.columns([1, 5], vertical_alignment="center")
+
+    if col_back.button("🔙 Listeye Dön", use_container_width=True):
+        clear_model_form_state()
+        st.session_state.view_mode = "list"
+        st.rerun()
+
+    if mode == "edit":
+        col_title.header("✏️ Makine Düzenle")
+    else:
+        col_title.header("✨ Yeni Makine Ekle")
+
+    st.markdown("---")
+
+    model = {}
+
+    if mode == "edit":
+        if model_id is None:
+            st.error("Düzenlenecek makine ID bilgisi bulunamadı.")
+            st.stop()
+
+        rows = db_query("SELECT * FROM models WHERE id=?", (safe_int(model_id),))
+
+        if not rows:
+            st.error(f"Kayıt veritabanında bulunamadı. Aranan makine ID: {model_id}")
+            st.info("Bu hata artık gerçek veritabanı hatasını gizlemez. Yukarıda başka hata varsa onu da kontrol edin.")
+            st.stop()
+
+        model = rows[0]
+
+    session_key = f"model_specs_{mode}_{model_id or 'new'}"
+
+    if session_key not in st.session_state:
+        if mode == "edit":
+            st.session_state[session_key] = parse_specs(model.get("specs", ""))
+        else:
+            st.session_state[session_key] = []
+
+    specs_list = st.session_state[session_key]
+
+    current_name = get_safe(model, "name")
+    current_category = get_safe(model, "category", "Diğer Makinalar")
+    current_price = safe_float(model.get("base_price"))
+    current_currency = get_safe(model, "currency", "USD")
+    current_discount = safe_float(model.get("port_discount"))
+    current_image = get_safe(model, "image_path")
+    current_options = [
+        x.strip()
+        for x in str(get_safe(model, "compatible_options")).split(",")
+        if x.strip()
+    ]
+
+    tab_general, tab_specs, tab_options = st.tabs([
+        "📄 Genel Bilgiler",
+        "⚙️ Teknik Özellikler",
+        "🔌 Uyumlu Donanımlar",
+    ])
+
+    with tab_general:
+        with st.container(border=True):
+            c1, c2 = st.columns([3, 1], gap="large")
+
+            with c1:
+                name = st.text_input("Makine Adı *", value=current_name)
+
+                cats = get_category_list()
+
+                if current_category not in cats:
+                    cats.append(current_category)
+
+                category = st.selectbox(
+                    "Kategori",
+                    options=cats,
+                    index=cats.index(current_category) if current_category in cats else 0,
+                )
+
+                c_price, c_currency, c_discount = st.columns(3)
+                price = c_price.number_input("Fiyat *", value=current_price, step=100.0)
+                currency = c_currency.selectbox(
+                    "Para Birimi",
+                    ["USD", "EUR", "TRY", "CNY"],
+                    index=["USD", "EUR", "TRY", "CNY"].index(current_currency) if current_currency in ["USD", "EUR", "TRY", "CNY"] else 0,
+                )
+                discount = c_discount.number_input("İskonto (%)", value=current_discount, step=1.0)
+
+                uploaded_image = st.file_uploader(
+                    "Ana Görsel",
+                    type=["png", "jpg", "jpeg"],
+                    key=f"model_main_img_{mode}_{model_id or 'new'}",
+                )
+
+            with c2:
+                st.markdown("**Görsel Önizleme**")
+
+                if uploaded_image:
+                    st.image(uploaded_image, use_container_width=True)
+                else:
+                    img_b64 = get_image_base64(current_image)
+                    if img_b64:
+                        st.markdown(
+                            f'<img src="{img_b64}" style="width:100%; border-radius:8px;">',
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.caption("Görsel yok")
+
+    with tab_specs:
+        st.markdown("### Teknik Özellikler")
+
+        if not specs_list:
+            st.info("Henüz teknik özellik eklenmedi.")
+
+        for i, spec in enumerate(specs_list):
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([2, 3, 2, 1], vertical_alignment="center")
+
+                spec["title"] = c1.text_input(
+                    "Başlık",
+                    value=spec.get("title", ""),
+                    key=f"spec_title_{session_key}_{i}",
+                )
+
+                spec["detail"] = c2.text_input(
+                    "Detay",
+                    value=spec.get("detail", ""),
+                    key=f"spec_detail_{session_key}_{i}",
+                )
+
+                upload_key = f"spec_img_{session_key}_{i}"
+                spec_upload = c3.file_uploader(
+                    "Görsel",
+                    type=["png", "jpg", "jpeg"],
+                    key=upload_key,
+                )
+
+                if spec_upload:
+                    new_spec_img = process_image(spec_upload, "spec", square=True)
+                    if new_spec_img:
+                        spec["img"] = new_spec_img
+
+                if spec.get("img"):
+                    img_b64 = get_image_base64(spec.get("img"))
+                    if img_b64:
+                        c3.markdown(
+                            f'<img src="{img_b64}" style="width:50px; height:50px; object-fit:contain;">',
+                            unsafe_allow_html=True,
+                        )
+
+                if c4.button("❌", key=f"delete_spec_{session_key}_{i}", use_container_width=True):
+                    specs_list.pop(i)
+                    st.rerun()
+
+        if st.button("➕ Yeni Özellik Satırı Ekle", use_container_width=True):
+            specs_list.append({"title": "", "detail": "", "img": ""})
+            st.rerun()
+
+    with tab_options:
+        st.markdown("### Uyumlu Donanımlar")
+
+        all_options = db_query("SELECT * FROM options ORDER BY opt_name ASC")
+        selected_options = []
+
+        if not all_options:
+            st.info("Henüz donanım eklenmedi.")
+        else:
+            for i in range(0, len(all_options), 3):
+                cols = st.columns(3)
+
+                for j in range(3):
+                    if i + j >= len(all_options):
+                        continue
+
+                    opt = all_options[i + j]
+                    opt_id = str(opt.get("id"))
+
+                    with cols[j].container(border=True):
+                        img_b64 = get_image_base64(opt.get("opt_image"))
+
+                        if img_b64:
+                            st.markdown(
+                                f'<img src="{img_b64}" style="width:100%; height:80px; object-fit:contain;">',
+                                unsafe_allow_html=True,
+                            )
+
+                        checked = st.checkbox(
+                            f"{opt.get('opt_name', 'Donanım')} (+{safe_float(opt.get('opt_price')):,.0f})",
+                            value=opt_id in current_options,
+                            key=f"model_opt_{mode}_{model_id or 'new'}_{opt_id}",
+                        )
+
+                        if checked:
+                            selected_options.append(opt_id)
+
+    st.markdown("---")
+
+    button_label = "💾 Değişiklikleri Kaydet" if mode == "edit" else "💾 Sisteme Ekle"
+
+    if st.button(button_label, type="primary", use_container_width=True):
+        if not str(name).strip():
+            st.error("Makine adı boş bırakılamaz.")
+            return
+
+        final_image = current_image
+
+        if uploaded_image:
+            processed = process_image(uploaded_image, "machine", square=False)
+            if processed:
+                final_image = processed
+
+        specs_text = build_specs(specs_list)
+        compatible_options = ",".join(selected_options)
+        user_id = st.session_state.get("user_id", 1)
+
+        if mode == "edit":
+            ok = exec_factory(
+                """
+                UPDATE models
+                SET name=?, category=?, base_price=?, currency=?, port_discount=?,
+                    image_path=?, specs=?, compatible_options=?
+                WHERE id=?
+                """,
+                (
+                    name.strip(),
+                    category,
+                    price,
+                    currency,
+                    discount,
+                    final_image,
+                    specs_text,
+                    compatible_options,
+                    safe_int(model_id),
+                ),
+            )
+        else:
+            ok = exec_factory(
+                """
+                INSERT INTO models (
+                    name, category, base_price, currency, port_discount,
+                    image_path, specs, compatible_options, user_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    name.strip(),
+                    category,
+                    price,
+                    currency,
+                    discount,
+                    final_image,
+                    specs_text,
+                    compatible_options,
+                    user_id,
+                ),
+            )
+
+        if ok:
+            clear_model_form_state()
+            st.session_state.view_mode = "list"
+            st.success("Makine başarıyla kaydedildi.")
+            st.rerun()
+
+
+def clear_model_form_state():
+    keys_to_delete = []
+
+    for key in st.session_state.keys():
+        if str(key).startswith("model_specs_"):
+            keys_to_delete.append(key)
+
+    for key in keys_to_delete:
+        st.session_state.pop(key, None)
+
+
+# ============================================================
+# DONANIM FORMU
+# ============================================================
+def show_option_form(mode="add", option_id=None):
+    col_back, col_title = st.columns([1, 5], vertical_alignment="center")
+
+    if col_back.button("🔙 Listeye Dön", use_container_width=True):
+        st.session_state.view_mode = "list"
+        st.rerun()
+
+    if mode == "edit":
+        col_title.header("✏️ Donanım Düzenle")
+    else:
+        col_title.header("✨ Yeni Donanım Ekle")
+
+    st.markdown("---")
+
+    option = {}
+
+    if mode == "edit":
+        if option_id is None:
+            st.error("Düzenlenecek donanım ID bilgisi bulunamadı.")
+            st.stop()
+
+        rows = db_query("SELECT * FROM options WHERE id=?", (safe_int(option_id),))
+
+        if not rows:
+            st.error(f"Donanım kaydı veritabanında bulunamadı. Aranan ID: {option_id}")
+            st.stop()
+
+        option = rows[0]
+
+    current_name = get_safe(option, "opt_name")
+    current_desc = get_safe(option, "opt_desc")
+    current_price = safe_float(option.get("opt_price"))
+    current_image = get_safe(option, "opt_image")
+    current_allow_qty = bool(safe_int(option.get("allow_qty"), 1))
+    current_suffix = get_safe(option, "opt_suffix")
+    current_variant_img = get_safe(option, "opt_variant_image")
+
+    with st.container(border=True):
+        c1, c2 = st.columns([3, 1], gap="large")
+
         with c1:
-            new_name = st.text_input(_m("opt_name"), value=o_name)
-            
-            st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-            v_col1, v_col2 = st.columns(2)
-            new_suffix = v_col1.text_input(_m("opt_suffix"), value=o_suffix, placeholder="Örn: L, -PRO")
-            v_col1.info(_m("opt_suffix_help"))
-            new_var_up = v_col2.file_uploader(_m("opt_v_img"), type=['png','jpg','jpeg'])
-            st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-            
-            new_price = st.number_input(_m("opt_price"), value=o_price, step=50.0)
-            new_qty = st.checkbox(_m("allow_qty"), value=o_qty)
-            new_desc = st.text_area(_m("opt_desc"), value=o_desc, height=120)
-            new_img_up = st.file_uploader(_m("opt_img_up"), type=['png','jpg','jpeg'])
-            
+            name = st.text_input("Donanım Adı *", value=current_name)
+            price = st.number_input("Fiyat *", value=current_price, step=50.0)
+            allow_qty = st.checkbox("Bu donanım için adet seçilebilir", value=current_allow_qty)
+            desc = st.text_area("Açıklama", value=current_desc, height=120)
+
+            st.markdown("---")
+            suffix = st.text_input(
+                "Model Adı Eki / Suffix",
+                value=current_suffix,
+                placeholder="Örn: L, PRO, PLUS",
+            )
+
+            main_img_upload = st.file_uploader(
+                "Donanım Görseli",
+                type=["png", "jpg", "jpeg"],
+                key=f"option_main_img_{mode}_{option_id or 'new'}",
+            )
+
+            variant_img_upload = st.file_uploader(
+                "Varyasyon Ana Resmi",
+                type=["png", "jpg", "jpeg"],
+                key=f"option_variant_img_{mode}_{option_id or 'new'}",
+            )
+
         with c2:
-            st.markdown(_m("img_prev"))
-            if new_img_up: st.image(new_img_up, use_container_width=True)
-            else:
-                prev_img = get_image_base64(o_img)
-                if prev_img: st.markdown(f'<img src="{prev_img}" style="width:100%; border-radius:8px;">', unsafe_allow_html=True)
+            st.markdown("**Donanım Görseli**")
 
-        if st.button("💾 " + _m("save_changes"), type="primary", use_container_width=True):
-            if not new_name: st.error(_m("err_opt_name"))
+            if main_img_upload:
+                st.image(main_img_upload, use_container_width=True)
             else:
-                with st.spinner("İşleniyor..."):
-                    final_img = o_img
-                    if new_img_up: final_img = process_image(new_img_up, "opt", square=True)
-                    
-                    final_v_img = o_v_img
-                    if new_var_up: final_v_img = process_image(new_var_up, "variant", square=False)
-                    
-                    uid = st.session_state.get("user_id", 1)
-                    allow_q = 1 if new_qty else 0
-                    
-                    n_zh = new_name if user_role == "manufacturer" else r.get('opt_name_zh', '')
-                    n_tr = auto_translate_to_tr(new_name) if user_role == "manufacturer" else new_name
-                    d_zh = new_desc if user_role == "manufacturer" else r.get('opt_desc_zh', '')
-                    d_tr = auto_translate_to_tr(new_desc) if user_role == "manufacturer" else new_desc
+                img_b64 = get_image_base64(current_image)
+                if img_b64:
+                    st.markdown(
+                        f'<img src="{img_b64}" style="width:100%; border-radius:8px;">',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.caption("Görsel yok")
 
-                    if mode == "edit": 
-                        exec_factory("UPDATE options SET opt_name=?, opt_name_zh=?, opt_desc=?, opt_desc_zh=?, opt_price=?, opt_image=?, allow_qty=?, opt_suffix=?, opt_variant_image=? WHERE id=?", (n_tr, n_zh, d_tr, d_zh, new_price, final_img, allow_q, new_suffix, final_v_img, int(opt_id)))
-                    else: 
-                        exec_factory("INSERT INTO options (opt_name, opt_name_zh, opt_desc, opt_desc_zh, opt_price, opt_image, allow_qty, opt_suffix, opt_variant_image, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)", (n_tr, n_zh, d_tr, d_zh, new_price, final_img, allow_q, new_suffix, final_v_img, uid))
-                    
-                    st.session_state.view_mode = "list"; st.rerun()
+            st.markdown("**Varyasyon Görseli**")
+
+            if variant_img_upload:
+                st.image(variant_img_upload, use_container_width=True)
+            else:
+                var_b64 = get_image_base64(current_variant_img)
+                if var_b64:
+                    st.markdown(
+                        f'<img src="{var_b64}" style="width:100%; border-radius:8px;">',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.caption("Varyasyon görseli yok")
+
+    st.markdown("---")
+
+    button_label = "💾 Değişiklikleri Kaydet" if mode == "edit" else "💾 Sisteme Ekle"
+
+    if st.button(button_label, type="primary", use_container_width=True):
+        if not str(name).strip():
+            st.error("Donanım adı boş bırakılamaz.")
+            return
+
+        final_img = current_image
+        final_variant_img = current_variant_img
+
+        if main_img_upload:
+            processed = process_image(main_img_upload, "option", square=True)
+            if processed:
+                final_img = processed
+
+        if variant_img_upload:
+            processed_variant = process_image(variant_img_upload, "variant", square=False)
+            if processed_variant:
+                final_variant_img = processed_variant
+
+        user_id = st.session_state.get("user_id", 1)
+        allow_qty_int = 1 if allow_qty else 0
+
+        if mode == "edit":
+            ok = exec_factory(
+                """
+                UPDATE options
+                SET opt_name=?, opt_desc=?, opt_price=?, opt_image=?,
+                    allow_qty=?, opt_suffix=?, opt_variant_image=?
+                WHERE id=?
+                """,
+                (
+                    name.strip(),
+                    desc,
+                    price,
+                    final_img,
+                    allow_qty_int,
+                    suffix,
+                    final_variant_img,
+                    safe_int(option_id),
+                ),
+            )
+        else:
+            ok = exec_factory(
+                """
+                INSERT INTO options (
+                    opt_name, opt_desc, opt_price, opt_image,
+                    allow_qty, opt_suffix, opt_variant_image, user_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    name.strip(),
+                    desc,
+                    price,
+                    final_img,
+                    allow_qty_int,
+                    suffix,
+                    final_variant_img,
+                    user_id,
+                ),
+            )
+
+        if ok:
+            st.session_state.view_mode = "list"
+            st.success("Donanım başarıyla kaydedildi.")
+            st.rerun()
