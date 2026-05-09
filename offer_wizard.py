@@ -211,11 +211,9 @@ def show_offer_wizard(user_id, is_admin=False):
         </style>
     """, unsafe_allow_html=True)
     
-    # 🚀 %100 ÇALIŞAN VE HATA VERMEYEN MENÜ BUTONU 🚀
     col_b1, col_b2, col_b3 = st.columns([1, 6, 1])
     if col_b1.button("☰ Menü", use_container_width=True):
         st.session_state.active_tab = "📊 Dashboard"
-        # Hatayı çözmek için widget anahtarını değiştirmiyoruz, doğrudan siliyoruz
         if "m_radio" in st.session_state:
             del st.session_state["m_radio"] 
         st.rerun()
@@ -257,7 +255,6 @@ def show_offer_wizard(user_id, is_admin=False):
         st.markdown("<div style='font-size:14px; font-weight:900; color:#2563eb; margin-bottom:8px;'>1. MÜŞTERİ VE MAKİNE SEÇİMİ</div>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            # KIRMIZI HATA İÇİN SABİT ANAHTARLI TOGGLE
             is_new_customer = st.toggle("➕ Yeni Müşteri Ekle", key="toggle_new_cust")
             
             if is_new_customer:
@@ -306,7 +303,6 @@ def show_offer_wizard(user_id, is_admin=False):
                 idx_c = c_names.index(wd.get("cust_name")) if wd.get("cust_name") in c_names else 0
             sel_cust = st.selectbox("Teklif Verilecek Müşteri", c_names, index=idx_c, key="wiz_customer")
 
-            # KATEGORİ İZOLASYONU
             all_cats_db = [c[0] for c in get_factory("SELECT name FROM categories ORDER BY name ASC")]
             cats = ["Tüm Kategoriler"]
 
@@ -320,7 +316,6 @@ def show_offer_wizard(user_id, is_admin=False):
             idx_cat = cats.index(wd.get("category")) if wd.get("category") in cats else 0
             sel_cat = st.selectbox("Kategori Filtresi", cats, index=idx_cat, key="wiz_category")
 
-            # MAKİNE İZOLASYONU
             m_query = "SELECT id, name, base_price, compatible_options, image_path, specs, port_discount, currency FROM models WHERE 1=1"
             m_params = []
 
@@ -370,15 +365,28 @@ def show_offer_wizard(user_id, is_admin=False):
         multiplier = 1.0 - (float(m_disc) / 100.0) if "Liman" in d_type and m_disc else 1.0
 
         selected_options_for_db, engine_options_list, opts_total = [], [], 0.0
+        
+        # 🚀 AKILLI VARYASYON DEĞİŞKENLERİ BAŞLANGICI 🚀
+        current_dynamic_m_name = m_name
+        current_dynamic_m_img = m_img
 
         with st.container(height=450, border=True):
             if m_opts_str:
                 ids = [x.strip() for x in str(m_opts_str).split(",") if x.strip()]
                 if ids:
-                    opts = get_factory(f"SELECT id, opt_name, opt_price, opt_desc, opt_image, allow_qty FROM options WHERE id IN ({','.join('?'*len(ids))})", tuple(ids))
+                    try:
+                        opts = get_factory(f"SELECT id, opt_name, opt_price, opt_desc, opt_image, allow_qty, opt_suffix, opt_variant_image FROM options WHERE id IN ({','.join('?'*len(ids))})", tuple(ids))
+                    except:
+                        # Eski DB yapısı koruması (migration yapılmadıysa)
+                        opts_old = get_factory(f"SELECT id, opt_name, opt_price, opt_desc, opt_image, allow_qty FROM options WHERE id IN ({','.join('?'*len(ids))})", tuple(ids))
+                        opts = [(*o, "", "") for o in opts_old]
+                        
                     for o in opts:
                         o_id, o_name, o_price, o_desc, o_img = o[0], o[1], o[2], o[3], o[4]
                         allow_qty = bool(o[5]) if len(o) > 5 and o[5] is not None else True
+                        o_suffix = o[6] if len(o) > 6 and o[6] is not None else ""
+                        o_v_img = o[7] if len(o) > 7 and o[7] is not None else ""
+                        
                         d_o_p = o_price * multiplier
 
                         with st.container(border=True):
@@ -396,6 +404,10 @@ def show_offer_wizard(user_id, is_admin=False):
                                 opts_total += (d_o_p * q_o)
                                 selected_options_for_db.append({"id": o_id, "qty": q_o})
                                 engine_options_list.append({'n': o_name, 'p': d_o_p, 'q': q_o, 'i': o_img, 'd': o_desc})
+                                
+                                # 🚀 AKILLI VARYASYON (İSİM VE GÖRSEL DEĞİŞİMİ) TETİKLEYİCİSİ 🚀
+                                if o_suffix: current_dynamic_m_name += f" {o_suffix}"
+                                if o_v_img: current_dynamic_m_img = o_v_img
                 else: st.info("Bu makineye tanımlı donanım bulunmuyor.")
 
         st.markdown("<div style='font-size:13px; font-weight:800; color:#2563eb; margin-top:15px; margin-bottom:8px;'>4. FİYATLANDIRMA VE KAYIT</div>", unsafe_allow_html=True)
@@ -436,5 +448,6 @@ def show_offer_wizard(user_id, is_admin=False):
 
     with col_prev:
         st.markdown("<div style='font-size:16px; font-weight:800; color:#0f172a; margin-bottom:10px;'>📄 A4 RAPOR ÖNİZLEMESİ</div>", unsafe_allow_html=True)
-        html = generate_embedded_html(sel_cust, m_name, m_price*multiplier, m_img, m_specs, engine_options_list, conds, m_curr, user_id)
+        # 🚀 AKILLI VARYASYON SONUÇLARINI PDF MOTORA GÖNDER 🚀
+        html = generate_embedded_html(sel_cust, current_dynamic_m_name, m_price*multiplier, current_dynamic_m_img, m_specs, engine_options_list, conds, m_curr, user_id)
         with st.container(border=True): components.html(html, height=1200, scrolling=True)
