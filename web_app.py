@@ -430,41 +430,82 @@ st.markdown("""
 }
 
 [data-testid="stSidebar"] {
-    background: #ffffff;
+    background: #ffffff !important;
     border-right: 1px solid #e2e8f0;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    padding: 22px 18px !important;
+    box-sizing: border-box !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stRadio"] {
+    width: 100% !important;
+}
+
+[data-testid="stSidebar"] div[role="radiogroup"] {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
 }
 
 [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
     display: none !important;
 }
 
-[data-testid="stSidebar"] div[role="radiogroup"] {
-    gap: 6px !important;
-}
-
 [data-testid="stSidebar"] div[role="radiogroup"] > label {
-    padding: 12px 15px;
-    border-radius: 10px;
-    transition: all 0.2s;
-    cursor: pointer;
+    width: 100% !important;
+    min-height: 58px !important;
+    padding: 0 18px !important;
+    margin: 0 !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+
+    border-radius: 15px !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    box-sizing: border-box !important;
+
+    cursor: pointer !important;
     color: #475569;
-    background: #f8fafc;
-    border: 1px solid #eef2f7;
+    transition: all 0.18s ease !important;
 }
 
 [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
-    background-color: #e2e8f0;
+    background: #eef4ff !important;
+    border-color: #bfdbfe !important;
     color: #0f172a;
+    transform: translateX(2px);
 }
 
-[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] {
-    background-color: #2563eb !important;
-    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3);
+[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"],
+[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28) !important;
 }
 
-[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] p {
-    color: white !important;
+[data-testid="stSidebar"] div[role="radiogroup"] > label p {
+    width: 100% !important;
+    margin: 0 !important;
+
+    font-size: 16px !important;
     font-weight: 800 !important;
+    line-height: 1.2 !important;
+    color: #334155 !important;
+
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] p,
+[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p {
+    color: white !important;
+    font-weight: 900 !important;
 }
 
 .dash-hero {
@@ -523,14 +564,21 @@ st.markdown("""
 }
 
 .mobile-menu-note {
+    min-height: 48px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    text-align: center !important;
     background: #eff6ff;
     color: #1e40af;
     border: 1px solid #bfdbfe;
-    border-radius: 14px;
-    padding: 10px 12px;
-    font-size: 12px;
+    border-radius: 15px !important;
+    padding: 12px 14px !important;
+    font-size: 13px !important;
     font-weight: 700;
-    margin-bottom: 12px;
+    line-height: 1.35 !important;
+    margin-bottom: 18px !important;
 }
 
 @media (max-width:768px) {
@@ -569,10 +617,29 @@ st.markdown("""
     }
 
     section[data-testid="stSidebar"] {
-        width: 86vw !important;
-        min-width: 86vw !important;
-        max-width: 86vw !important;
-        box-shadow: 0 0 45px rgba(15,23,42,.28);
+        width: 88vw !important;
+        min-width: 88vw !important;
+        max-width: 88vw !important;
+        border-radius: 0 22px 22px 0 !important;
+        box-shadow: 0 0 45px rgba(15,23,42,.30) !important;
+    }
+
+    [data-testid="stSidebar"] > div:first-child {
+        padding: 20px 16px !important;
+    }
+
+    [data-testid="stSidebar"] div[role="radiogroup"] {
+        gap: 11px !important;
+    }
+
+    [data-testid="stSidebar"] div[role="radiogroup"] > label {
+        min-height: 60px !important;
+        padding: 0 17px !important;
+        border-radius: 16px !important;
+    }
+
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p {
+        font-size: 16px !important;
     }
 
     .stTabs [data-baseweb="tab-list"] {
