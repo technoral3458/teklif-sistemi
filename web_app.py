@@ -394,10 +394,17 @@ if not st.session_state.logged_in:
 
 st.markdown("""
 <style>
-.stApp { background-color: #f8fafc; }
+.stApp {
+    background-color: #f8fafc;
+}
 
 .block-container {
     padding-top: 1.4rem;
+}
+
+/* Streamlit üst dekorları azalt */
+header[data-testid="stHeader"] {
+    background: transparent;
 }
 
 .stTabs [data-baseweb="tab-list"] {
@@ -429,6 +436,83 @@ st.markdown("""
     box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2) !important;
 }
 
+/* =====================================================================
+   LOGIN EKRANI
+   ===================================================================== */
+.login-desktop-title {
+    text-align: center;
+    color: #0f172a;
+    margin-bottom: 30px;
+    font-weight: 900;
+}
+
+.mobile-login-shell {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+.mobile-login-logo-card {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    padding: 22px 18px;
+    margin: 16px 0 18px 0;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+    text-align: center;
+}
+
+.mobile-login-logo-card img {
+    max-width: 78%;
+    max-height: 82px;
+    object-fit: contain;
+}
+
+.mobile-login-icon {
+    width: 76px;
+    height: 76px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #0f172a, #2563eb);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px auto;
+    font-size: 36px;
+    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.20);
+}
+
+.mobile-login-title {
+    font-size: 25px;
+    font-weight: 950;
+    color: #0f172a;
+    text-align: center;
+    line-height: 1.2;
+    margin-top: 10px;
+}
+
+.mobile-login-subtitle {
+    font-size: 13px;
+    font-weight: 700;
+    color: #64748b;
+    text-align: center;
+    margin-top: 6px;
+}
+
+.mobile-login-card-title {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 950;
+    color: #0f172a;
+    margin: 8px 0 18px 0;
+}
+
+.mobile-login-lang {
+    margin-bottom: 10px;
+}
+
+/* SIDEBAR */
 [data-testid="stSidebar"] {
     background: #ffffff !important;
     border-right: 1px solid #e2e8f0;
@@ -585,11 +669,19 @@ st.markdown("""
     .block-container {
         padding-left: 14px !important;
         padding-right: 14px !important;
-        padding-top: 82px !important;
+        padding-top: 18px !important;
+        padding-bottom: 28px !important;
     }
 
-    h1 { font-size: 28px !important; line-height: 1.2 !important; }
-    h2, h3 { font-size: 22px !important; line-height: 1.25 !important; }
+    h1 {
+        font-size: 28px !important;
+        line-height: 1.2 !important;
+    }
+
+    h2, h3 {
+        font-size: 22px !important;
+        line-height: 1.25 !important;
+    }
 
     .mobile-topbar {
         display: flex;
@@ -643,18 +735,27 @@ st.markdown("""
     }
 
     .stTabs [data-baseweb="tab-list"] {
+        width: 100% !important;
         overflow-x: auto !important;
         white-space: nowrap !important;
         justify-content: flex-start !important;
         gap: 6px !important;
         padding-bottom: 8px !important;
+        margin-bottom: 18px !important;
     }
 
     .stTabs [data-baseweb="tab"] {
         min-width: max-content !important;
-        padding: 10px 14px !important;
+        padding: 10px 13px !important;
         font-size: 14px !important;
-        border-radius: 12px !important;
+        border-radius: 13px !important;
+    }
+
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 24px !important;
+        border-color: #e2e8f0 !important;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06) !important;
+        background: #ffffff !important;
     }
 
     div[data-testid="column"] {
@@ -664,13 +765,23 @@ st.markdown("""
     }
 
     button {
-        min-height: 46px !important;
-        border-radius: 13px !important;
-        font-weight: 800 !important;
+        min-height: 48px !important;
+        border-radius: 14px !important;
+        font-weight: 900 !important;
     }
 
     input, textarea {
         font-size: 16px !important;
+    }
+
+    [data-testid="stTextInput"] input {
+        min-height: 50px !important;
+        border-radius: 14px !important;
+    }
+
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+        min-height: 50px !important;
+        border-radius: 14px !important;
     }
 
     .dash-hero {
@@ -679,8 +790,14 @@ st.markdown("""
         margin-bottom: 18px;
     }
 
-    .dash-hero h1 { font-size: 28px !important; }
-    .dash-hero p { font-size: 14px !important; line-height: 1.5 !important; }
+    .dash-hero h1 {
+        font-size: 28px !important;
+    }
+
+    .dash-hero p {
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+    }
 
     .dash-card {
         padding: 24px;
@@ -690,24 +807,188 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    .dash-value { font-size: 38px; }
+    .dash-value {
+        font-size: 38px;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================================================
+# GİRİŞ / KAYIT / ŞİFRE FORMU
+# =====================================================================
+def render_auth_form():
+    with st.container(border=True):
+        t_login, t_reg, t_forg = st.tabs([_("login_tab"), _("reg_tab"), _("forg_tab")])
+
+        with t_login:
+            st.write("")
+            le = st.text_input(_("email"), key="l_e", placeholder="ornek@firma.com").strip().lower()
+            lp = st.text_input(_("pass"), type="password", key="l_p", placeholder="••••••••")
+            rem = st.checkbox(_("rem"), value=True, key="l_r")
+
+            st.write("")
+            if st.button(_("login_btn"), type="primary", use_container_width=True):
+                conn = sqlite3.connect('users.db')
+                user = conn.execute(
+                    "SELECT id, user_type, is_approved, is_verified, role, allowed_menus FROM users WHERE email=? AND password=?",
+                    (le, hash_password(lp))
+                ).fetchone()
+
+                if user:
+                    if user[2] == 0:
+                        st.warning(_("sys_wait"))
+                        conn.close()
+                    else:
+                        tok = str(uuid.uuid4())
+                        conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0]))
+
+                        if rem:
+                            st.query_params["session_token"] = tok
+
+                        st.session_state.logged_in = True
+                        st.session_state.user_id = user[0]
+                        st.session_state.user_role = 'admin' if user[4] == 'admin' else ("manufacturer" if user[1] == "Üretici" else "dealer")
+                        st.session_state.user_email = le
+                        st.session_state.allowed_menus = user[5]
+
+                        conn.commit()
+                        conn.close()
+                        st.rerun()
+                else:
+                    st.error(_("sys_err"))
+                    conn.close()
+
+        with t_reg:
+            st.write("")
+            rt = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")], key="r_t")
+            rc = st.text_input(_("comp_name"), key="r_c")
+            rp = st.text_input(_("phone"), key="r_ph", placeholder="+90 5XX...")
+            re = st.text_input(_("email"), key="r_e", placeholder="ornek@firma.com").strip().lower()
+            rpw = st.text_input(_("pass"), type="password", key="r_p")
+
+            st.write("")
+            if st.button(_("reg_btn"), type="primary", use_container_width=True):
+                if all([rc, rp, re, rpw]):
+                    c = sqlite3.connect('users.db')
+                    if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone():
+                        st.error(_("email_in_use"))
+                    else:
+                        c.execute(
+                            "INSERT INTO users (email, password, company_name, phone, user_type, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,1,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')",
+                            (re, hash_password(rpw), rc, rp, rt)
+                        )
+                        c.commit()
+                        st.success("Kayıt Başarılı! Sistem yöneticisi onayladıktan sonra giriş yapabilirsiniz.")
+                    c.close()
+                else:
+                    st.warning(_("req_fields"))
+
+        with t_forg:
+            st.write("")
+            if st.session_state.forgot_step == 1:
+                fe = st.text_input(_("f_email"), key="f_e", placeholder="Kayıtlı e-postanız...").strip().lower()
+                st.write("")
+                if st.button(_("send_reset"), type="primary", use_container_width=True):
+                    c = sqlite3.connect('users.db')
+                    user = c.execute("SELECT id FROM users WHERE email=?", (fe,)).fetchone()
+                    if user:
+                        vc = generate_code()
+                        c.execute("UPDATE users SET auth_code=? WHERE email=?", (vc, fe))
+                        c.commit()
+                        if send_email(fe, vc, "Sifre Sifirlama / Password Reset"):
+                            st.session_state.temp_f_email = fe
+                            st.session_state.forgot_step = 2
+                            c.close()
+                            st.rerun()
+                        else:
+                            st.error("Mail gönderilemedi.")
+                    else:
+                        st.error(_("no_email"))
+                    c.close()
+
+            elif st.session_state.forgot_step == 2:
+                fc = st.text_input(_("enter_code"), max_chars=6, key="f_c")
+                np = st.text_input(_("new_pass"), type="password", key="f_np")
+                st.write("")
+                if st.button(_("change_pass"), type="primary", use_container_width=True):
+                    c = sqlite3.connect('users.db')
+                    user = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_f_email,)).fetchone()
+                    if user and user[0] == fc:
+                        c.execute(
+                            "UPDATE users SET password=?, auth_code=NULL WHERE email=?",
+                            (hash_password(np), st.session_state.temp_f_email)
+                        )
+                        c.commit()
+                        st.session_state.forgot_step = 1
+                        st.success(_("pass_changed"))
+                    else:
+                        st.error(_("wrong_code"))
+                    c.close()
+
+# =====================================================================
 # ŞIK GİRİŞ VE VİTRİN EKRANI
 # =====================================================================
 if not st.session_state.logged_in:
+    lang_opts_mobile = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
+    lang_opts_desktop = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
+
+    if IS_MOBILE:
+        st.markdown("<div class='mobile-login-shell'>", unsafe_allow_html=True)
+
+        st.markdown("<div class='mobile-login-lang'>", unsafe_allow_html=True)
+        sel = st.selectbox(
+            "🌍",
+            list(lang_opts_mobile.keys()),
+            format_func=lambda x: lang_opts_mobile[x],
+            index=list(lang_opts_mobile.keys()).index(st.session_state.lang),
+            key="main_lang_sel_mobile",
+            label_visibility="collapsed"
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if sel != st.session_state.lang:
+            st.session_state.lang = sel
+            st.rerun()
+
+        mobile_logo = get_system_logo()
+
+        if mobile_logo and mobile_logo.startswith("data:image"):
+            st.markdown(
+                f"""
+                <div class="mobile-login-logo-card">
+                    <img src="{mobile_logo}">
+                    <div class="mobile-login-title">B2B Sipariş Portalı</div>
+                    <div class="mobile-login-subtitle">Ersan Makine Satış ve Teklif Sistemi</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                """
+                <div class="mobile-login-logo-card">
+                    <div class="mobile-login-icon">⚙️</div>
+                    <div class="mobile-login-title">B2B Sipariş Portalı</div>
+                    <div class="mobile-login-subtitle">Ersan Makine Satış ve Teklif Sistemi</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        st.markdown("<div class='mobile-login-card-title'>Giriş Yap</div>", unsafe_allow_html=True)
+        render_auth_form()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.stop()
+
     c1, c2, c3 = st.columns([8, 1, 1])
-    lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
 
     with c3:
         sel = st.selectbox(
             "🌍",
-            list(lang_opts.keys()),
-            format_func=lambda x: lang_opts[x],
-            index=list(lang_opts.keys()).index(st.session_state.lang),
+            list(lang_opts_desktop.keys()),
+            format_func=lambda x: lang_opts_desktop[x],
+            index=list(lang_opts_desktop.keys()).index(st.session_state.lang),
             key="main_lang_sel",
             label_visibility="collapsed"
         )
@@ -773,128 +1054,33 @@ if not st.session_state.logged_in:
             """
             components.html(slider_html, height=480)
         else:
-            st.info("Sistemde henüz kayıtlı makine bulunmuyor.")
+            logo = get_system_logo()
+            if logo and logo.startswith("data:image"):
+                st.markdown(
+                    f"""
+                    <div style='height:450px; border-radius:22px; background:#ffffff; border:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 26px rgba(15,23,42,.06);'>
+                        <img src='{logo}' style='max-width:70%; max-height:180px; object-fit:contain;'>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.info("Sistemde henüz kayıtlı makine bulunmuyor.")
 
     with col_form:
         st.markdown(
-            "<h2 style='text-align:center; color:#0f172a; margin-bottom:30px; font-weight:900;'>B2B Sipariş Portalı</h2>",
+            "<h2 class='login-desktop-title'>B2B Sipariş Portalı</h2>",
             unsafe_allow_html=True
         )
+        render_auth_form()
 
-        with st.container(border=True):
-            t_login, t_reg, t_forg = st.tabs([_("login_tab"), _("reg_tab"), _("forg_tab")])
-
-            with t_login:
-                st.write("")
-                le = st.text_input(_("email"), key="l_e", placeholder="ornek@firma.com").strip().lower()
-                lp = st.text_input(_("pass"), type="password", key="l_p", placeholder="••••••••")
-                rem = st.checkbox(_("rem"), value=True, key="l_r")
-
-                st.write("")
-                if st.button(_("login_btn"), type="primary", use_container_width=True):
-                    conn = sqlite3.connect('users.db')
-                    user = conn.execute(
-                        "SELECT id, user_type, is_approved, is_verified, role, allowed_menus FROM users WHERE email=? AND password=?",
-                        (le, hash_password(lp))
-                    ).fetchone()
-
-                    if user:
-                        if user[2] == 0:
-                            st.warning(_("sys_wait"))
-                            conn.close()
-                        else:
-                            tok = str(uuid.uuid4())
-                            conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0]))
-
-                            if rem:
-                                st.query_params["session_token"] = tok
-
-                            st.session_state.logged_in = True
-                            st.session_state.user_id = user[0]
-                            st.session_state.user_role = 'admin' if user[4] == 'admin' else ("manufacturer" if user[1] == "Üretici" else "dealer")
-                            st.session_state.user_email = le
-                            st.session_state.allowed_menus = user[5]
-
-                            conn.commit()
-                            conn.close()
-                            st.rerun()
-                    else:
-                        st.error(_("sys_err"))
-                        conn.close()
-
-            with t_reg:
-                st.write("")
-                rt = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")], key="r_t")
-                rc = st.text_input(_("comp_name"), key="r_c")
-                rp = st.text_input(_("phone"), key="r_ph", placeholder="+90 5XX...")
-                re = st.text_input(_("email"), key="r_e", placeholder="ornek@firma.com").strip().lower()
-                rpw = st.text_input(_("pass"), type="password", key="r_p")
-
-                st.write("")
-                if st.button(_("reg_btn"), type="primary", use_container_width=True):
-                    if all([rc, rp, re, rpw]):
-                        c = sqlite3.connect('users.db')
-                        if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone():
-                            st.error(_("email_in_use"))
-                        else:
-                            c.execute(
-                                "INSERT INTO users (email, password, company_name, phone, user_type, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,1,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')",
-                                (re, hash_password(rpw), rc, rp, rt)
-                            )
-                            c.commit()
-                            st.success("Kayıt Başarılı! Sistem yöneticisi onayladıktan sonra giriş yapabilirsiniz.")
-                        c.close()
-                    else:
-                        st.warning(_("req_fields"))
-
-            with t_forg:
-                st.write("")
-                if st.session_state.forgot_step == 1:
-                    fe = st.text_input(_("f_email"), key="f_e", placeholder="Kayıtlı e-postanız...").strip().lower()
-                    st.write("")
-                    if st.button(_("send_reset"), type="primary", use_container_width=True):
-                        c = sqlite3.connect('users.db')
-                        user = c.execute("SELECT id FROM users WHERE email=?", (fe,)).fetchone()
-                        if user:
-                            vc = generate_code()
-                            c.execute("UPDATE users SET auth_code=? WHERE email=?", (vc, fe))
-                            c.commit()
-                            if send_email(fe, vc, "Sifre Sifirlama / Password Reset"):
-                                st.session_state.temp_f_email = fe
-                                st.session_state.forgot_step = 2
-                                c.close()
-                                st.rerun()
-                            else:
-                                st.error("Mail gönderilemedi.")
-                        else:
-                            st.error(_("no_email"))
-                        c.close()
-
-                elif st.session_state.forgot_step == 2:
-                    fc = st.text_input(_("enter_code"), max_chars=6, key="f_c")
-                    np = st.text_input(_("new_pass"), type="password", key="f_np")
-                    st.write("")
-                    if st.button(_("change_pass"), type="primary", use_container_width=True):
-                        c = sqlite3.connect('users.db')
-                        user = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_f_email,)).fetchone()
-                        if user and user[0] == fc:
-                            c.execute(
-                                "UPDATE users SET password=?, auth_code=NULL WHERE email=?",
-                                (hash_password(np), st.session_state.temp_f_email)
-                            )
-                            c.commit()
-                            st.session_state.forgot_step = 1
-                            st.success(_("pass_changed"))
-                        else:
-                            st.error(_("wrong_code"))
-                        c.close()
     st.stop()
 
 # =====================================================================
 # MOBİL ÜST MENÜ BUTONU
 # =====================================================================
 if IS_MOBILE:
-    st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
     top_left, top_right = st.columns([1, 5], vertical_alignment="center")
 
