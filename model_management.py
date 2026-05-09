@@ -8,8 +8,22 @@ from PIL import Image
 import json
 
 # =====================================================================
-# 🛡️ YEDEKLEME VE KASA MOTORU (MANUFACTURER VAULT)
+# 🛡️ YEDEKLEME, KASA MOTORU VE TABLO ONARIMI
 # =====================================================================
+def repair_model_db():
+    try:
+        conn = sqlite3.connect('factory_data.db', check_same_thread=False)
+        conn.execute("""CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE)""")
+        # Kategori tablosu boşsa varsayılanları ekle
+        if not conn.execute("SELECT * FROM categories").fetchall():
+            conn.execute("INSERT OR IGNORE INTO categories (name) VALUES ('CNC İşleme Merkezleri')")
+            conn.execute("INSERT OR IGNORE INTO categories (name) VALUES ('Diğer Makinalar')")
+        conn.commit(); conn.close()
+    except Exception as e:
+        print(f"Kategori Tablosu Onarım Hatası: {e}")
+
+repair_model_db()
+
 def sync_to_vault(table, data_dict, operation="upsert", item_id=None):
     try:
         conn = sqlite3.connect('manufacturer_vault.db', check_same_thread=False)
@@ -27,10 +41,7 @@ def sync_to_vault(table, data_dict, operation="upsert", item_id=None):
                 c.execute("DELETE FROM models WHERE id=?", (item_id,))
                 
         elif table == "options":
-            # YENİ: opt_suffix ve opt_variant_image EKLENDİ
             c.execute("""CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY, opt_name TEXT, opt_name_zh TEXT, opt_desc TEXT, opt_desc_zh TEXT, opt_price REAL, opt_image TEXT, allow_qty INTEGER, opt_suffix TEXT DEFAULT '', opt_variant_image TEXT DEFAULT '', user_id INTEGER)""")
-            
-            # Migration (Sütunlar yoksa ekle)
             cols_info = [col[1] for col in c.execute("PRAGMA table_info(options)").fetchall()]
             if "opt_suffix" not in cols_info: c.execute("ALTER TABLE options ADD COLUMN opt_suffix TEXT DEFAULT ''")
             if "opt_variant_image" not in cols_info: c.execute("ALTER TABLE options ADD COLUMN opt_variant_image TEXT DEFAULT ''")
@@ -96,78 +107,11 @@ DICT_MODEL = {
         "translating": "🤖 Metinler otomatik olarak Türkçeye çevriliyor...",
         "opt_suffix": "Model Adı Eki (Suffix)", "opt_v_img": "Seçilince Değişecek Ana Resim", 
         "opt_suffix_help": "💡 Örn: 'L' yazarsanız, bayi bu donanımı seçtiğinde makine isminin sonuna bu harf otomatik eklenir."
-    },
-    "en": {
-        "m_title": "📦 Factory Database Management",
-        "t_mod": "📦 Models (Showcase)", "t_opt": "⚙️ Extra Options", "t_cat": "📂 Categories",
-        "reg_mach": "Registered Machines", "add_mach": "➕ ADD NEW MACHINE",
-        "no_img": "No Image", "price_wait": "Price Pending", "no_auth_price": "🔒 Price Hidden",
-        "btn_edit": "✏️", "btn_copy": "📄", "btn_del": "🗑️",
-        "copied": "Copied!", "no_mach": "No machines found in the system yet.",
-        "opt_showcase": "Extra Options Showcase", "add_opt": "➕ ADD NEW OPTION",
-        "no_opt": "No extra options found in the system yet.",
-        "cat_mng": "📂 Category Management", "new_cat": "Add New Category", "new_cat_ph": "New Category Name...",
-        "btn_add": "➕ Add", "cat_exists": "A category with this name already exists!",
-        "new_name": "New Name", "save": "💾", "cancel": "❌", "btn_edit_txt": "✏️ Edit", "btn_del_txt": "🗑️ Delete",
-        "no_cat": "No categories found in the system yet.",
-        "back_list": "🔙 Back to List", "edit_mach": "✏️ Machine Card Editor", "new_mach": "✨ Create New Machine Card",
-        "tab_gen": "📄 General Info", "tab_tech": "⚙️ Technical Specs", "tab_comp": "🔌 Compatible Options",
-        "m_name": "Machine Name *", "m_cat": "Category",
-        "price_lock": "🔒 Pricing belongs to Admin.",
-        "dom_price": "Domestic Price *", "currency": "Currency", "port_disc": "Port Discount (%)",
-        "main_img": "Main Image", "img_prev": "**Image Preview**",
-        "spec_title": "Spec Title", "spec_det": "Spec Detail", "choose_img": "Choose Image",
-        "add_spec": "➕ ADD NEW SPEC ROW", "no_comp_opt": "No compatible options defined.",
-        "save_changes": "💾 SAVE CHANGES", "add_sys": "💾 ADD TO SYSTEM",
-        "err_name": "Please enter the machine name!", "err_price": "Please enter a valid price!",
-        "edit_opt_title": "✏️ Edit Option", "new_opt_title": "✨ Add New Extra Option",
-        "opt_name": "Option Name *", "opt_price_lock": "🔒 Pricing will be set by the Admin.",
-        "opt_price": "Price *", "allow_qty": "Allow quantity selection",
-        "opt_desc": "Description", "opt_img_up": "Option Image", "err_opt_name": "Option Name is required!",
-        "translating": "🤖 Translating texts automatically...",
-        "opt_suffix": "Model Name Suffix", "opt_v_img": "Variant Main Image", 
-        "opt_suffix_help": "💡 Ex: Enter 'L' to dynamically append it to the machine name when this option is selected."
-    },
-    "zh": {
-        "m_title": "📦 工厂数据库管理",
-        "t_mod": "📦 型号 (展示)", "t_opt": "⚙️ 额外选项", "t_cat": "📂 类别",
-        "reg_mach": "已注册机器", "add_mach": "➕ 添加新机器",
-        "no_img": "无图像", "price_wait": "等待定价", "no_auth_price": "🔒 价格隐藏",
-        "btn_edit": "✏️", "btn_copy": "📄", "btn_del": "🗑️",
-        "copied": "已复制！", "no_mach": "系统中尚未找到机器。",
-        "opt_showcase": "额外选项展示", "add_opt": "➕ 添加新选项",
-        "no_opt": "系统中尚未找到额外选项。",
-        "cat_mng": "📂 类别管理", "new_cat": "添加新类别", "new_cat_ph": "新类别名称...",
-        "btn_add": "➕ 添加", "cat_exists": "该名称的类别已存在！",
-        "new_name": "新名称", "save": "💾", "cancel": "❌", "btn_edit_txt": "✏️ 编辑", "btn_del_txt": "🗑️ 删除",
-        "no_cat": "系统中尚未找到类别。",
-        "back_list": "🔙 返回列表", "edit_mach": "✏️ 机器卡片编辑器", "new_mach": "✨ 创建新机器卡片",
-        "tab_gen": "📄 一般信息", "tab_tech": "⚙️ 技术规格", "tab_comp": "🔌 兼容选项",
-        "m_name": "机器名称 (中文) *", "m_cat": "类别",
-        "price_lock": "🔒 定价由土耳其总部完成。",
-        "dom_price": "价格 *", "currency": "货币", "port_disc": "折扣 (%)",
-        "main_img": "主图像文件", "img_prev": "**图像预览**",
-        "spec_title": "规格标题", "spec_det": "规格详情", "choose_img": "选择图像",
-        "add_spec": "➕ 添加新规格行", "no_comp_opt": "没有为此机器定义兼容选项。",
-        "save_changes": "💾 保存更改", "add_sys": "💾 将机器添加到系统",
-        "err_name": "请输入机器名称！", "err_price": "请输入有效价格！",
-        "edit_opt_title": "✏️ 编辑选项", "new_opt_title": "✨ 添加新额外选项",
-        "opt_name": "选项名称 (中文) *", "opt_price_lock": "🔒 定价由土耳其总部完成。",
-        "opt_price": "价格 *", "allow_qty": "允许数量选择",
-        "opt_desc": "描述", "opt_img_up": "选项图像", "err_opt_name": "选项名称为必填项！",
-        "translating": "🤖 正在自动翻译成土耳其语...",
-        "opt_suffix": "模型名称后缀", "opt_v_img": "变体主图像", 
-        "opt_suffix_help": "💡 提示：输入“L”，当选择此选项时，它将动态附加到机器名称中。"
     }
 }
-
 def _m(key): 
-    lang = "tr"
-    if "language" in st.session_state: lang = st.session_state.language
-    elif "lang" in st.session_state: lang = st.session_state.lang
-    lang = str(lang).lower()
-    if lang not in DICT_MODEL: lang = "tr"
-    return DICT_MODEL[lang].get(key, key)
+    lang = st.session_state.get("language", st.session_state.get("lang", "tr"))
+    return DICT_MODEL.get(str(lang).lower(), DICT_MODEL["tr"]).get(key, key)
 
 # =====================================================================
 # VERİTABANI BAĞLANTILARI
@@ -178,8 +122,7 @@ def get_factory(query, params=()):
         c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
         return res
     except Exception as e: 
-        st.error(f"DB Error: {e}")
-        return []
+        st.error(f"DB Error: {e}"); return []
 
 def exec_factory(query, params=()):
     try:
@@ -298,7 +241,6 @@ def show_list_view(user_role):
             st.session_state.opt_form_loaded = False; st.session_state.view_mode = "opt_add"; st.rerun()
         
         st.markdown("---")
-        # YENİ: opt_suffix ve opt_variant_image alanlarını da dahil ediyoruz
         query_opt = "SELECT id, opt_name, opt_price, opt_desc, opt_image, opt_name_zh, opt_suffix, opt_variant_image FROM options"
         params_opt = ()
         if user_role == "manufacturer":
@@ -310,7 +252,6 @@ def show_list_view(user_role):
                 cols = st.columns(4)
                 for j in range(4):
                     if i + j < len(opts):
-                        # YENİ formatta karşılama
                         o_id, o_name, o_price, o_desc, o_img, o_name_zh, o_suffix, o_var_img = opts[i+j]
                         disp_name = o_name_zh if user_role == "manufacturer" and o_name_zh else o_name
                         with cols[j].container(border=True):
@@ -319,8 +260,6 @@ def show_list_view(user_role):
                             else: st.markdown(f"<div style='height:120px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:12px; margin-bottom:15px;'>{_m('no_img')}</div>", unsafe_allow_html=True)
                             
                             st.markdown(f"<b>{disp_name}</b>", unsafe_allow_html=True)
-                            
-                            # Eğer Suffix veya Resim tanımlıysa bilgi ver
                             if o_suffix or o_var_img:
                                 st.markdown(f"<div style='font-size:11px; color:#2563eb; font-weight:bold; margin-bottom:5px;'>✨ Akıllı Varyasyon</div>", unsafe_allow_html=True)
                             
@@ -509,4 +448,97 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                         data_dict["id"] = mod_id
                         sync_to_vault("models", data_dict, "upsert", mod_id)
                 else:
-                    exec_factory("INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path, user_id) VALUES (?,?,?,?,?,?,?,
+                    exec_factory("INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (f_name_tr, f_name_zh, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, specs_tr, specs_zh, opt_str, st.session_state.f_disc, st.session_state.f_img, uid))
+                    if user_role == "manufacturer":
+                        new_id = get_factory("SELECT id FROM models ORDER BY id DESC LIMIT 1")[0][0]
+                        data_dict["id"] = new_id
+                        sync_to_vault("models", data_dict, "upsert", new_id)
+                
+                st.session_state.view_mode = "list"; st.rerun()
+
+# =====================================================================
+# DONANIM FORMU (YENİ AKILLI VARYASYON EKLENDİ)
+# =====================================================================
+def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
+    col_b, col_t = st.columns([1, 5], vertical_alignment="center")
+    if col_b.button(_m("back_list"), use_container_width=True): st.session_state.view_mode = "list"; st.rerun()
+    is_edit = (mode == "edit" and opt_id)
+    col_t.header(_m("edit_opt_title") if is_edit else _m("new_opt_title"))
+    st.markdown("---")
+
+    if not st.session_state.get("opt_form_loaded", False):
+        st.session_state.opt_form_loaded = True
+        if is_edit:
+            r = get_factory("SELECT opt_name, opt_price, opt_desc, opt_image, allow_qty, opt_name_zh, opt_desc_zh, opt_suffix, opt_variant_image FROM options WHERE id=?", (opt_id,))[0]
+            st.session_state.o_name = r[5] if user_role == "manufacturer" and r[5] else r[0]
+            st.session_state.o_desc = r[6] if user_role == "manufacturer" and r[6] else r[2]
+            st.session_state.o_price, st.session_state.o_img, st.session_state.o_qty = r[1], r[3], bool(r[4])
+            st.session_state.o_suffix = r[7]
+            st.session_state.o_v_img = r[8]
+        else:
+            st.session_state.o_name, st.session_state.o_price, st.session_state.o_desc, st.session_state.o_img, st.session_state.o_qty = "", 0.0, "", "", True
+            st.session_state.o_suffix, st.session_state.o_v_img = "", ""
+
+    with st.container(border=True):
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.session_state.o_name = st.text_input(_m("opt_name"), value=st.session_state.o_name)
+            
+            st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+            v_col1, v_col2 = st.columns(2)
+            st.session_state.o_suffix = v_col1.text_input(_m("opt_suffix"), value=st.session_state.o_suffix, placeholder="Örn: L, -PRO")
+            v_col1.info(_m("opt_suffix_help"))
+            v_col2.file_uploader(_m("opt_v_img"), type=['png','jpg','jpeg'], key="up_v_img")
+            st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+            
+            if user_role == "manufacturer": st.warning(_m("opt_price_lock"))
+            else: st.session_state.o_price = st.number_input(_m("opt_price"), value=st.session_state.o_price, min_value=0.0, step=50.0)
+            
+            st.session_state.o_qty = st.checkbox(_m("allow_qty"), value=st.session_state.o_qty)
+            st.session_state.o_desc = st.text_area(_m("opt_desc"), value=st.session_state.o_desc, height=120)
+            st.file_uploader(_m("opt_img_up"), type=['png','jpg','jpeg'], key="up_opt")
+            
+        with c2:
+            st.markdown(_m("img_prev"))
+            up_o = st.session_state.get("up_opt")
+            if up_o: st.image(up_o, use_container_width=True)
+            else:
+                prev_img = get_image_base64(st.session_state.o_img)
+                if prev_img: st.markdown(f'<img src="{prev_img}" style="width:100%; border-radius:8px;">', unsafe_allow_html=True)
+
+        if st.button("💾 " + (_m("save_changes") if is_edit else _m("add_sys")), type="primary", use_container_width=True):
+            if not st.session_state.o_name: st.error(_m("err_opt_name"))
+            elif user_role != "manufacturer" and st.session_state.o_price <= 0: st.error(_m("err_price"))
+            else:
+                with st.spinner(_m("translating")):
+                    uid = st.session_state.get("user_id", 1)
+                    
+                    up = st.session_state.get("up_opt")
+                    if up: st.session_state.o_img = process_image(up, "opt", square=True)
+                    
+                    up_var = st.session_state.get("up_v_img")
+                    if up_var: st.session_state.o_v_img = process_image(up_var, "variant_machine", size=(1200, 1200), square=False)
+                    
+                    allow_q = 1 if st.session_state.o_qty else 0
+                    
+                    if user_role == "manufacturer":
+                        o_n_zh = st.session_state.o_name; o_n_tr = auto_translate_to_tr(o_n_zh)
+                        o_d_zh = st.session_state.o_desc; o_d_tr = auto_translate_to_tr(o_d_zh)
+                        
+                        data_opt = {"opt_name": o_n_tr, "opt_name_zh": o_n_zh, "opt_desc": o_d_tr, "opt_desc_zh": o_d_zh, "opt_price": st.session_state.o_price, "opt_image": st.session_state.o_img, "allow_qty": allow_q, "opt_suffix": st.session_state.o_suffix, "opt_variant_image": st.session_state.o_v_img, "user_id": uid}
+                        
+                        if is_edit: 
+                            exec_factory("UPDATE options SET opt_name=?, opt_name_zh=?, opt_desc=?, opt_desc_zh=?, opt_price=?, opt_image=?, allow_qty=?, opt_suffix=?, opt_variant_image=? WHERE id=?", (o_n_tr, o_n_zh, o_d_tr, o_d_zh, st.session_state.o_price, st.session_state.o_img, allow_q, st.session_state.o_suffix, st.session_state.o_v_img, opt_id))
+                            data_opt["id"] = opt_id
+                            sync_to_vault("options", data_opt, "upsert", opt_id)
+                        else: 
+                            exec_factory("INSERT INTO options (opt_name, opt_name_zh, opt_desc, opt_desc_zh, opt_price, opt_image, allow_qty, opt_suffix, opt_variant_image, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)", (o_n_tr, o_n_zh, o_d_tr, o_d_zh, st.session_state.o_price, st.session_state.o_img, allow_q, st.session_state.o_suffix, st.session_state.o_v_img, uid))
+                            new_id = get_factory("SELECT id FROM options ORDER BY id DESC LIMIT 1")[0][0]
+                            data_opt["id"] = new_id
+                            sync_to_vault("options", data_opt, "upsert", new_id)
+                    else:
+                        o_n_tr = st.session_state.o_name; o_d_tr = st.session_state.o_desc
+                        if is_edit: exec_factory("UPDATE options SET opt_name=?, opt_desc=?, opt_price=?, opt_image=?, allow_qty=?, opt_suffix=?, opt_variant_image=? WHERE id=?", (o_n_tr, o_d_tr, st.session_state.o_price, st.session_state.o_img, allow_q, st.session_state.o_suffix, st.session_state.o_v_img, opt_id))
+                        else: exec_factory("INSERT INTO options (opt_name, opt_desc, opt_price, opt_image, allow_qty, opt_suffix, opt_variant_image, user_id) VALUES (?,?,?,?,?,?,?,?)", (o_n_tr, o_d_tr, st.session_state.o_price, st.session_state.o_img, allow_q, st.session_state.o_suffix, st.session_state.o_v_img, uid))
+                    
+                    st.session_state.view_mode = "list"; st.rerun()
