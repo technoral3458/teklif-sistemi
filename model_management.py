@@ -70,7 +70,6 @@ def sync_to_vault(table, data_dict, operation="upsert", item_id=None):
         elif table == "options":
             c.execute("""CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY, opt_name TEXT, opt_name_zh TEXT, opt_desc TEXT, opt_desc_zh TEXT, opt_price REAL, opt_image TEXT, allow_qty INTEGER, opt_suffix TEXT DEFAULT '', opt_variant_image TEXT DEFAULT '', user_id INTEGER)""")
             
-            # Migration (Sütunlar yoksa ekle)
             cols_info = [col[1] for col in c.execute("PRAGMA table_info(options)").fetchall()]
             if "opt_suffix" not in cols_info: c.execute("ALTER TABLE options ADD COLUMN opt_suffix TEXT DEFAULT ''")
             if "opt_variant_image" not in cols_info: c.execute("ALTER TABLE options ADD COLUMN opt_variant_image TEXT DEFAULT ''")
@@ -213,14 +212,16 @@ def get_factory(query, params=()):
         c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
         return res
     except Exception as e: 
-        st.error(f"DB Error: {e}"); return []
+        st.error(f"DB Read Error: {e}"); return []
 
 def exec_factory(query, params=()):
     try:
         conn = sqlite3.connect('factory_data.db')
         c = conn.cursor(); c.execute(query, params); conn.commit(); conn.close()
+        return True # BAŞARIYLA KAYDEDİLDİ
     except Exception as e:
-        st.error(f"DB Write Error: {e}")
+        st.error(f"Veritabanı Yazma Hatası: {e}")
+        return False # KAYIT BAŞARISIZ
 
 def get_image_base64(img_path):
     if not img_path: return ""
@@ -538,20 +539,21 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                     specs_zh = st.session_state.get('f_specs_zh', '')
                 
                 opt_str = ",".join(st.session_state.f_opts)
-                
                 data_dict = {"name": f_name_tr, "name_zh": f_name_zh, "category": st.session_state.f_cat, "base_price": st.session_state.f_price, "currency": st.session_state.f_curr, "specs": specs_tr, "specs_zh": specs_zh, "compatible_options": opt_str, "port_discount": st.session_state.f_disc, "image_path": st.session_state.f_img, "user_id": uid}
                 
                 if is_edit:
-                    exec_factory("UPDATE models SET name=?, name_zh=?, category=?, base_price=?, currency=?, specs=?, specs_zh=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?", (f_name_tr, f_name_zh, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, specs_tr, specs_zh, opt_str, st.session_state.f_disc, st.session_state.f_img, mod_id))
-                    if user_role == "manufacturer": 
+                    success = exec_factory("UPDATE models SET name=?, name_zh=?, category=?, base_price=?, currency=?, specs=?, specs_zh=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?", (f_name_tr, f_name_zh, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, specs_tr, specs_zh, opt_str, st.session_state.f_disc, st.session_state.f_img, mod_id))
+                    if success and user_role == "manufacturer": 
                         data_dict["id"] = mod_id
                         sync_to_vault("models", data_dict, "upsert", mod_id)
                 else:
-                    exec_factory("INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (f_name_tr, f_name_zh, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, specs_tr, specs_zh, opt_str, st.session_state.f_disc, st.session_state.f_img, uid))
-                    if user_role == "manufacturer":
-                        new_id = get_factory("SELECT id FROM models ORDER BY id DESC LIMIT 1")[0][0]
-                        data_dict["id"] = new_id
-                        sync_to_vault("models", data_dict, "upsert", new_id)
+                    success = exec_factory("INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (f_name_tr, f_name_zh, st.session_state.f_cat, st.session_state.f_price, st.session_state.f_curr, specs_tr, specs_zh, opt_str, st.session_state.f_disc, st.session_state.f_img, uid))
+                    if success and user_role == "manufacturer":
+                        new_id_res = get_factory("SELECT id FROM models ORDER BY id DESC LIMIT 1")
+                        if new_id_res:
+                            new_id = new_id_res[0][0]
+                            data_dict["id"] = new_id
+                            sync_to_vault("models", data_dict, "upsert", new_id)
                 
                 st.session_state.view_mode = "list"; st.rerun()
 
@@ -631,14 +633,18 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
                         data_opt = {"opt_name": o_n_tr, "opt_name_zh": o_n_zh, "opt_desc": o_d_tr, "opt_desc_zh": o_d_zh, "opt_price": st.session_state.o_price, "opt_image": st.session_state.o_img, "allow_qty": allow_q, "opt_suffix": st.session_state.o_suffix, "opt_variant_image": st.session_state.o_v_img, "user_id": uid}
                         
                         if is_edit: 
-                            exec_factory("UPDATE options SET opt_name=?, opt_name_zh=?, opt_desc=?, opt_desc_zh=?, opt_price=?, opt_image=?, allow_qty=?, opt_suffix=?, opt_variant_image=? WHERE id=?", (o_n_tr, o_n_zh, o_d_tr, o_d_zh, st.session_state.o_price, st.session_state.o_img, allow_q, st.session_state.o_suffix, st.session_state.o_v_img, opt_id))
-                            data_opt["id"] = opt_id
-                            sync_to_vault("options", data_opt, "upsert", opt_id)
+                            success = exec_factory("UPDATE options SET opt_name=?, opt_name_zh=?, opt_desc=?, opt_desc_zh=?, opt_price=?, opt_image=?, allow_qty=?, opt_suffix=?, opt_variant_image=? WHERE id=?", (o_n_tr, o_n_zh, o_d_tr, o_d_zh, st.session_state.o_price, st.session_state.o_img, allow_q, st.session_state.o_suffix, st.session_state.o_v_img, opt_id))
+                            if success:
+                                data_opt["id"] = opt_id
+                                sync_to_vault("options", data_opt, "upsert", opt_id)
                         else: 
-                            exec_factory("INSERT INTO options (opt_name, opt_name_zh, opt_desc, opt_desc_zh, opt_price, opt_image, allow_qty, opt_suffix, opt_variant_image, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)", (o_n_tr, o_n_zh, o_d_tr, o_d_zh, st.session_state.o_price, st.session_state.o_img, allow_q, st.session_state.o_suffix, st.session_state.o_v_img, uid))
-                            new_id = get_factory("SELECT id FROM options ORDER BY id DESC LIMIT 1")[0][0]
-                            data_opt["id"] = new_id
-                            sync_to_vault("options", data_opt, "upsert", new_id)
+                            success = exec_factory("INSERT INTO options (opt_name, opt_name_zh, opt_desc, opt_desc_zh, opt_price, opt_image, allow_qty, opt_suffix, opt_variant_image, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)", (o_n_tr, o_n_zh, o_d_tr, o_d_zh, st.session_state.o_price, st.session_state.o_img, allow_q, st.session_state.o_suffix, st.session_state.o_v_img, uid))
+                            if success:
+                                new_id_res = get_factory("SELECT id FROM options ORDER BY id DESC LIMIT 1")
+                                if new_id_res:
+                                    new_id = new_id_res[0][0]
+                                    data_opt["id"] = new_id
+                                    sync_to_vault("options", data_opt, "upsert", new_id)
                     else:
                         o_n_tr = st.session_state.o_name; o_d_tr = st.session_state.o_desc
                         if is_edit: exec_factory("UPDATE options SET opt_name=?, opt_desc=?, opt_price=?, opt_image=?, allow_qty=?, opt_suffix=?, opt_variant_image=? WHERE id=?", (o_n_tr, o_d_tr, st.session_state.o_price, st.session_state.o_img, allow_q, st.session_state.o_suffix, st.session_state.o_v_img, opt_id))
