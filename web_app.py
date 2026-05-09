@@ -160,7 +160,7 @@ def repair_databases():
             except: pass
     conn.commit(); conn.close()
 
-    # FACTORY DB
+    # FACTORY DB (Varyasyon sisteminin güvende olması için onarımlar eklendi)
     conn = sqlite3.connect('factory_data.db')
     conn.execute("""CREATE TABLE IF NOT EXISTS company_profile (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, logo_path TEXT)""")
     conn.execute("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_price REAL, image_path TEXT, specs TEXT, currency TEXT DEFAULT 'USD', port_discount REAL DEFAULT 0.0, compatible_options TEXT DEFAULT '', gallery_images TEXT DEFAULT '', category TEXT DEFAULT 'Diğer Makinalar', gallery_videos TEXT DEFAULT '', name_zh TEXT DEFAULT '', specs_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
@@ -172,7 +172,7 @@ def repair_databases():
     
     conn.execute("""CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY AUTOINCREMENT, opt_name TEXT, opt_desc TEXT, opt_price REAL, opt_image TEXT, sort_order INTEGER DEFAULT 0, allow_qty INTEGER DEFAULT 1, opt_name_zh TEXT DEFAULT '', opt_desc_zh TEXT DEFAULT '', user_id INTEGER DEFAULT 1)""")
     o_cols = [c[1] for c in conn.execute("PRAGMA table_info(options)").fetchall()]
-    for col, col_type in [("user_id", "INTEGER DEFAULT 1"), ("opt_name_zh", "TEXT DEFAULT ''"), ("opt_desc_zh", "TEXT DEFAULT ''")]:
+    for col, col_type in [("user_id", "INTEGER DEFAULT 1"), ("opt_name_zh", "TEXT DEFAULT ''"), ("opt_desc_zh", "TEXT DEFAULT ''"), ("opt_suffix", "TEXT DEFAULT ''"), ("opt_variant_image", "TEXT DEFAULT ''")]:
         if col not in o_cols:
             try: conn.execute(f"ALTER TABLE options ADD COLUMN {col} {col_type}")
             except: pass
