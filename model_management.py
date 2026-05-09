@@ -8,8 +8,14 @@ from PIL import Image
 import json
 
 # =====================================================================
-# 🛠️ GÜÇLENDİRİLMİŞ VERİTABANI OTO-TAMİR MOTORU
+# 🛡️ GÜVENLİ VERİ OKUMA VE TABLO ONARIM MOTORU
 # =====================================================================
+def get_safe(row, index, default=""):
+    """Veritabanından eksik sütun gelse bile çökmesini engelleyen çelik zırh"""
+    if row and isinstance(row, (list, tuple)) and len(row) > index:
+        return row[index] if row[index] is not None else default
+    return default
+
 def repair_model_db():
     try:
         conn = sqlite3.connect('factory_data.db', check_same_thread=False)
@@ -70,6 +76,7 @@ def sync_to_vault(table, data_dict, operation="upsert", item_id=None):
         elif table == "options":
             c.execute("""CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY, opt_name TEXT, opt_name_zh TEXT, opt_desc TEXT, opt_desc_zh TEXT, opt_price REAL, opt_image TEXT, allow_qty INTEGER, opt_suffix TEXT DEFAULT '', opt_variant_image TEXT DEFAULT '', user_id INTEGER)""")
             
+            # Migration
             cols_info = [col[1] for col in c.execute("PRAGMA table_info(options)").fetchall()]
             if "opt_suffix" not in cols_info: c.execute("ALTER TABLE options ADD COLUMN opt_suffix TEXT DEFAULT ''")
             if "opt_variant_image" not in cols_info: c.execute("ALTER TABLE options ADD COLUMN opt_variant_image TEXT DEFAULT ''")
@@ -218,10 +225,10 @@ def exec_factory(query, params=()):
     try:
         conn = sqlite3.connect('factory_data.db')
         c = conn.cursor(); c.execute(query, params); conn.commit(); conn.close()
-        return True # BAŞARIYLA KAYDEDİLDİ
+        return True
     except Exception as e:
         st.error(f"Veritabanı Yazma Hatası: {e}")
-        return False # KAYIT BAŞARISIZ
+        return False
 
 def get_image_base64(img_path):
     if not img_path: return ""
@@ -290,7 +297,12 @@ def show_list_view(user_role):
             
         mods = get_factory(query + " ORDER BY category ASC, name ASC", params)
         if mods:
-            df = pd.DataFrame(mods, columns=["id", "name", "category", "price", "currency", "image", "name_zh"])
+            # Eksik sütun gelirse diye korumalı DataFrame oluşturma
+            safe_mods = []
+            for m in mods:
+                safe_mods.append([get_safe(m,0,0), get_safe(m,1,""), get_safe(m,2,""), get_safe(m,3,0.0), get_safe(m,4,"USD"), get_safe(m,5,""), get_safe(m,6,"")])
+            
+            df = pd.DataFrame(safe_mods, columns=["id", "name", "category", "price", "currency", "image", "name_zh"])
             for cat in df['category'].unique():
                 with st.expander(f"📁 {cat}", expanded=True):
                     cat_mods = df[df['category'] == cat].reset_index(drop=True)
@@ -319,8 +331,9 @@ def show_list_view(user_role):
                                     if bc2.button(_m("btn_copy"), key=f"mc_{row['id']}", use_container_width=True):
                                         m_data = get_factory("SELECT name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos, name_zh, specs_zh FROM models WHERE id=?", (row['id'],))
                                         if m_data:
-                                            m_data = m_data[0]
-                                            exec_factory("INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos, name_zh, specs_zh, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (m_data[0] + " (Copy)", m_data[1], m_data[2], m_data[3], m_data[4], m_data[5], m_data[6], m_data[7], m_data[8], m_data[9], m_data[10], m_data[11], user_id))
+                                            m = m_data[0]
+                                            exec_factory("INSERT INTO models (name, base_price, image_path, specs, currency, port_discount, compatible_options, gallery_images, category, gallery_videos, name_zh, specs_zh, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", 
+                                                         (get_safe(m,0,"") + " (Copy)", get_safe(m,1,0.0), get_safe(m,2,""), get_safe(m,3,""), get_safe(m,4,"USD"), get_safe(m,5,0.0), get_safe(m,6,""), get_safe(m,7,""), get_safe(m,8,"Diğer Makinalar"), get_safe(m,9,""), get_safe(m,10,""), get_safe(m,11,""), user_id))
                                         st.rerun()
                                     if bc3.button(_m("btn_del"), key=f"md_{row['id']}", use_container_width=True):
                                         exec_factory("DELETE FROM models WHERE id=?", (row['id'],))
@@ -346,7 +359,16 @@ def show_list_view(user_role):
                 cols = st.columns(4)
                 for j in range(4):
                     if i + j < len(opts):
-                        o_id, o_name, o_price, o_desc, o_img, o_name_zh, o_suffix, o_var_img = opts[i+j]
+                        row_opt = opts[i+j]
+                        o_id = get_safe(row_opt, 0, 0)
+                        o_name = get_safe(row_opt, 1, "Bilinmeyen")
+                        o_price = get_safe(row_opt, 2, 0.0)
+                        o_desc = get_safe(row_opt, 3, "")
+                        o_img = get_safe(row_opt, 4, "")
+                        o_name_zh = get_safe(row_opt, 5, "")
+                        o_suffix = get_safe(row_opt, 6, "")
+                        o_var_img = get_safe(row_opt, 7, "")
+                        
                         disp_name = o_name_zh if user_role == "manufacturer" and o_name_zh else o_name
                         with cols[j].container(border=True):
                             img_b64 = get_image_base64(o_img)
@@ -366,8 +388,9 @@ def show_list_view(user_role):
                             if bc2.button(_m("btn_copy"), key=f"oc_{o_id}", use_container_width=True):
                                 o_data_list = get_factory("SELECT opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty, opt_name_zh, opt_desc_zh, opt_suffix, opt_variant_image FROM options WHERE id=?", (o_id,))
                                 if o_data_list:
-                                    o_data = o_data_list[0]
-                                    exec_factory("INSERT INTO options (opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty, opt_name_zh, opt_desc_zh, opt_suffix, opt_variant_image, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (o_data[0] + " (Copy)", o_data[1], o_data[2], o_data[3], o_data[4], o_data[5], o_data[6], o_data[7], o_data[8], o_data[9], user_id))
+                                    o = o_data_list[0]
+                                    exec_factory("INSERT INTO options (opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty, opt_name_zh, opt_desc_zh, opt_suffix, opt_variant_image, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", 
+                                                 (get_safe(o,0,"") + " (Copy)", get_safe(o,1,""), get_safe(o,2,0.0), get_safe(o,3,""), get_safe(o,4,0), get_safe(o,5,1), get_safe(o,6,""), get_safe(o,7,""), get_safe(o,8,""), get_safe(o,9,""), user_id))
                                 st.rerun()
                             if bc3.button(_m("btn_del"), key=f"od_{o_id}", use_container_width=True):
                                 exec_factory("DELETE FROM options WHERE id=?", (o_id,))
@@ -417,13 +440,13 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                 st.error("Kayıt bulunamadı. Lütfen listeye dönün.")
                 st.stop()
             r = r_list[0]
-            st.session_state.f_name = r[8] if user_role == "manufacturer" and r[8] else r[0]
-            st.session_state.f_price, st.session_state.f_curr, st.session_state.f_cat = r[1], r[2], r[3]
-            st.session_state.f_disc, st.session_state.f_img = r[4], r[5]
-            st.session_state.f_opts = [x.strip() for x in str(r[7]).split(",") if x.strip()]
+            st.session_state.f_name = get_safe(r, 8, "") if user_role == "manufacturer" and get_safe(r, 8, "") else get_safe(r, 0, "")
+            st.session_state.f_price, st.session_state.f_curr, st.session_state.f_cat = get_safe(r, 1, 0.0), get_safe(r, 2, "USD"), get_safe(r, 3, st.session_state.f_cats[0])
+            st.session_state.f_disc, st.session_state.f_img = get_safe(r, 4, 0.0), get_safe(r, 5, "")
+            st.session_state.f_opts = [x.strip() for x in str(get_safe(r, 7, "")).split(",") if x.strip()]
             
             s_list = []
-            target_specs = r[9] if user_role == "manufacturer" and r[9] else r[6]
+            target_specs = get_safe(r, 9, "") if user_role == "manufacturer" and get_safe(r, 9, "") else get_safe(r, 6, "")
             if target_specs:
                 for item in str(target_specs).split("||"):
                     if item.strip():
@@ -449,7 +472,7 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
             else:
                 cp1, cp2 = st.columns([3, 1])
                 st.session_state.f_price = cp1.number_input(_m("dom_price"), value=st.session_state.f_price, min_value=0.0, step=100.0)
-                st.session_state.f_curr = cp2.selectbox(_m("currency"), ["USD", "EUR", "TRY"], index=["USD", "EUR", "TRY"].index(st.session_state.f_curr))
+                st.session_state.f_curr = cp2.selectbox(_m("currency"), ["USD", "EUR", "TRY"], index=["USD", "EUR", "TRY"].index(st.session_state.f_curr) if st.session_state.f_curr in ["USD", "EUR", "TRY"] else 0)
                 st.session_state.f_disc = st.number_input(_m("port_disc"), value=st.session_state.f_disc, min_value=0.0, max_value=100.0)
             
             st.file_uploader(_m("main_img"), type=['png','jpg','jpeg'], key="up_main")
@@ -495,7 +518,12 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
         new_opts = []
         chk_cols = st.columns(3)
         for idx, opt in enumerate(opts_avail):
-            o_id, o_name, o_price, o_img, o_name_zh = opt
+            o_id = get_safe(opt, 0, 0)
+            o_name = get_safe(opt, 1, "Bilinmeyen")
+            o_price = get_safe(opt, 2, 0.0)
+            o_img = get_safe(opt, 3, "")
+            o_name_zh = get_safe(opt, 4, "")
+            
             disp_name = o_name_zh if user_role == "manufacturer" and o_name_zh else o_name
             p_text = "" if user_role == "manufacturer" else (f"(+{o_price:,.0f})" if o_price > 0 else f"({_m('price_wait')})")
             
@@ -575,11 +603,11 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
                 st.error("Kayıt bulunamadı. Lütfen listeye dönün.")
                 st.stop()
             r = r_list[0]
-            st.session_state.o_name = r[5] if user_role == "manufacturer" and r[5] else r[0]
-            st.session_state.o_desc = r[6] if user_role == "manufacturer" and r[6] else r[2]
-            st.session_state.o_price, st.session_state.o_img, st.session_state.o_qty = r[1], r[3], bool(r[4])
-            st.session_state.o_suffix = r[7] if len(r) > 7 and r[7] else ""
-            st.session_state.o_v_img = r[8] if len(r) > 8 and r[8] else ""
+            st.session_state.o_name = get_safe(r, 5, "") if user_role == "manufacturer" and get_safe(r, 5, "") else get_safe(r, 0, "")
+            st.session_state.o_desc = get_safe(r, 6, "") if user_role == "manufacturer" and get_safe(r, 6, "") else get_safe(r, 2, "")
+            st.session_state.o_price, st.session_state.o_img, st.session_state.o_qty = get_safe(r, 1, 0.0), get_safe(r, 3, ""), bool(get_safe(r, 4, 1))
+            st.session_state.o_suffix = get_safe(r, 7, "")
+            st.session_state.o_v_img = get_safe(r, 8, "")
         else:
             st.session_state.o_name, st.session_state.o_price, st.session_state.o_desc, st.session_state.o_img, st.session_state.o_qty = "", 0.0, "", "", True
             st.session_state.o_suffix, st.session_state.o_v_img = "", ""
