@@ -1,25 +1,23 @@
 import streamlit as st
 import sqlite3
-import pandas as pd
 import os
 import base64
 import uuid
 from PIL import Image
 
 # =====================================================================
-# 🛠️ ÖLÜMSÜZ VERİTABANI MOTORU (DICTIONARY MİMARİSİ)
+# 🛠️ ÖLÜMSÜZ VERİTABANI MOTORU (SADE VE NET)
 # =====================================================================
 def db_query(query, params=()):
-    """Sıra numarasıyla değil, isimle veri çeken IndexError vermeyen motor."""
     try:
         conn = sqlite3.connect('factory_data.db', check_same_thread=False)
-        conn.row_factory = sqlite3.Row # Verileri liste değil, sözlük olarak alır!
+        conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute(query, params)
         res = c.fetchall()
         conn.close()
         return [dict(row) for row in res]
-    except Exception as e:
+    except:
         return []
 
 def exec_factory(query, params=()):
@@ -28,93 +26,20 @@ def exec_factory(query, params=()):
         c = conn.cursor(); c.execute(query, params); conn.commit(); conn.close()
         return True
     except Exception as e:
-        st.error(f"Kayıt Hatası: {e}")
+        st.error(f"İşlem Hatası: {e}")
         return False
 
-# EKSİK SÜTUNLARI ZORLA OLUŞTURMA MOTORU
-def enforce_column(table, column, def_val):
-    conn = sqlite3.connect('factory_data.db')
-    cols = [x[1] for x in conn.execute(f"PRAGMA table_info({table})").fetchall()]
-    if column not in cols:
-        try: conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {def_val}")
-        except: pass
-    conn.commit(); conn.close()
-
-def repair_model_db():
-    conn = sqlite3.connect('factory_data.db')
-    conn.execute("""CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE)""")
-    if not conn.execute("SELECT * FROM categories").fetchall():
-        conn.execute("INSERT OR IGNORE INTO categories (name) VALUES ('CNC İşleme Merkezleri')")
-        conn.execute("INSERT OR IGNORE INTO categories (name) VALUES ('Diğer Makinalar')")
-    conn.execute("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_price REAL, image_path TEXT, specs TEXT, currency TEXT DEFAULT 'USD', category TEXT DEFAULT 'Diğer Makinalar')""")
-    conn.execute("""CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY AUTOINCREMENT, opt_name TEXT, opt_price REAL, opt_image TEXT, sort_order INTEGER DEFAULT 0)""")
-    conn.commit(); conn.close()
-
-    # Zorunlu yeni sütunları tek tek garantile
-    enforce_column("models", "name_zh", "TEXT DEFAULT ''")
-    enforce_column("models", "specs_zh", "TEXT DEFAULT ''")
-    enforce_column("models", "compatible_options", "TEXT DEFAULT ''")
-    enforce_column("models", "port_discount", "REAL DEFAULT 0.0")
-    enforce_column("models", "user_id", "INTEGER DEFAULT 1")
-    enforce_column("models", "gallery_images", "TEXT DEFAULT ''")
-
-    enforce_column("options", "opt_name_zh", "TEXT DEFAULT ''")
-    enforce_column("options", "opt_desc", "TEXT DEFAULT ''")
-    enforce_column("options", "opt_desc_zh", "TEXT DEFAULT ''")
-    enforce_column("options", "allow_qty", "INTEGER DEFAULT 1")
-    enforce_column("options", "opt_suffix", "TEXT DEFAULT ''") # AKILLI VARYASYON
-    enforce_column("options", "opt_variant_image", "TEXT DEFAULT ''") # AKILLI VARYASYON
-    enforce_column("options", "user_id", "INTEGER DEFAULT 1")
-
-repair_model_db()
-
-# =====================================================================
-# 🛡️ YEDEKLEME VE KASA MOTORU (MANUFACTURER VAULT)
-# =====================================================================
-def sync_to_vault(table, data_dict, operation="upsert", item_id=None):
-    try:
-        conn = sqlite3.connect('manufacturer_vault.db', check_same_thread=False)
-        c = conn.cursor()
-        if table == "models":
-            c.execute("""CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY, name TEXT, name_zh TEXT, category TEXT, base_price REAL, currency TEXT, specs TEXT, specs_zh TEXT, compatible_options TEXT, port_discount REAL, image_path TEXT, user_id INTEGER)""")
-            if operation == "upsert":
-                cols = ", ".join(data_dict.keys()); placeholders = ", ".join(["?"] * len(data_dict)); values = tuple(data_dict.values())
-                if item_id: c.execute(f"DELETE FROM models WHERE id=?", (item_id,))
-                c.execute(f"INSERT INTO models ({cols}) VALUES ({placeholders})", values)
-            elif operation == "delete": c.execute("DELETE FROM models WHERE id=?", (item_id,))
-        elif table == "options":
-            c.execute("""CREATE TABLE IF NOT EXISTS options (id INTEGER PRIMARY KEY, opt_name TEXT, opt_name_zh TEXT, opt_desc TEXT, opt_desc_zh TEXT, opt_price REAL, opt_image TEXT, allow_qty INTEGER, opt_suffix TEXT DEFAULT '', opt_variant_image TEXT DEFAULT '', user_id INTEGER)""")
-            cols_info = [col[1] for col in c.execute("PRAGMA table_info(options)").fetchall()]
-            if "opt_suffix" not in cols_info: c.execute("ALTER TABLE options ADD COLUMN opt_suffix TEXT DEFAULT ''")
-            if "opt_variant_image" not in cols_info: c.execute("ALTER TABLE options ADD COLUMN opt_variant_image TEXT DEFAULT ''")
-            if operation == "upsert":
-                cols = ", ".join(data_dict.keys()); placeholders = ", ".join(["?"] * len(data_dict)); values = tuple(data_dict.values())
-                if item_id: c.execute(f"DELETE FROM options WHERE id=?", (item_id,))
-                c.execute(f"INSERT INTO options ({cols}) VALUES ({placeholders})", values)
-            elif operation == "delete": c.execute("DELETE FROM options WHERE id=?", (item_id,))
-        conn.commit(); conn.close()
-    except: pass
-
-# =====================================================================
-# 🤖 YAPAY ZEKA ÇEVİRİ MOTORU
-# =====================================================================
-try:
-    from deep_translator import GoogleTranslator
-    TRANSLATOR_READY = True
-except ImportError:
-    TRANSLATOR_READY = False
-
-def auto_translate_to_tr(text):
-    if not TRANSLATOR_READY or not text or not str(text).strip(): return text
-    try: return GoogleTranslator(source='auto', target='tr').translate(str(text))
-    except: return text
+def get_safe(row, key, default=""):
+    if row and key in row and row[key] is not None:
+        return row[key]
+    return default
 
 # =====================================================================
 # RESİM YARDIMCILARI
 # =====================================================================
 def get_image_base64(img_path):
     if not img_path: return ""
-    paths = [img_path, f"images/{img_path}", f"../images/{img_path}"]
+    paths = [img_path, f"images/{img_path}"]
     for p in paths:
         if os.path.exists(p) and os.path.isfile(p):
             with open(p, "rb") as f:
@@ -138,8 +63,19 @@ def process_image(uploaded_file, prefix="img", size=(1200, 1200), square=True):
     except: return ""
 
 # =====================================================================
-# DİL SÖZLÜĞÜ
+# ÇOKLU DİL
 # =====================================================================
+try:
+    from deep_translator import GoogleTranslator
+    TRANSLATOR_READY = True
+except ImportError:
+    TRANSLATOR_READY = False
+
+def auto_translate_to_tr(text):
+    if not TRANSLATOR_READY or not text or not str(text).strip(): return text
+    try: return GoogleTranslator(source='auto', target='tr').translate(str(text))
+    except: return text
+
 DICT_MODEL = {
     "tr": {
         "m_title": "📦 Fabrika Veritabanı Yönetimi", "t_mod": "📦 Modeller (Vitrin)", "t_opt": "⚙️ Donanımlar", "t_cat": "📂 Kategoriler",
@@ -158,7 +94,7 @@ DICT_MODEL = {
 def _m(key): return DICT_MODEL.get(st.session_state.get("lang", "tr").lower(), DICT_MODEL["tr"]).get(key, key)
 
 # =====================================================================
-# ANA YÖNETİM MODÜLÜ
+# YÖNLENDİRME
 # =====================================================================
 def show_product_management():
     if "view_mode" not in st.session_state: st.session_state.view_mode = "list"
@@ -171,7 +107,7 @@ def show_product_management():
     elif st.session_state.view_mode == "opt_edit": show_opt_form_view("edit", st.session_state.get("edit_opt_id"), user_role)
 
 # =====================================================================
-# LİSTELEME EKRANI (PANDAS İLE GRUPLAMA YAPAN ŞIK VERSİYON)
+# LİSTELEME EKRANI (PANDAS KALDIRILDI, KOPYALA BUTONU EKLENDİ)
 # =====================================================================
 def show_list_view(user_role):
     st.header(_m("m_title"))
@@ -190,46 +126,47 @@ def show_list_view(user_role):
         mods = db_query("SELECT * FROM models" + q_ext + " ORDER BY category ASC, name ASC", p_ext)
             
         if mods:
-            # GÜVENLİ DATAFRAME OLUŞTURMA
-            safe_mods = []
+            # Saf Python Gruplama (Hataya yer yok)
+            cats_dict = {}
             for m in mods:
-                safe_mods.append({
-                    "id": m.get("id", 0),
-                    "name": m.get("name", "İsim Yok"),
-                    "category": m.get("category", "Diğer Makinalar"),
-                    "price": m.get("base_price", 0.0),
-                    "currency": m.get("currency", "USD"),
-                    "image": m.get("image_path", ""),
-                    "name_zh": m.get("name_zh", "")
-                })
-                
-            df = pd.DataFrame(safe_mods)
-            for cat in df['category'].unique():
+                c = m.get('category')
+                if not c: c = "Diğer Makinalar"
+                if c not in cats_dict: cats_dict[c] = []
+                cats_dict[c].append(m)
+
+            for cat, cat_mods in cats_dict.items():
                 with st.expander(f"📁 {cat}", expanded=True):
-                    cat_mods = df[df['category'] == cat].reset_index(drop=True)
                     for i in range(0, len(cat_mods), 4):
                         cols = st.columns(4)
                         for j in range(4):
                             if i + j < len(cat_mods):
-                                row = cat_mods.iloc[i + j]
+                                row = cat_mods[i + j]
                                 d_name = row.get('name_zh') if user_role == "manufacturer" and row.get('name_zh') else row.get('name')
-                                m_id = row.get('id')
+                                m_id = int(row.get('id'))
                                 
                                 with cols[j].container(border=True):
-                                    img_b64 = get_image_base64(row.get('image'))
+                                    img_b64 = get_image_base64(row.get('image_path'))
                                     if img_b64: st.markdown(f'<div style="text-align:center;"><img src="{img_b64}" style="width:100%; height:150px; object-fit:contain; margin-bottom:15px;"></div>', unsafe_allow_html=True)
                                     else: st.markdown(f"<div style='height:150px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:4px; color:#94a3b8; font-size:13px; margin-bottom:15px;'>{_m('no_img')}</div>", unsafe_allow_html=True)
                                     
                                     st.markdown(f"<h4 style='margin:0; color:#0f172a; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{d_name}</h4>", unsafe_allow_html=True)
                                     
                                     if user_role == "manufacturer": st.markdown(f"<div style='color:#64748b; font-weight:800; font-size:13px; margin-bottom:15px; padding:3px; background:#f1f5f9; border-radius:4px; text-align:center;'>{_m('no_auth_price')}</div>", unsafe_allow_html=True)
-                                    else: st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row.get('price',0):,.2f} {row.get('currency','USD')}</div>", unsafe_allow_html=True)
+                                    else: st.markdown(f"<div style='color:#ea580c; font-weight:800; font-size:16px; margin-bottom:15px;'>{row.get('base_price',0):,.2f} {row.get('currency','USD')}</div>", unsafe_allow_html=True)
                                         
-                                    bc1, bc2 = st.columns(2)
-                                    if bc1.button("✏️ Düzenle", key=f"me_{m_id}", use_container_width=True):
-                                        st.session_state.edit_mod_id = int(m_id); st.session_state.view_mode = "mod_edit"; st.rerun()
-                                    if bc2.button("🗑️ Sil", key=f"md_{m_id}", use_container_width=True):
-                                        exec_factory("DELETE FROM models WHERE id=?", (int(m_id),))
+                                    bc1, bc2, bc3 = st.columns(3)
+                                    if bc1.button("✏️", key=f"me_{m_id}", use_container_width=True, help="Düzenle"):
+                                        st.session_state.edit_mod_id = m_id; st.session_state.view_mode = "mod_edit"; st.rerun()
+                                    if bc2.button("📄", key=f"mc_{m_id}", use_container_width=True, help="Kopyala"):
+                                        c_data = db_query("SELECT * FROM models WHERE id=?", (m_id,))
+                                        if c_data:
+                                            cd = c_data[0]
+                                            exec_factory("""INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path, user_id) 
+                                                            VALUES (?,?,?,?,?,?,?,?,?,?,?)""", 
+                                                         (get_safe(cd,'name','') + " (Kopya)", get_safe(cd,'name_zh',''), get_safe(cd,'category',''), get_safe(cd,'base_price',0.0), get_safe(cd,'currency','USD'), get_safe(cd,'specs',''), get_safe(cd,'specs_zh',''), get_safe(cd,'compatible_options',''), get_safe(cd,'port_discount',0.0), get_safe(cd,'image_path',''), user_id))
+                                        st.rerun()
+                                    if bc3.button("🗑️", key=f"md_{m_id}", use_container_width=True, help="Sil"):
+                                        exec_factory("DELETE FROM models WHERE id=?", (m_id,))
                                         st.rerun()
         else: st.info("Sistemde makine bulunmuyor.")
 
@@ -247,7 +184,7 @@ def show_list_view(user_role):
                 for j in range(4):
                     if i + j < len(opts):
                         o = opts[i+j]
-                        o_id = o.get('id')
+                        o_id = int(o.get('id'))
                         d_name = o.get('opt_name_zh') if user_role == "manufacturer" and o.get('opt_name_zh') else o.get('opt_name')
                         with cols[j].container(border=True):
                             img_b64 = get_image_base64(o.get('opt_image'))
@@ -261,11 +198,19 @@ def show_list_view(user_role):
                             if user_role == "manufacturer": st.caption(_m("no_auth_price"))
                             else: st.markdown(f"<div style='color:#ea580c; font-weight:bold; margin-top:5px;'>+{o.get('opt_price',0):,.0f} USD</div>", unsafe_allow_html=True)
                             
-                            bc1, bc2 = st.columns(2)
-                            if bc1.button("✏️ Düzenle", key=f"oe_{o_id}", use_container_width=True):
-                                st.session_state.edit_opt_id = int(o_id); st.session_state.view_mode = "opt_edit"; st.rerun()
-                            if bc2.button("🗑️ Sil", key=f"od_{o_id}", use_container_width=True):
-                                exec_factory("DELETE FROM options WHERE id=?", (int(o_id),))
+                            bc1, bc2, bc3 = st.columns(3)
+                            if bc1.button("✏️", key=f"oe_{o_id}", use_container_width=True, help="Düzenle"):
+                                st.session_state.edit_opt_id = o_id; st.session_state.view_mode = "opt_edit"; st.rerun()
+                            if bc2.button("📄", key=f"oc_{o_id}", use_container_width=True, help="Kopyala"):
+                                c_data = db_query("SELECT * FROM options WHERE id=?", (o_id,))
+                                if c_data:
+                                    cd = c_data[0]
+                                    exec_factory("""INSERT INTO options (opt_name, opt_desc, opt_price, opt_image, sort_order, allow_qty, opt_name_zh, opt_desc_zh, opt_suffix, opt_variant_image, user_id) 
+                                                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""", 
+                                                 (get_safe(cd,'opt_name','') + " (Kopya)", get_safe(cd,'opt_desc',''), get_safe(cd,'opt_price',0.0), get_safe(cd,'opt_image',''), get_safe(cd,'sort_order',0), get_safe(cd,'allow_qty',1), get_safe(cd,'opt_name_zh',''), get_safe(cd,'opt_desc_zh',''), get_safe(cd,'opt_suffix',''), get_safe(cd,'opt_variant_image',''), user_id))
+                                st.rerun()
+                            if bc3.button("🗑️", key=f"od_{o_id}", use_container_width=True, help="Sil"):
+                                exec_factory("DELETE FROM options WHERE id=?", (o_id,))
                                 st.rerun()
         else: st.info("Sistemde donanım bulunmuyor.")
 
@@ -284,7 +229,7 @@ def show_list_view(user_role):
                     exec_factory("DELETE FROM categories WHERE id=?", (c.get('id'),)); st.rerun()
 
 # =====================================================================
-# MAKİNE DÜZENLEME FORMU - ZENGİN VE EKSİKSİZ
+# MAKİNE DÜZENLEME FORMU 
 # =====================================================================
 def show_form_view(mode="add", mod_id=None, user_role="dealer"):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
@@ -296,8 +241,8 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
     cats_db = [c.get('name') for c in cats_db_raw] if cats_db_raw else ["Diğer Makinalar"]
 
     r = {}
-    if mode == "edit" and mod_id:
-        r_list = db_query("SELECT * FROM models WHERE id=?", (mod_id,))
+    if mode == "edit" and mod_id is not None:
+        r_list = db_query("SELECT * FROM models WHERE id=?", (int(mod_id),))
         if not r_list: st.error("Kayıt veritabanında bulunamadı."); st.stop()
         r = r_list[0]
 
@@ -311,7 +256,6 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
     f_opts_raw = str(r.get("compatible_options", ""))
     f_opts = [x.strip() for x in f_opts_raw.split(",") if x.strip()]
     
-    # Teknik Özellikleri Ayrıştırma
     s_list = []
     t_specs = str(r.get("specs_zh", "") if user_role == "manufacturer" and r.get("specs_zh") else r.get("specs", ""))
     if t_specs:
@@ -416,19 +360,15 @@ def show_form_view(mode="add", mod_id=None, user_role="dealer"):
                 specs_tr = " || ".join(s_tr)
                 opt_str = ",".join(sel_opts)
                 
-                data_dict = {"name": n_tr, "name_zh": n_zh, "category": new_cat, "base_price": new_price, "currency": new_curr, "specs": specs_tr, "specs_zh": specs_zh, "compatible_options": opt_str, "port_discount": new_disc, "image_path": final_img, "user_id": uid}
-                
                 if mode == "edit":
-                    exec_factory("UPDATE models SET name=?, name_zh=?, category=?, base_price=?, currency=?, specs=?, specs_zh=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?", (n_tr, n_zh, new_cat, new_price, new_curr, specs_tr, specs_zh, opt_str, new_disc, final_img, mod_id))
-                    if user_role == "manufacturer": 
-                        data_dict["id"] = mod_id; sync_to_vault("models", data_dict, "upsert", mod_id)
+                    exec_factory("UPDATE models SET name=?, name_zh=?, category=?, base_price=?, currency=?, specs=?, specs_zh=?, compatible_options=?, port_discount=?, image_path=? WHERE id=?", (n_tr, n_zh, new_cat, new_price, new_curr, specs_tr, specs_zh, opt_str, new_disc, final_img, int(mod_id)))
                 else:
                     exec_factory("INSERT INTO models (name, name_zh, category, base_price, currency, specs, specs_zh, compatible_options, port_discount, image_path, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (n_tr, n_zh, new_cat, new_price, new_curr, specs_tr, specs_zh, opt_str, new_disc, final_img, uid))
                 
                 st.session_state.view_mode = "list"; st.rerun()
 
 # =====================================================================
-# DONANIM DÜZENLEME FORMU - ZENGİN VE EKSİKSİZ
+# DONANIM DÜZENLEME FORMU
 # =====================================================================
 def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
     col_back, col_title = st.columns([1, 5], vertical_alignment="center")
@@ -437,8 +377,8 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
     st.markdown("---")
 
     r = {}
-    if mode == "edit" and opt_id:
-        r_list = db_query("SELECT * FROM options WHERE id=?", (opt_id,))
+    if mode == "edit" and opt_id is not None:
+        r_list = db_query("SELECT * FROM options WHERE id=?", (int(opt_id),))
         if not r_list: st.error("Kayıt bulunamadı."); st.stop()
         r = r_list[0]
 
@@ -493,7 +433,7 @@ def show_opt_form_view(mode="add", opt_id=None, user_role="dealer"):
                     d_tr = auto_translate_to_tr(new_desc) if user_role == "manufacturer" else new_desc
 
                     if mode == "edit": 
-                        exec_factory("UPDATE options SET opt_name=?, opt_name_zh=?, opt_desc=?, opt_desc_zh=?, opt_price=?, opt_image=?, allow_qty=?, opt_suffix=?, opt_variant_image=? WHERE id=?", (n_tr, n_zh, d_tr, d_zh, new_price, final_img, allow_q, new_suffix, final_v_img, opt_id))
+                        exec_factory("UPDATE options SET opt_name=?, opt_name_zh=?, opt_desc=?, opt_desc_zh=?, opt_price=?, opt_image=?, allow_qty=?, opt_suffix=?, opt_variant_image=? WHERE id=?", (n_tr, n_zh, d_tr, d_zh, new_price, final_img, allow_q, new_suffix, final_v_img, int(opt_id)))
                     else: 
                         exec_factory("INSERT INTO options (opt_name, opt_name_zh, opt_desc, opt_desc_zh, opt_price, opt_image, allow_qty, opt_suffix, opt_variant_image, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)", (n_tr, n_zh, d_tr, d_zh, new_price, final_img, allow_q, new_suffix, final_v_img, uid))
                     
