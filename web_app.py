@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import customer_pages, model_management, offer_wizard, dealer_management, proforma_invoice, orders_page, offer_management, profile_settings
+import profit_management
 import sqlite3, pandas as pd, hashlib, random, smtplib, uuid, os, base64, datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -42,65 +43,63 @@ DICTIONARY = {
     "tr": {
         "login_tab": "🔑 Giriş", "reg_tab": "📝 Kayıt", "forg_tab": "❓ Şifremi Unuttum",
         "email": "E-Posta Adresi", "pass": "Şifre", "rem": "Beni Hatırla", "login_btn": "GİRİŞ YAP",
-        "sys_err": "Hatalı e-posta veya şifre!", "sys_unver": "Hesabınız henüz doğrulanmamış!", "sys_wait": "Hesap onayı bekleniyor.",
+        "sys_err": "Hatalı e-posta veya şifre!", "sys_wait": "Hesap onayı bekleniyor.",
         "reg_type": "Faaliyet Türü", "dealer": "Satıcı (Bayi)", "manuf": "Üretici",
         "comp_name": "Firma Tam Ünvanı *", "phone": "Telefon * (05XX...)", "reg_btn": "Kayıt Ol",
         "req_fields": "(*) alanlar zorunludur.", "email_in_use": "Bu e-posta zaten kullanımda!",
-        "enter_code": "Mailinize Gelen Kodu Girin", "verify_btn": "Doğrula ve Şifreyi Sıfırla",
-        "ver_success": "Doğrulandı! Yönetici onayı sonrası giriş yapabilirsiniz.", "wrong_code": "Hatalı kod girdiniz!",
-        "f_email": "Kayıtlı E-Posta Adresiniz", "send_reset": "Sıfırlama Kodu Gönder",
-        "no_email": "Sistemde böyle bir e-posta bulunamadı.", "new_pass": "Yeni Şifre Belirleyin",
-        "change_pass": "Şifremi Değiştir", "pass_changed": "Şifreniz değiştirildi! Giriş sekmesinden giriş yapabilirsiniz.",
+        "enter_code": "Mailinize Gelen Kodu Girin", "f_email": "Kayıtlı E-Posta Adresiniz",
+        "send_reset": "Sıfırlama Kodu Gönder", "no_email": "Sistemde böyle bir e-posta bulunamadı.",
+        "new_pass": "Yeni Şifre Belirleyin", "change_pass": "Şifremi Değiştir",
+        "pass_changed": "Şifreniz değiştirildi! Giriş sekmesinden giriş yapabilirsiniz.",
+        "wrong_code": "Hatalı kod girdiniz!",
         "m_dash": "📊 Dashboard", "m_new": "📝 Yeni Teklif Hazırla", "m_cust": "👥 Müşterilerim",
         "m_past": "📋 Geçmiş Tekliflerim", "m_order": "📦 Siparişler", "m_prof": "⚙️ Profil Ayarlarım",
-        "m_deal": "🏢 Bayi Yönetimi", "m_model": "📦 Tüm Modelleri Yönet", "logout": "🚪 Sistemi Kapat",
-        "lang_sel": "Sistem Dili / Language", "role_admin": "Sistem Yöneticisi", "role_dealer": "Satıcı Bayi",
-        "role_manuf": "Üretici"
+        "m_deal": "🏢 Bayi Yönetimi", "m_model": "📦 Tüm Modelleri Yönet",
+        "m_profit": "💰 Maliyet / Kârlılık",
+        "logout": "🚪 Sistemi Kapat", "lang_sel": "Sistem Dili / Language",
+        "role_admin": "Sistem Yöneticisi", "role_dealer": "Satıcı Bayi", "role_manuf": "Üretici"
     },
     "en": {
         "login_tab": "🔑 Login", "reg_tab": "📝 Register", "forg_tab": "❓ Forgot Password",
         "email": "Email Address", "pass": "Password", "rem": "Remember Me", "login_btn": "LOGIN",
-        "sys_err": "Incorrect email or password!", "sys_unver": "Account not verified!", "sys_wait": "Pending admin approval.",
+        "sys_err": "Incorrect email or password!", "sys_wait": "Pending admin approval.",
         "reg_type": "Business Type", "dealer": "Dealer", "manuf": "Manufacturer",
         "comp_name": "Full Company Name *", "phone": "Phone *", "reg_btn": "Register",
         "req_fields": "(*) fields are required.", "email_in_use": "Email is already in use!",
-        "enter_code": "Enter Code from Email", "verify_btn": "Verify & Reset",
-        "ver_success": "Verified! Wait for admin approval.", "wrong_code": "Incorrect code!",
-        "f_email": "Registered Email Address", "send_reset": "Send Reset Code",
-        "no_email": "No such email found in the system.", "new_pass": "Set New Password",
-        "change_pass": "Change Password", "pass_changed": "Password changed! You can now log in.",
+        "enter_code": "Enter Code from Email", "f_email": "Registered Email Address",
+        "send_reset": "Send Reset Code", "no_email": "No such email found in the system.",
+        "new_pass": "Set New Password", "change_pass": "Change Password",
+        "pass_changed": "Password changed! You can now log in.", "wrong_code": "Incorrect code!",
         "m_dash": "📊 Dashboard", "m_new": "📝 Create New Offer", "m_cust": "👥 My Customers",
         "m_past": "📋 Past Offers", "m_order": "📦 Orders", "m_prof": "⚙️ Profile Settings",
-        "m_deal": "🏢 Dealer Management", "m_model": "📦 Manage Models", "logout": "🚪 Logout",
-        "lang_sel": "System Language", "role_admin": "System Admin", "role_dealer": "Dealer",
-        "role_manuf": "Manufacturer"
+        "m_deal": "🏢 Dealer Management", "m_model": "📦 Manage Models",
+        "m_profit": "💰 Cost / Profit",
+        "logout": "🚪 Logout", "lang_sel": "System Language",
+        "role_admin": "System Admin", "role_dealer": "Dealer", "role_manuf": "Manufacturer"
     },
     "zh": {
         "login_tab": "🔑 登录", "reg_tab": "📝 注册", "forg_tab": "❓ 忘记密码",
         "email": "电子邮件地址", "pass": "密码", "rem": "记住我", "login_btn": "登录",
-        "sys_err": "电子邮件或密码错误！", "sys_unver": "帐户未验证！", "sys_wait": "等待管理员批准。",
+        "sys_err": "电子邮件或密码错误！", "sys_wait": "等待管理员批准。",
         "reg_type": "业务类型", "dealer": "经销商", "manuf": "制造商",
         "comp_name": "公司全称 *", "phone": "电话 *", "reg_btn": "注册",
         "req_fields": "(*) 必填字段。", "email_in_use": "电子邮件已被使用！",
-        "enter_code": "输入电子邮件验证码", "verify_btn": "验证并重置",
-        "ver_success": "已验证！等待管理员批准。", "wrong_code": "验证码错误！",
-        "f_email": "注册的电子邮件地址", "send_reset": "发送重置验证码",
-        "no_email": "系统中未找到此电子邮件。", "new_pass": "设置新密码",
-        "change_pass": "更改密码", "pass_changed": "密码已更改！您现在可以登录。",
+        "enter_code": "输入电子邮件验证码", "f_email": "注册的电子邮件地址",
+        "send_reset": "发送重置验证码", "no_email": "系统中未找到此电子邮件。",
+        "new_pass": "设置新密码", "change_pass": "更改密码", "pass_changed": "密码已更改！您现在可以登录。",
+        "wrong_code": "验证码错误！",
         "m_dash": "📊 仪表板", "m_new": "📝 创建新报价", "m_cust": "👥 我的客户",
         "m_past": "📋 历史报价", "m_order": "📦 订单", "m_prof": "⚙️ 个人资料设置",
-        "m_deal": "🏢 经销商管理", "m_model": "📦 管理所有型号", "logout": "🚪 退出系统",
-        "lang_sel": "系统语言 (Language)", "role_admin": "系统管理员", "role_dealer": "经销商",
-        "role_manuf": "制造商"
+        "m_deal": "🏢 经销商管理", "m_model": "📦 管理所有型号",
+        "m_profit": "💰 成本 / 利润",
+        "logout": "🚪 退出系统", "lang_sel": "系统语言 (Language)",
+        "role_admin": "系统管理员", "role_dealer": "经销商", "role_manuf": "制造商"
     }
 }
 
 def _(key):
     return DICTIONARY.get(st.session_state.lang, DICTIONARY["tr"]).get(key, key)
 
-# =====================================================================
-# YARDIMCI FONKSİYONLAR VE VERİTABANI ONARIMI
-# =====================================================================
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
@@ -137,7 +136,6 @@ def send_email(to_email, code, subject="Ersan Makine B2B"):
 def get_base64_image(path):
     if not path:
         return ""
-
     if str(path).startswith("http"):
         return path
 
@@ -152,12 +150,10 @@ def get_base64_image(path):
                     ext = "png"
                 if ext == "jpg":
                     ext = "jpeg"
-
                 with open(p, "rb") as f:
                     return f"data:image/{ext};base64,{base64.b64encode(f.read()).decode()}"
             except:
                 pass
-
     return ""
 
 def get_system_logo():
@@ -191,36 +187,41 @@ def repair_databases():
         website TEXT,
         address_full TEXT,
         allowed_menus TEXT,
-        allowed_categories TEXT
+        allowed_categories TEXT,
+        can_view_costs INTEGER DEFAULT 0
     )""")
 
     u_cols = [c[1] for c in conn.execute("PRAGMA table_info(users)").fetchall()]
-
-    if "allowed_menus" not in u_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN allowed_menus TEXT DEFAULT 'm_dash,m_new,m_cust,m_past,m_order,m_prof'")
-    if "role" not in u_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'dealer'")
-    if "allowed_categories" not in u_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN allowed_categories TEXT DEFAULT ''")
-    if "logo_path" not in u_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN logo_path TEXT DEFAULT ''")
-    if "website" not in u_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN website TEXT DEFAULT ''")
-    if "address_full" not in u_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN address_full TEXT DEFAULT ''")
-    if "session_token" not in u_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN session_token TEXT DEFAULT ''")
-    if "auth_code" not in u_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN auth_code TEXT DEFAULT ''")
+    for col, typ in [
+        ("allowed_menus", "TEXT DEFAULT 'm_dash,m_new,m_cust,m_past,m_order,m_prof'"),
+        ("role", "TEXT DEFAULT 'dealer'"),
+        ("allowed_categories", "TEXT DEFAULT ''"),
+        ("logo_path", "TEXT DEFAULT ''"),
+        ("website", "TEXT DEFAULT ''"),
+        ("address_full", "TEXT DEFAULT ''"),
+        ("session_token", "TEXT DEFAULT ''"),
+        ("auth_code", "TEXT DEFAULT ''"),
+        ("can_view_costs", "INTEGER DEFAULT 0"),
+    ]:
+        if col not in u_cols:
+            try:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
+            except:
+                pass
 
     if not conn.execute("SELECT id FROM users WHERE email='admin@ersanmakina.net'").fetchone():
         conn.execute(
             """INSERT INTO users
-            (email, password, company_name, role, is_approved, is_verified, user_type, allowed_menus)
+            (email, password, company_name, role, is_approved, is_verified, user_type, allowed_menus, can_view_costs)
             VALUES (?, ?, 'Ersan Makine Merkez', 'admin', 1, 1, 'Yönetici',
-            'm_dash,m_new,m_cust,m_past,m_order,m_prof,m_deal,m_model')""",
+            'm_dash,m_new,m_cust,m_past,m_order,m_prof,m_deal,m_model,m_profit', 1)""",
             ("admin@ersanmakina.net", hash_password("20132017"))
         )
+
+    try:
+        conn.execute("UPDATE users SET can_view_costs=1 WHERE role='admin'")
+    except:
+        pass
 
     conn.commit()
     conn.close()
@@ -235,20 +236,26 @@ def repair_databases():
         status TEXT DEFAULT 'Beklemede',
         user_id INTEGER DEFAULT 1,
         offer_date TEXT DEFAULT '',
-        order_date TEXT DEFAULT ''
+        order_date TEXT DEFAULT '',
+        total_cost REAL DEFAULT 0.0,
+        total_profit REAL DEFAULT 0.0,
+        profit_rate REAL DEFAULT 0.0
     )""")
 
     s_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
-    for col in ["user_id", "total_price", "conditions", "status", "offer_date", "order_date"]:
+    for col, typ in [
+        ("user_id", "INTEGER DEFAULT 1"),
+        ("total_price", "REAL DEFAULT 0.0"),
+        ("conditions", "TEXT DEFAULT ''"),
+        ("status", "TEXT DEFAULT 'Beklemede'"),
+        ("offer_date", "TEXT DEFAULT ''"),
+        ("order_date", "TEXT DEFAULT ''"),
+        ("total_cost", "REAL DEFAULT 0.0"),
+        ("total_profit", "REAL DEFAULT 0.0"),
+        ("profit_rate", "REAL DEFAULT 0.0"),
+    ]:
         if col not in s_cols:
             try:
-                typ = "TEXT DEFAULT ''"
-                if col == "total_price":
-                    typ = "REAL DEFAULT 0.0"
-                elif col == "user_id":
-                    typ = "INTEGER DEFAULT 1"
-                elif col == "status":
-                    typ = "TEXT DEFAULT 'Beklemede'"
                 conn.execute(f"ALTER TABLE offers ADD COLUMN {col} {typ}")
             except:
                 pass
@@ -265,15 +272,6 @@ def repair_databases():
         address TEXT DEFAULT '',
         address_full TEXT DEFAULT ''
     )""")
-
-    c_cols = [c[1] for c in conn.execute("PRAGMA table_info(customers)").fetchall()]
-    for col in ["user_id", "country", "city", "authorized_person", "email", "phone", "address", "address_full"]:
-        if col not in c_cols:
-            try:
-                typ = "INTEGER DEFAULT 1" if col == "user_id" else "TEXT DEFAULT ''"
-                conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {typ}")
-            except:
-                pass
 
     conn.commit()
     conn.close()
@@ -305,24 +303,6 @@ def repair_databases():
         specs_zh TEXT DEFAULT '',
         user_id INTEGER DEFAULT 1
     )""")
-
-    f_cols = [c[1] for c in conn.execute("PRAGMA table_info(models)").fetchall()]
-    for col, col_type in [
-        ("user_id", "INTEGER DEFAULT 1"),
-        ("name_zh", "TEXT DEFAULT ''"),
-        ("specs_zh", "TEXT DEFAULT ''"),
-        ("compatible_options", "TEXT DEFAULT ''"),
-        ("gallery_images", "TEXT DEFAULT ''"),
-        ("gallery_videos", "TEXT DEFAULT ''"),
-        ("category", "TEXT DEFAULT 'Diğer Makinalar'"),
-        ("port_discount", "REAL DEFAULT 0.0")
-    ]:
-        if col not in f_cols:
-            try:
-                conn.execute(f"ALTER TABLE models ADD COLUMN {col} {col_type}")
-            except:
-                pass
-
     conn.execute("""CREATE TABLE IF NOT EXISTS options (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         opt_name TEXT,
@@ -337,30 +317,13 @@ def repair_databases():
         opt_suffix TEXT DEFAULT '',
         opt_variant_image TEXT DEFAULT ''
     )""")
-
-    o_cols = [c[1] for c in conn.execute("PRAGMA table_info(options)").fetchall()]
-    for col, col_type in [
-        ("user_id", "INTEGER DEFAULT 1"),
-        ("opt_name_zh", "TEXT DEFAULT ''"),
-        ("opt_desc_zh", "TEXT DEFAULT ''"),
-        ("opt_suffix", "TEXT DEFAULT ''"),
-        ("opt_variant_image", "TEXT DEFAULT ''"),
-        ("sort_order", "INTEGER DEFAULT 0"),
-        ("allow_qty", "INTEGER DEFAULT 1")
-    ]:
-        if col not in o_cols:
-            try:
-                conn.execute(f"ALTER TABLE options ADD COLUMN {col} {col_type}")
-            except:
-                pass
-
     conn.commit()
     conn.close()
 
 repair_databases()
 
 # =====================================================================
-# OTURUM VE MODERN SAAS CSS
+# OTURUM
 # =====================================================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -392,27 +355,16 @@ if not st.session_state.logged_in:
             st.session_state.user_email = valid_user[3]
             st.session_state.allowed_menus = valid_user[4]
 
+# =====================================================================
+# CSS
+# =====================================================================
 st.markdown("""
 <style>
-.stApp {
-    background-color: #f8fafc;
-}
+.stApp { background-color: #f8fafc; }
+.block-container { padding-top: 1.4rem; }
+header[data-testid="stHeader"] { background: transparent; }
 
-.block-container {
-    padding-top: 1.4rem;
-}
-
-/* Streamlit üst dekorları azalt */
-header[data-testid="stHeader"] {
-    background: transparent;
-}
-
-.stTabs [data-baseweb="tab-list"] {
-    justify-content: center;
-    gap: 8px;
-    margin-bottom: 20px;
-}
-
+.stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 8px; margin-bottom: 20px; }
 .stTabs [data-baseweb="tab"] {
     background-color: transparent;
     border-radius: 10px;
@@ -421,24 +373,13 @@ header[data-testid="stHeader"] {
     font-weight: 700;
     color: #64748b;
     border: 1px solid transparent;
-    transition: all 0.2s ease;
 }
-
-.stTabs [data-baseweb="tab"]:hover {
-    color: #0f172a;
-    background-color: #f1f5f9;
-}
-
 .stTabs [aria-selected="true"] {
     background-color: #2563eb !important;
     color: white !important;
     border-color: #2563eb !important;
-    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2) !important;
 }
 
-/* =====================================================================
-   LOGIN EKRANI
-   ===================================================================== */
 .login-desktop-title {
     text-align: center;
     color: #0f172a;
@@ -446,14 +387,82 @@ header[data-testid="stHeader"] {
     font-weight: 900;
 }
 
-.mobile-login-shell {
-    width: 100%;
-    max-width: 520px;
-    margin: 0 auto;
+[data-testid="stSidebar"] {
+    background: #ffffff !important;
+    border-right: 1px solid #e2e8f0;
+}
+[data-testid="stSidebar"] > div:first-child { padding: 22px 18px !important; }
+[data-testid="stSidebar"] div[role="radiogroup"] {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+}
+[data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
+[data-testid="stSidebar"] div[role="radiogroup"] > label {
+    width: 100% !important;
+    min-height: 58px !important;
+    padding: 0 18px !important;
+    border-radius: 15px !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    display: flex !important;
+    align-items: center !important;
+}
+[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"],
+[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+}
+[data-testid="stSidebar"] div[role="radiogroup"] > label p {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    color: #334155 !important;
+}
+[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] p,
+[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p {
+    color: white !important;
 }
 
+.dash-hero {
+    background: linear-gradient(135deg, #0f172a, #2563eb);
+    padding: 30px;
+    border-radius: 24px;
+    color: white;
+    margin-bottom: 24px;
+}
+.dash-hero h1 { margin: 0; font-size: 34px; font-weight: 900; }
+.dash-hero p { margin: 8px 0 0 0; color: #dbeafe; font-size: 15px; }
+.dash-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 22px;
+    padding: 24px;
+    box-shadow: 0 10px 24px rgba(15,23,42,.06);
+    min-height: 130px;
+}
+.dash-label { color: #64748b; font-size: 12px; font-weight: 900; text-transform: uppercase; }
+.dash-value { color: #0f172a; font-size: 36px; font-weight: 900; margin-top: 10px; }
+.dash-blue { color:#2563eb; }
+.dash-orange { color:#ea580c; }
+.dash-green { color:#10b981; }
+
+.mobile-topbar { display: none; }
+
+.mobile-menu-note {
+    text-align: center !important;
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 15px !important;
+    padding: 12px 14px !important;
+    font-size: 13px !important;
+    font-weight: 700;
+    margin-bottom: 18px !important;
+}
+
+.mobile-login-shell { width: 100%; max-width: 520px; margin: 0 auto; }
 .mobile-login-logo-card {
-    width: 100%;
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 24px;
@@ -462,13 +471,7 @@ header[data-testid="stHeader"] {
     box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
     text-align: center;
 }
-
-.mobile-login-logo-card img {
-    max-width: 78%;
-    max-height: 82px;
-    object-fit: contain;
-}
-
+.mobile-login-logo-card img { max-width: 78%; max-height: 82px; object-fit: contain; }
 .mobile-login-icon {
     width: 76px;
     height: 76px;
@@ -480,190 +483,10 @@ header[data-testid="stHeader"] {
     justify-content: center;
     margin: 0 auto 14px auto;
     font-size: 36px;
-    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.20);
 }
-
-.mobile-login-title {
-    font-size: 25px;
-    font-weight: 950;
-    color: #0f172a;
-    text-align: center;
-    line-height: 1.2;
-    margin-top: 10px;
-}
-
-.mobile-login-subtitle {
-    font-size: 13px;
-    font-weight: 700;
-    color: #64748b;
-    text-align: center;
-    margin-top: 6px;
-}
-
-.mobile-login-card-title {
-    text-align: center;
-    font-size: 22px;
-    font-weight: 950;
-    color: #0f172a;
-    margin: 8px 0 18px 0;
-}
-
-.mobile-login-lang {
-    margin-bottom: 10px;
-}
-
-/* SIDEBAR */
-[data-testid="stSidebar"] {
-    background: #ffffff !important;
-    border-right: 1px solid #e2e8f0;
-}
-
-[data-testid="stSidebar"] > div:first-child {
-    padding: 22px 18px !important;
-    box-sizing: border-box !important;
-}
-
-[data-testid="stSidebar"] [data-testid="stRadio"] {
-    width: 100% !important;
-}
-
-[data-testid="stSidebar"] div[role="radiogroup"] {
-    width: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 10px !important;
-}
-
-[data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
-    display: none !important;
-}
-
-[data-testid="stSidebar"] div[role="radiogroup"] > label {
-    width: 100% !important;
-    min-height: 58px !important;
-    padding: 0 18px !important;
-    margin: 0 !important;
-
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-
-    border-radius: 15px !important;
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    box-sizing: border-box !important;
-
-    cursor: pointer !important;
-    color: #475569;
-    transition: all 0.18s ease !important;
-}
-
-[data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
-    background: #eef4ff !important;
-    border-color: #bfdbfe !important;
-    color: #0f172a;
-    transform: translateX(2px);
-}
-
-[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"],
-[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
-    background: #2563eb !important;
-    border-color: #2563eb !important;
-    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28) !important;
-}
-
-[data-testid="stSidebar"] div[role="radiogroup"] > label p {
-    width: 100% !important;
-    margin: 0 !important;
-
-    font-size: 16px !important;
-    font-weight: 800 !important;
-    line-height: 1.2 !important;
-    color: #334155 !important;
-
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-}
-
-[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] p,
-[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p {
-    color: white !important;
-    font-weight: 900 !important;
-}
-
-.dash-hero {
-    background: linear-gradient(135deg, #0f172a, #2563eb);
-    padding: 30px;
-    border-radius: 24px;
-    color: white;
-    margin-bottom: 24px;
-    box-shadow: 0 14px 32px rgba(15,23,42,.18);
-}
-
-.dash-hero h1 {
-    margin: 0;
-    font-size: 34px;
-    font-weight: 900;
-}
-
-.dash-hero p {
-    margin: 8px 0 0 0;
-    color: #dbeafe;
-    font-size: 15px;
-}
-
-.dash-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 22px;
-    padding: 24px;
-    box-shadow: 0 10px 24px rgba(15,23,42,.06);
-    text-align: left;
-    min-height: 130px;
-}
-
-.dash-label {
-    color: #64748b;
-    font-size: 12px;
-    font-weight: 900;
-    letter-spacing: .5px;
-    text-transform: uppercase;
-}
-
-.dash-value {
-    color: #0f172a;
-    font-size: 36px;
-    font-weight: 900;
-    margin-top: 10px;
-    line-height: 1;
-}
-
-.dash-blue { color:#2563eb; }
-.dash-orange { color:#ea580c; }
-.dash-green { color:#10b981; }
-
-.mobile-topbar {
-    display: none;
-}
-
-.mobile-menu-note {
-    min-height: 48px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-
-    text-align: center !important;
-    background: #eff6ff;
-    color: #1e40af;
-    border: 1px solid #bfdbfe;
-    border-radius: 15px !important;
-    padding: 12px 14px !important;
-    font-size: 13px !important;
-    font-weight: 700;
-    line-height: 1.35 !important;
-    margin-bottom: 18px !important;
-}
+.mobile-login-title { font-size: 25px; font-weight: 950; color: #0f172a; text-align: center; }
+.mobile-login-subtitle { font-size: 13px; font-weight: 700; color: #64748b; text-align: center; margin-top: 6px; }
+.mobile-login-card-title { text-align: center; font-size: 22px; font-weight: 950; color: #0f172a; margin: 8px 0 18px 0; }
 
 @media (max-width:768px) {
     .block-container {
@@ -672,17 +495,6 @@ header[data-testid="stHeader"] {
         padding-top: 18px !important;
         padding-bottom: 28px !important;
     }
-
-    h1 {
-        font-size: 28px !important;
-        line-height: 1.2 !important;
-    }
-
-    h2, h3 {
-        font-size: 22px !important;
-        line-height: 1.25 !important;
-    }
-
     .mobile-topbar {
         display: flex;
         align-items: center;
@@ -692,130 +504,32 @@ header[data-testid="stHeader"] {
         border-radius: 18px;
         padding: 12px 14px;
         margin-bottom: 16px;
-        box-shadow: 0 8px 22px rgba(15,23,42,.06);
     }
-
-    .mobile-topbar-title {
-        font-size: 16px;
-        font-weight: 900;
-        color: #0f172a;
-        line-height: 1.2;
-    }
-
-    .mobile-topbar-sub {
-        font-size: 11px;
-        color: #64748b;
-        font-weight: 700;
-    }
-
+    .mobile-topbar-title { font-size: 16px; font-weight: 900; color: #0f172a; }
+    .mobile-topbar-sub { font-size: 11px; color: #64748b; font-weight: 700; }
     section[data-testid="stSidebar"] {
         width: 88vw !important;
         min-width: 88vw !important;
         max-width: 88vw !important;
-        border-radius: 0 22px 22px 0 !important;
-        box-shadow: 0 0 45px rgba(15,23,42,.30) !important;
     }
-
-    [data-testid="stSidebar"] > div:first-child {
-        padding: 20px 16px !important;
-    }
-
-    [data-testid="stSidebar"] div[role="radiogroup"] {
-        gap: 11px !important;
-    }
-
-    [data-testid="stSidebar"] div[role="radiogroup"] > label {
-        min-height: 60px !important;
-        padding: 0 17px !important;
-        border-radius: 16px !important;
-    }
-
-    [data-testid="stSidebar"] div[role="radiogroup"] > label p {
-        font-size: 16px !important;
-    }
-
-    .stTabs [data-baseweb="tab-list"] {
-        width: 100% !important;
-        overflow-x: auto !important;
-        white-space: nowrap !important;
-        justify-content: flex-start !important;
-        gap: 6px !important;
-        padding-bottom: 8px !important;
-        margin-bottom: 18px !important;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        min-width: max-content !important;
-        padding: 10px 13px !important;
-        font-size: 14px !important;
-        border-radius: 13px !important;
-    }
-
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 24px !important;
-        border-color: #e2e8f0 !important;
-        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06) !important;
-        background: #ffffff !important;
-    }
-
     div[data-testid="column"] {
         width: 100% !important;
         flex: 1 1 100% !important;
         min-width: 100% !important;
     }
-
     button {
         min-height: 48px !important;
         border-radius: 14px !important;
         font-weight: 900 !important;
     }
-
-    input, textarea {
-        font-size: 16px !important;
-    }
-
-    [data-testid="stTextInput"] input {
-        min-height: 50px !important;
-        border-radius: 14px !important;
-    }
-
-    [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-        min-height: 50px !important;
-        border-radius: 14px !important;
-    }
-
-    .dash-hero {
-        padding: 22px;
-        border-radius: 22px;
-        margin-bottom: 18px;
-    }
-
-    .dash-hero h1 {
-        font-size: 28px !important;
-    }
-
-    .dash-hero p {
-        font-size: 14px !important;
-        line-height: 1.5 !important;
-    }
-
-    .dash-card {
-        padding: 24px;
-        border-radius: 20px;
-        text-align: center;
-        min-height: 125px;
-        margin-bottom: 10px;
-    }
-
-    .dash-value {
-        font-size: 38px;
-    }
+    input, textarea { font-size: 16px !important; }
+    .dash-card { text-align: center; margin-bottom: 10px; }
 }
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# GİRİŞ / KAYIT / ŞİFRE FORMU
+# AUTH FORM
 # =====================================================================
 def render_auth_form():
     with st.container(border=True):
@@ -860,14 +574,12 @@ def render_auth_form():
                     conn.close()
 
         with t_reg:
-            st.write("")
             rt = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")], key="r_t")
             rc = st.text_input(_("comp_name"), key="r_c")
             rp = st.text_input(_("phone"), key="r_ph", placeholder="+90 5XX...")
             re = st.text_input(_("email"), key="r_e", placeholder="ornek@firma.com").strip().lower()
             rpw = st.text_input(_("pass"), type="password", key="r_p")
 
-            st.write("")
             if st.button(_("reg_btn"), type="primary", use_container_width=True):
                 if all([rc, rp, re, rpw]):
                     c = sqlite3.connect('users.db')
@@ -885,10 +597,8 @@ def render_auth_form():
                     st.warning(_("req_fields"))
 
         with t_forg:
-            st.write("")
             if st.session_state.forgot_step == 1:
                 fe = st.text_input(_("f_email"), key="f_e", placeholder="Kayıtlı e-postanız...").strip().lower()
-                st.write("")
                 if st.button(_("send_reset"), type="primary", use_container_width=True):
                     c = sqlite3.connect('users.db')
                     user = c.execute("SELECT id FROM users WHERE email=?", (fe,)).fetchone()
@@ -901,8 +611,6 @@ def render_auth_form():
                             st.session_state.forgot_step = 2
                             c.close()
                             st.rerun()
-                        else:
-                            st.error("Mail gönderilemedi.")
                     else:
                         st.error(_("no_email"))
                     c.close()
@@ -910,7 +618,6 @@ def render_auth_form():
             elif st.session_state.forgot_step == 2:
                 fc = st.text_input(_("enter_code"), max_chars=6, key="f_c")
                 np = st.text_input(_("new_pass"), type="password", key="f_np")
-                st.write("")
                 if st.button(_("change_pass"), type="primary", use_container_width=True):
                     c = sqlite3.connect('users.db')
                     user = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_f_email,)).fetchone()
@@ -927,54 +634,37 @@ def render_auth_form():
                     c.close()
 
 # =====================================================================
-# ŞIK GİRİŞ VE VİTRİN EKRANI
+# LOGIN SCREEN
 # =====================================================================
 if not st.session_state.logged_in:
-    lang_opts_mobile = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
-    lang_opts_desktop = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
+    lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
 
     if IS_MOBILE:
         st.markdown("<div class='mobile-login-shell'>", unsafe_allow_html=True)
-
-        st.markdown("<div class='mobile-login-lang'>", unsafe_allow_html=True)
-        sel = st.selectbox(
-            "🌍",
-            list(lang_opts_mobile.keys()),
-            format_func=lambda x: lang_opts_mobile[x],
-            index=list(lang_opts_mobile.keys()).index(st.session_state.lang),
-            key="main_lang_sel_mobile",
-            label_visibility="collapsed"
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-
+        sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x],
+                           index=list(lang_opts.keys()).index(st.session_state.lang),
+                           key="main_lang_sel_mobile", label_visibility="collapsed")
         if sel != st.session_state.lang:
             st.session_state.lang = sel
             st.rerun()
 
         mobile_logo = get_system_logo()
-
         if mobile_logo and mobile_logo.startswith("data:image"):
-            st.markdown(
-                f"""
-                <div class="mobile-login-logo-card">
-                    <img src="{mobile_logo}">
-                    <div class="mobile-login-title">B2B Sipariş Portalı</div>
-                    <div class="mobile-login-subtitle">Ersan Makine Satış ve Teklif Sistemi</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            st.markdown(f"""
+            <div class="mobile-login-logo-card">
+                <img src="{mobile_logo}">
+                <div class="mobile-login-title">B2B Sipariş Portalı</div>
+                <div class="mobile-login-subtitle">Ersan Makine Satış ve Teklif Sistemi</div>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            st.markdown(
-                """
-                <div class="mobile-login-logo-card">
-                    <div class="mobile-login-icon">⚙️</div>
-                    <div class="mobile-login-title">B2B Sipariş Portalı</div>
-                    <div class="mobile-login-subtitle">Ersan Makine Satış ve Teklif Sistemi</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            st.markdown("""
+            <div class="mobile-login-logo-card">
+                <div class="mobile-login-icon">⚙️</div>
+                <div class="mobile-login-title">B2B Sipariş Portalı</div>
+                <div class="mobile-login-subtitle">Ersan Makine Satış ve Teklif Sistemi</div>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.markdown("<div class='mobile-login-card-title'>Giriş Yap</div>", unsafe_allow_html=True)
         render_auth_form()
@@ -982,16 +672,10 @@ if not st.session_state.logged_in:
         st.stop()
 
     c1, c2, c3 = st.columns([8, 1, 1])
-
     with c3:
-        sel = st.selectbox(
-            "🌍",
-            list(lang_opts_desktop.keys()),
-            format_func=lambda x: lang_opts_desktop[x],
-            index=list(lang_opts_desktop.keys()).index(st.session_state.lang),
-            key="main_lang_sel",
-            label_visibility="collapsed"
-        )
+        sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x],
+                           index=list(lang_opts.keys()).index(st.session_state.lang),
+                           key="main_lang_sel", label_visibility="collapsed")
         if sel != st.session_state.lang:
             st.session_state.lang = sel
             st.rerun()
@@ -1002,8 +686,6 @@ if not st.session_state.logged_in:
     col_slider, col_form = st.columns([1.2, 1], gap="large")
 
     with col_slider:
-        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-
         try:
             c_f = sqlite3.connect('factory_data.db')
             mods = c_f.execute("SELECT name, image_path FROM models").fetchall()
@@ -1014,28 +696,21 @@ if not st.session_state.logged_in:
         s_h = ""
         if mods:
             for m in mods:
-                img_b64 = get_base64_image(m[1]) if m[1] else ""
-                if not img_b64:
-                    img_b64 = get_system_logo()
-
+                img_b64 = get_base64_image(m[1]) if m[1] else get_system_logo()
                 img_tag = f'<img src="{img_b64}">' if img_b64 else '<div style="font-size:80px; margin-top:100px;">⚙️</div>'
                 s_h += f'<div class="mySlides fade">{img_tag}<div class="slide-text">{m[0]}</div></div>'
 
         if s_h:
             slider_html = f"""
-            <html>
-            <head>
-            <style>
+            <html><head><style>
             body {{ margin:0; padding:0; background:transparent; overflow:hidden; font-family:sans-serif; }}
-            .slideshow-container {{ position:relative; width:100%; height:450px; border-radius:20px; display:flex; align-items:center; justify-content:center; background:#ffffff; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); border:1px solid #e2e8f0; }}
+            .slideshow-container {{ position:relative; width:100%; height:450px; border-radius:20px; display:flex; align-items:center; justify-content:center; background:#ffffff; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; }}
             .mySlides {{ display:none; text-align:center; width:100%; height:100%; position:relative; }}
-            img {{ max-height:380px; max-width:85%; object-fit:contain; position:absolute; top:45%; left:50%; transform:translate(-50%,-50%); filter:drop-shadow(0 15px 20px rgba(0,0,0,0.1)); }}
-            .slide-text {{ color:#0f172a; font-size:16px; font-weight:900; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.85); padding:10px 25px; border-radius:30px; backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.6); box-shadow:0 4px 6px rgba(0,0,0,0.05); white-space:nowrap; }}
+            img {{ max-height:380px; max-width:85%; object-fit:contain; position:absolute; top:45%; left:50%; transform:translate(-50%,-50%); }}
+            .slide-text {{ color:#0f172a; font-size:16px; font-weight:900; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.85); padding:10px 25px; border-radius:30px; }}
             .fade {{ animation-name:fade; animation-duration:1.5s; }}
             @keyframes fade {{ from {{opacity:0.3; transform:scale(0.95);}} to {{opacity:1; transform:scale(1);}} }}
-            </style>
-            </head>
-            <body>
+            </style></head><body>
             <div class="slideshow-container">{s_h}</div>
             <script>
             let sI=0; show();
@@ -1043,80 +718,51 @@ if not st.session_state.logged_in:
                 let s=document.getElementsByClassName("mySlides");
                 if(s.length===0)return;
                 for(let i=0;i<s.length;i++) s[i].style.display="none";
-                sI++;
-                if(sI>s.length)sI=1;
+                sI++; if(sI>s.length)sI=1;
                 s[sI-1].style.display="block";
                 setTimeout(show,3500);
             }}
-            </script>
-            </body>
-            </html>
+            </script></body></html>
             """
             components.html(slider_html, height=480)
         else:
-            logo = get_system_logo()
-            if logo and logo.startswith("data:image"):
-                st.markdown(
-                    f"""
-                    <div style='height:450px; border-radius:22px; background:#ffffff; border:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 26px rgba(15,23,42,.06);'>
-                        <img src='{logo}' style='max-width:70%; max-height:180px; object-fit:contain;'>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-            else:
-                st.info("Sistemde henüz kayıtlı makine bulunmuyor.")
+            st.info("Sistemde henüz kayıtlı makine bulunmuyor.")
 
     with col_form:
-        st.markdown(
-            "<h2 class='login-desktop-title'>B2B Sipariş Portalı</h2>",
-            unsafe_allow_html=True
-        )
+        st.markdown("<h2 class='login-desktop-title'>B2B Sipariş Portalı</h2>", unsafe_allow_html=True)
         render_auth_form()
 
     st.stop()
 
 # =====================================================================
-# MOBİL ÜST MENÜ BUTONU
+# MOBİL ÜST MENÜ
 # =====================================================================
 if IS_MOBILE:
-    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-
     top_left, top_right = st.columns([1, 5], vertical_alignment="center")
-
     with top_left:
         if st.button("☰", key="mobile_hamburger_btn", use_container_width=True):
             st.session_state.mobile_menu_open = not st.session_state.mobile_menu_open
             st.rerun()
-
     with top_right:
-        st.markdown(
-            f"""
-            <div class="mobile-topbar">
-                <div>
-                    <div class="mobile-topbar-title">Ersan Makine B2B</div>
-                    <div class="mobile-topbar-sub">{st.session_state.user_email}</div>
-                </div>
-                <div style="font-size:22px;">⚙️</div>
+        st.markdown(f"""
+        <div class="mobile-topbar">
+            <div>
+                <div class="mobile-topbar-title">Ersan Makine B2B</div>
+                <div class="mobile-topbar-sub">{st.session_state.user_email}</div>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+            <div style="font-size:22px;">⚙️</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # =====================================================================
-# ANA MENÜ VE SAYFA YÖNLENDİRMELERİ
+# SIDEBAR
 # =====================================================================
-show_sidebar = True
-if IS_MOBILE and not st.session_state.mobile_menu_open:
-    show_sidebar = False
+show_sidebar = not (IS_MOBILE and not st.session_state.mobile_menu_open)
 
 if show_sidebar:
     with st.sidebar:
         if IS_MOBILE:
-            st.markdown(
-                "<div class='mobile-menu-note'>Menüden sayfa seçince bu panel otomatik kapanır.</div>",
-                unsafe_allow_html=True
-            )
+            st.markdown("<div class='mobile-menu-note'>Menüden sayfa seçince bu panel otomatik kapanır.</div>", unsafe_allow_html=True)
 
         c_user = sqlite3.connect('users.db')
         user_data = c_user.execute("SELECT logo_path, company_name FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
@@ -1124,40 +770,28 @@ if show_sidebar:
 
         sidebar_logo = ""
         sidebar_text = user_data[1] if user_data and user_data[1] else "B2B Portal"
-
         if user_data and user_data[0]:
             sidebar_logo = get_base64_image(user_data[0])
-
         if not sidebar_logo:
             sidebar_logo = get_system_logo()
 
         if sidebar_logo and sidebar_logo.startswith("data:image"):
-            st.markdown(
-                f"<div style='text-align:center; margin-bottom:15px; padding:10px 0;'><img src='{sidebar_logo}' style='max-width:90%; max-height:55px; object-fit:contain;'></div>",
-                unsafe_allow_html=True
-            )
+            st.markdown(f"<div style='text-align:center; margin-bottom:15px; padding:10px 0;'><img src='{sidebar_logo}' style='max-width:90%; max-height:55px; object-fit:contain;'></div>", unsafe_allow_html=True)
         else:
-            st.markdown(
-                f"<div style='text-align:center; margin-bottom:15px; padding:10px 0; font-weight:900; font-size:18px; color:#1e293b;'>{sidebar_text}</div>",
-                unsafe_allow_html=True
-            )
+            st.markdown(f"<div style='text-align:center; margin-bottom:15px; padding:10px 0; font-weight:900; font-size:18px; color:#1e293b;'>{sidebar_text}</div>", unsafe_allow_html=True)
 
         r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
-
-        st.markdown(
-            f"""
-            <div style='background-color:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; margin-bottom:20px; display:flex; align-items:center; gap:10px; overflow-wrap:anywhere;'>
-                <div style='background:#2563eb; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold;'>
-                    {st.session_state.user_email[0].upper()}
-                </div>
-                <div style='overflow:hidden; width:100%;'>
-                    <div style='font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div>
-                    <div style='font-size:11px; color:#64748b; font-weight:700;'>{r_text}</div>
-                </div>
+        st.markdown(f"""
+        <div style='background-color:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; margin-bottom:20px; display:flex; align-items:center; gap:10px;'>
+            <div style='background:#2563eb; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold;'>
+                {st.session_state.user_email[0].upper()}
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+            <div style='overflow:hidden; width:100%;'>
+                <div style='font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div>
+                <div style='font-size:11px; color:#64748b; font-weight:700;'>{r_text}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         pending_count_txt = ""
         if st.session_state.user_role == "admin":
@@ -1179,11 +813,12 @@ if show_sidebar:
                 _("m_order"),
                 _("m_prof"),
                 _("m_deal"),
-                _("m_model")
+                _("m_model"),
+                _("m_profit"),
             ]
         else:
             allowed = st.session_state.allowed_menus.split(',') if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
-            v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model"]
+            v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model", "m_profit"]
             menu_items_labels = [_(k.strip()) for k in allowed if k.strip() in v_keys]
 
         if not menu_items_labels:
@@ -1203,25 +838,13 @@ if show_sidebar:
             if IS_MOBILE:
                 st.session_state.mobile_menu_open = False
 
-        st.radio(
-            "MENÜ",
-            menu_items_labels,
-            index=current_idx,
-            key="m_radio",
-            on_change=on_menu_change,
-            label_visibility="collapsed"
-        )
+        st.radio("MENÜ", menu_items_labels, index=current_idx, key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
 
         st.markdown("<hr style='margin:15px 0; border:none; border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
         lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
-        sel = st.selectbox(
-            "🌐 " + _("lang_sel"),
-            list(lang_opts.keys()),
-            format_func=lambda x: lang_opts[x],
-            index=list(lang_opts.keys()).index(st.session_state.lang),
-            key="sb_lang"
-        )
+        sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()), format_func=lambda x: lang_opts[x],
+                           index=list(lang_opts.keys()).index(st.session_state.lang), key="sb_lang")
 
         if sel != st.session_state.lang:
             st.session_state.lang = sel
@@ -1239,7 +862,9 @@ else:
     if "active_tab" not in st.session_state:
         st.session_state.active_tab = _("m_dash")
 
-# --- SAYFA YÖNLENDİRMELERİ VE DASHBOARD ---
+# =====================================================================
+# SAYFA YÖNLENDİRME
+# =====================================================================
 act_tab = st.session_state.active_tab
 
 if _("m_cust") in act_tab:
@@ -1263,14 +888,15 @@ elif _("m_order") in act_tab:
 elif _("m_prof") in act_tab:
     profile_settings.show_profile_settings(st.session_state.user_id)
 
+elif _("m_profit") in act_tab:
+    profit_management.show_profit_management(st.session_state.user_role)
+
 elif _("m_dash") in act_tab:
     conn_s = sqlite3.connect('sales_data.db')
-
     if st.session_state.user_role == "admin":
         my_offers = conn_s.execute("SELECT status, total_price FROM offers").fetchall()
     else:
         my_offers = conn_s.execute("SELECT status, total_price FROM offers WHERE user_id=?", (st.session_state.user_id,)).fetchall()
-
     conn_s.close()
 
     tot_o = len(my_offers)
@@ -1278,54 +904,15 @@ elif _("m_dash") in act_tab:
     ord_o = len([x for x in my_offers if x[0] in ['Onaylandı', 'Siparişe Çevir']])
     ord_v = sum([(x[1] or 0) for x in my_offers if x[0] in ['Onaylandı', 'Siparişe Çevir']])
 
-    st.markdown(
-        """
-        <div class="dash-hero">
-            <h1>📊 B2B Kontrol Paneli</h1>
-            <p>Teklif, sipariş ve satış performansınızın güncel özeti.</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown("""
+    <div class="dash-hero">
+        <h1>📊 B2B Kontrol Paneli</h1>
+        <p>Teklif, sipariş ve satış performansınızın güncel özeti.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     c1, c2, c3, c4 = st.columns(4)
-
-    c1.markdown(
-        f"""
-        <div class="dash-card">
-            <div class="dash-label">Toplam Teklif</div>
-            <div class="dash-value">{tot_o}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    c2.markdown(
-        f"""
-        <div class="dash-card">
-            <div class="dash-label">Toplam Hacim</div>
-            <div class="dash-value dash-blue">{tot_v:,.0f} $</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    c3.markdown(
-        f"""
-        <div class="dash-card">
-            <div class="dash-label">Onaylanan Sipariş</div>
-            <div class="dash-value dash-orange">{ord_o}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    c4.markdown(
-        f"""
-        <div class="dash-card">
-            <div class="dash-label">Sipariş Hacmi</div>
-            <div class="dash-value dash-green">{ord_v:,.0f} $</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    c1.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Teklif</div><div class='dash-value'>{tot_o}</div></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Hacim</div><div class='dash-value dash-blue'>{tot_v:,.0f} $</div></div>", unsafe_allow_html=True)
+    c3.markdown(f"<div class='dash-card'><div class='dash-label'>Onaylanan Sipariş</div><div class='dash-value dash-orange'>{ord_o}</div></div>", unsafe_allow_html=True)
+    c4.markdown(f"<div class='dash-card'><div class='dash-label'>Sipariş Hacmi</div><div class='dash-value dash-green'>{ord_v:,.0f} $</div></div>", unsafe_allow_html=True)
