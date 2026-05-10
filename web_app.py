@@ -17,7 +17,6 @@ def is_mobile_device():
 
 IS_MOBILE = is_mobile_device()
 
-# --- SİSTEM AYARLARI ---
 st.set_page_config(
     page_title="Ersan Makine B2B Portalı",
     page_icon="⚙️",
@@ -26,16 +25,13 @@ st.set_page_config(
 )
 
 # =====================================================================
-# 🌍 ÇOKLU DİL MOTORU
+# DİL MOTORU
 # =====================================================================
-if 'lang' not in st.session_state:
+if "lang" not in st.session_state:
     try:
         accept_lang = st.context.headers.get("Accept-Language", "")
-        if accept_lang:
-            primary_lang = accept_lang.split(',')[0][:2].lower()
-            st.session_state.lang = primary_lang if primary_lang in ["tr", "en", "zh"] else "tr"
-        else:
-            st.session_state.lang = "tr"
+        primary_lang = accept_lang.split(",")[0][:2].lower() if accept_lang else "tr"
+        st.session_state.lang = primary_lang if primary_lang in ["tr", "en", "zh"] else "tr"
     except:
         st.session_state.lang = "tr"
 
@@ -86,8 +82,8 @@ DICTIONARY = {
         "req_fields": "(*) 必填字段。", "email_in_use": "电子邮件已被使用！",
         "enter_code": "输入电子邮件验证码", "f_email": "注册的电子邮件地址",
         "send_reset": "发送重置验证码", "no_email": "系统中未找到此电子邮件。",
-        "new_pass": "设置新密码", "change_pass": "更改密码", "pass_changed": "密码已更改！您现在可以登录。",
-        "wrong_code": "验证码错误！",
+        "new_pass": "设置新密码", "change_pass": "更改密码",
+        "pass_changed": "密码已更改！您现在可以登录。", "wrong_code": "验证码错误！",
         "m_dash": "📊 仪表板", "m_new": "📝 创建新报价", "m_cust": "👥 我的客户",
         "m_past": "📋 历史报价", "m_order": "📦 订单", "m_prof": "⚙️ 个人资料设置",
         "m_deal": "🏢 经销商管理", "m_model": "📦 管理所有型号",
@@ -117,10 +113,10 @@ def send_email(to_email, code, subject="Ersan Makine B2B"):
         return False
 
     msg = MIMEMultipart()
-    msg['From'] = f"Ersan Makine B2B <{SENDER_EMAIL}>"
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(f"Doğrulama Kodunuz: {code}", 'plain'))
+    msg["From"] = f"Ersan Makine B2B <{SENDER_EMAIL}>"
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(f"Doğrulama Kodunuz: {code}", "plain"))
 
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
@@ -158,7 +154,7 @@ def get_base64_image(path):
 
 def get_system_logo():
     try:
-        conn = sqlite3.connect('factory_data.db', check_same_thread=False)
+        conn = sqlite3.connect("factory_data.db", check_same_thread=False)
         res = conn.execute("SELECT logo_path FROM company_profile WHERE id=1").fetchone()
         conn.close()
         if res and res[0]:
@@ -169,8 +165,16 @@ def get_system_logo():
         pass
     return ""
 
+def add_col(conn, table, col, typ):
+    cols = [c[1] for c in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    if col not in cols:
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+        except:
+            pass
+
 def repair_databases():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect("users.db")
     conn.execute("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE,
@@ -191,7 +195,6 @@ def repair_databases():
         can_view_costs INTEGER DEFAULT 0
     )""")
 
-    u_cols = [c[1] for c in conn.execute("PRAGMA table_info(users)").fetchall()]
     for col, typ in [
         ("allowed_menus", "TEXT DEFAULT 'm_dash,m_new,m_cust,m_past,m_order,m_prof'"),
         ("role", "TEXT DEFAULT 'dealer'"),
@@ -203,11 +206,7 @@ def repair_databases():
         ("auth_code", "TEXT DEFAULT ''"),
         ("can_view_costs", "INTEGER DEFAULT 0"),
     ]:
-        if col not in u_cols:
-            try:
-                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
-            except:
-                pass
+        add_col(conn, "users", col, typ)
 
     if not conn.execute("SELECT id FROM users WHERE email='admin@ersanmakina.net'").fetchone():
         conn.execute(
@@ -226,7 +225,7 @@ def repair_databases():
     conn.commit()
     conn.close()
 
-    conn = sqlite3.connect('sales_data.db')
+    conn = sqlite3.connect("sales_data.db")
     conn.execute("""CREATE TABLE IF NOT EXISTS offers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         customer_id INTEGER,
@@ -242,7 +241,6 @@ def repair_databases():
         profit_rate REAL DEFAULT 0.0
     )""")
 
-    s_cols = [c[1] for c in conn.execute("PRAGMA table_info(offers)").fetchall()]
     for col, typ in [
         ("user_id", "INTEGER DEFAULT 1"),
         ("total_price", "REAL DEFAULT 0.0"),
@@ -254,11 +252,7 @@ def repair_databases():
         ("total_profit", "REAL DEFAULT 0.0"),
         ("profit_rate", "REAL DEFAULT 0.0"),
     ]:
-        if col not in s_cols:
-            try:
-                conn.execute(f"ALTER TABLE offers ADD COLUMN {col} {typ}")
-            except:
-                pass
+        add_col(conn, "offers", col, typ)
 
     conn.execute("""CREATE TABLE IF NOT EXISTS customers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -273,20 +267,34 @@ def repair_databases():
         address_full TEXT DEFAULT ''
     )""")
 
+    for col, typ in [
+        ("user_id", "INTEGER DEFAULT 1"),
+        ("country", "TEXT DEFAULT ''"),
+        ("city", "TEXT DEFAULT ''"),
+        ("authorized_person", "TEXT DEFAULT ''"),
+        ("email", "TEXT DEFAULT ''"),
+        ("phone", "TEXT DEFAULT ''"),
+        ("address", "TEXT DEFAULT ''"),
+        ("address_full", "TEXT DEFAULT ''"),
+    ]:
+        add_col(conn, "customers", col, typ)
+
     conn.commit()
     conn.close()
 
-    conn = sqlite3.connect('factory_data.db')
+    conn = sqlite3.connect("factory_data.db")
     conn.execute("""CREATE TABLE IF NOT EXISTS company_profile (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_name TEXT,
         logo_path TEXT
     )""")
+
     conn.execute("""CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE,
         image_path TEXT DEFAULT ''
     )""")
+
     conn.execute("""CREATE TABLE IF NOT EXISTS models (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
@@ -301,8 +309,41 @@ def repair_databases():
         gallery_videos TEXT DEFAULT '',
         name_zh TEXT DEFAULT '',
         specs_zh TEXT DEFAULT '',
-        user_id INTEGER DEFAULT 1
+        user_id INTEGER DEFAULT 1,
+        purchase_price REAL DEFAULT 0.0,
+        sale_price REAL DEFAULT 0.0,
+        shipping_cost REAL DEFAULT 0.0,
+        customs_tax_rate REAL DEFAULT 3.0,
+        extra_tax_rate REAL DEFAULT 10.0,
+        port_cost REAL DEFAULT 0.0,
+        document_cost REAL DEFAULT 0.0,
+        installation_cost REAL DEFAULT 0.0,
+        other_cost REAL DEFAULT 0.0,
+        cost_note TEXT DEFAULT ''
     )""")
+
+    for col, typ in [
+        ("user_id", "INTEGER DEFAULT 1"),
+        ("name_zh", "TEXT DEFAULT ''"),
+        ("specs_zh", "TEXT DEFAULT ''"),
+        ("compatible_options", "TEXT DEFAULT ''"),
+        ("gallery_images", "TEXT DEFAULT ''"),
+        ("gallery_videos", "TEXT DEFAULT ''"),
+        ("category", "TEXT DEFAULT 'Diğer Makinalar'"),
+        ("port_discount", "REAL DEFAULT 0.0"),
+        ("purchase_price", "REAL DEFAULT 0.0"),
+        ("sale_price", "REAL DEFAULT 0.0"),
+        ("shipping_cost", "REAL DEFAULT 0.0"),
+        ("customs_tax_rate", "REAL DEFAULT 3.0"),
+        ("extra_tax_rate", "REAL DEFAULT 10.0"),
+        ("port_cost", "REAL DEFAULT 0.0"),
+        ("document_cost", "REAL DEFAULT 0.0"),
+        ("installation_cost", "REAL DEFAULT 0.0"),
+        ("other_cost", "REAL DEFAULT 0.0"),
+        ("cost_note", "TEXT DEFAULT ''"),
+    ]:
+        add_col(conn, "models", col, typ)
+
     conn.execute("""CREATE TABLE IF NOT EXISTS options (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         opt_name TEXT,
@@ -315,8 +356,40 @@ def repair_databases():
         opt_desc_zh TEXT DEFAULT '',
         user_id INTEGER DEFAULT 1,
         opt_suffix TEXT DEFAULT '',
-        opt_variant_image TEXT DEFAULT ''
+        opt_variant_image TEXT DEFAULT '',
+        purchase_price REAL DEFAULT 0.0,
+        sale_price REAL DEFAULT 0.0,
+        shipping_cost REAL DEFAULT 0.0,
+        customs_tax_rate REAL DEFAULT 3.0,
+        extra_tax_rate REAL DEFAULT 10.0,
+        port_cost REAL DEFAULT 0.0,
+        document_cost REAL DEFAULT 0.0,
+        installation_cost REAL DEFAULT 0.0,
+        other_cost REAL DEFAULT 0.0,
+        cost_note TEXT DEFAULT ''
     )""")
+
+    for col, typ in [
+        ("user_id", "INTEGER DEFAULT 1"),
+        ("opt_name_zh", "TEXT DEFAULT ''"),
+        ("opt_desc_zh", "TEXT DEFAULT ''"),
+        ("opt_suffix", "TEXT DEFAULT ''"),
+        ("opt_variant_image", "TEXT DEFAULT ''"),
+        ("sort_order", "INTEGER DEFAULT 0"),
+        ("allow_qty", "INTEGER DEFAULT 1"),
+        ("purchase_price", "REAL DEFAULT 0.0"),
+        ("sale_price", "REAL DEFAULT 0.0"),
+        ("shipping_cost", "REAL DEFAULT 0.0"),
+        ("customs_tax_rate", "REAL DEFAULT 3.0"),
+        ("extra_tax_rate", "REAL DEFAULT 10.0"),
+        ("port_cost", "REAL DEFAULT 0.0"),
+        ("document_cost", "REAL DEFAULT 0.0"),
+        ("installation_cost", "REAL DEFAULT 0.0"),
+        ("other_cost", "REAL DEFAULT 0.0"),
+        ("cost_note", "TEXT DEFAULT ''"),
+    ]:
+        add_col(conn, "options", col, typ)
+
     conn.commit()
     conn.close()
 
@@ -341,7 +414,7 @@ if "forgot_step" not in st.session_state:
 if not st.session_state.logged_in:
     current_token = st.query_params.get("session_token")
     if current_token:
-        conn = sqlite3.connect('users.db', check_same_thread=False)
+        conn = sqlite3.connect("users.db", check_same_thread=False)
         valid_user = conn.execute(
             "SELECT id, user_type, role, email, allowed_menus FROM users WHERE session_token=?",
             (current_token,)
@@ -351,7 +424,7 @@ if not st.session_state.logged_in:
         if valid_user:
             st.session_state.logged_in = True
             st.session_state.user_id = valid_user[0]
-            st.session_state.user_role = valid_user[2] if valid_user[2] == 'admin' else ("manufacturer" if valid_user[1] == "Üretici" else "dealer")
+            st.session_state.user_role = valid_user[2] if valid_user[2] == "admin" else ("manufacturer" if valid_user[1] == "Üretici" else "dealer")
             st.session_state.user_email = valid_user[3]
             st.session_state.allowed_menus = valid_user[4]
 
@@ -543,7 +616,7 @@ def render_auth_form():
 
             st.write("")
             if st.button(_("login_btn"), type="primary", use_container_width=True):
-                conn = sqlite3.connect('users.db')
+                conn = sqlite3.connect("users.db")
                 user = conn.execute(
                     "SELECT id, user_type, is_approved, is_verified, role, allowed_menus FROM users WHERE email=? AND password=?",
                     (le, hash_password(lp))
@@ -562,7 +635,7 @@ def render_auth_form():
 
                         st.session_state.logged_in = True
                         st.session_state.user_id = user[0]
-                        st.session_state.user_role = 'admin' if user[4] == 'admin' else ("manufacturer" if user[1] == "Üretici" else "dealer")
+                        st.session_state.user_role = "admin" if user[4] == "admin" else ("manufacturer" if user[1] == "Üretici" else "dealer")
                         st.session_state.user_email = le
                         st.session_state.allowed_menus = user[5]
 
@@ -582,7 +655,7 @@ def render_auth_form():
 
             if st.button(_("reg_btn"), type="primary", use_container_width=True):
                 if all([rc, rp, re, rpw]):
-                    c = sqlite3.connect('users.db')
+                    c = sqlite3.connect("users.db")
                     if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone():
                         st.error(_("email_in_use"))
                     else:
@@ -600,7 +673,7 @@ def render_auth_form():
             if st.session_state.forgot_step == 1:
                 fe = st.text_input(_("f_email"), key="f_e", placeholder="Kayıtlı e-postanız...").strip().lower()
                 if st.button(_("send_reset"), type="primary", use_container_width=True):
-                    c = sqlite3.connect('users.db')
+                    c = sqlite3.connect("users.db")
                     user = c.execute("SELECT id FROM users WHERE email=?", (fe,)).fetchone()
                     if user:
                         vc = generate_code()
@@ -619,7 +692,7 @@ def render_auth_form():
                 fc = st.text_input(_("enter_code"), max_chars=6, key="f_c")
                 np = st.text_input(_("new_pass"), type="password", key="f_np")
                 if st.button(_("change_pass"), type="primary", use_container_width=True):
-                    c = sqlite3.connect('users.db')
+                    c = sqlite3.connect("users.db")
                     user = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_f_email,)).fetchone()
                     if user and user[0] == fc:
                         c.execute(
@@ -687,7 +760,7 @@ if not st.session_state.logged_in:
 
     with col_slider:
         try:
-            c_f = sqlite3.connect('factory_data.db')
+            c_f = sqlite3.connect("factory_data.db")
             mods = c_f.execute("SELECT name, image_path FROM models").fetchall()
             c_f.close()
         except:
@@ -764,7 +837,7 @@ if show_sidebar:
         if IS_MOBILE:
             st.markdown("<div class='mobile-menu-note'>Menüden sayfa seçince bu panel otomatik kapanır.</div>", unsafe_allow_html=True)
 
-        c_user = sqlite3.connect('users.db')
+        c_user = sqlite3.connect("users.db")
         user_data = c_user.execute("SELECT logo_path, company_name FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
         c_user.close()
 
@@ -796,7 +869,7 @@ if show_sidebar:
         pending_count_txt = ""
         if st.session_state.user_role == "admin":
             try:
-                conn_p = sqlite3.connect('sales_data.db')
+                conn_p = sqlite3.connect("sales_data.db")
                 p_count = conn_p.execute("SELECT COUNT(*) FROM offers WHERE status='Onay Bekliyor'").fetchone()[0]
                 conn_p.close()
                 if p_count > 0:
@@ -817,7 +890,7 @@ if show_sidebar:
                 _("m_profit"),
             ]
         else:
-            allowed = st.session_state.allowed_menus.split(',') if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
+            allowed = st.session_state.allowed_menus.split(",") if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
             v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model", "m_profit"]
             menu_items_labels = [_(k.strip()) for k in allowed if k.strip() in v_keys]
 
@@ -851,7 +924,7 @@ if show_sidebar:
             st.rerun()
 
         if st.button(_("logout"), use_container_width=True):
-            c = sqlite3.connect('users.db')
+            c = sqlite3.connect("users.db")
             c.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
             c.commit()
             c.close()
@@ -892,7 +965,7 @@ elif _("m_profit") in act_tab:
     profit_management.show_profit_management(st.session_state.user_role)
 
 elif _("m_dash") in act_tab:
-    conn_s = sqlite3.connect('sales_data.db')
+    conn_s = sqlite3.connect("sales_data.db")
     if st.session_state.user_role == "admin":
         my_offers = conn_s.execute("SELECT status, total_price FROM offers").fetchall()
     else:
@@ -901,8 +974,8 @@ elif _("m_dash") in act_tab:
 
     tot_o = len(my_offers)
     tot_v = sum([(x[1] or 0) for x in my_offers])
-    ord_o = len([x for x in my_offers if x[0] in ['Onaylandı', 'Siparişe Çevir']])
-    ord_v = sum([(x[1] or 0) for x in my_offers if x[0] in ['Onaylandı', 'Siparişe Çevir']])
+    ord_o = len([x for x in my_offers if x[0] in ["Onaylandı", "Siparişe Çevir"]])
+    ord_v = sum([(x[1] or 0) for x in my_offers if x[0] in ["Onaylandı", "Siparişe Çevir"]])
 
     st.markdown("""
     <div class="dash-hero">
