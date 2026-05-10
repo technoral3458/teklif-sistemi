@@ -2,23 +2,113 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 
-DB_PATH = "database.db"
+DB_PATH = "factory_data.db"
 
 
 def get_conn():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 
-def calculate_import_cost(
-    purchase_price=0,
-    shipping_cost=0,
-    customs_tax_rate=3,
-    extra_tax_rate=10,
-    port_cost=0,
-    document_cost=0,
-    installation_cost=0,
-    other_cost=0
-):
+def ensure_profit_schema():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cols = {
+        "purchase_price": "REAL DEFAULT 0.0",
+        "sale_price": "REAL DEFAULT 0.0",
+        "shipping_cost": "REAL DEFAULT 0.0",
+        "customs_tax_rate": "REAL DEFAULT 3.0",
+        "extra_tax_rate": "REAL DEFAULT 10.0",
+        "port_cost": "REAL DEFAULT 0.0",
+        "document_cost": "REAL DEFAULT 0.0",
+        "installation_cost": "REAL DEFAULT 0.0",
+        "other_cost": "REAL DEFAULT 0.0",
+        "cost_note": "TEXT DEFAULT ''"
+    }
+
+    for table in ["models", "options"]:
+        existing = [c[1] for c in cur.execute(f"PRAGMA table_info({table})").fetchall()]
+        for col, typ in cols.items():
+            if col not in existing:
+                cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+
+    conn.commit()
+    conn.close()
+
+
+def inject_profit_css():
+    st.markdown("""
+    <style>
+    .block-container {
+        padding-top: 1rem !important;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        display: flex !important;
+        gap: 8px !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        padding-bottom: 8px !important;
+        margin-bottom: 18px !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        scrollbar-width: none !important;
+    }
+
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        flex: 0 0 auto !important;
+        min-width: max-content !important;
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 14px !important;
+        padding: 12px 16px !important;
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        color: #475569 !important;
+        box-shadow: 0 2px 6px rgba(15,23,42,0.04) !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+        color: white !important;
+        border-color: #2563eb !important;
+    }
+
+    @media (max-width: 768px) {
+        h1 {
+            font-size: 34px !important;
+            line-height: 1.15 !important;
+        }
+
+        .block-container {
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+        }
+
+        div[data-testid="column"] {
+            width: 100% !important;
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+
+        button {
+            min-height: 48px !important;
+            border-radius: 14px !important;
+            font-weight: 900 !important;
+        }
+
+        input, textarea {
+            font-size: 16px !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def calculate_import_cost(purchase_price, shipping_cost, customs_tax_rate, extra_tax_rate, port_cost, document_cost, installation_cost, other_cost):
     purchase_price = float(purchase_price or 0)
     shipping_cost = float(shipping_cost or 0)
     customs_tax_rate = float(customs_tax_rate or 0)
@@ -33,18 +123,20 @@ def calculate_import_cost(
     subtotal_2 = subtotal_1 + customs_tax
     extra_tax = subtotal_2 * extra_tax_rate / 100
     subtotal_3 = subtotal_2 + extra_tax
-
     total_cost = subtotal_3 + port_cost + document_cost + installation_cost + other_cost
 
     return subtotal_1, customs_tax, subtotal_2, extra_tax, subtotal_3, total_cost
 
 
 def show_profit_management(user_role="admin"):
+    inject_profit_css()
+    ensure_profit_schema()
+
     if user_role != "admin":
         st.error("Bu sayfayı görüntüleme yetkiniz yok.")
         return
 
-    st.header("💰 Maliyet ve Kârlılık Yönetimi")
+    st.title("💰 Maliyet ve Kârlılık Yönetimi")
     st.caption("Bu alan sadece yönetici tarafından görülmelidir.")
 
     tab_models, tab_options, tab_report = st.tabs([
@@ -73,8 +165,7 @@ def show_model_costs():
         st.info("Henüz kayıtlı makine yok.")
         return
 
-    model_names = [f"{m['id']} - {m['name']}" for m in models]
-    selected = st.selectbox("Makine Seç", model_names)
+    selected = st.selectbox("Makine Seç", [f"{m['id']} - {m['name']}" for m in models])
     model_id = int(selected.split(" - ")[0])
 
     conn = get_conn()
@@ -109,10 +200,10 @@ def show_model_costs():
     profit = sale_price - total_cost
     profit_rate = (profit / sale_price * 100) if sale_price > 0 else 0
 
-    a, b, c = st.columns(3)
-    a.metric("Toplam Maliyet", f"{total_cost:,.2f} $")
-    b.metric("Net Kâr", f"{profit:,.2f} $")
-    c.metric("Kâr Oranı", f"%{profit_rate:.2f}")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Toplam Maliyet", f"{total_cost:,.2f} $")
+    m2.metric("Net Kâr", f"{profit:,.2f} $")
+    m3.metric("Kâr Oranı", f"%{profit_rate:.2f}")
 
     with st.expander("Hesaplama Detayı"):
         st.write(f"Alış + Nakliye: {subtotal_1:,.2f} $")
@@ -151,8 +242,7 @@ def show_option_costs():
         st.info("Henüz kayıtlı opsiyon yok.")
         return
 
-    option_names = [f"{o['id']} - {o['opt_name']}" for o in options]
-    selected = st.selectbox("Opsiyon Seç", option_names)
+    selected = st.selectbox("Opsiyon Seç", [f"{o['id']} - {o['opt_name']}" for o in options])
     option_id = int(selected.split(" - ")[0])
 
     conn = get_conn()
@@ -187,10 +277,10 @@ def show_option_costs():
     profit = sale_price - total_cost
     profit_rate = (profit / sale_price * 100) if sale_price > 0 else 0
 
-    a, b, c = st.columns(3)
-    a.metric("Toplam Maliyet", f"{total_cost:,.2f} $")
-    b.metric("Net Kâr", f"{profit:,.2f} $")
-    c.metric("Kâr Oranı", f"%{profit_rate:.2f}")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Toplam Maliyet", f"{total_cost:,.2f} $")
+    m2.metric("Net Kâr", f"{profit:,.2f} $")
+    m3.metric("Kâr Oranı", f"%{profit_rate:.2f}")
 
     if st.button("💾 Opsiyon Maliyetini Kaydet", type="primary", use_container_width=True):
         conn = get_conn()
@@ -214,11 +304,16 @@ def show_option_costs():
 def show_profit_report():
     conn = get_conn()
 
-    models = pd.read_sql_query("""
-        SELECT name, purchase_price, sale_price, shipping_cost, customs_tax_rate,
-               extra_tax_rate, port_cost, document_cost, installation_cost, other_cost
-        FROM models
-    """, conn)
+    try:
+        models = pd.read_sql_query("""
+            SELECT name, purchase_price, sale_price, shipping_cost, customs_tax_rate,
+                   extra_tax_rate, port_cost, document_cost, installation_cost, other_cost
+            FROM models
+        """, conn)
+    except Exception as e:
+        conn.close()
+        st.error(f"Rapor okunamadı: {e}")
+        return
 
     conn.close()
 
@@ -249,13 +344,9 @@ def show_profit_report():
 
     df = pd.DataFrame(rows)
 
-    total_sale = df["Satış Fiyatı"].sum()
-    total_cost = df["Toplam Maliyet"].sum()
-    total_profit = df["Net Kâr"].sum()
-
     c1, c2, c3 = st.columns(3)
-    c1.metric("Toplam Satış", f"{total_sale:,.2f} $")
-    c2.metric("Toplam Maliyet", f"{total_cost:,.2f} $")
-    c3.metric("Toplam Kâr", f"{total_profit:,.2f} $")
+    c1.metric("Toplam Satış", f"{df['Satış Fiyatı'].sum():,.2f} $")
+    c2.metric("Toplam Maliyet", f"{df['Toplam Maliyet'].sum():,.2f} $")
+    c3.metric("Toplam Kâr", f"{df['Net Kâr'].sum():,.2f} $")
 
     st.dataframe(df, use_container_width=True, hide_index=True)
