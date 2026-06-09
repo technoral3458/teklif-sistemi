@@ -35,23 +35,32 @@ CITIES = [
 # VERİTABANI BAĞLANTI MOTORLARI VE ONARIM
 # =====================================================================
 def get_factory(query, params=()):
-    conn = sqlite3.connect('factory_data.db', check_same_thread=False)
-    c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
-    return res
+    try:
+        conn = sqlite3.connect('factory_data.db', check_same_thread=False)
+        c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
+        return res
+    except: return []
 
 def get_sales(query, params=()):
-    conn = sqlite3.connect('sales_data.db', check_same_thread=False)
-    c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
-    return res
+    try:
+        conn = sqlite3.connect('sales_data.db', check_same_thread=False)
+        c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
+        return res
+    except: return []
 
 def exec_sales(query, params=()):
-    conn = sqlite3.connect('sales_data.db')
-    c = conn.cursor(); c.execute(query, params); conn.commit(); conn.close()
+    try:
+        conn = sqlite3.connect('sales_data.db')
+        c = conn.cursor(); c.execute(query, params); conn.commit(); conn.close()
+    except Exception as e:
+        st.error(f"Veritabanı Hatası: {e}")
 
 def get_user_query(query, params=()):
-    conn = sqlite3.connect('users.db', check_same_thread=False)
-    c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
-    return res
+    try:
+        conn = sqlite3.connect('users.db', check_same_thread=False)
+        c = conn.cursor(); c.execute(query, params); res = c.fetchall(); conn.close()
+        return res
+    except: return []
 
 def init_wizard_tables():
     exec_sales("""CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, company_name TEXT, authorized_person TEXT, phone TEXT, email TEXT, address_full TEXT, user_id INTEGER DEFAULT 1)""")
