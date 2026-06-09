@@ -197,6 +197,9 @@ def ensure_database_schema():
         ("installation_cost", "REAL DEFAULT 0.0"),
         ("other_cost", "REAL DEFAULT 0.0"),
         ("cost_note", "TEXT DEFAULT ''"),
+        ("category", "TEXT DEFAULT ''"),
+        ("conflict", "TEXT DEFAULT ''"),
+        ("variant_image_priority", "INTEGER DEFAULT 100"),
     ]
 
     for col, typ in model_cols:
@@ -738,9 +741,10 @@ def copy_option(option_id):
             opt_name, opt_desc, opt_price, sale_price, purchase_price, shipping_cost,
             customs_tax_rate, extra_tax_rate, port_cost, document_cost, installation_cost,
             other_cost, cost_note, opt_image, sort_order, allow_qty, opt_name_zh,
-            opt_desc_zh, opt_suffix, opt_variant_image, user_id
+            opt_desc_zh, opt_suffix, opt_variant_image, user_id,
+            category, conflict, variant_image_priority
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             f"{get_safe(o, 'opt_name', 'Donanım')} (Kopya)",
@@ -764,6 +768,9 @@ def copy_option(option_id):
             get_safe(o, "opt_suffix"),
             get_safe(o, "opt_variant_image"),
             st.session_state.get("user_id", 1),
+            get_safe(o, "category"),
+            get_safe(o, "conflict"),
+            safe_int(o.get("variant_image_priority"), 100),
         ),
     )
 
@@ -1130,6 +1137,10 @@ def show_option_form(mode="add", option_id=None):
     current_allow_qty = bool(safe_int(option.get("allow_qty"), 1))
     current_suffix = get_safe(option, "opt_suffix")
     current_variant_img = get_safe(option, "opt_variant_image")
+    current_sort_order = safe_int(option.get("sort_order"), 0)
+    current_category = get_safe(option, "category")
+    current_conflict = get_safe(option, "conflict")
+    current_variant_priority = safe_int(option.get("variant_image_priority"), 100)
 
     tabs = ["📄 Genel Bilgiler"]
     if can_view_costs():
@@ -1144,19 +1155,39 @@ def show_option_form(mode="add", option_id=None):
             c1, c2 = st.columns([3, 1], gap="large")
 
             with c1:
-                name = st.text_input("Donanım Adı *", value=current_name)
-                c_price, c_sale = st.columns(2)
+                name = st.text_input("Opsiyon Adı *", value=current_name)
+
+                c_sort, c_price, c_sale = st.columns([1, 2, 2])
+                sort_order = c_sort.number_input("Görüntüleme Sırası", value=current_sort_order, step=1, min_value=0)
                 price = c_price.number_input("Liste Fiyatı / Eski Fiyat", value=current_price, step=50.0)
                 sale_price = c_sale.number_input("Satış Fiyatı *", value=current_sale_price, step=50.0)
 
-                allow_qty = st.checkbox("Bu donanım için adet seçilebilir", value=current_allow_qty)
+                cats = get_category_list()
+                if current_category and current_category not in cats:
+                    cats = [current_category] + cats
+                category = st.selectbox(
+                    "Opsiyon Kategorisi",
+                    options=cats if cats else [""],
+                    index=cats.index(current_category) if current_category in cats else 0,
+                )
+
                 desc = st.text_area("Açıklama", value=current_desc, height=120)
 
                 st.markdown("---")
-                suffix = st.text_input("Model Adı Eki / Suffix", value=current_suffix, placeholder="Örn: L, PRO, PLUS")
+                c_suffix, c_conflict = st.columns(2)
+                suffix = c_suffix.text_input("Son Ek", value=current_suffix, placeholder="Örn: L, PRO, PLUS")
+                conflict = c_conflict.text_input("Çakışma", value=current_conflict, placeholder="Örn: Vakum Tablası, PVC")
 
-                main_img_upload = st.file_uploader("Donanım Görseli", type=["png", "jpg", "jpeg"], key=f"option_main_img_{mode}_{option_id or 'new'}")
-                variant_img_upload = st.file_uploader("Varyasyon Ana Resmi", type=["png", "jpg", "jpeg"], key=f"option_variant_img_{mode}_{option_id or 'new'}")
+                allow_qty_options = ["Manuel adet", "Tek adet"]
+                allow_qty_label = st.selectbox(
+                    "Adet Hesaplama",
+                    options=allow_qty_options,
+                    index=0 if current_allow_qty else 1,
+                )
+
+                main_img_upload = st.file_uploader("Opsiyon Görseli", type=["png", "jpg", "jpeg"], key=f"option_main_img_{mode}_{option_id or 'new'}")
+                variant_img_upload = st.file_uploader("Varyant Görseli", type=["png", "jpg", "jpeg"], key=f"option_variant_img_{mode}_{option_id or 'new'}")
+                variant_priority = st.number_input("Varyant Görsel Önceliği", value=current_variant_priority, step=1, min_value=0)
 
             with c2:
                 st.markdown("**Donanım Görseli**")
@@ -1252,14 +1283,15 @@ def show_option_form(mode="add", option_id=None):
                 final_variant_img = processed_variant
 
         user_id = st.session_state.get("user_id", 1)
-        allow_qty_int = 1 if allow_qty else 0
+        allow_qty_int = 1 if allow_qty_label == "Manuel adet" else 0
 
         if mode == "edit":
             ok = exec_factory(
                 """
                 UPDATE options
                 SET opt_name=?, opt_desc=?, opt_price=?, sale_price=?, opt_image=?,
-                    allow_qty=?, opt_suffix=?, opt_variant_image=?,
+                    sort_order=?, allow_qty=?, opt_suffix=?, opt_variant_image=?,
+                    category=?, conflict=?, variant_image_priority=?,
                     purchase_price=?, shipping_cost=?, customs_tax_rate=?, extra_tax_rate=?,
                     port_cost=?, document_cost=?, installation_cost=?, other_cost=?, cost_note=?
                 WHERE id=?
@@ -1270,9 +1302,13 @@ def show_option_form(mode="add", option_id=None):
                     price,
                     sale_price,
                     final_img,
+                    sort_order,
                     allow_qty_int,
                     suffix,
                     final_variant_img,
+                    category,
+                    conflict,
+                    variant_priority,
                     purchase_price,
                     shipping_cost,
                     customs_tax_rate,
@@ -1290,11 +1326,12 @@ def show_option_form(mode="add", option_id=None):
                 """
                 INSERT INTO options (
                     opt_name, opt_desc, opt_price, sale_price, opt_image,
-                    allow_qty, opt_suffix, opt_variant_image, user_id,
+                    sort_order, allow_qty, opt_suffix, opt_variant_image, user_id,
+                    category, conflict, variant_image_priority,
                     purchase_price, shipping_cost, customs_tax_rate, extra_tax_rate,
                     port_cost, document_cost, installation_cost, other_cost, cost_note
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     name.strip(),
@@ -1302,10 +1339,14 @@ def show_option_form(mode="add", option_id=None):
                     price,
                     sale_price,
                     final_img,
+                    sort_order,
                     allow_qty_int,
                     suffix,
                     final_variant_img,
                     user_id,
+                    category,
+                    conflict,
+                    variant_priority,
                     purchase_price,
                     shipping_cost,
                     customs_tax_rate,
