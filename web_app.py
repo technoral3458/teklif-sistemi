@@ -558,16 +558,36 @@ header[data-testid="stHeader"] { background: transparent; }
 
 .mobile-topbar { display: none; }
 
-.mobile-menu-note {
-    text-align: center !important;
-    background: #eff6ff;
-    color: #1e40af;
-    border: 1px solid #bfdbfe;
-    border-radius: 15px !important;
-    padding: 12px 14px !important;
-    font-size: 13px !important;
-    font-weight: 700;
-    margin-bottom: 18px !important;
+/* ===== MOBİL NAVIGASYON ===== */
+.mob-topbar-divider { height: 1px; background: #e2e8f0; margin: 6px 0 16px 0; }
+.mob-page-label {
+    font-size: 15px; font-weight: 900; color: #0f172a;
+    text-align: center; padding: 6px 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mob-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    color: white; font-size: 14px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto;
+}
+.mob-user-card {
+    display: flex; align-items: center; gap: 12px;
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    border-radius: 14px; padding: 14px 16px; margin-bottom: 18px;
+}
+.mob-user-av {
+    width: 46px; height: 46px; border-radius: 50%;
+    color: white; font-size: 18px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.mob-user-email {
+    font-size: 13px; font-weight: 800; color: #0f172a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
+}
+.mob-user-role { font-size: 11px; color: #64748b; font-weight: 700; margin-top: 3px; }
+.mob-sec-title {
+    font-size: 11px; font-weight: 900; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
 }
 
 /* ===== LOGIN PAGE ===== */
@@ -622,26 +642,11 @@ header[data-testid="stHeader"] { background: transparent; }
     .block-container {
         padding-left: 14px !important;
         padding-right: 14px !important;
-        padding-top: 18px !important;
-        padding-bottom: 28px !important;
+        padding-top: 14px !important;
+        padding-bottom: 32px !important;
     }
-    .mobile-topbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 18px;
-        padding: 12px 14px;
-        margin-bottom: 16px;
-    }
-    .mobile-topbar-title { font-size: 16px; font-weight: 900; color: #0f172a; }
-    .mobile-topbar-sub { font-size: 11px; color: #64748b; font-weight: 700; }
-    section[data-testid="stSidebar"] {
-        width: 88vw !important;
-        min-width: 88vw !important;
-        max-width: 88vw !important;
-    }
+    /* Mobilde sidebar tamamen gizle */
+    section[data-testid="stSidebar"] { display: none !important; }
     div[data-testid="column"] {
         width: 100% !important;
         flex: 1 1 100% !important;
@@ -654,6 +659,17 @@ header[data-testid="stHeader"] { background: transparent; }
     }
     input, textarea { font-size: 16px !important; }
     .dash-card { text-align: center; margin-bottom: 10px; }
+    /* Mobil top bar hamburger butonu */
+    div[data-testid="stVerticalBlock"] > div:first-child .stButton > button {
+        background: #f1f5f9 !important;
+        border: 1.5px solid #e2e8f0 !important;
+        color: #0f172a !important;
+        font-size: 18px !important;
+        font-weight: 900 !important;
+        border-radius: 10px !important;
+        min-height: 42px !important;
+        padding: 4px !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -952,35 +968,135 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# MOBİL ÜST MENÜ
+# MENÜ ÖĞELERİ (mobil + masaüstü ortak)
+# =====================================================================
+pending_count_txt = ""
+if st.session_state.user_role == "admin":
+    try:
+        conn_p = sqlite3.connect("sales_data.db")
+        p_count = conn_p.execute("SELECT COUNT(*) FROM offers WHERE status='Onay Bekliyor'").fetchone()[0]
+        conn_p.close()
+        if p_count > 0:
+            pending_count_txt = f" ({p_count})"
+    except:
+        pass
+
+if st.session_state.user_role == "admin":
+    menu_items_labels = [
+        _("m_dash"), _("m_new"), _("m_cust"),
+        _("m_past") + pending_count_txt, _("m_order"), _("m_prof"),
+        _("m_deal"), _("m_model"), _("m_profit"),
+    ]
+else:
+    allowed = st.session_state.allowed_menus.split(",") if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
+    v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model", "m_profit"]
+    menu_items_labels = [_(k.strip()) for k in allowed if k.strip() in v_keys]
+
+if not menu_items_labels:
+    menu_items_labels = [_("m_dash")]
+
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = menu_items_labels[0]
+
+r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
+role_color = {"admin": "#dc2626", "manufacturer": "#d97706"}.get(st.session_state.user_role, "#2563eb")
+u_init = (st.session_state.user_email or "U")[0].upper()
+
+# =====================================================================
+# MOBİL NAVİGASYON (Sidebar kullanılmıyor)
 # =====================================================================
 if IS_MOBILE:
-    top_left, top_right = st.columns([1, 5], vertical_alignment="center")
-    with top_left:
-        if st.button("☰", key="mobile_hamburger_btn", use_container_width=True):
+    # ── Top bar ──────────────────────────────────────────────────────
+    tb1, tb2, tb3 = st.columns([1, 5, 1], vertical_alignment="center")
+
+    with tb1:
+        ham_icon = "✕" if st.session_state.mobile_menu_open else "☰"
+        if st.button(ham_icon, key="mob_ham_btn", use_container_width=True):
             st.session_state.mobile_menu_open = not st.session_state.mobile_menu_open
             st.rerun()
-    with top_right:
+
+    with tb2:
+        top_label = ("Menü" if st.session_state.lang == "tr" else "Menu") if st.session_state.mobile_menu_open else st.session_state.active_tab
+        st.markdown(f"<div class='mob-page-label'>{top_label}</div>", unsafe_allow_html=True)
+
+    with tb3:
+        st.markdown(f"<div class='mob-avatar' style='background:{role_color};'>{u_init}</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='mob-topbar-divider'></div>", unsafe_allow_html=True)
+
+    # ── Menu overlay (menü açıksa sayfa içeriği yerine menü göster) ──
+    if st.session_state.mobile_menu_open:
+        # Kullanıcı kartı
         st.markdown(f"""
-        <div class="mobile-topbar">
-            <div>
-                <div class="mobile-topbar-title">Ersan Makine B2B</div>
-                <div class="mobile-topbar-sub">{st.session_state.user_email}</div>
+        <div class='mob-user-card'>
+            <div class='mob-user-av' style='background:{role_color};'>{u_init}</div>
+            <div style='overflow:hidden;'>
+                <div class='mob-user-email'>{st.session_state.user_email}</div>
+                <div class='mob-user-role'>{r_text}</div>
             </div>
-            <div style="font-size:22px;">⚙️</div>
         </div>
         """, unsafe_allow_html=True)
 
-# =====================================================================
-# SIDEBAR
-# =====================================================================
-show_sidebar = not (IS_MOBILE and not st.session_state.mobile_menu_open)
+        nav_title = "Sayfalar" if st.session_state.lang == "tr" else ("Pages" if st.session_state.lang == "en" else "页面")
+        st.markdown(f"<div class='mob-sec-title'>{nav_title}</div>", unsafe_allow_html=True)
 
-if show_sidebar:
+        # Navigasyon butonları için özel stil
+        st.markdown("""<style>
+        section.main div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] .stButton > button {
+            min-height: 56px !important; border-radius: 13px !important;
+            font-size: 15px !important; font-weight: 700 !important;
+            margin-bottom: 5px !important;
+        }
+        section.main div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] .stButton > button[kind="secondary"] {
+            background: #f8fafc !important; border: 1.5px solid #e2e8f0 !important;
+            color: #1e293b !important; text-align: left !important;
+        }
+        section.main div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] .stButton > button[kind="secondary"]:hover {
+            background: #eff6ff !important; border-color: #bfdbfe !important;
+        }
+        section.main div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] .stButton > button[kind="primary"] {
+            background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
+            border: none !important; color: white !important;
+            box-shadow: 0 4px 14px rgba(37,99,235,.3) !important;
+        }
+        </style>""", unsafe_allow_html=True)
+
+        # Menü öğeleri
+        for label in menu_items_labels:
+            is_active = st.session_state.active_tab in label or label in st.session_state.active_tab
+            if st.button(label, key=f"mob_nav_{label}", use_container_width=True,
+                         type="primary" if is_active else "secondary"):
+                st.session_state.active_tab = label
+                st.session_state.mobile_menu_open = False
+                st.rerun()
+
+        # Dil + çıkış satırı
+        st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='mob-sec-title'>{_('lang_sel')}</div>", unsafe_allow_html=True)
+        lang_opts_m = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
+        ml1, ml2 = st.columns([2, 1])
+        with ml1:
+            sel_m = st.selectbox("🌐", list(lang_opts_m.keys()),
+                                 format_func=lambda x: lang_opts_m[x],
+                                 index=list(lang_opts_m.keys()).index(st.session_state.lang),
+                                 key="mob_lang_sel", label_visibility="collapsed")
+            if sel_m != st.session_state.lang:
+                st.session_state.lang = sel_m
+                st.rerun()
+        with ml2:
+            if st.button(_("logout"), use_container_width=True):
+                c = sqlite3.connect("users.db")
+                c.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
+                c.commit(); c.close()
+                st.query_params.clear(); st.session_state.clear(); st.rerun()
+
+        st.stop()  # Sayfa içeriği menü açıkken render edilmesin
+
+# =====================================================================
+# SIDEBAR (sadece masaüstü)
+# =====================================================================
+if not IS_MOBILE:
     with st.sidebar:
-        if IS_MOBILE:
-            st.markdown("<div class='mobile-menu-note'>Menüden sayfa seçince bu panel otomatik kapanır.</div>", unsafe_allow_html=True)
-
         c_user = sqlite3.connect("users.db")
         user_data = c_user.execute("SELECT logo_path, company_name FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
         c_user.close()
@@ -997,11 +1113,10 @@ if show_sidebar:
         else:
             st.markdown(f"<div style='text-align:center; margin-bottom:15px; padding:10px 0; font-weight:900; font-size:18px; color:#1e293b;'>{sidebar_text}</div>", unsafe_allow_html=True)
 
-        r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
         st.markdown(f"""
         <div style='background-color:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; margin-bottom:20px; display:flex; align-items:center; gap:10px;'>
-            <div style='background:#2563eb; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold;'>
-                {st.session_state.user_email[0].upper()}
+            <div style='background:{role_color}; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold;'>
+                {u_init}
             </div>
             <div style='overflow:hidden; width:100%;'>
                 <div style='font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div>
@@ -1009,40 +1124,6 @@ if show_sidebar:
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-        pending_count_txt = ""
-        if st.session_state.user_role == "admin":
-            try:
-                conn_p = sqlite3.connect("sales_data.db")
-                p_count = conn_p.execute("SELECT COUNT(*) FROM offers WHERE status='Onay Bekliyor'").fetchone()[0]
-                conn_p.close()
-                if p_count > 0:
-                    pending_count_txt = f" ({p_count})"
-            except:
-                pass
-
-        if st.session_state.user_role == "admin":
-            menu_items_labels = [
-                _("m_dash"),
-                _("m_new"),
-                _("m_cust"),
-                _("m_past") + pending_count_txt,
-                _("m_order"),
-                _("m_prof"),
-                _("m_deal"),
-                _("m_model"),
-                _("m_profit"),
-            ]
-        else:
-            allowed = st.session_state.allowed_menus.split(",") if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
-            v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model", "m_profit"]
-            menu_items_labels = [_(k.strip()) for k in allowed if k.strip() in v_keys]
-
-        if not menu_items_labels:
-            menu_items_labels = [_("m_dash")]
-
-        if "active_tab" not in st.session_state:
-            st.session_state.active_tab = menu_items_labels[0]
 
         current_idx = 0
         for idx, label in enumerate(menu_items_labels):
@@ -1052,17 +1133,16 @@ if show_sidebar:
 
         def on_menu_change():
             st.session_state.active_tab = st.session_state.m_radio
-            if IS_MOBILE:
-                st.session_state.mobile_menu_open = False
 
-        st.radio("MENÜ", menu_items_labels, index=current_idx, key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
+        st.radio("MENÜ", menu_items_labels, index=current_idx, key="m_radio",
+                 on_change=on_menu_change, label_visibility="collapsed")
 
         st.markdown("<hr style='margin:15px 0; border:none; border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
         lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
-        sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()), format_func=lambda x: lang_opts[x],
+        sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()),
+                           format_func=lambda x: lang_opts[x],
                            index=list(lang_opts.keys()).index(st.session_state.lang), key="sb_lang")
-
         if sel != st.session_state.lang:
             st.session_state.lang = sel
             st.rerun()
@@ -1070,14 +1150,8 @@ if show_sidebar:
         if st.button(_("logout"), use_container_width=True):
             c = sqlite3.connect("users.db")
             c.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
-            c.commit()
-            c.close()
-            st.query_params.clear()
-            st.session_state.clear()
-            st.rerun()
-else:
-    if "active_tab" not in st.session_state:
-        st.session_state.active_tab = _("m_dash")
+            c.commit(); c.close()
+            st.query_params.clear(); st.session_state.clear(); st.rerun()
 
 # =====================================================================
 # SAYFA YÖNLENDİRME
