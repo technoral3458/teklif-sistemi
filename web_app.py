@@ -597,7 +597,78 @@ header[data-testid="stHeader"] { background: transparent; }
     }
     input, textarea { font-size: 16px !important; }
     .dash-card { text-align: center; margin-bottom: 10px; }
+    .block-container { padding-bottom: 90px !important; }
 }
+
+/* ── Bizim Hesap tarzı altta gezinme çubuğu ── */
+.bh-header {
+    background: linear-gradient(135deg,#0f172a,#1e3a8a);
+    color: white;
+    padding: 13px 16px;
+    border-radius: 18px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.bh-header-title { font-size:15px; font-weight:900; }
+.bh-header-sub   { font-size:11px; opacity:.7; margin-top:2px; }
+.bh-header-avatar {
+    width:36px; height:36px; border-radius:50%;
+    background:rgba(255,255,255,.2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:15px; font-weight:900;
+}
+.bh-bottom-nav {
+    position:fixed; bottom:0; left:0; right:0;
+    background:#fff;
+    border-top:1px solid #e8ecf0;
+    display:flex; align-items:stretch;
+    z-index:9999; height:62px;
+    box-shadow:0 -4px 24px rgba(15,23,42,.10);
+    padding:0 6px;
+}
+.bh-nav-item {
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2px;
+    text-decoration:none; cursor:pointer;
+    border:none; background:none;
+    padding:6px 2px; border-radius:14px; margin:4px 2px;
+    color:#94a3b8; -webkit-tap-highlight-color:transparent;
+    transition: background .15s, color .15s;
+}
+.bh-nav-item.bh-active { color:#2563eb; background:#eff6ff; }
+.bh-nav-icon  { font-size:19px; line-height:1; }
+.bh-nav-label { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.2px; }
+.bh-drawer-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(15,23,42,.45); z-index:9997;
+}
+.bh-drawer-overlay.open { display:block; }
+.bh-drawer {
+    position:fixed; bottom:62px; left:0; right:0;
+    background:white; border-radius:22px 22px 0 0;
+    padding:16px 16px 24px; z-index:9998;
+    transform:translateY(105%);
+    transition:transform .28s cubic-bezier(.32,.72,0,1);
+    box-shadow:0 -8px 40px rgba(15,23,42,.14);
+}
+.bh-drawer.open { transform:translateY(0); }
+.bh-drawer-handle {
+    width:36px; height:4px; background:#e2e8f0;
+    border-radius:4px; margin:0 auto 16px;
+}
+.bh-drawer-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.bh-drawer-item {
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:14px 8px; border-radius:16px;
+    background:#f8fafc; border:1.5px solid #e2e8f0;
+    text-decoration:none; color:#334155; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+}
+.bh-drawer-item.bh-active { background:#eff6ff; border-color:#93c5fd; color:#2563eb; }
+.bh-drawer-icon  { font-size:24px; }
+.bh-drawer-label { font-size:11px; font-weight:800; text-align:center; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -808,35 +879,102 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# MOBİL ÜST MENÜ
+# MOBİL HEADER + ALT NAV (Bizim Hesap tarzı)
 # =====================================================================
 if IS_MOBILE:
-    top_left, top_right = st.columns([1, 5], vertical_alignment="center")
-    with top_left:
-        if st.button("☰", key="mobile_hamburger_btn", use_container_width=True):
-            st.session_state.mobile_menu_open = not st.session_state.mobile_menu_open
-            st.rerun()
-    with top_right:
-        st.markdown(f"""
-        <div class="mobile-topbar">
-            <div>
-                <div class="mobile-topbar-title">Ersan Makine B2B</div>
-                <div class="mobile-topbar-sub">{st.session_state.user_email}</div>
-            </div>
-            <div style="font-size:22px;">⚙️</div>
+    # Nav param → active_tab (URL: ?nav=dash gibi)
+    _nav_p = st.query_params.get("nav", "")
+    if _nav_p:
+        _nmap = {
+            "dash": _("m_dash"), "new": _("m_new"), "cust": _("m_cust"),
+            "past": _("m_past"), "order": _("m_order"), "prof": _("m_prof"),
+            "deal": _("m_deal"), "model": _("m_model"), "profit": _("m_profit"),
+        }
+        if _nav_p in _nmap:
+            st.session_state.active_tab = _nmap[_nav_p]
+
+    # Üst başlık
+    _ui = (st.session_state.user_email or "U")[0].upper()
+    st.markdown(f"""
+    <div class="bh-header">
+        <div>
+            <div class="bh-header-title">Ersan Makine B2B</div>
+            <div class="bh-header-sub">{st.session_state.user_email}</div>
         </div>
-        """, unsafe_allow_html=True)
+        <div class="bh-header-avatar">{_ui}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Menü tanımları
+    _all_nav = [
+        ("dash",   "📊", "Panel"),
+        ("new",    "📝", "Teklif"),
+        ("cust",   "👥", "Müşteri"),
+        ("past",   "📋", "Teklifler"),
+        ("order",  "📦", "Sipariş"),
+        ("prof",   "⚙️", "Profil"),
+        ("deal",   "🏢", "Bayiler"),
+        ("model",  "🗂", "Modeller"),
+        ("profit", "💰", "Maliyet"),
+    ]
+    if st.session_state.user_role == "admin":
+        _allowed_keys = [x[0] for x in _all_nav]
+    else:
+        _ak_map = {"m_dash":"dash","m_new":"new","m_cust":"cust","m_past":"past",
+                   "m_order":"order","m_prof":"prof","m_deal":"deal","m_model":"model","m_profit":"profit"}
+        _raw = st.session_state.allowed_menus.split(",") if st.session_state.allowed_menus else ["m_dash","m_new","m_cust","m_past","m_order","m_prof"]
+        _allowed_keys = [_ak_map[k.strip()] for k in _raw if k.strip() in _ak_map]
+
+    _fnav = [(k, ic, lb) for (k, ic, lb) in _all_nav if k in _allowed_keys]
+    _main_items   = _fnav[:4]
+    _drawer_items = _fnav[4:]
+
+    # Aktif anahtar
+    _act = st.session_state.get("active_tab", "")
+    _kmap = {"dash":_("m_dash"),"new":_("m_new"),"cust":_("m_cust"),"past":_("m_past"),
+             "order":_("m_order"),"prof":_("m_prof"),"deal":_("m_deal"),"model":_("m_model"),"profit":_("m_profit")}
+    _cur_key = "dash"
+    for _k, _lbl in _kmap.items():
+        if _lbl in _act or _act in _lbl:
+            _cur_key = _k
+            break
+
+    # HTML üretimi
+    def _ni(k, ic, lb):
+        cls = "bh-active" if _cur_key == k else ""
+        return f'<a class="bh-nav-item {cls}" href="javascript:void(0)" onclick="bhNav(\'{k}\')"><span class="bh-nav-icon">{ic}</span><span class="bh-nav-label">{lb}</span></a>'
+
+    _main_html = "".join(_ni(k, ic, lb) for k, ic, lb in _main_items)
+
+    if _drawer_items:
+        _daha_cls = "bh-active" if _cur_key in [x[0] for x in _drawer_items] else ""
+        _drawer_inner = "".join(
+            f'<a class="bh-drawer-item {"bh-active" if _cur_key==k else ""}" href="javascript:void(0)" onclick="bhNav(\'{k}\')"><span class="bh-drawer-icon">{ic}</span><span class="bh-drawer-label">{lb}</span></a>'
+            for k, ic, lb in _drawer_items
+        )
+        _daha_btn = f'<a class="bh-nav-item {_daha_cls}" href="javascript:void(0)" onclick="toggleBhDrawer()"><span class="bh-nav-icon">⋯</span><span class="bh-nav-label">Daha</span></a>'
+        _drawer_html = f'<div class="bh-drawer-overlay" id="bhOverlay" onclick="closeBhDrawer()"></div><div class="bh-drawer" id="bhDrawer"><div class="bh-drawer-handle"></div><div class="bh-drawer-grid">{_drawer_inner}</div></div>'
+    else:
+        _daha_btn = ""
+        _drawer_html = ""
+
+    st.markdown(f"""
+    {_drawer_html}
+    <div class="bh-bottom-nav">{_main_html}{_daha_btn}</div>
+    <script>
+    function bhNav(k){{closeBhDrawer();window.parent.location.href='?nav='+k;}}
+    function toggleBhDrawer(){{var d=document.getElementById('bhDrawer'),o=document.getElementById('bhOverlay');if(d&&d.classList.contains('open')){{closeBhDrawer();}}else{{if(d)d.classList.add('open');if(o)o.classList.add('open');}}}}
+    function closeBhDrawer(){{var d=document.getElementById('bhDrawer'),o=document.getElementById('bhOverlay');if(d)d.classList.remove('open');if(o)o.classList.remove('open');}}
+    </script>
+    """, unsafe_allow_html=True)
 
 # =====================================================================
-# SIDEBAR
+# SIDEBAR (yalnızca masaüstü)
 # =====================================================================
-show_sidebar = not (IS_MOBILE and not st.session_state.mobile_menu_open)
+show_sidebar = not IS_MOBILE
 
 if show_sidebar:
     with st.sidebar:
-        if IS_MOBILE:
-            st.markdown("<div class='mobile-menu-note'>Menüden sayfa seçince bu panel otomatik kapanır.</div>", unsafe_allow_html=True)
-
         c_user = sqlite3.connect("users.db")
         user_data = c_user.execute("SELECT logo_path, company_name FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
         c_user.close()
@@ -909,8 +1047,6 @@ if show_sidebar:
         def on_menu_change():
             st.session_state.active_tab = st.session_state.m_radio
             st.session_state.close_sidebar = True
-            if IS_MOBILE:
-                st.session_state.mobile_menu_open = False
 
         st.radio("MENÜ", menu_items_labels, index=current_idx, key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
 
@@ -939,7 +1075,7 @@ else:
 # =====================================================================
 # SAYFA YÖNLENDİRME
 # =====================================================================
-if st.session_state.get("close_sidebar"):
+if not IS_MOBILE and st.session_state.get("close_sidebar"):
     st.session_state.close_sidebar = False
     st.markdown(
         """<script>
