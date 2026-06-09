@@ -647,11 +647,6 @@ header[data-testid="stHeader"] { background: transparent; }
     }
     /* Mobilde sidebar tamamen gizle */
     section[data-testid="stSidebar"] { display: none !important; }
-    div[data-testid="column"] {
-        width: 100% !important;
-        flex: 1 1 100% !important;
-        min-width: 100% !important;
-    }
     button {
         min-height: 48px !important;
         border-radius: 14px !important;
@@ -1202,8 +1197,9 @@ elif _("m_dash") in act_tab:
     </div>
     """, unsafe_allow_html=True)
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Teklif</div><div class='dash-value'>{tot_o}</div></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Hacim</div><div class='dash-value dash-blue'>{tot_v:,.0f} $</div></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='dash-card'><div class='dash-label'>Onaylanan Sipariş</div><div class='dash-value dash-orange'>{ord_o}</div></div>", unsafe_allow_html=True)
-    c4.markdown(f"<div class='dash-card'><div class='dash-label'>Sipariş Hacmi</div><div class='dash-value dash-green'>{ord_v:,.0f} $</div></div>", unsafe_allow_html=True)
+    r1c1, r1c2 = st.columns(2)
+    r1c1.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Teklif</div><div class='dash-value'>{tot_o}</div></div>", unsafe_allow_html=True)
+    r1c2.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Hacim</div><div class='dash-value dash-blue'>{tot_v:,.0f} $</div></div>", unsafe_allow_html=True)
+    r2c1, r2c2 = st.columns(2)
+    r2c1.markdown(f"<div class='dash-card'><div class='dash-label'>Onaylanan Sipariş</div><div class='dash-value dash-orange'>{ord_o}</div></div>", unsafe_allow_html=True)
+    r2c2.markdown(f"<div class='dash-card'><div class='dash-label'>Sipariş Hacmi</div><div class='dash-value dash-green'>{ord_v:,.0f} $</div></div>", unsafe_allow_html=True)

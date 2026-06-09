@@ -20,18 +20,20 @@ def inject_responsive_css():
     .soft-info-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:14px; }
     .cost-box { background:#fff7ed; border:1px solid #fed7aa; border-radius:14px; padding:14px; margin-bottom:14px; }
 
+    .opt-card-img { width:100%; max-height:72px; object-fit:contain; border-radius:8px; }
+    .opt-card-name { font-size:14px; font-weight:800; color:#0f172a; line-height:1.3; }
+    .opt-card-price { font-size:16px; font-weight:900; color:#ea580c; margin-top:3px; }
+    .opt-card-cost { font-size:11px; color:#16a34a; font-weight:700; margin-top:2px; }
+    .opt-card-badge { font-size:10px; background:#eff6ff; color:#2563eb; padding:2px 5px; border-radius:4px; font-weight:700; margin-left:4px; vertical-align:middle; }
+
     @media (max-width:768px) {
         .block-container { padding-left:10px!important; padding-right:10px!important; padding-top:10px!important; }
         h1,h2,h3 { font-size:22px!important; line-height:1.25!important; }
         .stTabs [data-baseweb="tab-list"] { overflow-x:auto!important; white-space:nowrap!important; gap:6px!important; padding-bottom:8px!important; border-bottom:1px solid #e2e8f0!important; }
         .stTabs [data-baseweb="tab"] { min-width:max-content!important; padding:10px 14px!important; font-size:14px!important; border-radius:12px!important; background:#f8fafc!important; border:1px solid #e2e8f0!important; }
         .stTabs [aria-selected="true"] { background:#2563eb!important; color:white!important; border-color:#2563eb!important; }
-        div[data-testid="column"] { width:100%!important; flex:1 1 100%!important; min-width:100%!important; }
         input,textarea { font-size:16px!important; }
         button { min-height:46px!important; border-radius:13px!important; font-weight:800!important; }
-        div[data-testid="stNumberInput"], div[data-testid="stSelectbox"], div[data-testid="stFileUploader"] { width:100%!important; }
-        section[data-testid="stSidebar"] { width:86vw!important; }
-        .product-card { padding:12px!important; border-radius:14px!important; }
         .desktop-only { display:none!important; }
     }
     </style>
@@ -448,84 +450,69 @@ def show_models_list():
 
     for cat_name, cat_models in grouped.items():
         with st.expander(f"📁 {cat_name} ({len(cat_models)})", expanded=True):
-            for i in range(0, len(cat_models), 4):
-                cols = st.columns(4)
+            for model in cat_models:
+                model_id = safe_int(model.get("id"))
+                display_price = safe_float(model.get("sale_price")) or safe_float(model.get("base_price"))
+                img_b64 = get_image_base64(model.get("image_path"))
 
-                for j in range(4):
-                    if i + j >= len(cat_models):
-                        continue
+                with st.container(border=True):
+                    c_img, c_body = st.columns([1, 4], vertical_alignment="center")
 
-                    model = cat_models[i + j]
-                    model_id = safe_int(model.get("id"))
-
-                    with cols[j]:
-                        st.markdown("<div class='product-card'>", unsafe_allow_html=True)
-
-                        img_b64 = get_image_base64(model.get("image_path"))
-                        if img_b64:
-                            st.markdown(
-                                f"""
-                                <div style="text-align:center;">
-                                    <img src="{img_b64}" style="width:100%; height:150px; object-fit:contain; margin-bottom:10px; border-radius:12px;">
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-                        else:
-                            st.markdown(
-                                """
-                                <div style="height:150px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:12px; color:#94a3b8; margin-bottom:10px;">
-                                    Görsel Yok
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-
-                        display_price = safe_float(model.get("sale_price")) or safe_float(model.get("base_price"))
-
-                        st.markdown(
-                            f"""
-                            <div class="mobile-card-title">{model.get("name", "İsimsiz Makine")}</div>
-                            <div class="mobile-card-sub">ID: {model_id} · {model.get("category", "Diğer Makinalar")}</div>
-                            <div class="product-price">{display_price:,.2f} {model.get("currency", "USD")}</div>
-                            """,
+                    # Görsel
+                    if img_b64:
+                        c_img.markdown(
+                            f'<img src="{img_b64}" style="width:100%; max-height:80px; '
+                            f'object-fit:contain; border-radius:8px;">',
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        c_img.markdown(
+                            '<div style="height:70px; background:#f1f5f9; border-radius:8px; '
+                            'display:flex; align-items:center; justify-content:center; '
+                            'color:#94a3b8; font-size:10px; text-align:center;">Görsel<br>Yok</div>',
                             unsafe_allow_html=True,
                         )
 
-                        if can_view_costs():
-                            cost = calculate_import_cost(
-                                model.get("purchase_price"),
-                                model.get("shipping_cost"),
-                                model.get("customs_tax_rate"),
-                                model.get("extra_tax_rate"),
-                                model.get("port_cost"),
-                                model.get("document_cost"),
-                                model.get("installation_cost"),
-                                model.get("other_cost"),
-                            )
-                            profit = display_price - cost["toplam"]
-                            st.markdown(
-                                f"<div class='cost-price'>Maliyet: {cost['toplam']:,.2f} $ · Kâr: {profit:,.2f} $</div>",
-                                unsafe_allow_html=True,
-                            )
+                    # Bilgi
+                    cost_html = ""
+                    if can_view_costs():
+                        cost = calculate_import_cost(
+                            model.get("purchase_price"), model.get("shipping_cost"),
+                            model.get("customs_tax_rate"), model.get("extra_tax_rate"),
+                            model.get("port_cost"), model.get("document_cost"),
+                            model.get("installation_cost"), model.get("other_cost"),
+                        )
+                        profit = display_price - cost["toplam"]
+                        cost_html = (
+                            f'<div class="opt-card-cost">Maliyet: {cost["toplam"]:,.0f}$ '
+                            f'· Kâr: {profit:,.0f}$</div>'
+                        )
 
-                        b1, b2, b3 = st.columns(3)
+                    c_body.markdown(
+                        f'<div class="opt-card-name">{model.get("name", "İsimsiz Makine")}</div>'
+                        f'<div style="font-size:11px; color:#64748b; font-weight:600; margin-top:2px;">'
+                        f'{model.get("category", "Diğer Makinalar")}</div>'
+                        f'<div class="opt-card-price">{display_price:,.2f} {model.get("currency","USD")}</div>'
+                        f'{cost_html}',
+                        unsafe_allow_html=True,
+                    )
 
-                        if b1.button("✏️", key=f"edit_model_{model_id}", help="Düzenle", use_container_width=True):
-                            st.session_state.edit_model_id = model_id
-                            st.session_state.view_mode = "model_edit"
-                            st.rerun()
+                    # Aksiyon butonları
+                    b1, b2, b3 = c_body.columns(3)
 
-                        if b2.button("📄", key=f"copy_model_{model_id}", help="Kopyala", use_container_width=True):
-                            copy_model(model_id)
-                            st.rerun()
+                    if b1.button("✏️ Düzenle", key=f"edit_model_{model_id}", use_container_width=True):
+                        st.session_state.edit_model_id = model_id
+                        st.session_state.view_mode = "model_edit"
+                        st.rerun()
 
-                        if b3.button("🗑️", key=f"delete_model_{model_id}", help="Sil", use_container_width=True):
-                            exec_factory("DELETE FROM models WHERE id=?", (model_id,))
-                            st.success("Makine silindi.")
-                            st.rerun()
+                    if b2.button("📄 Kopya", key=f"copy_model_{model_id}", use_container_width=True):
+                        copy_model(model_id)
+                        st.rerun()
 
-                        st.markdown("</div>", unsafe_allow_html=True)
+                    if b3.button("🗑️ Sil", key=f"delete_model_{model_id}", use_container_width=True):
+                        exec_factory("DELETE FROM models WHERE id=?", (model_id,))
+                        st.success("Makine silindi.")
+                        st.rerun()
 
 
 def show_options_list():
@@ -537,7 +524,7 @@ def show_options_list():
         st.rerun()
 
     search = st.text_input("🔍 Donanım ara", placeholder="Donanım adı yazın...")
-    options = db_query("SELECT * FROM options ORDER BY id DESC")
+    options = db_query("SELECT * FROM options ORDER BY sort_order ASC, opt_name ASC")
 
     if search:
         s = search.lower()
@@ -551,87 +538,71 @@ def show_options_list():
         st.info("Henüz kayıtlı donanım bulunmuyor.")
         return
 
-    for i in range(0, len(options), 4):
-        cols = st.columns(4)
+    st.caption(f"{len(options)} donanım listeleniyor")
 
-        for j in range(4):
-            if i + j >= len(options):
-                continue
+    for opt in options:
+        opt_id = safe_int(opt.get("id"))
+        display_price = safe_float(opt.get("sale_price")) or safe_float(opt.get("opt_price"))
+        img_b64 = get_image_base64(opt.get("opt_image"))
+        has_variant = bool(opt.get("opt_suffix") or opt.get("opt_variant_image"))
 
-            opt = options[i + j]
-            opt_id = safe_int(opt.get("id"))
+        with st.container(border=True):
+            c_img, c_body = st.columns([1, 4], vertical_alignment="center")
 
-            with cols[j]:
-                st.markdown("<div class='product-card'>", unsafe_allow_html=True)
-
-                img_b64 = get_image_base64(opt.get("opt_image"))
-                if img_b64:
-                    st.markdown(
-                        f"""
-                        <div style="text-align:center;">
-                            <img src="{img_b64}" style="width:100%; height:120px; object-fit:contain; margin-bottom:10px; border-radius:12px;">
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.markdown(
-                        """
-                        <div style="height:120px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:12px; color:#94a3b8; margin-bottom:10px;">
-                            Görsel Yok
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-                display_price = safe_float(opt.get("sale_price")) or safe_float(opt.get("opt_price"))
-
-                st.markdown(
-                    f"""
-                    <div class="mobile-card-title">{opt.get("opt_name", "İsimsiz Donanım")}</div>
-                    <div class="mobile-card-sub">ID: {opt_id}</div>
-                    <div class="product-price">+{display_price:,.2f} USD</div>
-                    """,
+            # Görsel
+            if img_b64:
+                c_img.markdown(
+                    f'<img src="{img_b64}" class="opt-card-img">',
+                    unsafe_allow_html=True,
+                )
+            else:
+                c_img.markdown(
+                    '<div style="height:64px; background:#f1f5f9; border-radius:8px; '
+                    'display:flex; align-items:center; justify-content:center; '
+                    'color:#94a3b8; font-size:10px; text-align:center;">Görsel<br>Yok</div>',
                     unsafe_allow_html=True,
                 )
 
-                if can_view_costs():
-                    cost = calculate_import_cost(
-                        opt.get("purchase_price"),
-                        opt.get("shipping_cost"),
-                        opt.get("customs_tax_rate"),
-                        opt.get("extra_tax_rate"),
-                        opt.get("port_cost"),
-                        opt.get("document_cost"),
-                        opt.get("installation_cost"),
-                        opt.get("other_cost"),
-                    )
-                    profit = display_price - cost["toplam"]
-                    st.markdown(
-                        f"<div class='cost-price'>Maliyet: {cost['toplam']:,.2f} $ · Kâr: {profit:,.2f} $</div>",
-                        unsafe_allow_html=True,
-                    )
+            # Ad + fiyat
+            variant_badge = '<span class="opt-card-badge">✨ Var.</span>' if has_variant else ""
+            cost_html = ""
+            if can_view_costs():
+                cost = calculate_import_cost(
+                    opt.get("purchase_price"), opt.get("shipping_cost"),
+                    opt.get("customs_tax_rate"), opt.get("extra_tax_rate"),
+                    opt.get("port_cost"), opt.get("document_cost"),
+                    opt.get("installation_cost"), opt.get("other_cost"),
+                )
+                profit = display_price - cost["toplam"]
+                cost_html = (
+                    f'<div class="opt-card-cost">Maliyet: {cost["toplam"]:,.0f}$ '
+                    f'· Kâr: {profit:,.0f}$</div>'
+                )
 
-                if opt.get("opt_suffix") or opt.get("opt_variant_image"):
-                    st.caption("✨ Varyasyon bilgisi var")
+            c_body.markdown(
+                f'<div class="opt-card-name">{opt.get("opt_name", "İsimsiz Donanım")}'
+                f'{variant_badge}</div>'
+                f'<div class="opt-card-price">+{display_price:,.2f} USD</div>'
+                f'{cost_html}',
+                unsafe_allow_html=True,
+            )
 
-                b1, b2, b3 = st.columns(3)
+            # Aksiyon butonları
+            b1, b2, b3 = c_body.columns(3)
 
-                if b1.button("✏️", key=f"edit_option_{opt_id}", help="Düzenle", use_container_width=True):
-                    st.session_state.edit_option_id = opt_id
-                    st.session_state.view_mode = "option_edit"
-                    st.rerun()
+            if b1.button("✏️ Düzenle", key=f"edit_opt_{opt_id}", use_container_width=True):
+                st.session_state.edit_option_id = opt_id
+                st.session_state.view_mode = "option_edit"
+                st.rerun()
 
-                if b2.button("📄", key=f"copy_option_{opt_id}", help="Kopyala", use_container_width=True):
-                    copy_option(opt_id)
-                    st.rerun()
+            if b2.button("📄 Kopya", key=f"copy_opt_{opt_id}", use_container_width=True):
+                copy_option(opt_id)
+                st.rerun()
 
-                if b3.button("🗑️", key=f"delete_option_{opt_id}", help="Sil", use_container_width=True):
-                    exec_factory("DELETE FROM options WHERE id=?", (opt_id,))
-                    st.success("Donanım silindi.")
-                    st.rerun()
-
-                st.markdown("</div>", unsafe_allow_html=True)
+            if b3.button("🗑️ Sil", key=f"del_opt_{opt_id}", use_container_width=True):
+                exec_factory("DELETE FROM options WHERE id=?", (opt_id,))
+                st.success("Donanım silindi.")
+                st.rerun()
 
 
 def show_categories_list():
