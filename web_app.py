@@ -908,6 +908,7 @@ if show_sidebar:
 
         def on_menu_change():
             st.session_state.active_tab = st.session_state.m_radio
+            st.session_state.close_sidebar = True
             if IS_MOBILE:
                 st.session_state.mobile_menu_open = False
 
@@ -938,6 +939,18 @@ else:
 # =====================================================================
 # SAYFA YÖNLENDİRME
 # =====================================================================
+if st.session_state.get("close_sidebar"):
+    st.session_state.close_sidebar = False
+    st.markdown(
+        """<script>
+        (function() {
+            var btn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+            if (btn) btn.click();
+        })();
+        </script>""",
+        unsafe_allow_html=True,
+    )
+
 act_tab = st.session_state.active_tab
 
 if _("m_cust") in act_tab:
