@@ -1,0 +1,36 @@
+[Unit]
+Description=Ersan B2B Teklif Sistemi
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ersanb2b
+Group=ersanb2b
+WorkingDirectory=/opt/ersanb2b
+ExecStart=/opt/ersanb2b/venv/bin/streamlit run web_app.py \
+    --server.port=8501 \
+    --server.address=0.0.0.0 \
+    --server.headless=true \
+    --server.fileWatcherType=none \
+    --browser.gatherUsageStats=false
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables — edit as needed
+Environment="ADMIN_EMAIL=admin@example.com"
+Environment="ADMIN_PASS=Admin123!"
+Environment="ADMIN_COMPANY=Yönetim"
+
+# Optional SMTP settings
+#Environment="SMTP_SERVER=mail.example.com"
+#Environment="SMTP_PORT=587"
+#Environment="SMTP_USER=info@example.com"
+#Environment="SMTP_PASS=yourpassword"
+#Environment="SMTP_FROM=info@example.com"
+
+[Install]
+WantedBy=multi-user.target
