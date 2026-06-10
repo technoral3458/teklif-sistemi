@@ -138,6 +138,17 @@ def update_admin(uid,**kw):
     with _c() as c:
         c.execute(f"UPDATE users SET {sets} WHERE id=?",list(f.values())+[uid])
 
+def create_user_by_admin(email, password, company_name, role, phone=""):
+    if by_email(email): return False, "email_in_use"
+    try:
+        with _c() as c:
+            c.execute(
+                "INSERT INTO users(email,password,company_name,role,user_type,phone,is_approved,is_active) VALUES(?,?,?,?,?,?,1,1)",
+                (email, hash_pw(password), company_name, role, role, phone)
+            )
+        return True, "ok"
+    except: return False, "email_in_use"
+
 def delete_user(uid):
     with _c() as c:
         c.execute("DELETE FROM users WHERE id=?",(uid,))

@@ -12,7 +12,10 @@
     <button class="tab-btn" data-tab="tab-approved" onclick="switchTab('tab-approved')">Onaylılar</button>
     <button class="tab-btn" data-tab="tab-all" onclick="switchTab('tab-all')">Tümü</button>
   </div>
-  <a href="/ledger/manufacturers" class="btn btn-outline btn-sm">📒 Cari Hesap</a>
+  <div style="display:flex;gap:8px;">
+    <a href="/ledger/manufacturers" class="btn btn-outline btn-sm">📒 Cari Hesap</a>
+    <button class="btn btn-primary btn-sm" onclick="openModal('addMfrModal')">+ Üretici Ekle</button>
+  </div>
 </div>
 
 {% macro mfr_table(mfr_list) %}
@@ -56,7 +59,7 @@
             </form>
             {% endif %}
             <button class="btn btn-ghost btn-sm"
-              onclick="editMfr({{ m.id }}, '{{ m.company_name|e }}', {{ m.can_view_costs or 0 }}, '{{ m.allowed_categories|e }}')">
+              onclick="editMfr({{ m.id }}, '{{ m.company_name|e }}', {{ m.can_view_costs or 0 }}, '{{ m.role }}', '{{ m.allowed_categories|e }}')">
               ✏️ Düzenle
             </button>
             <form method="post" action="/manufacturers/delete" onsubmit="return confirmDelete(this)" data-confirm="Bu üreticiyi silmek istiyor musunuz?">
@@ -84,46 +87,86 @@
   {{ mfr_table(manufacturers) }}
 </div>
 
-<!-- Edit Modal -->
+<!-- Üretici Ekle Modalı -->
+<div id="addMfrModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Yeni Üretici Ekle</h3>
+      <button class="modal-close" onclick="closeModal('addMfrModal')">&times;</button>
+    </div>
+    <form method="post" action="/manufacturers/add">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">E-posta *</label>
+          <input type="email" name="email" class="form-control" required placeholder="uretici@firma.com" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Şifre *</label>
+          <input type="password" name="password" class="form-control" required placeholder="Geçici şifre" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Firma Adı</label>
+          <input type="text" name="company_name" class="form-control" placeholder="Firma adı" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefon</label>
+          <input type="tel" name="phone" class="form-control" placeholder="Telefon numarası" />
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addMfrModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Ekle</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Düzenle Modalı -->
 <div id="mfrEditModal" class="modal-overlay">
   <div class="modal-box" style="max-width:480px;">
     <div class="modal-header">
       <h3 class="modal-title">Üretici Düzenle</h3>
       <button class="modal-close" onclick="closeModal('mfrEditModal')">&times;</button>
     </div>
-    <div class="modal-body">
-      <form method="post" action="/manufacturers/save">
+    <form method="post" action="/manufacturers/save">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
         <input type="hidden" name="id" id="meid" value="" />
         <div class="form-group">
           <label class="form-label">Firma Adı</label>
           <input type="text" name="company_name" id="mecompany" class="form-control" />
         </div>
         <div class="form-group">
-          <label class="form-label">İzinli Kategoriler (virgülle ayırın)</label>
-          <input type="text" name="allowed_categories" id="mecat" class="form-control" placeholder="Tüm kategoriler için boş bırakın" />
+          <label class="form-label">Rol</label>
+          <select name="role" id="merole" class="form-control">
+            <option value="manufacturer">Üretici</option>
+            <option value="dealer">Bayi olarak taşı →</option>
+          </select>
         </div>
         <div class="form-group">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" name="can_view_costs" id="mecosts" value="1" />
-            <span>Maliyet bilgilerini görebilir</span>
-          </label>
+          <label class="form-label">İzinli Kategoriler <small style="color:var(--text-muted)">(virgülle, boş=tümü)</small></label>
+          <input type="text" name="allowed_categories" id="mecat" class="form-control" />
         </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-          <button type="button" class="btn btn-ghost" onclick="closeModal('mfrEditModal')">İptal</button>
-          <button type="submit" class="btn btn-primary">Kaydet</button>
-        </div>
-      </form>
-    </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" name="can_view_costs" id="mecosts" value="1" />
+          <span style="font-size:13px;">💰 Maliyet bilgilerini görebilir</span>
+        </label>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('mfrEditModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function editMfr(id, company, canCosts, cats) {
+function editMfr(id, company, canCosts, role, cats) {
   document.getElementById('meid').value = id;
   document.getElementById('mecompany').value = company;
   document.getElementById('mecosts').checked = !!canCosts;
+  document.getElementById('merole').value = role;
   document.getElementById('mecat').value = cats;
   openModal('mfrEditModal');
 }

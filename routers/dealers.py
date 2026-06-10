@@ -12,14 +12,29 @@ templates = Jinja2Templates(directory="templates")
 @router.get("")
 async def dealers_list(request: Request):
     user = auth.require_admin(request)
-    users = [u for u in udb.all_users() if u["role"] != "admin"]
+    dealers = [u for u in udb.all_users() if u["role"] == "dealer"]
     cats = fdb.get_cats()
     return templates.TemplateResponse(request, "dealers.html", {
         "user": user,
-        "dealers": users,
+        "dealers": dealers,
         "categories": cats,
         "active_page": "dealers",
+        "msg": request.query_params.get("msg"),
+        "msg_type": request.query_params.get("msg_type", "info"),
     })
+
+
+@router.post("/add")
+async def add_dealer(request: Request,
+                     email: str = Form(...),
+                     password: str = Form(...),
+                     company_name: str = Form(""),
+                     phone: str = Form("")):
+    auth.require_admin(request)
+    ok, reason = udb.create_user_by_admin(email, password, company_name, "dealer", phone)
+    if ok:
+        return RedirectResponse("/dealers?msg=Bayi+eklendi&msg_type=success", 303)
+    return RedirectResponse("/dealers?msg=Bu+e-posta+zaten+kayıtlı&msg_type=error", 303)
 
 
 @router.post("/approve")
@@ -51,6 +66,8 @@ async def save_dealer(request: Request,
         role=role,
         allowed_categories=allowed_categories,
     )
+    if role == "manufacturer":
+        return RedirectResponse("/manufacturers?msg=Kullanıcı+üretici+olarak+taşındı&msg_type=info", 303)
     return RedirectResponse("/dealers", 303)
 
 

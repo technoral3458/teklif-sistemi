@@ -70,6 +70,12 @@
 
 <!-- ── Kullanıcılar ── -->
 <div id="tab-users" class="tab-pane card" {% if not request.query_params.get('tab')=='users' %}style="display:none"{% endif %}>
+  {% set pending = users|selectattr('is_approved','eq',0)|list %}
+  {% if pending %}
+  <div style="padding:10px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);font-size:13px;color:var(--text-muted);">
+    ⚠️ <strong>{{ pending|length }}</strong> yeni kayıt rol ataması bekliyor — Düzenle ile Bayi veya Üretici yapabilirsiniz.
+  </div>
+  {% endif %}
   <div class="table-wrap">
     <table>
       <thead>
@@ -84,7 +90,7 @@
       </thead>
       <tbody>
         {% for u in users %}
-        <tr>
+        <tr {% if not u.is_approved %}style="opacity:.75"{% endif %}>
           <td>{{ u.email }}</td>
           <td>{{ u.company_name or '-' }}</td>
           <td>
