@@ -427,6 +427,18 @@ def upd_offer_status(oid, status):
         c.execute("UPDATE offers SET status=? WHERE id=?", (status, oid))
 
 
+def upd_offer(oid, **kw):
+    allowed = ["customer_id", "model_id", "machine_count", "currency",
+               "base_price", "options_total", "discount_pct", "total_price",
+               "status", "notes", "validity_date"]
+    f = {k: v for k, v in kw.items() if k in allowed}
+    if not f:
+        return
+    sets = ",".join(f"{k}=?" for k in f)
+    with _c() as c:
+        c.execute(f"UPDATE offers SET {sets} WHERE id=?", list(f.values()) + [oid])
+
+
 def del_offer(oid):
     with _c() as c:
         c.execute("DELETE FROM offers WHERE id=?", (oid,))

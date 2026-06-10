@@ -138,6 +138,88 @@ async def create_offer(request: Request,
     return RedirectResponse(f"/offers/{offer_id}", 303)
 
 
+@router.get("/{offer_id}/edit")
+async def offer_edit(request: Request, offer_id: int):
+    user = auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+    items = fdb.get_offer_items(offer_id)
+    customers = fdb.get_customers()
+    cats = fdb.get_cats()
+    models = fdb.get_models()
+    options = fdb.get_options()
+    cat_map = {c["id"]: c["name"] for c in cats}
+    for m in models:
+        m["category_name"] = cat_map.get(m.get("category_id"), "-")
+        compat = []
+        if m.get("compatible_options"):
+            try:
+                compat = json.loads(m["compatible_options"])
+            except Exception:
+                pass
+        m["compatible_options_list"] = compat
+    return templates.TemplateResponse(request, "offer_wizard.html", {
+        "user": user,
+        "customers": customers,
+        "categories": cats,
+        "models": models,
+        "options": options,
+        "currencies": CURRENCIES,
+        "edit_offer": offer,
+        "edit_items": items,
+        "active_page": "offers",
+    })
+
+
+@router.post("/{offer_id}/update")
+async def update_offer(request: Request,
+                       offer_id: int,
+                       customer_id: int = Form(0),
+                       model_id: int = Form(...),
+                       machine_count: int = Form(1),
+                       currency: str = Form("USD"),
+                       discount_pct: float = Form(0.0),
+                       notes: str = Form(""),
+                       validity_date: str = Form(""),
+                       options_json: str = Form("[]")):
+    auth.require_user(request)
+
+    model = fdb.get_model(model_id)
+    base_price = float(model["base_price"]) if model else 0.0
+
+    selected_options = []
+    try:
+        selected_options = json.loads(options_json)
+    except Exception:
+        pass
+
+    options_total = sum(float(o.get("line_total", 0)) for o in selected_options)
+    subtotal = base_price * machine_count + options_total
+    total_price = subtotal * (1 - discount_pct / 100)
+
+    fdb.upd_offer(offer_id,
+        customer_id=customer_id or None,
+        model_id=model_id,
+        machine_count=machine_count,
+        currency=currency,
+        base_price=base_price,
+        options_total=options_total,
+        discount_pct=discount_pct,
+        total_price=total_price,
+        notes=notes,
+        validity_date=validity_date,
+    )
+
+    fdb.save_offer_items(offer_id, [
+        {"option_id": o["id"], "qty": o.get("qty", 1),
+         "unit_price": o.get("price", 0), "line_total": o.get("line_total", 0)}
+        for o in selected_options
+    ])
+
+    return RedirectResponse(f"/offers/{offer_id}", 303)
+
+
 @router.get("/{offer_id}")
 async def offer_detail(request: Request, offer_id: int):
     user = auth.require_user(request)

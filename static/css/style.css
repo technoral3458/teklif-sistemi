@@ -715,3 +715,20 @@ input.search-box:focus { outline: none; border-color: var(--accent); }
   .topbar { left: 0; }
 }
 
+
+/* ── Mobile: collapse all inline grid layouts ───────────────────── */
+@media (max-width: 640px) {
+  [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="grid-column:1/-1"] {
+    grid-column: 1 / -1 !important;
+  }
+  .wizard-steps {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .step-connector { display: none; }
+  .table-wrap { overflow-x: auto; }
+  table { min-width: 480px; }
+}

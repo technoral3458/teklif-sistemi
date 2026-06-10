@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block page_title %}Yeni Teklif{% endblock %}
+{% block page_title %}{% if edit_offer %}Teklif Düzenle — {{ edit_offer.offer_no }}{% else %}Yeni Teklif{% endif %}{% endblock %}
 
 {% block content %}
 <!-- Wizard Steps Indicator -->
@@ -25,7 +25,7 @@
   </div>
 </div>
 
-<form method="post" action="/offers/create" id="wizardForm">
+<form method="post" action="{% if edit_offer %}/offers/{{ edit_offer.id }}/update{% else %}/offers/create{% endif %}" id="wizardForm">
   <input type="hidden" name="model_id" id="wModelId" value="" />
   <input type="hidden" name="options_json" id="wOptionsJson" value="[]" />
 
@@ -43,7 +43,7 @@
           <select name="customer_id" id="wCustomerId" class="form-control" style="max-width:400px;">
             <option value="">-- Müşteri Seçin --</option>
             {% for c in customers %}
-            <option value="{{ c.id }}">{{ c.name }} {% if c.city %}({{ c.city }}){% endif %}</option>
+            <option value="{{ c.id }}" {% if edit_offer and edit_offer.customer_id == c.id %}selected{% endif %}>{{ c.name }} {% if c.city %}({{ c.city }}){% endif %}</option>
             {% endfor %}
           </select>
         </div>
@@ -72,13 +72,13 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:400px;margin-top:16px;">
         <div class="form-group">
           <label class="form-label">Adet</label>
-          <input type="number" name="machine_count" id="wMachineCount" class="form-control" value="1" min="1" />
+          <input type="number" name="machine_count" id="wMachineCount" class="form-control" value="{{ edit_offer.machine_count if edit_offer else 1 }}" min="1" />
         </div>
         <div class="form-group">
           <label class="form-label">Para Birimi</label>
           <select name="currency" id="wCurrency" class="form-control">
             {% for cur in currencies %}
-            <option value="{{ cur }}">{{ cur }}</option>
+            <option value="{{ cur }}" {% if edit_offer and edit_offer.currency == cur %}selected{% endif %}>{{ cur }}</option>
             {% endfor %}
           </select>
         </div>
@@ -178,15 +178,15 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:600px;">
         <div class="form-group">
           <label class="form-label">İskonto (%)</label>
-          <input type="number" name="discount_pct" id="wDiscount" class="form-control" value="0" min="0" max="100" step="0.5" oninput="wizardBuildSummary()" />
+          <input type="number" name="discount_pct" id="wDiscount" class="form-control" value="{{ edit_offer.discount_pct if edit_offer else 0 }}" min="0" max="100" step="0.5" oninput="wizardBuildSummary()" />
         </div>
         <div class="form-group">
           <label class="form-label">Geçerlilik Tarihi</label>
-          <input type="date" name="validity_date" class="form-control" />
+          <input type="date" name="validity_date" class="form-control" value="{{ edit_offer.validity_date if edit_offer else '' }}" />
         </div>
         <div class="form-group" style="grid-column:1/-1;">
           <label class="form-label">Notlar</label>
-          <textarea name="notes" class="form-control" rows="3" placeholder="Müşteriye iletilecek notlar..."></textarea>
+          <textarea name="notes" class="form-control" rows="3" placeholder="Müşteriye iletilecek notlar...">{{ edit_offer.notes if edit_offer else '' }}</textarea>
         </div>
       </div>
     </div>
@@ -194,7 +194,7 @@
       <button type="button" class="btn btn-ghost" onclick="wizardBack()">← Geri</button>
       <button type="submit" class="btn btn-success" onclick="wizardBuildSummary()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><polyline points="20 6 9 17 4 12"/></svg>
-        Teklifi Oluştur
+        {% if edit_offer %}Teklifi Güncelle{% else %}Teklifi Oluştur{% endif %}
       </button>
     </div>
   </div>
@@ -341,5 +341,38 @@ document.querySelectorAll('.model-card').forEach(card => {
     card.style.background = 'rgba(59,130,246,.08)';
   });
 });
+
+{% if edit_offer %}
+const _editModelMap = {
+  {% for m in models %}{{ m.id }}: { name: {{ m.name|tojson }}, price: {{ m.base_price|default(0) }}, currency: {{ m.currency|tojson }} },
+  {% endfor %}
+};
+const _editOptNames = {
+  {% for o in options %}{{ o.id }}: {{ o.name|tojson }},
+  {% endfor %}
+};
+document.addEventListener('DOMContentLoaded', function() {
+  const md = _editModelMap[{{ edit_offer.model_id }}];
+  if (md) wizardSelectModel({{ edit_offer.model_id }}, md.name, md.price, md.currency);
+  {% for item in edit_items %}
+  (function(){
+    const cb = document.getElementById('opt_{{ item.option_id }}');
+    if (cb) {
+      cb.checked = true;
+      const qEl = document.getElementById('optqty_{{ item.option_id }}');
+      if (qEl) qEl.value = {{ item.qty }};
+      wizardSelectedOptions[{{ item.option_id }}] = {
+        id: {{ item.option_id }},
+        name: _editOptNames[{{ item.option_id }}] || '',
+        price: {{ item.unit_price }},
+        qty: {{ item.qty }},
+        currency: {{ edit_offer.currency|tojson }},
+        line_total: {{ item.line_total }}
+      };
+    }
+  })();
+  {% endfor %}
+});
+{% endif %}
 </script>
 {% endblock %}
