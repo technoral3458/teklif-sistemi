@@ -15,7 +15,7 @@
   <button class="tab-btn {% if not request.query_params.get('tab') or request.query_params.get('tab')=='company' %}active{% endif %}"
           data-tab="tab-company" onclick="switchTab('tab-company')">Şirket Profili</button>
   <button class="tab-btn {% if request.query_params.get('tab')=='users' %}active{% endif %}"
-          data-tab="tab-users" onclick="switchTab('tab-users')">Yöneticiler</button>
+          data-tab="tab-users" onclick="switchTab('tab-users')">Kullanıcılar</button>
   <button class="tab-btn" data-tab="tab-system" onclick="switchTab('tab-system')">Sistem</button>
 </div>
 
@@ -68,7 +68,7 @@
   </div>
 </div>
 
-<!-- ── Yöneticiler ── -->
+<!-- ── Kullanıcılar ── -->
 <div id="tab-users" class="tab-pane card" {% if not request.query_params.get('tab')=='users' %}style="display:none"{% endif %}>
   <div class="table-wrap">
     <table>
@@ -76,8 +76,10 @@
         <tr>
           <th>E-posta</th>
           <th>Firma</th>
+          <th>Rol</th>
           <th>Durum</th>
           <th>Kayıt</th>
+          <th>İşlem</th>
         </tr>
       </thead>
       <tbody>
@@ -85,11 +87,40 @@
         <tr>
           <td>{{ u.email }}</td>
           <td>{{ u.company_name or '-' }}</td>
-          <td><span class="badge badge-green">Aktif</span></td>
+          <td>
+            <span class="badge badge-{{ 'red' if u.role=='admin' else ('amber' if u.role=='manufacturer' else 'blue') }}">
+              {{ role_tr.get(u.role, u.role) }}
+            </span>
+          </td>
+          <td>
+            {% if u.is_approved and u.is_active %}
+              <span class="badge badge-green">Aktif</span>
+            {% elif not u.is_approved %}
+              <span class="badge badge-amber">Bekliyor</span>
+            {% else %}
+              <span class="badge badge-red">Pasif</span>
+            {% endif %}
+          </td>
           <td>{{ u.created_at[:10] if u.created_at else '-' }}</td>
+          <td>
+            {% if u.role != 'admin' %}
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="btn btn-outline btn-sm"
+                onclick="openUserModal({{ u.id }}, '{{ u.email|e }}', '{{ u.company_name|e }}', '{{ u.role }}',
+                  {{ u.is_approved }}, {{ u.is_active }}, {{ u.can_view_costs }},
+                  '{{ u.allowed_menus or '' }}', '{{ u.allowed_categories or '' }}')">
+                ✏️ Düzenle
+              </button>
+              <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)" style="margin:0;">
+                <input type="hidden" name="id" value="{{ u.id }}" />
+                <button class="btn btn-danger btn-sm">Sil</button>
+              </form>
+            </div>
+            {% else %}
+            <span style="color:var(--text-muted);font-size:12px;">Admin</span>
+            {% endif %}
+          </td>
         </tr>
-        {% else %}
-        <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Kayıt bulunamadı</td></tr>
         {% endfor %}
       </tbody>
     </table>

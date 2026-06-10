@@ -12,7 +12,7 @@ templates = Jinja2Templates(directory="templates")
 @router.get("")
 async def dealers_list(request: Request):
     user = auth.require_admin(request)
-    users = [u for u in udb.all_users() if u["role"] == "dealer"]
+    users = [u for u in udb.all_users() if u["role"] != "admin"]
     cats = fdb.get_cats()
     return templates.TemplateResponse(request, "dealers.html", {
         "user": user,
