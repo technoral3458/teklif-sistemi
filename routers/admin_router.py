@@ -20,10 +20,12 @@ async def admin_page(request: Request):
     user = auth.require_admin(request)
     users = udb.all_users()
     company = fdb.get_company()
+    categories = fdb.get_cats()
     return templates.TemplateResponse(request, "admin.html", {
         "user": user,
         "users": users,
         "company": company,
+        "categories": categories,
         "active_page": "admin",
     })
 
@@ -55,3 +57,25 @@ async def save_company(request: Request,
         kw["logo_path"] = logo_path
     fdb.save_company(**kw)
     return RedirectResponse("/admin", 303)
+
+
+@router.post("/update-user")
+async def update_user(request: Request,
+                      uid: int = Form(...),
+                      role: str = Form("dealer"),
+                      is_approved: int = Form(0),
+                      is_active: int = Form(0),
+                      can_view_costs: int = Form(0)):
+    auth.require_admin(request)
+    form = await request.form()
+    allowed_menus = ",".join(form.getlist("allowed_menus"))
+    allowed_categories = ",".join(form.getlist("allowed_categories"))
+    udb.update_admin(uid,
+        role=role,
+        is_approved=is_approved,
+        is_active=is_active,
+        can_view_costs=can_view_costs,
+        allowed_menus=allowed_menus,
+        allowed_categories=allowed_categories,
+    )
+    return RedirectResponse("/admin?tab=users", 303)

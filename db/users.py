@@ -41,7 +41,7 @@ def init():
             ("website","TEXT DEFAULT ''"),("address","TEXT DEFAULT ''"),
             ("allowed_categories","TEXT DEFAULT ''"),("can_view_costs","INTEGER DEFAULT 0"),
             ("is_active","INTEGER DEFAULT 1"),("lang","TEXT DEFAULT 'tr'"),
-            ("theme","TEXT DEFAULT 'dark'"),
+            ("theme","TEXT DEFAULT 'dark'"),("allowed_menus","TEXT DEFAULT ''"),
         ]:
             _acol(c.cursor(),"users",col,typ)
         h = bcrypt.hashpw(ADMIN_PASS.encode(), bcrypt.gensalt()).decode()
@@ -60,10 +60,10 @@ def init():
 def _row(r):
     if not r: return None
     keys=["id","email","password","company_name","role","is_approved","is_active",
-          "phone","logo_path","website","address","allowed_categories","can_view_costs","lang","theme","created_at"]
+          "phone","logo_path","website","address","allowed_categories","can_view_costs","lang","theme","allowed_menus","created_at"]
     return dict(zip(keys,r))
 
-_SEL = "id,email,password,company_name,role,is_approved,is_active,phone,logo_path,website,address,allowed_categories,can_view_costs,lang,theme,created_at"
+_SEL = "id,email,password,company_name,role,is_approved,is_active,phone,logo_path,website,address,allowed_categories,can_view_costs,lang,theme,allowed_menus,created_at"
 
 def by_email(email):
     with _c() as c:
@@ -131,7 +131,7 @@ def all_users():
     return [_row(r) for r in rows]
 
 def update_admin(uid,**kw):
-    allowed=["is_approved","is_active","role","allowed_categories","can_view_costs","company_name"]
+    allowed=["is_approved","is_active","role","allowed_categories","can_view_costs","company_name","allowed_menus"]
     f={k:v for k,v in kw.items() if k in allowed}
     if not f: return
     sets=",".join(f"{k}=?" for k in f)

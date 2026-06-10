@@ -1,15 +1,26 @@
 {% extends "base.html" %}
 {% block page_title %}Sistem Yönetimi{% endblock %}
 
+{% set role_tr = {'admin':'Admin','manufacturer':'Üretici','dealer':'Bayi'} %}
+{% set ALL_MENUS = [
+  ('dashboard','Dashboard'),('customers','Müşteriler'),('models','Modeller'),
+  ('options','Opsiyonlar'),('categories','Kategoriler'),('offers','Teklifler'),
+  ('orders','Siparişler'),('ledger_customers','Müşteri Cari'),
+  ('ledger_manufacturers','Üretici Cari'),('costs','Maliyet Analizi'),
+  ('dealers','Bayiler'),('admin','Ayarlar')
+] %}
+
 {% block content %}
 <div class="tabs" style="margin-bottom:20px;">
-  <button class="tab-btn active" data-tab="tab-company" onclick="switchTab('tab-company')">Şirket Profili</button>
-  <button class="tab-btn" data-tab="tab-users" onclick="switchTab('tab-users')">Kullanıcılar</button>
+  <button class="tab-btn {% if not request.query_params.get('tab') or request.query_params.get('tab')=='company' %}active{% endif %}"
+          data-tab="tab-company" onclick="switchTab('tab-company')">Şirket Profili</button>
+  <button class="tab-btn {% if request.query_params.get('tab')=='users' %}active{% endif %}"
+          data-tab="tab-users" onclick="switchTab('tab-users')">Kullanıcılar</button>
   <button class="tab-btn" data-tab="tab-system" onclick="switchTab('tab-system')">Sistem</button>
 </div>
 
-<!-- Company Profile -->
-<div id="tab-company" class="tab-pane">
+<!-- ── Şirket Profili ── -->
+<div id="tab-company" class="tab-pane" {% if request.query_params.get('tab')=='users' %}style="display:none"{% endif %}>
   <div class="card" style="max-width:640px;">
     <div class="card-header"><h3 class="card-title">Şirket Bilgileri</h3></div>
     <div class="card-body">
@@ -51,16 +62,14 @@
             <textarea name="address" class="form-control" rows="2">{{ company.address if company else '' }}</textarea>
           </div>
         </div>
-        <div style="margin-top:16px;">
-          <button type="submit" class="btn btn-primary">Kaydet</button>
-        </div>
+        <div style="margin-top:16px;"><button type="submit" class="btn btn-primary">Kaydet</button></div>
       </form>
     </div>
   </div>
 </div>
 
-<!-- Users Tab -->
-<div id="tab-users" class="tab-pane card" style="display:none;">
+<!-- ── Kullanıcılar ── -->
+<div id="tab-users" class="tab-pane card" {% if not request.query_params.get('tab')=='users' %}style="display:none"{% endif %}>
   <div class="table-wrap">
     <table>
       <thead>
@@ -78,7 +87,11 @@
         <tr>
           <td>{{ u.email }}</td>
           <td>{{ u.company_name or '-' }}</td>
-          <td><span class="badge badge-{{ 'red' if u.role == 'admin' else ('blue' if u.role == 'dealer' else 'amber') }}">{{ u.role }}</span></td>
+          <td>
+            <span class="badge badge-{{ 'red' if u.role=='admin' else ('amber' if u.role=='manufacturer' else 'blue') }}">
+              {{ role_tr.get(u.role, u.role) }}
+            </span>
+          </td>
           <td>
             {% if u.is_approved and u.is_active %}
               <span class="badge badge-green">Aktif</span>
@@ -91,11 +104,17 @@
           <td>{{ u.created_at[:10] if u.created_at else '-' }}</td>
           <td>
             {% if u.role != 'admin' %}
-            <div style="display:flex;gap:4px;">
-              {% if not u.is_approved %}
-              <form method="post" action="/dealers/approve"><input type="hidden" name="id" value="{{ u.id }}" /><button class="btn btn-success btn-sm">Onayla</button></form>
-              {% endif %}
-              <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)"><input type="hidden" name="id" value="{{ u.id }}" /><button class="btn btn-danger btn-sm">Sil</button></form>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="btn btn-outline btn-sm"
+                onclick="openUserModal({{ u.id }}, '{{ u.email|e }}', '{{ u.company_name|e }}', '{{ u.role }}',
+                  {{ u.is_approved }}, {{ u.is_active }}, {{ u.can_view_costs }},
+                  '{{ u.allowed_menus or '' }}', '{{ u.allowed_categories or '' }}')">
+                ✏️ Düzenle
+              </button>
+              <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)" style="margin:0;">
+                <input type="hidden" name="id" value="{{ u.id }}" />
+                <button class="btn btn-danger btn-sm">Sil</button>
+              </form>
             </div>
             {% else %}
             <span style="color:var(--text-muted);font-size:12px;">Admin</span>
@@ -108,24 +127,161 @@
   </div>
 </div>
 
-<!-- System Tab -->
+<!-- ── Sistem ── -->
 <div id="tab-system" class="tab-pane" style="display:none;">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:640px;">
     <div class="card">
-      <div class="card-header"><h3 class="card-title">Versiyon Bilgisi</h3></div>
+      <div class="card-header"><h3 class="card-title">Versiyon</h3></div>
       <div class="card-body" style="font-size:14px;">
         <div style="margin-bottom:8px;"><strong>B2B Teklif Sistemi</strong></div>
-        <div style="color:var(--text-muted);">Versiyon: 3.0.0</div>
-        <div style="color:var(--text-muted);">FastAPI + SQLite</div>
+        <div style="color:var(--text-muted);">Versiyon: 3.0.0 — FastAPI + SQLite</div>
       </div>
     </div>
     <div class="card">
       <div class="card-header"><h3 class="card-title">Yedekleme</h3></div>
       <div class="card-body">
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Veritabanı dosyaları data/ klasöründe saklanır.</p>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Veritabanı dosyaları <code>data/</code> klasöründe saklanır.</p>
         <p style="font-size:12px;color:var(--text-muted);">Manuel yedek için sunucudan <code>data/</code> klasörünü kopyalayın.</p>
       </div>
     </div>
   </div>
 </div>
+
+<!-- ── Kullanıcı Düzenleme Modalı ── -->
+<div id="userEditModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:600px;">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Kullanıcı Düzenle</h3>
+        <div id="uModalEmail" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('userEditModal')">&times;</button>
+    </div>
+    <form method="post" action="/admin/update-user" id="userEditForm">
+      <input type="hidden" name="uid" id="uModalUid" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Temel bilgiler -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Rol</label>
+            <select name="role" id="uModalRole" class="form-control">
+              <option value="manufacturer">Üretici</option>
+              <option value="dealer">Bayi</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Durum</label>
+            <select name="is_approved" id="uModalApproved" class="form-control">
+              <option value="1">Onaylı</option>
+              <option value="0">Bekliyor</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Aktiflik</label>
+            <select name="is_active" id="uModalActive" class="form-control">
+              <option value="1">Aktif</option>
+              <option value="0">Pasif</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- İzinler -->
+        <div>
+          <label class="form-label" style="margin-bottom:8px;display:block;">Özel İzinler</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="can_view_costs_chk" id="uModalCosts" onchange="document.getElementById('uModalCostsHidden').value=this.checked?1:0" />
+              <span style="font-size:13px;">💰 Maliyet Analizi Görüntüle</span>
+            </label>
+            <input type="hidden" name="can_view_costs" id="uModalCostsHidden" value="0" />
+          </div>
+        </div>
+
+        <!-- Menü İzinleri -->
+        <div>
+          <label class="form-label" style="margin-bottom:4px;display:block;">Menü İzinleri</label>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Boş bırakılırsa tüm menüler erişilebilir olur.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            {% for key, label in ALL_MENUS %}
+            {% if key not in ('dealers', 'admin') %}
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="allowed_menus" value="{{ key }}" class="menu-chk" />
+              <span style="font-size:13px;">{{ label }}</span>
+            </label>
+            {% endif %}
+            {% endfor %}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="checkAllMenus(true)">Tümünü Seç</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="checkAllMenus(false)">Temizle</button>
+          </div>
+        </div>
+
+        <!-- Kategori İzinleri -->
+        <div>
+          <label class="form-label" style="margin-bottom:4px;display:block;">Kategori İzinleri</label>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Boş bırakılırsa tüm kategoriler erişilebilir olur.</p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            {% for cat in categories %}
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="allowed_categories" value="{{ cat.name }}" class="cat-chk" />
+              <span style="font-size:13px;">{{ cat.name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('userEditModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openUserModal(uid, email, company, role, approved, active, costs, allowedMenus, allowedCats) {
+  document.getElementById('uModalUid').value = uid;
+  document.getElementById('uModalEmail').textContent = email + (company ? ' — ' + company : '');
+  document.getElementById('uModalRole').value = role;
+  document.getElementById('uModalApproved').value = approved ? '1' : '0';
+  document.getElementById('uModalActive').value = active ? '1' : '0';
+  const costsChk = document.getElementById('uModalCosts');
+  costsChk.checked = !!costs;
+  document.getElementById('uModalCostsHidden').value = costs ? 1 : 0;
+  costsChk.onchange = () => document.getElementById('uModalCostsHidden').value = costsChk.checked ? 1 : 0;
+
+  // Menus
+  const menuList = allowedMenus ? allowedMenus.split(',') : [];
+  document.querySelectorAll('.menu-chk').forEach(cb => {
+    cb.checked = menuList.length === 0 || menuList.includes(cb.value);
+  });
+
+  // Categories
+  const catList = allowedCats ? allowedCats.split(',') : [];
+  document.querySelectorAll('.cat-chk').forEach(cb => {
+    cb.checked = catList.length === 0 || catList.includes(cb.value);
+  });
+
+  openModal('userEditModal');
+}
+
+function checkAllMenus(state) {
+  document.querySelectorAll('.menu-chk').forEach(cb => cb.checked = state);
+}
+
+// Open users tab directly if ?tab=users
+if (new URLSearchParams(location.search).get('tab') === 'users') {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+  const tb = document.querySelector('[data-tab="tab-users"]');
+  const tp = document.getElementById('tab-users');
+  if (tb) tb.classList.add('active');
+  if (tp) tp.style.display = '';
+}
+</script>
 {% endblock %}
