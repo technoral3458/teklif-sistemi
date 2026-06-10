@@ -85,20 +85,25 @@ function switchTab(tabId) {
   if (activeBtn) activeBtn.classList.add("active");
 }
 
-// Initialize first tab on page load
+// Initialize tabs on page load — respect active class set in HTML
 document.addEventListener("DOMContentLoaded", function () {
-  const firstPane = document.querySelector(".tab-pane");
-  const firstBtn = document.querySelector(".tab-btn");
-  if (firstPane) {
-    // Only show first, hide rest
-    document.querySelectorAll(".tab-pane").forEach(function (p, i) {
-      if (i === 0) {
-        p.classList.add("active");
-        p.style.display = "block";
-      } else {
-        p.style.display = "none";
-      }
-    });
+  const panes = document.querySelectorAll(".tab-pane");
+  if (!panes.length) return;
+
+  const activeBtn = document.querySelector(".tab-btn.active");
+  const targetId = activeBtn ? activeBtn.getAttribute("data-tab") : null;
+
+  panes.forEach(function (p) {
+    const show = targetId ? p.id === targetId : false;
+    p.style.display = show ? "block" : "none";
+    p.classList.toggle("active", show);
+  });
+
+  if (!targetId) {
+    // Fallback: show first pane, activate first button
+    panes[0].style.display = "block";
+    panes[0].classList.add("active");
+    const firstBtn = document.querySelector(".tab-btn");
     if (firstBtn) firstBtn.classList.add("active");
   }
 });
