@@ -8,12 +8,20 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 
+def _admin_ctx():
+    admin = udb.get_admin()
+    return {
+        "admin_logo": (admin.get("logo_path") or "") if admin else "",
+        "admin_company": (admin.get("company_name") or "") if admin else "",
+    }
+
+
 @router.get("/login")
 async def login_page(request: Request):
     u = auth.get_user(request)
     if u and u["is_approved"] and u["is_active"]:
         return RedirectResponse("/", 303)
-    return templates.TemplateResponse(request, "login.html", {})
+    return templates.TemplateResponse(request, "login.html", _admin_ctx())
 
 
 @router.post("/auth/login")
@@ -23,17 +31,20 @@ async def do_login(request: Request,
     u = udb.by_email(email.strip().lower())
     if not u or not udb.check_pw(password, u["password"]):
         return templates.TemplateResponse(request, "login.html", {
+            **_admin_ctx(),
             "msg": "E-posta veya şifre hatalı.",
             "msg_type": "danger",
             "tab": "login",
         })
     if not u["is_active"]:
         return templates.TemplateResponse(request, "login.html", {
+            **_admin_ctx(),
             "msg": "Hesabınız pasif durumda. Lütfen yöneticiyle iletişime geçin.",
             "msg_type": "danger",
         })
     if not u["is_approved"]:
         return templates.TemplateResponse(request, "login.html", {
+            **_admin_ctx(),
             "msg": "Hesabınız henüz onaylanmamış. Admin onayı bekleniyor.",
             "msg_type": "warning",
         })
@@ -65,11 +76,13 @@ async def do_register(request: Request,
     if not ok:
         msg = "Bu e-posta zaten kayıtlı." if reason == "email_in_use" else "Kayıt başarısız."
         return templates.TemplateResponse(request, "login.html", {
+            **_admin_ctx(),
             "msg": msg,
             "msg_type": "danger",
             "tab": "register",
         })
     return templates.TemplateResponse(request, "login.html", {
+        **_admin_ctx(),
         "msg": "Kayıt başarılı! Admin onayından sonra giriş yapabilirsiniz.",
         "msg_type": "success",
         "tab": "login",
@@ -88,10 +101,12 @@ async def do_forgot(request: Request, email: str = Form(...)):
     tok = udb.reset_token(email.strip().lower())
     if tok:
         return templates.TemplateResponse(request, "login.html", {
+            **_admin_ctx(),
             "msg": f"Sıfırlama kodu: {tok}  (Geliştirme modu — gerçek sistemde e-posta gönderilir)",
             "msg_type": "info",
         })
     return templates.TemplateResponse(request, "login.html", {
+        **_admin_ctx(),
         "msg": "Bu e-posta ile kayıtlı hesap bulunamadı.",
         "msg_type": "danger",
     })
@@ -104,11 +119,13 @@ async def do_reset(request: Request,
                    new_password: str = Form(...)):
     if not udb.verify_token(email.strip().lower(), token.strip()):
         return templates.TemplateResponse(request, "login.html", {
+            **_admin_ctx(),
             "msg": "Geçersiz veya süresi dolmuş kod.",
             "msg_type": "danger",
         })
     udb.reset_pw(email.strip().lower(), new_password)
     return templates.TemplateResponse(request, "login.html", {
+        **_admin_ctx(),
         "msg": "Şifreniz başarıyla sıfırlandı. Giriş yapabilirsiniz.",
         "msg_type": "success",
     })

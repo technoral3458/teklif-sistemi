@@ -67,6 +67,10 @@ def by_id(uid):
     with _c() as c:
         return _row(c.execute(f"SELECT {_SEL} FROM users WHERE id=?",(uid,)).fetchone())
 
+def get_admin():
+    with _c() as c:
+        return _row(c.execute(f"SELECT {_SEL} FROM users WHERE role='admin' LIMIT 1").fetchone())
+
 def check_pw(plain,hashed):
     try: return bcrypt.checkpw(plain.encode(),hashed.encode())
     except: return False
