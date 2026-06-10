@@ -1261,11 +1261,11 @@ def show_option_form(mode="add", option_id=None):
                 """
                 INSERT INTO options (
                     opt_name, opt_desc, opt_price, sale_price, opt_image,
-                    allow_qty, opt_suffix, opt_variant_image, user_id,
+                    sort_order, allow_qty, opt_suffix, opt_variant_image, user_id,
                     purchase_price, shipping_cost, customs_tax_rate, extra_tax_rate,
                     port_cost, document_cost, installation_cost, other_cost, cost_note
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     name.strip(),
@@ -1273,6 +1273,7 @@ def show_option_form(mode="add", option_id=None):
                     price,
                     sale_price,
                     final_img,
+                    safe_int(option.get("sort_order"), 0),
                     allow_qty_int,
                     suffix,
                     final_variant_img,
