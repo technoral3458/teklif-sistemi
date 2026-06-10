@@ -665,6 +665,28 @@ header[data-testid="stHeader"] { background: transparent; }
         min-height: 42px !important;
         padding: 4px !important;
     }
+    /* Mobil nav grid butonları (2'li sıra) */
+    div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"] {
+        background: #f8fafc !important;
+        border: 1.5px solid #e2e8f0 !important;
+        color: #1e293b !important;
+        border-radius: 14px !important;
+        font-size: 13px !important;
+        font-weight: 800 !important;
+        white-space: normal !important;
+        line-height: 1.3 !important;
+        padding: 8px 4px !important;
+        min-height: 58px !important;
+    }
+    div[data-testid="stHorizontalBlock"] .stButton > button[kind="primary"] {
+        border-radius: 14px !important;
+        font-size: 13px !important;
+        font-weight: 800 !important;
+        white-space: normal !important;
+        line-height: 1.3 !important;
+        padding: 8px 4px !important;
+        min-height: 58px !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1021,13 +1043,15 @@ if IS_MOBILE:
 
     # ── Menu overlay (menü açıksa sayfa içeriği yerine menü göster) ──
     if st.session_state.mobile_menu_open:
-        # Kullanıcı kartı
+        # Kullanıcı kartı (rol badge'li)
         st.markdown(f"""
         <div class='mob-user-card'>
             <div class='mob-user-av' style='background:{role_color};'>{u_init}</div>
             <div style='overflow:hidden;'>
                 <div class='mob-user-email'>{st.session_state.user_email}</div>
-                <div class='mob-user-role'>{r_text}</div>
+                <div class='mob-user-role' style='margin-top:4px;'>
+                    <span style='background:{role_color}22; color:{role_color}; padding:2px 9px; border-radius:6px; font-size:11px; font-weight:800;'>{r_text}</span>
+                </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1035,51 +1059,35 @@ if IS_MOBILE:
         nav_title = "Sayfalar" if st.session_state.lang == "tr" else ("Pages" if st.session_state.lang == "en" else "页面")
         st.markdown(f"<div class='mob-sec-title'>{nav_title}</div>", unsafe_allow_html=True)
 
-        # Navigasyon butonları için özel stil
-        st.markdown("""<style>
-        section.main div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] .stButton > button {
-            min-height: 56px !important; border-radius: 13px !important;
-            font-size: 15px !important; font-weight: 700 !important;
-            margin-bottom: 5px !important;
-        }
-        section.main div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] .stButton > button[kind="secondary"] {
-            background: #f8fafc !important; border: 1.5px solid #e2e8f0 !important;
-            color: #1e293b !important; text-align: left !important;
-        }
-        section.main div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] .stButton > button[kind="secondary"]:hover {
-            background: #eff6ff !important; border-color: #bfdbfe !important;
-        }
-        section.main div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
-            border: none !important; color: white !important;
-            box-shadow: 0 4px 14px rgba(37,99,235,.3) !important;
-        }
-        </style>""", unsafe_allow_html=True)
+        # 2-sütun nav grid
+        items = menu_items_labels
+        for i in range(0, len(items), 2):
+            pair = items[i:i+2]
+            cols = st.columns(len(pair))
+            for col, label in zip(cols, pair):
+                is_active = st.session_state.active_tab in label or label in st.session_state.active_tab
+                with col:
+                    if st.button(label, key=f"mob_nav_{label}", use_container_width=True,
+                                 type="primary" if is_active else "secondary"):
+                        st.session_state.active_tab = label
+                        st.session_state.mobile_menu_open = False
+                        st.rerun()
 
-        # Menü öğeleri
-        for label in menu_items_labels:
-            is_active = st.session_state.active_tab in label or label in st.session_state.active_tab
-            if st.button(label, key=f"mob_nav_{label}", use_container_width=True,
-                         type="primary" if is_active else "secondary"):
-                st.session_state.active_tab = label
-                st.session_state.mobile_menu_open = False
-                st.rerun()
-
-        # Dil + çıkış satırı
+        # Dil + çıkış tek satırda
         st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='mob-sec-title'>{_('lang_sel')}</div>", unsafe_allow_html=True)
-        lang_opts_m = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
-        ml1, ml2 = st.columns([2, 1])
-        with ml1:
-            sel_m = st.selectbox("🌐", list(lang_opts_m.keys()),
-                                 format_func=lambda x: lang_opts_m[x],
-                                 index=list(lang_opts_m.keys()).index(st.session_state.lang),
-                                 key="mob_lang_sel", label_visibility="collapsed")
-            if sel_m != st.session_state.lang:
-                st.session_state.lang = sel_m
-                st.rerun()
-        with ml2:
-            if st.button(_("logout"), use_container_width=True):
+        lang_title = "Dil Seçimi" if st.session_state.lang == "tr" else ("Language" if st.session_state.lang == "en" else "语言")
+        st.markdown(f"<div class='mob-sec-title'>{lang_title}</div>", unsafe_allow_html=True)
+
+        lc1, lc2, lc3, lc4 = st.columns(4)
+        for col, (lkey, lval) in zip([lc1, lc2, lc3], [("tr", "🇹🇷 TR"), ("en", "🇬🇧 EN"), ("zh", "🇨🇳 ZH")]):
+            with col:
+                if st.button(lval, key=f"mob_lang_{lkey}", use_container_width=True,
+                             type="primary" if st.session_state.lang == lkey else "secondary"):
+                    st.session_state.lang = lkey
+                    st.rerun()
+        with lc4:
+            logout_label = "🚪 Çıkış" if st.session_state.lang == "tr" else ("🚪 Exit" if st.session_state.lang == "en" else "🚪 退出")
+            if st.button(logout_label, key="mob_logout_btn", use_container_width=True):
                 c = sqlite3.connect("users.db")
                 c.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
                 c.commit(); c.close()
