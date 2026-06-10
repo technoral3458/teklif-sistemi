@@ -50,8 +50,7 @@ async def costs_page(request: Request, model_id: int = 0):
             "margin": margin,
         })
 
-    return templates.TemplateResponse("costs.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "costs.html", {
         "user": user,
         "models": models,
         "cost_data": cost_data,

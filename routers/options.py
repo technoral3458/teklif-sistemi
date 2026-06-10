@@ -17,8 +17,7 @@ async def options_list(request: Request):
     cat_map = {c["id"]: c["name"] for c in cats}
     for o in options:
         o["category_name"] = cat_map.get(o.get("category_id"), "Genel")
-    return templates.TemplateResponse("options.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "options.html", {
         "user": user,
         "options": options,
         "categories": cats,

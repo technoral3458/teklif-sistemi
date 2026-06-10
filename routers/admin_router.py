@@ -20,8 +20,7 @@ async def admin_page(request: Request):
     user = auth.require_admin(request)
     users = udb.all_users()
     company = fdb.get_company()
-    return templates.TemplateResponse("admin.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "admin.html", {
         "user": user,
         "users": users,
         "company": company,

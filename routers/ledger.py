@@ -17,8 +17,7 @@ async def cust_ledger_list(request: Request):
     user = auth.require_user(request)
     customers = fdb.get_customers()
     balances = fdb.all_cust_balances()
-    return templates.TemplateResponse("ledger_customer_list.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "ledger_customer_list.html", {
         "user": user,
         "customers": customers,
         "balances": balances,
@@ -32,8 +31,7 @@ async def cust_ledger(request: Request, customer_id: int):
     customer = fdb.get_customer(customer_id)
     txns = fdb.get_ctxns(customer_id)
     balance = fdb.cust_balance(customer_id)
-    return templates.TemplateResponse("ledger_customer.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "ledger_customer.html", {
         "user": user,
         "customer": customer,
         "txns": txns,
@@ -75,8 +73,7 @@ async def mfr_ledger_list(request: Request):
     all_txns = fdb.get_mtxns()
     mfr_names = list({t["manufacturer_name"] for t in all_txns})
     balances = {name: fdb.mfr_balance(name) for name in mfr_names}
-    return templates.TemplateResponse("ledger_manufacturer_list.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "ledger_manufacturer_list.html", {
         "user": user,
         "manufacturers": mfr_names,
         "balances": balances,
@@ -90,8 +87,7 @@ async def mfr_ledger(request: Request, mfr_name: str):
     user = auth.require_user(request)
     txns = fdb.get_mtxns(mfr_name)
     balance = fdb.mfr_balance(mfr_name)
-    return templates.TemplateResponse("ledger_manufacturer.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "ledger_manufacturer.html", {
         "user": user,
         "mfr_name": mfr_name,
         "txns": txns,

@@ -19,8 +19,7 @@ async def customers_list(request: Request, q: str = ""):
             if ql in (c.get("name") or "").lower() or ql in (c.get("email") or "").lower()
         ]
     balances = fdb.all_cust_balances()
-    return templates.TemplateResponse("customers.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "customers.html", {
         "user": user,
         "customers": customers,
         "balances": balances,

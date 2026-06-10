@@ -14,8 +14,7 @@ async def dealers_list(request: Request):
     user = auth.require_admin(request)
     users = [u for u in udb.all_users() if u["role"] != "admin"]
     cats = fdb.get_cats()
-    return templates.TemplateResponse("dealers.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "dealers.html", {
         "user": user,
         "dealers": users,
         "categories": cats,

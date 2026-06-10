@@ -33,8 +33,7 @@ async def models_list(request: Request, category_id: int = 0):
     cat_map = {c["id"]: c["name"] for c in cats}
     for m in models:
         m["category_name"] = cat_map.get(m.get("category_id"), "-")
-    return templates.TemplateResponse("models.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "models.html", {
         "user": user,
         "models": models,
         "categories": cats,
@@ -49,8 +48,7 @@ async def model_new(request: Request):
     user = auth.require_user(request)
     cats = fdb.get_cats()
     options = fdb.get_options()
-    return templates.TemplateResponse("model_form.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "model_form.html", {
         "user": user,
         "model": {},
         "categories": cats,
@@ -75,8 +73,7 @@ async def model_edit(request: Request, model_id: int):
             compatible = json.loads(m["compatible_options"])
         except Exception:
             pass
-    return templates.TemplateResponse("model_form.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "model_form.html", {
         "user": user,
         "model": m,
         "categories": cats,

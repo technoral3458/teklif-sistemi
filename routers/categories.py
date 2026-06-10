@@ -12,8 +12,7 @@ templates = Jinja2Templates(directory="templates")
 async def categories_list(request: Request):
     user = auth.require_user(request)
     cats = fdb.get_cats()
-    return templates.TemplateResponse("categories.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "categories.html", {
         "user": user,
         "categories": cats,
         "active_page": "categories",

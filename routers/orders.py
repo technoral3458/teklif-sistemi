@@ -16,8 +16,7 @@ async def orders_list(request: Request):
     for o in orders:
         o["customer_name"] = customers.get(o.get("customer_id"), {}).get("name", "-")
         o["model_name"] = models.get(o.get("model_id"), {}).get("name", "-")
-    return templates.TemplateResponse("orders.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "orders.html", {
         "user": user,
         "orders": orders,
         "active_page": "orders",

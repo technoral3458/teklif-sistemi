@@ -17,8 +17,7 @@ templates = Jinja2Templates(directory="templates")
 @router.get("")
 async def profile_page(request: Request):
     user = auth.require_user(request)
-    return templates.TemplateResponse("profile.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "profile.html", {
         "user": user,
         "langs": LANGS,
         "active_page": "profile",
@@ -65,8 +64,7 @@ async def change_password(request: Request,
     user = auth.require_user(request)
     u = udb.by_id(user["id"])
     if not udb.check_pw(current_password, u["password"]):
-        return templates.TemplateResponse("profile.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "profile.html", {
             "user": user,
             "msg": "Mevcut şifre hatalı.",
             "msg_type": "danger",
@@ -74,8 +72,7 @@ async def change_password(request: Request,
             "active_page": "profile",
         })
     if new_password != confirm_password:
-        return templates.TemplateResponse("profile.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "profile.html", {
             "user": user,
             "msg": "Yeni şifreler eşleşmiyor.",
             "msg_type": "danger",
@@ -83,8 +80,7 @@ async def change_password(request: Request,
             "active_page": "profile",
         })
     udb.change_pw(user["id"], new_password)
-    return templates.TemplateResponse("profile.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "profile.html", {
         "user": user,
         "msg": "Şifreniz başarıyla güncellendi.",
         "msg_type": "success",

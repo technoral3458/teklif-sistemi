@@ -17,8 +17,7 @@ async def dashboard(request: Request):
     for o in recent_offers:
         o["customer_name"] = customers.get(o.get("customer_id"), {}).get("name", "-")
         o["model_name"] = models.get(o.get("model_id"), {}).get("name", "-")
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "dashboard.html", {
         "user": user,
         "stats": stats,
         "recent_offers": recent_offers,

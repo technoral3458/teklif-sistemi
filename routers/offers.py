@@ -29,8 +29,7 @@ async def offers_list(request: Request, status: str = "", q: str = ""):
             if ql in (o.get("offer_no") or "").lower()
             or ql in (o.get("customer_name") or "").lower()
         ]
-    return templates.TemplateResponse("offers.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "offers.html", {
         "user": user,
         "offers": offers,
         "statuses": OFFER_STATUSES,
@@ -57,8 +56,7 @@ async def offer_new(request: Request):
             except Exception:
                 pass
         m["compatible_options_list"] = compat
-    return templates.TemplateResponse("offer_wizard.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "offer_wizard.html", {
         "user": user,
         "customers": customers,
         "categories": cats,
@@ -153,8 +151,7 @@ async def offer_detail(request: Request, offer_id: int):
     for item in items:
         opt = opts.get(item.get("option_id"), {})
         item["option_name"] = opt.get("name", "-")
-    return templates.TemplateResponse("offer_detail.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "offer_detail.html", {
         "user": user,
         "offer": offer,
         "items": items,
