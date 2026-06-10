@@ -4,13 +4,13 @@
 {% block content %}
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
   <div class="tabs" style="margin-bottom:0;">
-    <button class="tab-btn active" data-tab="tab-pending" onclick="switchTab('tab-pending')">
+    <button class="tab-btn" data-tab="tab-pending" onclick="switchTab('tab-pending')">
       Bekleyenler
       {% set pcount = manufacturers|selectattr('is_approved','eq',0)|list|length %}
       {% if pcount > 0 %}<span class="badge badge-amber" style="margin-left:6px">{{ pcount }}</span>{% endif %}
     </button>
     <button class="tab-btn" data-tab="tab-approved" onclick="switchTab('tab-approved')">Onaylılar</button>
-    <button class="tab-btn" data-tab="tab-all" onclick="switchTab('tab-all')">Tümü</button>
+    <button class="tab-btn active" data-tab="tab-all" onclick="switchTab('tab-all')">Tümü</button>
   </div>
   <div style="display:flex;gap:8px;">
     <a href="/ledger/manufacturers" class="btn btn-outline btn-sm">📒 Cari Hesap</a>
@@ -77,13 +77,13 @@
 </div>
 {% endmacro %}
 
-<div id="tab-pending" class="tab-pane card">
+<div id="tab-pending" class="tab-pane card" style="display:none;">
   {{ mfr_table(manufacturers|selectattr('is_approved','eq',0)|list) }}
 </div>
 <div id="tab-approved" class="tab-pane card" style="display:none;">
   {{ mfr_table(manufacturers|selectattr('is_approved','eq',1)|list) }}
 </div>
-<div id="tab-all" class="tab-pane card" style="display:none;">
+<div id="tab-all" class="tab-pane card">
   {{ mfr_table(manufacturers) }}
 </div>
 
