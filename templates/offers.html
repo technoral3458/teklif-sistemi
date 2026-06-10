@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block page_title %}Teklifler{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <select name="status" class="form-control" style="max-width:180px;" onchange="this.form.submit()">
+      <option value="">Tüm Durumlar</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="q" class="search-box" placeholder="Teklif/Müşteri ara..." value="{{ q }}" style="max-width:220px;" />
+    <button type="submit" class="btn btn-ghost btn-sm">Filtrele</button>
+  </form>
+  <a href="/offers/new" class="btn btn-primary" style="margin-left:auto;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Yeni Teklif
+  </a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Teklif No</th>
+          <th>Müşteri</th>
+          <th>Model</th>
+          <th>Adet</th>
+          <th>Tutar</th>
+          <th>Durum</th>
+          <th>Tarih</th>
+          <th>İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in offers %}
+        {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray'} %}
+        <tr>
+          <td><code>{{ o.offer_no }}</code></td>
+          <td>{{ o.customer_name }}</td>
+          <td>{{ o.model_name }}</td>
+          <td>{{ o.machine_count }}</td>
+          <td><strong>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</strong></td>
+          <td><span class="badge badge-{{ sc.get(o.status, 'gray') }}">{{ o.status }}</span></td>
+          <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
+          <td>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <a href="/offers/{{ o.id }}" class="btn btn-ghost btn-sm">Görüntüle</a>
+              <form method="post" action="/offers/delete" onsubmit="return confirmDelete(this)" data-confirm="Bu teklifi silmek istiyor musunuz?">
+                <input type="hidden" name="id" value="{{ o.id }}" />
+                <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px">Henüz teklif oluşturulmadı</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

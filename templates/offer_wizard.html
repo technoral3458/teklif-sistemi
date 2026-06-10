@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+{% block page_title %}Yeni Teklif{% endblock %}
+
+{% block content %}
+<!-- Wizard Steps Indicator -->
+<div class="wizard-steps" style="margin-bottom:32px;">
+  <div class="step-item active" id="si1">
+    <div class="step-circle">1</div>
+    <div class="step-label">Müşteri</div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" id="si2">
+    <div class="step-circle">2</div>
+    <div class="step-label">Makine</div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" id="si3">
+    <div class="step-circle">3</div>
+    <div class="step-label">Opsiyonlar</div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" id="si4">
+    <div class="step-circle">4</div>
+    <div class="step-label">Özet</div>
+  </div>
+</div>
+
+<form method="post" action="/offers/create" id="wizardForm">
+  <input type="hidden" name="model_id" id="wModelId" value="" />
+  <input type="hidden" name="options_json" id="wOptionsJson" value="[]" />
+
+  <!-- Step 1: Customer -->
+  <div class="wizard-step-content card" id="wstep1">
+    <div class="card-header"><h3 class="card-title">Müşteri Seçimi</h3></div>
+    <div class="card-body">
+      <div class="tabs" style="margin-bottom:20px;">
+        <button type="button" class="tab-btn active" data-tab="existing-cust" onclick="switchTab('existing-cust')">Mevcut Müşteri</button>
+        <button type="button" class="tab-btn" data-tab="new-cust" onclick="switchTab('new-cust')">Yeni Müşteri</button>
+      </div>
+      <div id="existing-cust" class="tab-pane active">
+        <div class="form-group">
+          <label class="form-label">Müşteri Seçin</label>
+          <select name="customer_id" id="wCustomerId" class="form-control" style="max-width:400px;">
+            <option value="">-- Müşteri Seçin --</option>
+            {% for c in customers %}
+            <option value="{{ c.id }}">{{ c.name }} {% if c.city %}({{ c.city }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div id="new-cust" class="tab-pane" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:600px;">
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">Firma Adı *</label>
+            <input type="text" name="new_customer_name" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">İletişim Kişisi</label>
+            <input type="text" name="new_customer_contact" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">E-posta</label>
+            <input type="email" name="new_customer_email" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Telefon</label>
+            <input type="tel" name="new_customer_phone" class="form-control" />
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:400px;margin-top:16px;">
+        <div class="form-group">
+          <label class="form-label">Adet</label>
+          <input type="number" name="machine_count" id="wMachineCount" class="form-control" value="1" min="1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Para Birimi</label>
+          <select name="currency" id="wCurrency" class="form-control">
+            {% for cur in currencies %}
+            <option value="{{ cur }}">{{ cur }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;justify-content:flex-end;padding:16px;">
+      <button type="button" class="btn btn-primary" onclick="wizardNext()">İleri →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Model -->
+  <div class="wizard-step-content card" id="wstep2" style="display:none;">
+    <div class="card-header"><h3 class="card-title">Makine Seçimi</h3></div>
+    <div class="card-body">
+      <!-- Category filter -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat(0)">Tümü</button>
+        {% for cat in categories %}
+        <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat({{ cat.id }})">{{ cat.name }}</button>
+        {% endfor %}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;">
+        {% for m in models %}
+        <div class="model-card option-card" data-id="{{ m.id }}" data-cat="{{ m.category_id or 0 }}"
+             data-compat="{{ m.compatible_options_list|tojson }}"
+             onclick="wizardSelectModel({{ m.id }}, '{{ m.name|e }}', {{ m.base_price|default(0) }}, '{{ m.currency }}')"
+             style="cursor:pointer;">
+          {% if m.image_path %}
+          <img src="/static/{{ m.image_path }}" alt="{{ m.name }}" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;" />
+          {% else %}
+          <div style="width:100%;height:120px;background:var(--surface-2);border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;color:var(--text-muted);">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          </div>
+          {% endif %}
+          <div style="font-weight:600;margin-bottom:4px;">{{ m.name }}</div>
+          <div style="color:var(--accent);font-size:15px;font-weight:700;">{{ "%.2f"|format(m.base_price|default(0)|float) }} {{ m.currency }}</div>
+          {% if m.category_name %}<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ m.category_name }}</div>{% endif %}
+        </div>
+        {% else %}
+        <p style="color:var(--text-muted)">Henüz model eklenmedi</p>
+        {% endfor %}
+      </div>
+      <div id="selectedModelInfo" style="display:none;margin-top:20px;padding:16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--accent);">
+        <strong>Seçilen: </strong><span class="sel-model-name"></span> — <span class="sel-model-price" style="color:var(--accent);"></span>
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
+      <button type="button" class="btn btn-ghost" onclick="wizardBack()">← Geri</button>
+      <button type="button" class="btn btn-primary" onclick="wizardNext()">İleri →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Options -->
+  <div class="wizard-step-content card" id="wstep3" style="display:none;">
+    <div class="card-header"><h3 class="card-title">Opsiyon Seçimi</h3></div>
+    <div class="card-body">
+      <div id="conflictWarning" class="alert alert-danger" style="display:none;">
+        ⚠️ Seçilen bazı opsiyonlar birbiriyle çakışıyor! Lütfen kontrol edin.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        {% for o in options %}
+        <div class="option-row" data-opt-id="{{ o.id }}" data-conflict="{{ o.conflict_group or '' }}"
+             style="padding:12px 16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <input type="checkbox" id="opt_{{ o.id }}"
+                   onchange="wizardToggleOption({{ o.id }}, {{ o.price|default(0) }}, '{{ o.name|e }}', '{{ o.currency }}')" />
+            <label for="opt_{{ o.id }}" style="flex:1;cursor:pointer;">
+              <strong>{{ o.name }}</strong>
+              {% if o.description %}<br><small style="color:var(--text-muted)">{{ o.description }}</small>{% endif %}
+            </label>
+            {% if o.qty_type == 'MANUAL' %}
+            <div style="display:flex;align-items:center;gap:6px;">
+              <label style="font-size:12px;color:var(--text-muted);">Adet:</label>
+              <input type="number" id="optqty_{{ o.id }}" value="1" min="1" max="99" class="form-control" style="width:70px;"
+                     onchange="wizardQtyChange({{ o.id }}, {{ o.price|default(0) }}, '{{ o.name|e }}', '{{ o.currency }}')" />
+            </div>
+            {% endif %}
+            <span style="font-weight:600;color:var(--accent);white-space:nowrap;">{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</span>
+          </div>
+        </div>
+        {% else %}
+        <p style="color:var(--text-muted)">Bu model için opsiyon bulunamadı</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
+      <button type="button" class="btn btn-ghost" onclick="wizardBack()">← Geri</button>
+      <button type="button" class="btn btn-primary" onclick="wizardNext()">İleri →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Summary -->
+  <div class="wizard-step-content card" id="wstep4" style="display:none;">
+    <div class="card-header"><h3 class="card-title">Özet ve Onay</h3></div>
+    <div class="card-body">
+      <div id="wizardSummary" style="margin-bottom:20px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:600px;">
+        <div class="form-group">
+          <label class="form-label">İskonto (%)</label>
+          <input type="number" name="discount_pct" id="wDiscount" class="form-control" value="0" min="0" max="100" step="0.5" oninput="wizardBuildSummary()" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Geçerlilik Tarihi</label>
+          <input type="date" name="validity_date" class="form-control" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">Notlar</label>
+          <textarea name="notes" class="form-control" rows="3" placeholder="Müşteriye iletilecek notlar..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
+      <button type="button" class="btn btn-ghost" onclick="wizardBack()">← Geri</button>
+      <button type="submit" class="btn btn-success" onclick="wizardBuildSummary()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><polyline points="20 6 9 17 4 12"/></svg>
+        Teklifi Oluştur
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let wizardCurrentStep = 1;
+let wizardSelectedModel = null;
+let wizardSelectedOptions = {};
+
+function wizardShowStep(n) {
+  document.querySelectorAll('.wizard-step-content').forEach(s => s.style.display = 'none');
+  const step = document.getElementById('wstep' + n);
+  if (step) step.style.display = 'block';
+  wizardCurrentStep = n;
+  document.querySelectorAll('.step-item').forEach((item, i) => {
+    item.classList.toggle('active', i + 1 === n);
+    item.classList.toggle('done', i + 1 < n);
+  });
+}
+
+function wizardNext() {
+  if (wizardCurrentStep === 2 && !wizardSelectedModel) {
+    showToast('Lütfen bir model seçiniz.', 'warning'); return;
+  }
+  wizardShowStep(wizardCurrentStep + 1);
+  if (wizardCurrentStep === 3) wizardLoadOptions();
+  if (wizardCurrentStep === 4) wizardBuildSummary();
+}
+
+function wizardBack() { wizardShowStep(wizardCurrentStep - 1); }
+
+function wizardSelectModel(modelId, modelName, basePrice, currency) {
+  wizardSelectedModel = { id: modelId, name: modelName, price: parseFloat(basePrice) || 0, currency };
+  document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector('.model-card[data-id="' + modelId + '"]');
+  if (card) card.classList.add('selected');
+  document.getElementById('wModelId').value = modelId;
+  const info = document.getElementById('selectedModelInfo');
+  if (info) {
+    info.style.display = 'block';
+    info.querySelector('.sel-model-name').textContent = modelName;
+    info.querySelector('.sel-model-price').textContent = basePrice + ' ' + currency;
+  }
+}
+
+function filterModelCat(catId) {
+  document.querySelectorAll('.model-card').forEach(card => {
+    card.parentElement.style.display = (catId === 0 || parseInt(card.dataset.cat) === catId) ? '' : 'none';
+  });
+}
+
+function wizardLoadOptions() {
+  if (!wizardSelectedModel) return;
+  const card = document.querySelector('.model-card[data-id="' + wizardSelectedModel.id + '"]');
+  let compat = [];
+  if (card) { try { compat = JSON.parse(card.dataset.compat || '[]'); } catch(e) {} }
+  document.querySelectorAll('.option-row').forEach(row => {
+    const optId = parseInt(row.dataset.optId);
+    row.style.display = (compat.length === 0 || compat.includes(optId)) ? '' : 'none';
+  });
+}
+
+function wizardToggleOption(optId, price, name, currency) {
+  const cb = document.getElementById('opt_' + optId);
+  if (cb.checked) {
+    const qtyEl = document.getElementById('optqty_' + optId);
+    const qty = qtyEl ? parseInt(qtyEl.value) || 1 : 1;
+    wizardSelectedOptions[optId] = { id: optId, name, price: parseFloat(price), qty, currency, line_total: parseFloat(price) * qty };
+  } else {
+    delete wizardSelectedOptions[optId];
+  }
+  wizardCheckConflicts();
+}
+
+function wizardQtyChange(optId, price, name, currency) {
+  if (wizardSelectedOptions[optId]) {
+    const qty = parseInt(document.getElementById('optqty_' + optId)?.value) || 1;
+    wizardSelectedOptions[optId].qty = qty;
+    wizardSelectedOptions[optId].line_total = parseFloat(price) * qty;
+  }
+}
+
+function wizardCheckConflicts() {
+  const groups = {};
+  document.querySelectorAll('.option-row[data-conflict]').forEach(row => {
+    const cg = row.dataset.conflict;
+    const optId = parseInt(row.dataset.optId);
+    if (cg && wizardSelectedOptions[optId]) groups[cg] = (groups[cg] || 0) + 1;
+  });
+  const warn = document.getElementById('conflictWarning');
+  if (warn) warn.style.display = Object.values(groups).some(v => v > 1) ? 'block' : 'none';
+}
+
+function wizardBuildSummary() {
+  if (!wizardSelectedModel) return;
+  const qty = parseInt(document.getElementById('wMachineCount')?.value) || 1;
+  const disc = parseFloat(document.getElementById('wDiscount')?.value) || 0;
+  const baseTotal = wizardSelectedModel.price * qty;
+  let optTotal = 0, optRows = '';
+  Object.values(wizardSelectedOptions).forEach(o => {
+    const lt = o.price * (o.qty || 1);
+    optTotal += lt;
+    optRows += `<tr><td style="padding:8px">${o.name}</td><td style="padding:8px;text-align:center">${o.qty||1}</td><td style="padding:8px;text-align:right">${o.price.toFixed(2)}</td><td style="padding:8px;text-align:right">${lt.toFixed(2)}</td></tr>`;
+  });
+  const subtotal = baseTotal + optTotal;
+  const total = subtotal * (1 - disc / 100);
+  const cur = wizardSelectedModel.currency;
+  const summaryEl = document.getElementById('wizardSummary');
+  if (summaryEl) summaryEl.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <thead style="background:var(--surface-2)"><tr><th style="padding:10px;text-align:left">Kalem</th><th style="padding:10px;text-align:center">Adet</th><th style="padding:10px;text-align:right">Birim</th><th style="padding:10px;text-align:right">Toplam</th></tr></thead>
+      <tbody>
+        <tr style="background:var(--surface)"><td style="padding:8px"><strong>${wizardSelectedModel.name}</strong></td><td style="padding:8px;text-align:center">${qty}</td><td style="padding:8px;text-align:right">${wizardSelectedModel.price.toFixed(2)}</td><td style="padding:8px;text-align:right">${baseTotal.toFixed(2)}</td></tr>
+        ${optRows}
+      </tbody>
+    </table>
+    <div style="text-align:right;margin-top:12px;font-size:14px;">
+      <div>Ara Toplam: <strong>${subtotal.toFixed(2)} ${cur}</strong></div>
+      ${disc>0?`<div style="color:var(--success)">İskonto (${disc}%): -${(subtotal*disc/100).toFixed(2)} ${cur}</div>`:''}
+      <div style="font-size:20px;margin-top:8px;color:var(--accent)">Genel Toplam: <strong>${total.toFixed(2)} ${cur}</strong></div>
+    </div>`;
+  document.getElementById('wOptionsJson').value = JSON.stringify(
+    Object.values(wizardSelectedOptions).map(o => ({id:o.id, qty:o.qty||1, price:o.price, line_total:o.price*(o.qty||1)}))
+  );
+}
+
+// Model card selection style
+document.querySelectorAll('.model-card').forEach(card => {
+  card.style.padding = '12px';
+  card.style.border = '2px solid var(--border)';
+  card.style.borderRadius = '10px';
+  card.style.transition = 'border-color .2s, background .2s';
+});
+document.querySelectorAll('.model-card').forEach(card => {
+  card.addEventListener('click', function() {
+    document.querySelectorAll('.model-card').forEach(c => {
+      c.style.borderColor = 'var(--border)';
+      c.style.background = '';
+    });
+    card.style.borderColor = 'var(--accent)';
+    card.style.background = 'rgba(59,130,246,.08)';
+  });
+});
+</script>
+{% endblock %}

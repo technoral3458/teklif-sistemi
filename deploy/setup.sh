@@ -1,66 +1,54 @@
 #!/bin/bash
-# ============================================================
-# B2B Teklif Sistemi — Hetzner Ubuntu Kurulum Scripti
-# Sunucu: ubuntu-4gb-fsn1-1 (167.233.104.21)
-# Servis: ersanb2b
-# ============================================================
+# B2B Teklif Sistemi - Sunucu Kurulum Scripti
+# Ubuntu 22.04 / Hetzner
+# Kullanım: bash setup.sh
 
 set -e
 
-APP_DIR="/opt/ersanb2b"
-APP_USER="ersanb2b"
-SERVICE="ersanb2b"
+APP_DIR="/opt/teklif-sistemi"
 REPO_URL="https://github.com/technoral3458/teklif-sistemi.git"
-PORT=8501
+BRANCH="claude/new-server-setup-71krv9"
+SERVICE_NAME="ersanb2b"
 
-echo "=== [1/8] Sistem güncelleniyor ==="
-apt-get update -y
-apt-get upgrade -y
-apt-get install -y python3 python3-pip python3-venv git curl ufw nginx certbot python3-certbot-nginx
+echo "=== B2B Teklif Sistemi Kurulum ==="
 
-echo "=== [2/8] Kullanıcı oluşturuluyor ==="
-if ! id "$APP_USER" &>/dev/null; then
-    useradd -m -s /bin/bash "$APP_USER"
-fi
+# 1. System packages
+apt-get update -qq
+apt-get install -y python3 python3-pip python3-venv git
 
-echo "=== [3/8] Uygulama dizini hazırlanıyor ==="
-mkdir -p "$APP_DIR"
-chown "$APP_USER":"$APP_USER" "$APP_DIR"
-
-echo "=== [4/8] Kod kopyalanıyor ==="
+# 2. Clone / update repo
 if [ -d "$APP_DIR/.git" ]; then
-    cd "$APP_DIR" && sudo -u "$APP_USER" git pull origin main
+  echo "Repo güncelleniyor..."
+  cd "$APP_DIR"
+  git fetch origin
+  git checkout "$BRANCH"
+  git pull origin "$BRANCH"
 else
-    sudo -u "$APP_USER" git clone "$REPO_URL" "$APP_DIR"
+  echo "Repo klonlanıyor..."
+  rm -rf "$APP_DIR"
+  git clone -b "$BRANCH" "$REPO_URL" "$APP_DIR"
+  cd "$APP_DIR"
 fi
 
-echo "=== [5/8] Python sanal ortam ve paketler ==="
-cd "$APP_DIR"
-sudo -u "$APP_USER" python3 -m venv venv
-sudo -u "$APP_USER" "$APP_DIR/venv/bin/pip" install --upgrade pip
-sudo -u "$APP_USER" "$APP_DIR/venv/bin/pip" install -r requirements.txt
+# 3. Virtual environment
+python3 -m venv "$APP_DIR/venv"
+"$APP_DIR/venv/bin/pip" install --upgrade pip -q
+"$APP_DIR/venv/bin/pip" install -r "$APP_DIR/requirements.txt" -q
 
-echo "=== [6/8] Dizinler ve izinler ==="
-sudo -u "$APP_USER" mkdir -p "$APP_DIR/data" "$APP_DIR/images"
-chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
+# 4. Directories
+mkdir -p "$APP_DIR/data"
+mkdir -p "$APP_DIR/static/img/uploads"
 
-echo "=== [7/8] systemd servisi kuruluyor ==="
-cp "$APP_DIR/deploy/ersanb2b.service" /etc/systemd/system/
+# 5. Service file
+cp "$APP_DIR/deploy/ersanb2b.service" "/etc/systemd/system/${SERVICE_NAME}.service"
 systemctl daemon-reload
-systemctl enable "$SERVICE"
-systemctl restart "$SERVICE"
-
-echo "=== [8/8] Firewall ayarları ==="
-ufw allow OpenSSH
-ufw allow 80
-ufw allow 443
-ufw allow "$PORT"
-ufw --force enable
+systemctl enable "$SERVICE_NAME"
+systemctl restart "$SERVICE_NAME"
 
 echo ""
-echo "============================================"
-echo "✅ Kurulum tamamlandı!"
-echo "Uygulama: http://167.233.104.21:$PORT"
-echo "Servis durumu: systemctl status $SERVICE"
-echo "Loglar: journalctl -u $SERVICE -f"
-echo "============================================"
+echo "=== Kurulum tamamlandı! ==="
+echo "Servis durumu: systemctl status $SERVICE_NAME"
+echo "Uygulama adresi: http://$(hostname -I | awk '{print $1}'):8501"
+echo ""
+echo "NOT: /etc/systemd/system/${SERVICE_NAME}.service dosyasındaki"
+echo "SECRET_KEY, ADMIN_EMAIL ve ADMIN_PASS değerlerini değiştirin!"

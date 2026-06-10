@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block page_title %}Müşteri Cari{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:20px;">
+  <input type="text" id="tableSearch" class="search-box" placeholder="Müşteri ara..." style="max-width:280px;" />
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>Firma Adı</th>
+          <th>İletişim</th>
+          <th>Bakiye</th>
+          <th>Para Birimi</th>
+          <th>İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        {% set bal = balances.get(c.id, 0) %}
+        <tr>
+          <td><strong>{{ c.name }}</strong></td>
+          <td>{{ c.contact_person or '-' }}</td>
+          <td>
+            <strong style="color:{% if bal > 0 %}var(--danger){% elif bal < 0 %}var(--success){% else %}var(--text-muted){% endif %}">
+              {{ "%.2f"|format(bal) }}
+            </strong>
+          </td>
+          <td>{{ c.currency or 'USD' }}</td>
+          <td><a href="/ledger/customers/{{ c.id }}" class="btn btn-primary btn-sm">Cari Görüntüle</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">Henüz müşteri yok</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => initTableSearch('tableSearch', 'mainTable'));</script>
+{% endblock %}

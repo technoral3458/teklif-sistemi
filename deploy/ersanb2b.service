@@ -1,36 +1,19 @@
 [Unit]
-Description=Ersan B2B Teklif Sistemi
+Description=B2B Teklif Sistemi (FastAPI)
 After=network.target
-Wants=network-online.target
 
 [Service]
 Type=simple
-User=ersanb2b
-Group=ersanb2b
-WorkingDirectory=/opt/ersanb2b
-ExecStart=/opt/ersanb2b/venv/bin/streamlit run web_app.py \
-    --server.port=8501 \
-    --server.address=0.0.0.0 \
-    --server.headless=true \
-    --server.fileWatcherType=none \
-    --browser.gatherUsageStats=false
-
+User=root
+WorkingDirectory=/opt/teklif-sistemi
+ExecStart=/opt/teklif-sistemi/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8501 --workers 2
 Restart=always
 RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-# Environment variables — edit as needed
-Environment="ADMIN_EMAIL=admin@example.com"
-Environment="ADMIN_PASS=Admin123!"
-Environment="ADMIN_COMPANY=Yönetim"
-
-# Optional SMTP settings
-#Environment="SMTP_SERVER=mail.example.com"
-#Environment="SMTP_PORT=587"
-#Environment="SMTP_USER=info@example.com"
-#Environment="SMTP_PASS=yourpassword"
-#Environment="SMTP_FROM=info@example.com"
+Environment=PYTHONUNBUFFERED=1
+Environment=SECRET_KEY=change-this-to-random-64-char-string-in-production
+Environment=ADMIN_EMAIL=admin@example.com
+Environment=ADMIN_PASS=Admin123!
+Environment=ADMIN_COMPANY=B2B Sistem
 
 [Install]
 WantedBy=multi-user.target

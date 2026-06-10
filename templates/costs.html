@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block page_title %}Maliyet Analizi{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <form method="get" style="display:flex;gap:8px;align-items:center;">
+    <select name="model_id" class="form-control" style="max-width:280px;" onchange="this.form.submit()">
+      <option value="0">Tüm Modeller</option>
+      {% for m in models %}
+      <option value="{{ m.id }}" {% if selected_model_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-ghost btn-sm">Filtrele</button>
+  </form>
+</div>
+
+{% for d in cost_data %}
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header">
+    <h3 class="card-title">{{ d.model.name }}</h3>
+    <span style="font-size:13px;color:var(--text-muted);">{{ d.model.currency }}</span>
+  </div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <!-- Cost breakdown -->
+      <div>
+        <h4 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;">Maliyet Kırılımı</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;">
+          {% macro row(label, value, color='') %}
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+            <span style="color:var(--text-muted)">{{ label }}</span>
+            <span {% if color %}style="color:{{ color }}"{% endif %}>{{ "%.2f"|format(value) }}</span>
+          </div>
+          {% endmacro %}
+          {{ row('Alış Fiyatı', d.purchase) }}
+          {{ row('Nakliye', d.shipping) }}
+          {{ row('Gümrük', d.customs) }}
+          {{ row('Ek Vergi', d.extra) }}
+          {{ row('Liman/Gümrük Masrafı', d.port) }}
+          {{ row('Belge Masrafı', d.doc) }}
+          {{ row('Montaj', d.inst) }}
+          {{ row('Diğer', d.other) }}
+          <div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:700;font-size:15px;">
+            <span>Toplam Maliyet</span>
+            <span style="color:var(--danger)">{{ "%.2f"|format(d.total_cost) }}</span>
+          </div>
+        </div>
+      </div>
+      <!-- Profit analysis -->
+      <div>
+        <h4 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;">Kâr Analizi</h4>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="stat-card" style="padding:16px;">
+            <div class="stat-info">
+              <div class="stat-value" style="font-size:18px;">{{ "%.2f"|format(d.sale_price) }}</div>
+              <div class="stat-label">Satış Fiyatı ({{ d.model.currency }})</div>
+            </div>
+          </div>
+          <div class="stat-card" style="padding:16px;">
+            <div class="stat-info">
+              <div class="stat-value" style="font-size:18px;color:{{ 'var(--success)' if d.profit >= 0 else 'var(--danger)' }}">{{ "%.2f"|format(d.profit) }}</div>
+              <div class="stat-label">Net Kâr</div>
+            </div>
+          </div>
+          <div class="stat-card" style="padding:16px;">
+            <div class="stat-info">
+              <div class="stat-value" style="font-size:18px;color:{{ 'var(--success)' if d.margin >= 0 else 'var(--danger)' }}">
+                {{ "%.1f"|format(d.margin) }}%
+              </div>
+              <div class="stat-label">Kâr Marjı</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:48px;color:var(--text-muted);">
+    {% if selected_model_id %}
+    Seçilen model için maliyet verisi bulunamadı.
+    {% else %}
+    Henüz maliyet verisi girilmemiş model yok.
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,181 @@
+import json
+import datetime
+
+from fastapi import APIRouter, Request, Form
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+import db.factory as fdb
+import auth
+from config import OFFER_STATUSES, CURRENCIES
+
+router = APIRouter(prefix="/offers")
+templates = Jinja2Templates(directory="templates")
+
+
+@router.get("")
+async def offers_list(request: Request, status: str = "", q: str = ""):
+    user = auth.require_user(request)
+    offers = fdb.get_offers(status=status or None)
+    customers = {c["id"]: c for c in fdb.get_customers()}
+    models = {m["id"]: m for m in fdb.get_models()}
+    for o in offers:
+        o["customer_name"] = customers.get(o.get("customer_id"), {}).get("name", "-")
+        o["model_name"] = models.get(o.get("model_id"), {}).get("name", "-")
+    if q:
+        ql = q.lower()
+        offers = [
+            o for o in offers
+            if ql in (o.get("offer_no") or "").lower()
+            or ql in (o.get("customer_name") or "").lower()
+        ]
+    return templates.TemplateResponse("offers.html", {
+        "request": request,
+        "user": user,
+        "offers": offers,
+        "statuses": OFFER_STATUSES,
+        "selected_status": status,
+        "q": q,
+        "active_page": "offers",
+    })
+
+
+@router.get("/new")
+async def offer_new(request: Request):
+    user = auth.require_user(request)
+    customers = fdb.get_customers()
+    cats = fdb.get_cats()
+    models = fdb.get_models()
+    options = fdb.get_options()
+    cat_map = {c["id"]: c["name"] for c in cats}
+    for m in models:
+        m["category_name"] = cat_map.get(m.get("category_id"), "-")
+        compat = []
+        if m.get("compatible_options"):
+            try:
+                compat = json.loads(m["compatible_options"])
+            except Exception:
+                pass
+        m["compatible_options_list"] = compat
+    return templates.TemplateResponse("offer_wizard.html", {
+        "request": request,
+        "user": user,
+        "customers": customers,
+        "categories": cats,
+        "models": models,
+        "options": options,
+        "currencies": CURRENCIES,
+        "active_page": "offers",
+    })
+
+
+@router.post("/create")
+async def create_offer(request: Request,
+                       customer_id: int = Form(0),
+                       new_customer_name: str = Form(""),
+                       new_customer_contact: str = Form(""),
+                       new_customer_email: str = Form(""),
+                       new_customer_phone: str = Form(""),
+                       model_id: int = Form(...),
+                       machine_count: int = Form(1),
+                       currency: str = Form("USD"),
+                       discount_pct: float = Form(0.0),
+                       notes: str = Form(""),
+                       validity_date: str = Form(""),
+                       options_json: str = Form("[]")):
+    user = auth.require_user(request)
+
+    if not customer_id and new_customer_name.strip():
+        customer_id = fdb.add_customer(
+            name=new_customer_name.strip(),
+            contact_person=new_customer_contact,
+            email=new_customer_email,
+            phone=new_customer_phone,
+            dealer_id=user["id"],
+        )
+
+    model = fdb.get_model(model_id)
+    base_price = float(model["base_price"]) if model else 0.0
+
+    selected_options = []
+    try:
+        selected_options = json.loads(options_json)
+    except Exception:
+        pass
+
+    options_total = sum(float(o.get("line_total", 0)) for o in selected_options)
+    subtotal = base_price * machine_count + options_total
+    total_price = subtotal * (1 - discount_pct / 100)
+
+    offer_no = f"TKL-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+    offer_id = fdb.create_offer(
+        offer_no=offer_no,
+        customer_id=customer_id,
+        model_id=model_id,
+        machine_count=machine_count,
+        currency=currency,
+        base_price=base_price,
+        options_total=options_total,
+        discount_pct=discount_pct,
+        total_price=total_price,
+        status="Beklemede",
+        notes=notes,
+        validity_date=validity_date,
+        dealer_id=user["id"],
+    )
+
+    if selected_options:
+        items = [
+            {
+                "option_id": o["id"],
+                "qty": o.get("qty", 1),
+                "unit_price": o.get("price", 0),
+                "line_total": o.get("line_total", 0),
+            }
+            for o in selected_options
+        ]
+        fdb.save_offer_items(offer_id, items)
+
+    return RedirectResponse(f"/offers/{offer_id}", 303)
+
+
+@router.get("/{offer_id}")
+async def offer_detail(request: Request, offer_id: int):
+    user = auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+    items = fdb.get_offer_items(offer_id)
+    customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
+    model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
+    opts = {o["id"]: o for o in fdb.get_options()}
+    for item in items:
+        opt = opts.get(item.get("option_id"), {})
+        item["option_name"] = opt.get("name", "-")
+    return templates.TemplateResponse("offer_detail.html", {
+        "request": request,
+        "user": user,
+        "offer": offer,
+        "items": items,
+        "customer": customer,
+        "model": model,
+        "statuses": OFFER_STATUSES,
+        "active_page": "offers",
+    })
+
+
+@router.post("/{offer_id}/status")
+async def update_status(request: Request,
+                        offer_id: int,
+                        status: str = Form(...)):
+    auth.require_user(request)
+    fdb.upd_offer_status(offer_id, status)
+    return RedirectResponse(f"/offers/{offer_id}", 303)
+
+
+@router.post("/delete")
+async def delete_offer(request: Request, id: int = Form(...)):
+    auth.require_user(request)
+    fdb.del_offer(id)
+    return RedirectResponse("/offers", 303)

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block page_title %}Bayi Yönetimi{% endblock %}
+
+{% block content %}
+<div class="tabs" style="margin-bottom:20px;">
+  <button class="tab-btn active" data-tab="tab-pending" onclick="switchTab('tab-pending')">
+    Bekleyenler
+    {% set pcount = dealers|selectattr('is_approved','eq',0)|list|length %}
+    {% if pcount > 0 %}<span class="badge badge-amber" style="margin-left:6px">{{ pcount }}</span>{% endif %}
+  </button>
+  <button class="tab-btn" data-tab="tab-approved" onclick="switchTab('tab-approved')">Onaylılar</button>
+  <button class="tab-btn" data-tab="tab-all" onclick="switchTab('tab-all')">Tümü</button>
+</div>
+
+{% macro dealer_table(dealer_list) %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Firma Adı</th>
+        <th>E-posta</th>
+        <th>Tip</th>
+        <th>Durum</th>
+        <th>Kayıt Tarihi</th>
+        <th>İşlemler</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in dealer_list %}
+      <tr>
+        <td><strong>{{ d.company_name or d.email }}</strong></td>
+        <td>{{ d.email }}</td>
+        <td><span class="badge badge-{{ 'blue' if d.role == 'dealer' else 'amber' }}">{{ d.role }}</span></td>
+        <td>
+          {% if d.is_approved and d.is_active %}
+            <span class="badge badge-green">Aktif</span>
+          {% elif not d.is_approved %}
+            <span class="badge badge-amber">Bekliyor</span>
+          {% else %}
+            <span class="badge badge-red">Pasif</span>
+          {% endif %}
+        </td>
+        <td>{{ d.created_at[:10] if d.created_at else '-' }}</td>
+        <td>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            {% if not d.is_approved %}
+            <form method="post" action="/dealers/approve" style="display:inline;">
+              <input type="hidden" name="id" value="{{ d.id }}" />
+              <button type="submit" class="btn btn-success btn-sm">Onayla</button>
+            </form>
+            {% else %}
+            <form method="post" action="/dealers/reject" style="display:inline;">
+              <input type="hidden" name="id" value="{{ d.id }}" />
+              <button type="submit" class="btn btn-outline btn-sm">Pasif Yap</button>
+            </form>
+            {% endif %}
+            <button class="btn btn-ghost btn-sm" onclick="editDealer({{ d.id }}, '{{ d.company_name|e }}', {{ d.can_view_costs or 0 }}, '{{ d.role }}', '{{ d.allowed_categories|e }}')">Düzenle</button>
+            <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)" data-confirm="Bu kullanıcıyı silmek istiyor musunuz?">
+              <input type="hidden" name="id" value="{{ d.id }}" />
+              <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Kayıt bulunamadı</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+<div id="tab-pending" class="tab-pane card">
+  {{ dealer_table(dealers|selectattr('is_approved','eq',0)|list) }}
+</div>
+<div id="tab-approved" class="tab-pane card" style="display:none;">
+  {{ dealer_table(dealers|selectattr('is_approved','eq',1)|list) }}
+</div>
+<div id="tab-all" class="tab-pane card" style="display:none;">
+  {{ dealer_table(dealers) }}
+</div>
+
+<!-- Edit Modal -->
+<div id="dealerEditModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Kullanıcı Düzenle</h3>
+      <button class="modal-close" onclick="closeModal('dealerEditModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/dealers/save">
+        <input type="hidden" name="id" id="deid" value="" />
+        <div class="form-group">
+          <label class="form-label">Firma Adı</label>
+          <input type="text" name="company_name" id="decompany" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rol</label>
+          <select name="role" id="derole" class="form-control">
+            <option value="dealer">Bayi</option>
+            <option value="manufacturer">Üretici</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">İzinli Kategoriler (virgülle ayırın)</label>
+          <input type="text" name="allowed_categories" id="decat" class="form-control" placeholder="Tüm kategoriler için boş bırakın" />
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="can_view_costs" id="decosts" value="1" />
+            <span>Maliyet bilgilerini görebilir</span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('dealerEditModal')">İptal</button>
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editDealer(id, company, canCosts, role, cats) {
+  document.getElementById('deid').value = id;
+  document.getElementById('decompany').value = company;
+  document.getElementById('decosts').checked = !!canCosts;
+  document.getElementById('derole').value = role;
+  document.getElementById('decat').value = cats;
+  openModal('dealerEditModal');
+}
+</script>
+{% endblock %}

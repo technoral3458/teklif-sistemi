@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block page_title %}Siparişler{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Siparişler</h3>
+    <span style="font-size:13px;color:var(--text-muted);">"Sipariş Verildi" durumundaki teklifler</span>
+  </div>
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>Teklif No</th>
+          <th>Müşteri</th>
+          <th>Model</th>
+          <th>Adet</th>
+          <th>Tutar</th>
+          <th>Sipariş Tarihi</th>
+          <th>İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td><code>{{ o.offer_no }}</code></td>
+          <td>{{ o.customer_name }}</td>
+          <td>{{ o.model_name }}</td>
+          <td>{{ o.machine_count }}</td>
+          <td><strong>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</strong></td>
+          <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
+          <td>
+            <a href="/offers/{{ o.id }}" class="btn btn-ghost btn-sm">Görüntüle</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">Henüz sipariş yok</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => initTableSearch('', 'mainTable'));</script>
+{% endblock %}

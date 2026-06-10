@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block page_title %}Teklif {{ offer.offer_no }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+  <a href="/offers" class="btn btn-ghost btn-sm">← Tekliflere Dön</a>
+  <button onclick="window.print()" class="btn btn-outline btn-sm">🖨️ Yazdır</button>
+</div>
+
+{% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray'} %}
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;">
+  <div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h3 class="card-title">{{ offer.offer_no }}</h3>
+          <div style="font-size:13px;color:var(--text-muted);">{{ offer.created_at[:10] if offer.created_at else '' }}</div>
+        </div>
+        <span class="badge badge-{{ sc.get(offer.status, 'gray') }}" style="font-size:14px;padding:6px 12px;">{{ offer.status }}</span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">MÜŞTERİ</div>
+            <div style="font-weight:600;">{{ customer.name if customer else '-' }}</div>
+            {% if customer and customer.contact_person %}<div style="font-size:13px;">{{ customer.contact_person }}</div>{% endif %}
+            {% if customer and customer.email %}<div style="font-size:13px;color:var(--text-muted);">{{ customer.email }}</div>{% endif %}
+            {% if customer and customer.phone %}<div style="font-size:13px;color:var(--text-muted);">{{ customer.phone }}</div>{% endif %}
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">MODEL</div>
+            <div style="font-weight:600;">{{ model.name if model else '-' }}</div>
+            <div style="font-size:13px;color:var(--text-muted);">Adet: {{ offer.machine_count }}</div>
+            <div style="font-size:13px;color:var(--text-muted);">Para Birimi: {{ offer.currency }}</div>
+            {% if offer.validity_date %}<div style="font-size:13px;color:var(--text-muted);">Geçerlilik: {{ offer.validity_date }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><h3 class="card-title">Fiyat Detayı</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Kalem</th><th style="text-align:center">Adet</th><th style="text-align:right">Birim Fiyat</th><th style="text-align:right">Toplam</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>{{ model.name if model else 'Model' }}</strong></td>
+              <td style="text-align:center">{{ offer.machine_count }}</td>
+              <td style="text-align:right">{{ "%.2f"|format(offer.base_price|default(0)|float) }} {{ offer.currency }}</td>
+              <td style="text-align:right">{{ "%.2f"|format((offer.base_price|default(0)|float) * (offer.machine_count|default(1)|int)) }} {{ offer.currency }}</td>
+            </tr>
+            {% for item in items %}
+            <tr>
+              <td style="padding-left:24px;color:var(--text-muted);">{{ item.option_name }}</td>
+              <td style="text-align:center">{{ item.qty }}</td>
+              <td style="text-align:right">{{ "%.2f"|format(item.unit_price|default(0)|float) }}</td>
+              <td style="text-align:right">{{ "%.2f"|format(item.line_total|default(0)|float) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            {% if offer.discount_pct and offer.discount_pct > 0 %}
+            <tr>
+              <td colspan="3" style="text-align:right;color:var(--text-muted);">Ara Toplam</td>
+              <td style="text-align:right">{{ "%.2f"|format(((offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int)) + (offer.options_total|default(0)|float)) }} {{ offer.currency }}</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="text-align:right;color:var(--success);">İskonto ({{ offer.discount_pct }}%)</td>
+              <td style="text-align:right;color:var(--success);">-{{ "%.2f"|format(((offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int) + (offer.options_total|default(0)|float)) * (offer.discount_pct|default(0)|float)/100) }}</td>
+            </tr>
+            {% endif %}
+            <tr style="font-size:16px;font-weight:700;">
+              <td colspan="3" style="text-align:right;">TOPLAM</td>
+              <td style="text-align:right;color:var(--accent);">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    {% if offer.notes %}
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Notlar</h3></div>
+      <div class="card-body"><p>{{ offer.notes }}</p></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Status & actions -->
+  <div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><h3 class="card-title">Durum Güncelle</h3></div>
+      <div class="card-body">
+        <form method="post" action="/offers/{{ offer.id }}/status">
+          <div class="form-group">
+            <select name="status" class="form-control">
+              {% for s in statuses %}
+              <option value="{{ s }}" {% if offer.status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%">Durumu Güncelle</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Özet</h3></div>
+      <div class="card-body">
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-muted)">Teklif No</span>
+            <code>{{ offer.offer_no }}</code>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-muted)">Tarih</span>
+            <span>{{ offer.created_at[:10] if offer.created_at else '-' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-muted)">Müşteri</span>
+            <span>{{ customer.name if customer else '-' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-muted)">Adet</span>
+            <span>{{ offer.machine_count }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">
+            <span>Toplam</span>
+            <span style="color:var(--accent)">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

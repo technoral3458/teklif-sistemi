@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block page_title %}Kategoriler{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+  <button class="btn btn-primary" onclick="openModal('catModal')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Yeni Kategori
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Kategori Adı</th>
+          <th>Açıklama</th>
+          <th>İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in categories %}
+        <tr>
+          <td>{{ c.id }}</td>
+          <td><strong>{{ c.name }}</strong></td>
+          <td>{{ c.description or '-' }}</td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-ghost btn-sm" onclick="editCat({{ c.id }}, '{{ c.name|e }}', '{{ c.description|e }}')">Düzenle</button>
+              <form method="post" action="/categories/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ c.name }}' kategorisini silmek istiyor musunuz?">
+                <input type="hidden" name="id" value="{{ c.id }}" />
+                <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:32px">Henüz kategori eklenmedi</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="catModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="catModalTitle">Yeni Kategori</h3>
+      <button class="modal-close" onclick="closeModal('catModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/categories/save">
+        <input type="hidden" name="id" id="catId" value="0" />
+        <div class="form-group">
+          <label class="form-label">Kategori Adı *</label>
+          <input type="text" name="name" id="catName" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Açıklama</label>
+          <textarea name="description" id="catDesc" class="form-control" rows="3"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('catModal')">İptal</button>
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editCat(id, name, desc) {
+  document.getElementById('catModalTitle').textContent = 'Kategori Düzenle';
+  document.getElementById('catId').value = id;
+  document.getElementById('catName').value = name;
+  document.getElementById('catDesc').value = desc;
+  openModal('catModal');
+}
+</script>
+{% endblock %}
