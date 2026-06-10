@@ -176,6 +176,20 @@ def init():
             created_at TEXT DEFAULT(datetime('now'))
         )""")
 
+        # Manufacturer user ledger (user-id based, for per-user hakediş tracking)
+        cur.execute("""CREATE TABLE IF NOT EXISTS manufacturer_user_ledger(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            manufacturer_id INTEGER NOT NULL,
+            txn_type TEXT NOT NULL,
+            amount REAL DEFAULT 0,
+            currency TEXT DEFAULT 'USD',
+            description TEXT DEFAULT '',
+            payment_method TEXT DEFAULT '',
+            txn_date TEXT DEFAULT(date('now')),
+            order_id INTEGER DEFAULT NULL,
+            created_at TEXT DEFAULT(datetime('now'))
+        )""")
+
         c.commit()
 
 
@@ -712,6 +726,55 @@ def all_dealer_balances():
         if txn_type in balances[did]:
             balances[did][txn_type] = float(total or 0)
     return {did: v["debit"] - v["credit"] for did, v in balances.items()}
+
+
+# ── Manufacturer User Ledger ──────────────────────────────────────────────────
+
+def add_mfr_user_txn(manufacturer_id, txn_type, amount, currency="USD",
+                     description="", payment_method="", txn_date="", order_id=None):
+    with _c() as c:
+        c.execute(
+            "INSERT INTO manufacturer_user_ledger(manufacturer_id,txn_type,amount,currency,description,payment_method,txn_date,order_id) VALUES(?,?,?,?,?,?,?,?)",
+            (manufacturer_id, txn_type, amount, currency, description, payment_method, txn_date, order_id)
+        )
+
+def get_mfr_user_txns(manufacturer_id):
+    with _c() as c:
+        rows = c.execute(
+            "SELECT id,manufacturer_id,txn_type,amount,currency,description,payment_method,txn_date,order_id,created_at FROM manufacturer_user_ledger WHERE manufacturer_id=? ORDER BY txn_date DESC,id DESC",
+            (manufacturer_id,)
+        ).fetchall()
+    return [{"id":r[0],"manufacturer_id":r[1],"txn_type":r[2],"amount":r[3],"currency":r[4],
+             "description":r[5],"payment_method":r[6],"txn_date":r[7],"order_id":r[8],"created_at":r[9]} for r in rows]
+
+def del_mfr_user_txn(tid):
+    with _c() as c:
+        c.execute("DELETE FROM manufacturer_user_ledger WHERE id=?", (tid,))
+
+def mfr_user_balance(manufacturer_id):
+    with _c() as c:
+        rows = c.execute(
+            "SELECT txn_type,SUM(amount) FROM manufacturer_user_ledger WHERE manufacturer_id=? GROUP BY txn_type",
+            (manufacturer_id,)
+        ).fetchall()
+    totals = {"debit": 0.0, "credit": 0.0}
+    for txn_type, total in rows:
+        if txn_type in totals:
+            totals[txn_type] = float(total or 0)
+    return totals["debit"] - totals["credit"]
+
+def all_mfr_user_balances():
+    with _c() as c:
+        rows = c.execute(
+            "SELECT manufacturer_id,txn_type,SUM(amount) FROM manufacturer_user_ledger GROUP BY manufacturer_id,txn_type"
+        ).fetchall()
+    balances = {}
+    for mid, txn_type, total in rows:
+        if mid not in balances:
+            balances[mid] = {"debit": 0.0, "credit": 0.0}
+        if txn_type in balances[mid]:
+            balances[mid][txn_type] = float(total or 0)
+    return {mid: v["debit"] - v["credit"] for mid, v in balances.items()}
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block page_title %}Üretici Cari{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Firma Adı</th>
+          <th>E-posta</th>
+          <th>Bakiye</th>
+          <th>İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in manufacturers %}
+        <tr>
+          <td><strong>{{ m.company_name or m.email }}</strong></td>
+          <td>{{ m.email }}</td>
+          <td>
+            {% set bal = balances.get(m.id, 0) %}
+            <span style="font-weight:600;color:{% if bal > 0 %}var(--danger){% elif bal < 0 %}var(--success){% else %}inherit{% endif %}">
+              {{ "%.2f"|format(bal) }}
+            </span>
+          </td>
+          <td>
+            <a href="/ledger/manufacturers/users/{{ m.id }}" class="btn btn-outline btn-sm">Cari Görüntüle</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:32px">Kayıtlı üretici yok</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

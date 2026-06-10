@@ -58,6 +58,7 @@
               <button type="submit" class="btn btn-outline btn-sm">Pasif Yap</button>
             </form>
             {% endif %}
+            <a href="/ledger/manufacturers/users/{{ m.id }}" class="btn btn-ghost btn-sm">📒 Cari</a>
             <button class="btn btn-ghost btn-sm"
               onclick="editMfr({{ m.id }}, '{{ m.company_name|e }}', {{ m.can_view_costs or 0 }}, '{{ m.role }}', '{{ m.allowed_categories|e }}')">
               ✏️ Düzenle

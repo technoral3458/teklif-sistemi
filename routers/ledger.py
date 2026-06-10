@@ -68,6 +68,67 @@ async def del_cust_txn(request: Request,
     return RedirectResponse(f"/ledger/customers/{customer_id}", 303)
 
 
+# ── Manufacturer User Ledger (user-id based) ─────────────────────────────────
+# NOTE: these routes must come BEFORE /manufacturers/{mfr_name} to avoid conflict
+
+@router.get("/manufacturers/users")
+async def mfr_user_ledger_list(request: Request):
+    user = auth.require_admin(request)
+    manufacturers = [u for u in udb.all_users() if u["role"] == "manufacturer"]
+    balances = fdb.all_mfr_user_balances()
+    return templates.TemplateResponse(request, "ledger_mfr_user_list.html", {
+        "user": user,
+        "manufacturers": manufacturers,
+        "balances": balances,
+        "active_page": "ledger_manufacturers",
+    })
+
+
+@router.get("/manufacturers/users/{mfr_id}")
+async def mfr_user_ledger(request: Request, mfr_id: int):
+    user = auth.require_admin(request)
+    manufacturer = udb.by_id(mfr_id)
+    if not manufacturer:
+        return RedirectResponse("/manufacturers", 303)
+    txns = fdb.get_mfr_user_txns(mfr_id)
+    balance = fdb.mfr_user_balance(mfr_id)
+    return templates.TemplateResponse(request, "ledger_mfr_user.html", {
+        "user": user,
+        "manufacturer": manufacturer,
+        "txns": txns,
+        "balance": balance,
+        "currencies": CURRENCIES,
+        "payment_methods": PAYMENT_METHODS,
+        "active_page": "ledger_manufacturers",
+    })
+
+
+@router.post("/manufacturers/users/{mfr_id}/add")
+async def add_mfr_user_txn(request: Request, mfr_id: int,
+                            txn_type: str = Form(...),
+                            amount: float = Form(...),
+                            currency: str = Form("USD"),
+                            description: str = Form(""),
+                            payment_method: str = Form(""),
+                            txn_date: str = Form("")):
+    auth.require_admin(request)
+    if not txn_date:
+        txn_date = datetime.date.today().isoformat()
+    fdb.add_mfr_user_txn(mfr_id, txn_type, amount, currency, description, payment_method, txn_date)
+    return RedirectResponse(f"/ledger/manufacturers/users/{mfr_id}", 303)
+
+
+@router.post("/manufacturers/users/txn/delete")
+async def del_mfr_user_txn(request: Request,
+                            id: int = Form(...),
+                            manufacturer_id: int = Form(...)):
+    auth.require_admin(request)
+    fdb.del_mfr_user_txn(id)
+    return RedirectResponse(f"/ledger/manufacturers/users/{manufacturer_id}", 303)
+
+
+# ── Manufacturer Name-based Ledger ────────────────────────────────────────────
+
 @router.get("/manufacturers")
 async def mfr_ledger_list(request: Request):
     user = auth.require_user(request)
