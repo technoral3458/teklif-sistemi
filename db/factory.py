@@ -138,6 +138,44 @@ def init():
             created_at TEXT DEFAULT(datetime('now'))
         )""")
 
+        # New columns on offers for order workflow
+        for col, typ in [
+            ("manufacturer_id", "INTEGER DEFAULT NULL"),
+            ("admin_status",    "TEXT DEFAULT ''"),
+            ("admin_notes",     "TEXT DEFAULT ''"),
+            ("termin_date",     "TEXT DEFAULT ''"),
+            ("mfr_status",      "TEXT DEFAULT ''"),
+            ("mfr_notes",       "TEXT DEFAULT ''"),
+        ]:
+            _acol(cur, "offers", col, typ)
+
+        # Add order_id to manufacturer_transactions
+        _acol(cur, "manufacturer_transactions", "order_id", "INTEGER DEFAULT NULL")
+
+        # Production stage log
+        cur.execute("""CREATE TABLE IF NOT EXISTS order_stages(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            stage_name TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            stage_date TEXT DEFAULT '',
+            created_at TEXT DEFAULT(datetime('now'))
+        )""")
+
+        # Dealer ledger
+        cur.execute("""CREATE TABLE IF NOT EXISTS dealer_ledger(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dealer_id INTEGER NOT NULL,
+            txn_type TEXT NOT NULL,
+            amount REAL DEFAULT 0,
+            currency TEXT DEFAULT 'USD',
+            description TEXT DEFAULT '',
+            payment_method TEXT DEFAULT '',
+            txn_date TEXT DEFAULT(date('now')),
+            order_id INTEGER DEFAULT NULL,
+            created_at TEXT DEFAULT(datetime('now'))
+        )""")
+
         c.commit()
 
 
@@ -368,10 +406,12 @@ def del_customer(cid):
 
 _OFCOLS = ("id,offer_no,customer_id,model_id,machine_count,currency,"
            "base_price,options_total,discount_pct,total_price,status,"
-           "notes,validity_date,dealer_id,created_at")
-_OFKEYS = ["id", "offer_no", "customer_id", "model_id", "machine_count", "currency",
-           "base_price", "options_total", "discount_pct", "total_price", "status",
-           "notes", "validity_date", "dealer_id", "created_at"]
+           "notes,validity_date,dealer_id,manufacturer_id,admin_status,"
+           "admin_notes,termin_date,mfr_status,mfr_notes,created_at")
+_OFKEYS = ["id","offer_no","customer_id","model_id","machine_count","currency",
+           "base_price","options_total","discount_pct","total_price","status",
+           "notes","validity_date","dealer_id","manufacturer_id","admin_status",
+           "admin_notes","termin_date","mfr_status","mfr_notes","created_at"]
 
 
 def _rof(r):
@@ -565,6 +605,113 @@ def mfr_balance(manufacturer_name):
         if txn_type in totals:
             totals[txn_type] = float(total or 0)
     return totals["purchase"] - totals["payment"]
+
+
+# ── Order Workflow ────────────────────────────────────────────────────────────
+
+def approve_order(oid, manufacturer_id, admin_notes=""):
+    with _c() as c:
+        c.execute(
+            "UPDATE offers SET admin_status='approved', manufacturer_id=?, admin_notes=?, status='Admin Onaylı' WHERE id=?",
+            (manufacturer_id, admin_notes, oid)
+        )
+
+def reject_order(oid, admin_notes=""):
+    with _c() as c:
+        c.execute(
+            "UPDATE offers SET admin_status='rejected', admin_notes=?, status='İptal' WHERE id=?",
+            (admin_notes, oid)
+        )
+
+def mfr_confirm_order(oid, termin_date, mfr_notes=""):
+    with _c() as c:
+        c.execute(
+            "UPDATE offers SET mfr_status='confirmed', termin_date=?, mfr_notes=?, status='Üretimde' WHERE id=?",
+            (termin_date, mfr_notes, oid)
+        )
+
+def update_mfr_status(oid, mfr_status):
+    status_map = {
+        "in_production": "Üretimde",
+        "completed":     "Tamamlandı",
+        "delivered":     "Teslim Edildi",
+    }
+    with _c() as c:
+        c.execute(
+            "UPDATE offers SET mfr_status=?, status=? WHERE id=?",
+            (mfr_status, status_map.get(mfr_status, "Üretimde"), oid)
+        )
+
+
+# ── Order Stages ─────────────────────────────────────────────────────────────
+
+def add_order_stage(order_id, stage_name, notes, stage_date):
+    with _c() as c:
+        c.execute(
+            "INSERT INTO order_stages(order_id,stage_name,notes,stage_date) VALUES(?,?,?,?)",
+            (order_id, stage_name, notes, stage_date)
+        )
+
+def get_order_stages(order_id):
+    with _c() as c:
+        rows = c.execute(
+            "SELECT id,order_id,stage_name,notes,stage_date,created_at FROM order_stages WHERE order_id=? ORDER BY stage_date DESC,id DESC",
+            (order_id,)
+        ).fetchall()
+    return [{"id":r[0],"order_id":r[1],"stage_name":r[2],"notes":r[3],"stage_date":r[4],"created_at":r[5]} for r in rows]
+
+def del_order_stage(sid):
+    with _c() as c:
+        c.execute("DELETE FROM order_stages WHERE id=?", (sid,))
+
+
+# ── Dealer Ledger ─────────────────────────────────────────────────────────────
+
+def add_dealer_txn(dealer_id, txn_type, amount, currency="USD",
+                   description="", payment_method="", txn_date="", order_id=None):
+    with _c() as c:
+        c.execute(
+            "INSERT INTO dealer_ledger(dealer_id,txn_type,amount,currency,description,payment_method,txn_date,order_id) VALUES(?,?,?,?,?,?,?,?)",
+            (dealer_id, txn_type, amount, currency, description, payment_method, txn_date, order_id)
+        )
+
+def get_dealer_txns(dealer_id):
+    with _c() as c:
+        rows = c.execute(
+            "SELECT id,dealer_id,txn_type,amount,currency,description,payment_method,txn_date,order_id,created_at FROM dealer_ledger WHERE dealer_id=? ORDER BY txn_date DESC,id DESC",
+            (dealer_id,)
+        ).fetchall()
+    return [{"id":r[0],"dealer_id":r[1],"txn_type":r[2],"amount":r[3],"currency":r[4],
+             "description":r[5],"payment_method":r[6],"txn_date":r[7],"order_id":r[8],"created_at":r[9]} for r in rows]
+
+def del_dealer_txn(tid):
+    with _c() as c:
+        c.execute("DELETE FROM dealer_ledger WHERE id=?", (tid,))
+
+def dealer_balance(dealer_id):
+    with _c() as c:
+        rows = c.execute(
+            "SELECT txn_type,SUM(amount) FROM dealer_ledger WHERE dealer_id=? GROUP BY txn_type",
+            (dealer_id,)
+        ).fetchall()
+    totals = {"debit": 0.0, "credit": 0.0}
+    for txn_type, total in rows:
+        if txn_type in totals:
+            totals[txn_type] = float(total or 0)
+    return totals["debit"] - totals["credit"]
+
+def all_dealer_balances():
+    with _c() as c:
+        rows = c.execute(
+            "SELECT dealer_id,txn_type,SUM(amount) FROM dealer_ledger GROUP BY dealer_id,txn_type"
+        ).fetchall()
+    balances = {}
+    for did, txn_type, total in rows:
+        if did not in balances:
+            balances[did] = {"debit": 0.0, "credit": 0.0}
+        if txn_type in balances[did]:
+            balances[did][txn_type] = float(total or 0)
+    return {did: v["debit"] - v["credit"] for did, v in balances.items()}
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────

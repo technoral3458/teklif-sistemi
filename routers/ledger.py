@@ -5,6 +5,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 import db.factory as fdb
+import db.users as udb
 import auth
 from config import CURRENCIES, PAYMENT_METHODS
 
@@ -120,3 +121,62 @@ async def del_mfr_txn(request: Request,
     auth.require_user(request)
     fdb.del_mtxn(id)
     return RedirectResponse(f"/ledger/manufacturers/{mfr_name}", 303)
+
+
+# ── Dealer Ledger ─────────────────────────────────────────────────────────────
+
+@router.get("/dealers")
+async def dealer_ledger_list(request: Request):
+    user = auth.require_admin(request)
+    dealers = [u for u in udb.all_users() if u["role"] == "dealer"]
+    balances = fdb.all_dealer_balances()
+    return templates.TemplateResponse(request, "ledger_dealer_list.html", {
+        "user": user,
+        "dealers": dealers,
+        "balances": balances,
+        "active_page": "ledger_dealers",
+    })
+
+
+@router.get("/dealers/{dealer_id}")
+async def dealer_ledger(request: Request, dealer_id: int):
+    user = auth.require_admin(request)
+    from db.users import by_id as user_by_id
+    dealer = user_by_id(dealer_id)
+    if not dealer:
+        return RedirectResponse("/ledger/dealers", 303)
+    txns = fdb.get_dealer_txns(dealer_id)
+    balance = fdb.dealer_balance(dealer_id)
+    return templates.TemplateResponse(request, "ledger_dealer.html", {
+        "user": user,
+        "dealer": dealer,
+        "txns": txns,
+        "balance": balance,
+        "currencies": CURRENCIES,
+        "payment_methods": PAYMENT_METHODS,
+        "active_page": "ledger_dealers",
+    })
+
+
+@router.post("/dealers/{dealer_id}/add")
+async def add_dealer_txn(request: Request, dealer_id: int,
+                         txn_type: str = Form(...),
+                         amount: float = Form(...),
+                         currency: str = Form("USD"),
+                         description: str = Form(""),
+                         payment_method: str = Form(""),
+                         txn_date: str = Form("")):
+    auth.require_admin(request)
+    if not txn_date:
+        txn_date = datetime.date.today().isoformat()
+    fdb.add_dealer_txn(dealer_id, txn_type, amount, currency, description, payment_method, txn_date)
+    return RedirectResponse(f"/ledger/dealers/{dealer_id}", 303)
+
+
+@router.post("/dealers/txn/delete")
+async def del_dealer_txn(request: Request,
+                         id: int = Form(...),
+                         dealer_id: int = Form(...)):
+    auth.require_admin(request)
+    fdb.del_dealer_txn(id)
+    return RedirectResponse(f"/ledger/dealers/{dealer_id}", 303)
