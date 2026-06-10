@@ -13,7 +13,7 @@ async def login_page(request: Request):
     u = auth.get_user(request)
     if u and u["is_approved"] and u["is_active"]:
         return RedirectResponse("/", 303)
-    return templates.TemplateResponse(request, "login.html", {
+    return templates.TemplateResponse(request, "login.html", {})
 
 
 @router.post("/auth/login")
