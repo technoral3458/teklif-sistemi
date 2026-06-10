@@ -240,6 +240,7 @@ def _build_menu(user: dict) -> list:
         menu.append(("customers", _("menu_customers")))
         menu.append(("offers", _("menu_offers")))
         menu.append(("orders", _("menu_orders")))
+        menu.append(("customer_ledger", "💳 Müşteri Cari"))
 
     if role in ("admin", "manufacturer"):
         menu.append(("models", _("menu_models")))
@@ -248,6 +249,7 @@ def _build_menu(user: dict) -> list:
 
     if role == "admin":
         menu.append(("dealers", _("menu_dealers")))
+        menu.append(("manufacturer_ledger", "🏭 Üretici Hesapları"))
 
     if user.get("can_view_costs") or role == "admin":
         menu.append(("costs", _("menu_costs")))
@@ -291,6 +293,20 @@ def main():
     elif page == "orders":
         from pages import orders
         orders.show(user)
+
+    elif page == "customer_ledger":
+        if user["role"] in ("dealer", "admin"):
+            from pages import customer_ledger
+            customer_ledger.show(user)
+        else:
+            st.error("Bu sayfaya erişim yetkiniz yok.")
+
+    elif page == "manufacturer_ledger":
+        if user["role"] == "admin":
+            from pages import manufacturer_ledger
+            manufacturer_ledger.show(user)
+        else:
+            st.error("Bu sayfaya erişim yetkiniz yok.")
 
     elif page == "models":
         from pages import models

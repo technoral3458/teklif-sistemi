@@ -154,6 +154,44 @@ def init():
             )
         """)
 
+        # ── Cari / Hesap Takibi ──────────────────────────────────────
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS customer_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_id INTEGER NOT NULL,
+                txn_type TEXT NOT NULL,
+                amount REAL DEFAULT 0.0,
+                currency TEXT DEFAULT 'USD',
+                description TEXT DEFAULT '',
+                offer_id INTEGER DEFAULT 0,
+                payment_method TEXT DEFAULT '',
+                reference_no TEXT DEFAULT '',
+                due_date TEXT DEFAULT '',
+                txn_date TEXT DEFAULT (date('now')),
+                user_id INTEGER DEFAULT 0,
+                notes TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS manufacturer_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                manufacturer_id INTEGER NOT NULL,
+                txn_type TEXT NOT NULL,
+                amount REAL DEFAULT 0.0,
+                currency TEXT DEFAULT 'USD',
+                description TEXT DEFAULT '',
+                model_id INTEGER DEFAULT 0,
+                payment_method TEXT DEFAULT '',
+                reference_no TEXT DEFAULT '',
+                due_date TEXT DEFAULT '',
+                txn_date TEXT DEFAULT (date('now')),
+                notes TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
         conn.commit()
 
 
@@ -595,3 +633,166 @@ def get_stats(user_id: int = None, role: str = "admin") -> dict:
             ).fetchone()[0]
         models = conn.execute("SELECT COUNT(*) FROM models").fetchone()[0]
     return {"customers": customers, "offers": offers, "models": models, "orders": orders}
+
+
+# ── Customer Transactions (Müşteri Cari) ─────────────────────────────
+
+def _row_to_ctxn(row) -> dict:
+    return {
+        "id": row[0], "customer_id": row[1], "txn_type": row[2],
+        "amount": row[3], "currency": row[4], "description": row[5],
+        "offer_id": row[6], "payment_method": row[7], "reference_no": row[8],
+        "due_date": row[9], "txn_date": row[10], "user_id": row[11],
+        "notes": row[12], "created_at": row[13],
+    }
+
+_CTXN_COLS = ("id, customer_id, txn_type, amount, currency, description, "
+              "offer_id, payment_method, reference_no, due_date, txn_date, "
+              "user_id, notes, created_at")
+
+
+def get_customer_transactions(customer_id: int = None, user_id: int = None) -> list:
+    q = f"SELECT {_CTXN_COLS} FROM customer_transactions WHERE 1=1"
+    params = []
+    if customer_id:
+        q += " AND customer_id=?"; params.append(customer_id)
+    if user_id:
+        q += " AND user_id=?"; params.append(user_id)
+    q += " ORDER BY txn_date DESC, id DESC"
+    with _conn() as conn:
+        rows = conn.execute(q, params).fetchall()
+    return [_row_to_ctxn(r) for r in rows]
+
+
+def add_customer_transaction(customer_id: int, txn_type: str, amount: float,
+                              currency: str = "USD", **kwargs) -> int:
+    allowed = ["description", "offer_id", "payment_method", "reference_no",
+               "due_date", "txn_date", "user_id", "notes"]
+    fields = {"customer_id": customer_id, "txn_type": txn_type,
+              "amount": amount, "currency": currency}
+    for k in allowed:
+        if k in kwargs:
+            fields[k] = kwargs[k]
+    cols = ", ".join(fields.keys())
+    ph = ", ".join("?" * len(fields))
+    with _conn() as conn:
+        cur = conn.execute(f"INSERT INTO customer_transactions ({cols}) VALUES ({ph})",
+                           list(fields.values()))
+        conn.commit()
+        return cur.lastrowid
+
+
+def delete_customer_transaction(txn_id: int):
+    with _conn() as conn:
+        conn.execute("DELETE FROM customer_transactions WHERE id=?", (txn_id,))
+        conn.commit()
+
+
+def get_customer_balance(customer_id: int, currency: str = None) -> dict:
+    with _conn() as conn:
+        q = ("SELECT txn_type, SUM(amount) FROM customer_transactions "
+             "WHERE customer_id=?")
+        params = [customer_id]
+        if currency:
+            q += " AND currency=?"; params.append(currency)
+        q += " GROUP BY txn_type"
+        rows = conn.execute(q, params).fetchall()
+    totals = {"debit": 0.0, "credit": 0.0}
+    for row in rows:
+        totals[row[0]] = float(row[1] or 0)
+    balance = totals["debit"] - totals["credit"]
+    return {
+        "total_debit": totals["debit"],
+        "total_credit": totals["credit"],
+        "balance": balance,
+    }
+
+
+def get_all_customer_balances(user_id: int = None, role: str = "admin") -> list:
+    customers = get_customers(user_id=user_id, role=role)
+    result = []
+    with _conn() as conn:
+        for c in customers:
+            rows = conn.execute(
+                "SELECT txn_type, SUM(amount), currency FROM customer_transactions "
+                "WHERE customer_id=? GROUP BY txn_type, currency",
+                (c["id"],)
+            ).fetchall()
+            by_currency = {}
+            for row in rows:
+                cur = row[2] or "USD"
+                if cur not in by_currency:
+                    by_currency[cur] = {"debit": 0.0, "credit": 0.0}
+                by_currency[cur][row[0]] = float(row[1] or 0)
+            result.append({**c, "balances": by_currency})
+    return result
+
+
+# ── Manufacturer Transactions (Üretici Hesap Takibi) ─────────────────
+
+def _row_to_mtxn(row) -> dict:
+    return {
+        "id": row[0], "manufacturer_id": row[1], "txn_type": row[2],
+        "amount": row[3], "currency": row[4], "description": row[5],
+        "model_id": row[6], "payment_method": row[7], "reference_no": row[8],
+        "due_date": row[9], "txn_date": row[10], "notes": row[11], "created_at": row[12],
+    }
+
+_MTXN_COLS = ("id, manufacturer_id, txn_type, amount, currency, description, "
+              "model_id, payment_method, reference_no, due_date, txn_date, notes, created_at")
+
+
+def get_manufacturer_transactions(manufacturer_id: int = None) -> list:
+    q = f"SELECT {_MTXN_COLS} FROM manufacturer_transactions WHERE 1=1"
+    params = []
+    if manufacturer_id:
+        q += " AND manufacturer_id=?"; params.append(manufacturer_id)
+    q += " ORDER BY txn_date DESC, id DESC"
+    with _conn() as conn:
+        rows = conn.execute(q, params).fetchall()
+    return [_row_to_mtxn(r) for r in rows]
+
+
+def add_manufacturer_transaction(manufacturer_id: int, txn_type: str, amount: float,
+                                  currency: str = "USD", **kwargs) -> int:
+    allowed = ["description", "model_id", "payment_method", "reference_no",
+               "due_date", "txn_date", "notes"]
+    fields = {"manufacturer_id": manufacturer_id, "txn_type": txn_type,
+              "amount": amount, "currency": currency}
+    for k in allowed:
+        if k in kwargs:
+            fields[k] = kwargs[k]
+    cols = ", ".join(fields.keys())
+    ph = ", ".join("?" * len(fields))
+    with _conn() as conn:
+        cur = conn.execute(f"INSERT INTO manufacturer_transactions ({cols}) VALUES ({ph})",
+                           list(fields.values()))
+        conn.commit()
+        return cur.lastrowid
+
+
+def delete_manufacturer_transaction(txn_id: int):
+    with _conn() as conn:
+        conn.execute("DELETE FROM manufacturer_transactions WHERE id=?", (txn_id,))
+        conn.commit()
+
+
+def get_manufacturer_balance(manufacturer_id: int, currency: str = None) -> dict:
+    with _conn() as conn:
+        q = ("SELECT txn_type, SUM(amount) FROM manufacturer_transactions "
+             "WHERE manufacturer_id=?")
+        params = [manufacturer_id]
+        if currency:
+            q += " AND currency=?"; params.append(currency)
+        q += " GROUP BY txn_type"
+        rows = conn.execute(q, params).fetchall()
+    totals = {"purchase": 0.0, "payment": 0.0}
+    for row in rows:
+        if row[0] in totals:
+            totals[row[0]] = float(row[1] or 0)
+    owed = totals["purchase"] - totals["payment"]
+    return {
+        "total_purchase": totals["purchase"],
+        "total_payment": totals["payment"],
+        "balance_owed": owed,
+    }
