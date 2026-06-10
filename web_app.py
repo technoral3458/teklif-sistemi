@@ -829,6 +829,7 @@ if not st.session_state.logged_in:
 # MOBİL ÜST MENÜ
 # =====================================================================
 if IS_MOBILE:
+    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
     _role_color = {"admin": "#dc2626", "manufacturer": "#d97706"}.get(st.session_state.user_role, "#2563eb")
     _u_init = (st.session_state.user_email or "U")[0].upper()
     _hi = "✕" if st.session_state.mobile_menu_open else "☰"
