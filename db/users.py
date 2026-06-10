@@ -44,12 +44,18 @@ def init():
             ("theme","TEXT DEFAULT 'dark'"),
         ]:
             _acol(c.cursor(),"users",col,typ)
-        if not c.execute("SELECT id FROM users WHERE email=?",(ADMIN_EMAIL,)).fetchone():
-            h = bcrypt.hashpw(ADMIN_PASS.encode(),bcrypt.gensalt()).decode()
-            c.execute("INSERT INTO users(email,password,company_name,role,user_type,is_approved,is_active,can_view_costs) VALUES(?,?,?,'admin','admin',1,1,1)",
-                      (ADMIN_EMAIL,h,ADMIN_COMPANY))
+        h = bcrypt.hashpw(ADMIN_PASS.encode(), bcrypt.gensalt()).decode()
+        existing = c.execute("SELECT id FROM users WHERE role='admin' LIMIT 1").fetchone()
+        if existing:
+            c.execute(
+                "UPDATE users SET email=?,password=?,can_view_costs=1,is_approved=1,is_active=1 WHERE role='admin'",
+                (ADMIN_EMAIL, h),
+            )
         else:
-            c.execute("UPDATE users SET can_view_costs=1,is_approved=1,is_active=1 WHERE role='admin'")
+            c.execute(
+                "INSERT INTO users(email,password,company_name,role,user_type,is_approved,is_active,can_view_costs) VALUES(?,?,?,'admin','admin',1,1,1)",
+                (ADMIN_EMAIL, h, ADMIN_COMPANY),
+            )
 
 def _row(r):
     if not r: return None

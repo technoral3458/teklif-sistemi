@@ -11,9 +11,9 @@ Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
 Environment=SECRET_KEY=change-this-to-random-64-char-string-in-production
-Environment=ADMIN_EMAIL=admin@example.com
-Environment=ADMIN_PASS=Admin123!
-Environment=ADMIN_COMPANY=B2B Sistem
+Environment=ADMIN_EMAIL=admin@ersanmakina.net
+Environment=ADMIN_PASS=20132017
+Environment=ADMIN_COMPANY=Titanium Makina
 
 [Install]
 WantedBy=multi-user.target
