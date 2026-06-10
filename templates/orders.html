@@ -1,47 +1,52 @@
 {% extends "base.html" %}
 {% block page_title %}Siparişler{% endblock %}
 
+{% set STATUS_COLOR = {
+  'Sipariş Verildi': 'blue',
+  'Admin Onaylı': 'amber',
+  'Üretimde': 'amber',
+  'Tamamlandı': 'green',
+  'Teslim Edildi': 'green',
+  'İptal': 'red'
+} %}
+
 {% block content %}
 <div class="card">
-  <div class="card-header">
-    <h3 class="card-title">Siparişler</h3>
-    <span style="font-size:13px;color:var(--text-muted);">"Sipariş Verildi" durumundaki teklifler</span>
-  </div>
   <div class="table-wrap">
-    <table id="mainTable">
+    <table>
       <thead>
         <tr>
-          <th>Teklif No</th>
+          <th>No</th>
           <th>Müşteri</th>
           <th>Model</th>
           <th>Adet</th>
           <th>Tutar</th>
-          <th>Sipariş Tarihi</th>
-          <th>İşlemler</th>
+          {% if user.role == 'admin' %}<th>Bayi</th>{% endif %}
+          {% if user.role in ('admin','dealer') %}<th>Üretici</th>{% endif %}
+          <th>Durum</th>
+          <th>Tarih</th>
+          <th>İşlem</th>
         </tr>
       </thead>
       <tbody>
         {% for o in orders %}
         <tr>
-          <td><code>{{ o.offer_no }}</code></td>
+          <td><a href="/orders/{{ o.id }}" style="color:var(--primary)">{{ o.offer_no or o.id }}</a></td>
           <td>{{ o.customer_name }}</td>
           <td>{{ o.model_name }}</td>
           <td>{{ o.machine_count }}</td>
-          <td><strong>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</strong></td>
+          <td>{{ "%.0f"|format(o.total_price) }} {{ o.currency }}</td>
+          {% if user.role == 'admin' %}<td>{{ o.dealer_name }}</td>{% endif %}
+          {% if user.role in ('admin','dealer') %}<td>{{ o.manufacturer_name }}</td>{% endif %}
+          <td><span class="badge badge-{{ STATUS_COLOR.get(o.status, 'blue') }}">{{ o.status }}</span></td>
           <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
-          <td>
-            <a href="/offers/{{ o.id }}" class="btn btn-ghost btn-sm">Görüntüle</a>
-          </td>
+          <td><a href="/orders/{{ o.id }}" class="btn btn-outline btn-sm">Detay</a></td>
         </tr>
         {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">Henüz sipariş yok</td></tr>
+        <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:32px">Henüz sipariş yok</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>document.addEventListener('DOMContentLoaded', () => initTableSearch('', 'mainTable'));</script>
 {% endblock %}

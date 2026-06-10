@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block page_title %}Bayi Cari{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Firma Adı</th>
+          <th>E-posta</th>
+          <th>Bakiye</th>
+          <th>İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in dealers %}
+        <tr>
+          <td><strong>{{ d.company_name or d.email }}</strong></td>
+          <td>{{ d.email }}</td>
+          <td>
+            {% set bal = balances.get(d.id, 0) %}
+            <span style="font-weight:600;color:{% if bal > 0 %}var(--danger){% elif bal < 0 %}var(--success){% else %}inherit{% endif %}">
+              {{ "%.2f"|format(bal) }}
+            </span>
+          </td>
+          <td>
+            <a href="/ledger/dealers/{{ d.id }}" class="btn btn-outline btn-sm">Cari Görüntüle</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:32px">Kayıtlı bayi yok</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
