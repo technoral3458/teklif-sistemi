@@ -3,6 +3,16 @@ import streamlit.components.v1 as components
 import customer_pages, model_management, offer_wizard, dealer_management, proforma_invoice, orders_page, offer_management, profile_settings
 import profit_management
 import sqlite3, pandas as pd, hashlib, random, smtplib, uuid, os, base64, datetime
+try:
+    import backup_management
+    _HAS_BACKUP = True
+except ImportError:
+    _HAS_BACKUP = False
+try:
+    import credit_calculator
+    _HAS_CREDIT = True
+except ImportError:
+    _HAS_CREDIT = False
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import ntpath, posixpath
@@ -52,6 +62,7 @@ DICTIONARY = {
         "m_past": "📋 Geçmiş Tekliflerim", "m_order": "📦 Siparişler", "m_prof": "⚙️ Profil Ayarlarım",
         "m_deal": "🏢 Bayi Yönetimi", "m_model": "📦 Tüm Modelleri Yönet",
         "m_profit": "💰 Maliyet / Kârlılık",
+        "m_backup": "🗄️ Yedekleme", "m_leads": "📨 Teklif Talepleri", "m_credit": "💳 Kredi Hesapla",
         "logout": "🚪 Sistemi Kapat", "lang_sel": "Sistem Dili / Language",
         "role_admin": "Sistem Yöneticisi", "role_dealer": "Satıcı Bayi", "role_manuf": "Üretici"
     },
@@ -70,6 +81,7 @@ DICTIONARY = {
         "m_past": "📋 Past Offers", "m_order": "📦 Orders", "m_prof": "⚙️ Profile Settings",
         "m_deal": "🏢 Dealer Management", "m_model": "📦 Manage Models",
         "m_profit": "💰 Cost / Profit",
+        "m_backup": "🗄️ Backup", "m_leads": "📨 Offer Requests", "m_credit": "💳 Credit Calc",
         "logout": "🚪 Logout", "lang_sel": "System Language",
         "role_admin": "System Admin", "role_dealer": "Dealer", "role_manuf": "Manufacturer"
     },
@@ -88,6 +100,7 @@ DICTIONARY = {
         "m_past": "📋 历史报价", "m_order": "📦 订单", "m_prof": "⚙️ 个人资料设置",
         "m_deal": "🏢 经销商管理", "m_model": "📦 管理所有型号",
         "m_profit": "💰 成本 / 利润",
+        "m_backup": "🗄️ 备份管理", "m_leads": "📨 询价请求", "m_credit": "💳 贷款计算",
         "logout": "🚪 退出系统", "lang_sel": "系统语言 (Language)",
         "role_admin": "系统管理员", "role_dealer": "经销商", "role_manuf": "制造商"
     }
@@ -818,21 +831,20 @@ if not st.session_state.logged_in:
 if IS_MOBILE:
     _role_color = {"admin": "#dc2626", "manufacturer": "#d97706"}.get(st.session_state.user_role, "#2563eb")
     _u_init = (st.session_state.user_email or "U")[0].upper()
-    _r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
-    _tb1, _tb2, _tb3 = st.columns([1, 5, 1], vertical_alignment="center")
+    _hi = "✕" if st.session_state.mobile_menu_open else "☰"
+    if st.session_state.mobile_menu_open:
+        _page_label = "Menü" if st.session_state.lang == "tr" else "Menu"
+    else:
+        _page_label = st.session_state.get("active_tab", "")
+    _tb1, _tb2 = st.columns([1, 6])
     with _tb1:
-        _hi = "✕" if st.session_state.mobile_menu_open else "☰"
         if st.button(_hi, key="mobile_hamburger_btn", use_container_width=True):
             st.session_state.mobile_menu_open = not st.session_state.mobile_menu_open
-            st.rerun()
     with _tb2:
-        if st.session_state.mobile_menu_open:
-            _page_label = "Menü" if st.session_state.lang == "tr" else "Menu"
-        else:
-            _page_label = st.session_state.get("active_tab", "")
-        st.markdown(f"<div style='text-align:center;font-size:14px;font-weight:900;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;'>{_page_label}</div>", unsafe_allow_html=True)
-    with _tb3:
-        st.markdown(f"<div style='width:34px;height:34px;border-radius:50%;background:{_role_color};color:white;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;margin:0 auto;'>{_u_init}</div>", unsafe_allow_html=True)
+        st.markdown(f"""<div style='display:flex;align-items:center;justify-content:space-between;height:100%;padding:4px 0;'>
+            <div style='font-size:14px;font-weight:900;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{_page_label}</div>
+            <div style='width:34px;height:34px;border-radius:50%;background:{_role_color};color:white;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;'>{_u_init}</div>
+        </div>""", unsafe_allow_html=True)
     st.markdown("<hr style='margin:4px 0 12px 0;border:none;border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
 # =====================================================================
@@ -895,10 +907,13 @@ if show_sidebar:
                 _("m_deal"),
                 _("m_model"),
                 _("m_profit"),
+                _("m_backup"),
+                _("m_leads"),
+                _("m_credit"),
             ]
         else:
             allowed = st.session_state.allowed_menus.split(",") if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
-            v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model", "m_profit"]
+            v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model", "m_profit", "m_backup", "m_leads", "m_credit"]
             menu_items_labels = [_(k.strip()) for k in allowed if k.strip() in v_keys]
 
         if not menu_items_labels:
@@ -972,6 +987,23 @@ elif _("m_prof") in act_tab:
 
 elif _("m_profit") in act_tab:
     profit_management.show_profit_management(st.session_state.user_role)
+
+elif _("m_backup") in act_tab:
+    if _HAS_BACKUP:
+        backup_management.show_backup_management()
+    else:
+        st.info("Yedekleme modülü yükleniyor...")
+
+elif _("m_leads") in act_tab:
+    st.markdown("## 📨 Teklif Talepleri")
+    st.info("Teklif talepleri modülü yükleniyor...")
+
+elif _("m_credit") in act_tab:
+    if _HAS_CREDIT:
+        credit_calculator.show_credit_calculator()
+    else:
+        st.markdown("## 💳 Kredi Hesaplama")
+        st.info("Kredi hesaplama modülü yükleniyor...")
 
 elif _("m_dash") in act_tab:
     conn_s = sqlite3.connect("sales_data.db")
