@@ -484,9 +484,8 @@ header[data-testid="stHeader"] { background: transparent; }
 }
 [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"],
 [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
-    background: #1d4ed8 !important;
-    border-color: #1d4ed8 !important;
-    box-shadow: 0 2px 8px rgba(29,78,216,.25) !important;
+    background: #2563eb !important;
+    border-color: #2563eb !important;
 }
 [data-testid="stSidebar"] div[role="radiogroup"] > label p {
     font-size: 16px !important;
@@ -523,28 +522,17 @@ header[data-testid="stHeader"] { background: transparent; }
 
 .mobile-topbar { display: none; }
 
-.mob-topbar-avatar {
-    width: 32px; height: 32px; border-radius: 50%;
-    color: white; font-size: 13px; font-weight: 900;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+.mobile-menu-note {
+    text-align: center !important;
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 15px !important;
+    padding: 12px 14px !important;
+    font-size: 13px !important;
+    font-weight: 700;
+    margin-bottom: 18px !important;
 }
-.mob-topbar-page {
-    font-size: 14px; font-weight: 900; color: #0f172a;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    text-align: center; flex: 1;
-}
-.mob-user-card {
-    display: flex; align-items: center; gap: 12px;
-    background: #f8fafc; border: 1px solid #e2e8f0;
-    border-radius: 14px; padding: 14px 16px; margin-bottom: 16px;
-}
-.mob-user-av {
-    width: 42px; height: 42px; border-radius: 50%;
-    color: white; font-size: 17px; font-weight: 900;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.mob-user-email { font-size: 13px; font-weight: 800; color: #0f172a; overflow: hidden; text-overflow: ellipsis; }
-.mob-user-role { margin-top: 4px; }
 
 .mobile-login-shell { width: 100%; max-width: 520px; margin: 0 auto; }
 .mobile-login-logo-card {
@@ -604,6 +592,16 @@ header[data-testid="stHeader"] { background: transparent; }
     }
     input, textarea { font-size: 16px !important; }
     .dash-card { text-align: center; margin-bottom: 10px; }
+    /* Hamburger butonu küçük tut */
+    div[data-testid="stVerticalBlock"] > div:first-child .stButton > button {
+        min-height: 40px !important;
+        border-radius: 10px !important;
+        font-size: 18px !important;
+        background: #f1f5f9 !important;
+        border: 1.5px solid #e2e8f0 !important;
+        color: #0f172a !important;
+        padding: 2px !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -815,29 +813,27 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# KULLANICI BİLGİSİ (mobil üst bar + sidebar için ortak)
-# =====================================================================
-r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
-role_color = {"admin": "#dc2626", "manufacturer": "#d97706"}.get(st.session_state.user_role, "#2563eb")
-u_init = (st.session_state.user_email or "U")[0].upper()
-
-# =====================================================================
 # MOBİL ÜST MENÜ
 # =====================================================================
 if IS_MOBILE:
-    tb1, tb2, tb3 = st.columns([1, 5, 1], vertical_alignment="center")
-    with tb1:
-        ham_icon = "✕" if st.session_state.mobile_menu_open else "☰"
-        if st.button(ham_icon, key="mobile_hamburger_btn", use_container_width=True):
+    _role_color = {"admin": "#dc2626", "manufacturer": "#d97706"}.get(st.session_state.user_role, "#2563eb")
+    _u_init = (st.session_state.user_email or "U")[0].upper()
+    _r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
+    _tb1, _tb2, _tb3 = st.columns([1, 5, 1], vertical_alignment="center")
+    with _tb1:
+        _hi = "✕" if st.session_state.mobile_menu_open else "☰"
+        if st.button(_hi, key="mobile_hamburger_btn", use_container_width=True):
             st.session_state.mobile_menu_open = not st.session_state.mobile_menu_open
             st.rerun()
-    with tb2:
-        active_label = st.session_state.get("active_tab", "B2B Portal")
-        page_label = ("Menü" if st.session_state.lang == "tr" else "Menu") if st.session_state.mobile_menu_open else active_label
-        st.markdown(f"<div class='mob-topbar-page'>{page_label}</div>", unsafe_allow_html=True)
-    with tb3:
-        st.markdown(f"<div class='mob-topbar-avatar' style='background:{role_color};'>{u_init}</div>", unsafe_allow_html=True)
-    st.markdown("<hr style='margin:4px 0 14px 0; border:none; border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
+    with _tb2:
+        if st.session_state.mobile_menu_open:
+            _page_label = "Menü" if st.session_state.lang == "tr" else "Menu"
+        else:
+            _page_label = st.session_state.get("active_tab", "")
+        st.markdown(f"<div style='text-align:center;font-size:14px;font-weight:900;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;'>{_page_label}</div>", unsafe_allow_html=True)
+    with _tb3:
+        st.markdown(f"<div style='width:34px;height:34px;border-radius:50%;background:{_role_color};color:white;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;margin:0 auto;'>{_u_init}</div>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:4px 0 12px 0;border:none;border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
 # =====================================================================
 # SIDEBAR
@@ -858,18 +854,21 @@ if show_sidebar:
             sidebar_logo = get_system_logo()
 
         if sidebar_logo and sidebar_logo.startswith("data:image"):
-            st.markdown(f"<div style='text-align:center; margin-bottom:14px; padding:8px 0;'><img src='{sidebar_logo}' style='max-width:90%; max-height:52px; object-fit:contain;'></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center;margin-bottom:12px;padding:8px 0;'><img src='{sidebar_logo}' style='max-width:90%;max-height:52px;object-fit:contain;'></div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div style='text-align:center; margin-bottom:14px; padding:8px 0; font-weight:900; font-size:17px; color:#1e293b;'>{sidebar_text}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center;margin-bottom:12px;padding:8px 0;font-weight:900;font-size:17px;color:#1e293b;'>{sidebar_text}</div>", unsafe_allow_html=True)
 
+        r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
+        role_color = {"admin": "#dc2626", "manufacturer": "#d97706"}.get(st.session_state.user_role, "#2563eb")
+        u_init = (st.session_state.user_email or "U")[0].upper()
         st.markdown(f"""
-        <div class='mob-user-card'>
-            <div class='mob-user-av' style='background:{role_color};'>{u_init}</div>
-            <div style='overflow:hidden; flex:1;'>
-                <div class='mob-user-email'>{st.session_state.user_email}</div>
-                <div class='mob-user-role'>
-                    <span style='background:{role_color}22; color:{role_color}; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:800;'>{r_text}</span>
-                </div>
+        <div style='background:#f8fafc;padding:12px;border-radius:14px;border:1px solid #e2e8f0;margin-bottom:18px;display:flex;align-items:center;gap:10px;'>
+            <div style='background:{role_color};color:white;border-radius:50%;min-width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;flex-shrink:0;'>
+                {u_init}
+            </div>
+            <div style='overflow:hidden;flex:1;'>
+                <div style='font-size:12px;font-weight:800;color:#0f172a;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;'>{st.session_state.user_email}</div>
+                <div style='margin-top:3px;'><span style='background:{role_color}22;color:{role_color};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:800;'>{r_text}</span></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -921,14 +920,14 @@ if show_sidebar:
 
         st.radio("MENÜ", menu_items_labels, index=current_idx, key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
 
-        st.markdown("<hr style='margin:15px 0; border:none; border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin:14px 0;border:none;border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
-        lc1, lc2, lc3 = st.columns(3)
-        for col, (lkey, lval) in zip([lc1, lc2, lc3], [("tr", "🇹🇷 TR"), ("en", "🇬🇧 EN"), ("zh", "🇨🇳 ZH")]):
-            with col:
-                if st.button(lval, key=f"sb_lang_{lkey}", use_container_width=True,
-                             type="primary" if st.session_state.lang == lkey else "secondary"):
-                    st.session_state.lang = lkey
+        _lc1, _lc2, _lc3 = st.columns(3)
+        for _col, (_lk, _lv) in zip([_lc1, _lc2, _lc3], [("tr", "🇹🇷 TR"), ("en", "🇬🇧 EN"), ("zh", "🇨🇳 ZH")]):
+            with _col:
+                if st.button(_lv, key=f"sb_lang_{_lk}", use_container_width=True,
+                             type="primary" if st.session_state.lang == _lk else "secondary"):
+                    st.session_state.lang = _lk
                     st.rerun()
 
         st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
