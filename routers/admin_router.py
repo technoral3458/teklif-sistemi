@@ -18,7 +18,7 @@ templates = Jinja2Templates(directory="templates")
 @router.get("")
 async def admin_page(request: Request):
     user = auth.require_admin(request)
-    users = udb.all_users()
+    users = [u for u in udb.all_users() if u["role"] == "admin"]
     company = fdb.get_company()
     categories = fdb.get_cats()
     return templates.TemplateResponse(request, "admin.html", {

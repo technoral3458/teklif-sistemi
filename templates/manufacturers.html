@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block page_title %}Üreticiler{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+  <div class="tabs" style="margin-bottom:0;">
+    <button class="tab-btn active" data-tab="tab-pending" onclick="switchTab('tab-pending')">
+      Bekleyenler
+      {% set pcount = manufacturers|selectattr('is_approved','eq',0)|list|length %}
+      {% if pcount > 0 %}<span class="badge badge-amber" style="margin-left:6px">{{ pcount }}</span>{% endif %}
+    </button>
+    <button class="tab-btn" data-tab="tab-approved" onclick="switchTab('tab-approved')">Onaylılar</button>
+    <button class="tab-btn" data-tab="tab-all" onclick="switchTab('tab-all')">Tümü</button>
+  </div>
+  <a href="/ledger/manufacturers" class="btn btn-outline btn-sm">📒 Cari Hesap</a>
+</div>
+
+{% macro mfr_table(mfr_list) %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Firma Adı</th>
+        <th>E-posta</th>
+        <th>Durum</th>
+        <th>Kayıt Tarihi</th>
+        <th>İşlemler</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in mfr_list %}
+      <tr>
+        <td><strong>{{ m.company_name or m.email }}</strong></td>
+        <td>{{ m.email }}</td>
+        <td>
+          {% if m.is_approved and m.is_active %}
+            <span class="badge badge-green">Aktif</span>
+          {% elif not m.is_approved %}
+            <span class="badge badge-amber">Bekliyor</span>
+          {% else %}
+            <span class="badge badge-red">Pasif</span>
+          {% endif %}
+        </td>
+        <td>{{ m.created_at[:10] if m.created_at else '-' }}</td>
+        <td>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            {% if not m.is_approved %}
+            <form method="post" action="/manufacturers/approve" style="display:inline;">
+              <input type="hidden" name="id" value="{{ m.id }}" />
+              <button type="submit" class="btn btn-success btn-sm">Onayla</button>
+            </form>
+            {% else %}
+            <form method="post" action="/manufacturers/reject" style="display:inline;">
+              <input type="hidden" name="id" value="{{ m.id }}" />
+              <button type="submit" class="btn btn-outline btn-sm">Pasif Yap</button>
+            </form>
+            {% endif %}
+            <button class="btn btn-ghost btn-sm"
+              onclick="editMfr({{ m.id }}, '{{ m.company_name|e }}', {{ m.can_view_costs or 0 }}, '{{ m.allowed_categories|e }}')">
+              ✏️ Düzenle
+            </button>
+            <form method="post" action="/manufacturers/delete" onsubmit="return confirmDelete(this)" data-confirm="Bu üreticiyi silmek istiyor musunuz?">
+              <input type="hidden" name="id" value="{{ m.id }}" />
+              <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">Kayıt bulunamadı</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+<div id="tab-pending" class="tab-pane card">
+  {{ mfr_table(manufacturers|selectattr('is_approved','eq',0)|list) }}
+</div>
+<div id="tab-approved" class="tab-pane card" style="display:none;">
+  {{ mfr_table(manufacturers|selectattr('is_approved','eq',1)|list) }}
+</div>
+<div id="tab-all" class="tab-pane card" style="display:none;">
+  {{ mfr_table(manufacturers) }}
+</div>
+
+<!-- Edit Modal -->
+<div id="mfrEditModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Üretici Düzenle</h3>
+      <button class="modal-close" onclick="closeModal('mfrEditModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/manufacturers/save">
+        <input type="hidden" name="id" id="meid" value="" />
+        <div class="form-group">
+          <label class="form-label">Firma Adı</label>
+          <input type="text" name="company_name" id="mecompany" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">İzinli Kategoriler (virgülle ayırın)</label>
+          <input type="text" name="allowed_categories" id="mecat" class="form-control" placeholder="Tüm kategoriler için boş bırakın" />
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="can_view_costs" id="mecosts" value="1" />
+            <span>Maliyet bilgilerini görebilir</span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('mfrEditModal')">İptal</button>
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editMfr(id, company, canCosts, cats) {
+  document.getElementById('meid').value = id;
+  document.getElementById('mecompany').value = company;
+  document.getElementById('mecosts').checked = !!canCosts;
+  document.getElementById('mecat').value = cats;
+  openModal('mfrEditModal');
+}
+</script>
+{% endblock %}
