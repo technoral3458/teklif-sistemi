@@ -437,63 +437,27 @@ st.markdown("""
 .block-container { padding-top: 1.4rem; }
 header[data-testid="stHeader"] { background: transparent; }
 
-.stTabs [data-baseweb="tab-list"] {
-    justify-content: center; gap: 4px; margin-bottom: 20px;
-    background: #f1f5f9; border-radius: 12px; padding: 4px;
-}
+.stTabs [data-baseweb="tab-list"] { justify-content: center; gap: 8px; margin-bottom: 20px; }
 .stTabs [data-baseweb="tab"] {
     background-color: transparent;
-    border-radius: 9px;
-    padding: 9px 18px !important;
-    font-size: 13px !important;
+    border-radius: 10px;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
     font-weight: 700;
     color: #64748b;
-    border: none !important;
-    flex: 1;
-    justify-content: center;
+    border: 1px solid transparent;
 }
 .stTabs [aria-selected="true"] {
-    background-color: #ffffff !important;
-    color: #0f172a !important;
-    box-shadow: 0 1px 4px rgba(15,23,42,0.12) !important;
-}
-
-/* Input alanları */
-[data-testid="stTextInput"] > div > div > input {
-    border-radius: 10px !important;
-    border: 1.5px solid #e2e8f0 !important;
-    background: #f8fafc !important;
-    padding: 10px 14px !important;
-    font-size: 14px !important;
-    transition: border-color .2s, box-shadow .2s !important;
-}
-[data-testid="stTextInput"] > div > div > input:focus {
+    background-color: #2563eb !important;
+    color: white !important;
     border-color: #2563eb !important;
-    background: #fff !important;
-    box-shadow: 0 0 0 3px rgba(37,99,235,.1) !important;
-}
-[data-testid="stTextInput"] label {
-    font-size: 12px !important;
-    font-weight: 700 !important;
-    color: #475569 !important;
-    margin-bottom: 3px !important;
 }
 
-/* Buton */
-[data-testid="stButton"] button[kind="primary"] {
-    border-radius: 10px !important;
-    font-size: 14px !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.3px !important;
-    padding: 12px 20px !important;
-    background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
-    border: none !important;
-    box-shadow: 0 4px 14px rgba(37,99,235,.3) !important;
-    transition: transform .15s, box-shadow .15s !important;
-}
-[data-testid="stButton"] button[kind="primary"]:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 20px rgba(37,99,235,.4) !important;
+.login-desktop-title {
+    text-align: center;
+    color: #0f172a;
+    margin-bottom: 30px;
+    font-weight: 900;
 }
 
 [data-testid="stSidebar"] {
@@ -520,8 +484,9 @@ header[data-testid="stHeader"] { background: transparent; }
 }
 [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"],
 [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
-    background: #2563eb !important;
-    border-color: #2563eb !important;
+    background: #1d4ed8 !important;
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 2px 8px rgba(29,78,216,.25) !important;
 }
 [data-testid="stSidebar"] div[role="radiogroup"] > label p {
     font-size: 16px !important;
@@ -558,95 +523,80 @@ header[data-testid="stHeader"] { background: transparent; }
 
 .mobile-topbar { display: none; }
 
-/* ===== MOBİL NAVIGASYON ===== */
-.mob-topbar-divider { height: 1px; background: #e2e8f0; margin: 6px 0 16px 0; }
-.mob-page-label {
-    font-size: 15px; font-weight: 900; color: #0f172a;
-    text-align: center; padding: 6px 0;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.mob-topbar-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    color: white; font-size: 13px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.mob-avatar {
-    width: 34px; height: 34px; border-radius: 50%;
-    color: white; font-size: 14px; font-weight: 900;
-    display: flex; align-items: center; justify-content: center; margin: 0 auto;
+.mob-topbar-page {
+    font-size: 14px; font-weight: 900; color: #0f172a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-align: center; flex: 1;
 }
 .mob-user-card {
     display: flex; align-items: center; gap: 12px;
     background: #f8fafc; border: 1px solid #e2e8f0;
-    border-radius: 14px; padding: 14px 16px; margin-bottom: 18px;
+    border-radius: 14px; padding: 14px 16px; margin-bottom: 16px;
 }
 .mob-user-av {
-    width: 46px; height: 46px; border-radius: 50%;
-    color: white; font-size: 18px; font-weight: 900;
+    width: 42px; height: 42px; border-radius: 50%;
+    color: white; font-size: 17px; font-weight: 900;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.mob-user-email {
-    font-size: 13px; font-weight: 800; color: #0f172a;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
-}
-.mob-user-role { font-size: 11px; color: #64748b; font-weight: 700; margin-top: 3px; }
-.mob-sec-title {
-    font-size: 11px; font-weight: 900; color: #94a3b8;
-    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
-}
+.mob-user-email { font-size: 13px; font-weight: 800; color: #0f172a; overflow: hidden; text-overflow: ellipsis; }
+.mob-user-role { margin-top: 4px; }
 
-/* ===== LOGIN PAGE ===== */
-.login-brand-panel {
-    background: linear-gradient(155deg, #020617 0%, #0f172a 45%, #1e3a8a 100%);
-    border-radius: 20px;
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 40px 28px 32px;
-}
-.login-form-welcome {
-    font-size: 26px; font-weight: 900; color: #0f172a;
-    margin: 0 0 6px 0; line-height: 1.2;
-}
-.login-form-sub {
-    font-size: 14px; color: #64748b; font-weight: 500; margin: 0 0 28px 0;
-}
-.login-lang-bar {
-    display: flex; justify-content: flex-end; margin-bottom: 18px;
-}
-
-/* Mobile header */
-.mlh-wrap {
-    background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e3a8a 100%);
-    border-radius: 0 0 28px 28px;
-    padding: 36px 24px 28px;
+.mobile-login-shell { width: 100%; max-width: 520px; margin: 0 auto; }
+.mobile-login-logo-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    padding: 22px 18px;
+    margin: 16px 0 18px 0;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
     text-align: center;
-    margin: -18px -14px 0 -14px;
-    position: relative; overflow: hidden;
 }
-.mlh-glow {
-    position: absolute; width: 240px; height: 240px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(37,99,235,0.25) 0%, transparent 70%);
-    top: -80px; right: -60px; pointer-events: none;
+.mobile-login-logo-card img { max-width: 78%; max-height: 82px; object-fit: contain; }
+.mobile-login-icon {
+    width: 76px;
+    height: 76px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #0f172a, #2563eb);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px auto;
+    font-size: 36px;
 }
-.mlh-logo img { max-height: 52px; max-width: 180px; object-fit: contain; display: block; margin: 0 auto 14px; }
-.mlh-icon { font-size: 42px; margin-bottom: 12px; }
-.mlh-title { font-size: 22px; font-weight: 900; color: #ffffff; margin: 0 0 5px 0; }
-.mlh-sub { font-size: 12px; color: #93c5fd; font-weight: 600; }
-.mlh-lang { background: rgba(255,255,255,0.08); border-radius: 0 0 28px 28px; padding: 10px 24px; margin: 0 -14px; display: flex; justify-content: flex-end; }
-
-/* Auth form styling */
-.auth-form-container { padding: 8px 0; }
-.auth-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
-.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
-.auth-divider span { color: #94a3b8; font-size: 12px; font-weight: 700; }
+.mobile-login-title { font-size: 25px; font-weight: 950; color: #0f172a; text-align: center; }
+.mobile-login-subtitle { font-size: 13px; font-weight: 700; color: #64748b; text-align: center; margin-top: 6px; }
+.mobile-login-card-title { text-align: center; font-size: 22px; font-weight: 950; color: #0f172a; margin: 8px 0 18px 0; }
 
 @media (max-width:768px) {
     .block-container {
         padding-left: 14px !important;
         padding-right: 14px !important;
-        padding-top: 14px !important;
-        padding-bottom: 32px !important;
+        padding-top: 18px !important;
+        padding-bottom: 28px !important;
     }
-    /* Mobilde sidebar tamamen gizle */
-    section[data-testid="stSidebar"] { display: none !important; }
+    .mobile-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        padding: 12px 14px;
+        margin-bottom: 16px;
+    }
+    .mobile-topbar-title { font-size: 16px; font-weight: 900; color: #0f172a; }
+    .mobile-topbar-sub { font-size: 11px; color: #64748b; font-weight: 700; }
+    section[data-testid="stSidebar"] {
+        width: 300px !important;
+        min-width: 260px !important;
+        max-width: 88vw !important;
+    }
     button {
         min-height: 48px !important;
         border-radius: 14px !important;
@@ -654,237 +604,114 @@ header[data-testid="stHeader"] { background: transparent; }
     }
     input, textarea { font-size: 16px !important; }
     .dash-card { text-align: center; margin-bottom: 10px; }
-    /* Mobil top bar hamburger butonu */
-    div[data-testid="stVerticalBlock"] > div:first-child .stButton > button {
-        background: #f1f5f9 !important;
-        border: 1.5px solid #e2e8f0 !important;
-        color: #0f172a !important;
-        font-size: 18px !important;
-        font-weight: 900 !important;
-        border-radius: 10px !important;
-        min-height: 42px !important;
-        padding: 4px !important;
-    }
-    /* Mobil nav grid butonları (2'li sıra) */
-    div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"] {
-        background: #f8fafc !important;
-        border: 1.5px solid #e2e8f0 !important;
-        color: #1e293b !important;
-        border-radius: 14px !important;
-        font-size: 13px !important;
-        font-weight: 800 !important;
-        white-space: normal !important;
-        line-height: 1.3 !important;
-        padding: 8px 4px !important;
-        min-height: 58px !important;
-    }
-    div[data-testid="stHorizontalBlock"] .stButton > button[kind="primary"] {
-        border-radius: 14px !important;
-        font-size: 13px !important;
-        font-weight: 800 !important;
-        white-space: normal !important;
-        line-height: 1.3 !important;
-        padding: 8px 4px !important;
-        min-height: 58px !important;
-    }
 }
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# BRAND PANEL HTML (sol kolon)
-# =====================================================================
-def build_brand_panel_html(mods, logo_b64, lang):
-    slides_html = ""
-    dots_html = ""
-    for i, m in enumerate(mods[:8]):
-        img_b64 = get_base64_image(m[1]) if m[1] else ""
-        img_tag = f'<img src="{img_b64}" alt="">' if img_b64 else '<div style="font-size:52px;opacity:.25;">⚙️</div>'
-        slides_html += f'<div class="slide" data-i="{i}">{img_tag}<div class="sname">{m[0]}</div></div>'
-        dots_html += f'<div class="dot" data-d="{i}"></div>'
-
-    if not slides_html:
-        slides_html = '<div class="slide active"><div style="font-size:52px;opacity:.25;">⚙️</div><div class="sname">Ersan Makine</div></div>'
-        dots_html = '<div class="dot active"></div>'
-
-    if lang == "zh":
-        feats = [("📋","快速报价创建和跟踪"),("📦","订单和生产工单管理"),("🏢","多用户经销商网络")]
-        title, sub = "B2B订单门户", "Ersan机器销售和报价系统"
-    elif lang == "en":
-        feats = [("📋","Fast quote creation & tracking"),("📦","Order & production management"),("🏢","Multi-user dealer network")]
-        title, sub = "B2B Order Portal", "Ersan Machine Sales & Quotation"
-    else:
-        feats = [("📋","Hızlı teklif oluşturma ve takip"),("📦","Sipariş ve üretim emri yönetimi"),("🏢","Çok kullanıcılı bayi/üretici ağı")]
-        title, sub = "B2B Sipariş Portalı", "Ersan Makine Satış ve Teklif Sistemi"
-
-    feats_html = "".join(f'<div class="feat"><div class="fi">{ic}</div><div class="ft">{tx}</div></div>' for ic, tx in feats)
-    logo_html = f'<div class="logo-w"><img src="{logo_b64}"></div>' if logo_b64 else '<div class="icon-badge">⚙️</div>'
-
-    return f"""<html><head><meta charset="utf-8"><style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:transparent;overflow:hidden}}
-.panel{{
-  background:linear-gradient(155deg,#020617 0%,#0f172a 45%,#1e3a8a 100%);
-  border-radius:20px;position:relative;overflow:hidden;
-  display:flex;flex-direction:column;align-items:center;
-  padding:36px 24px 28px;height:680px;
-}}
-.g1{{position:absolute;width:360px;height:360px;border-radius:50%;
-  background:radial-gradient(circle,rgba(37,99,235,.22) 0%,transparent 70%);
-  top:-120px;right:-100px;pointer-events:none}}
-.g2{{position:absolute;width:220px;height:220px;border-radius:50%;
-  background:radial-gradient(circle,rgba(37,99,235,.12) 0%,transparent 70%);
-  bottom:-60px;left:-70px;pointer-events:none}}
-.logo-w{{margin-bottom:14px;z-index:1}}
-.logo-w img{{max-height:50px;max-width:170px;object-fit:contain}}
-.icon-badge{{width:64px;height:64px;background:rgba(37,99,235,.3);
-  border:1px solid rgba(37,99,235,.5);border-radius:17px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:28px;margin-bottom:14px;z-index:1}}
-h1{{font-size:21px;font-weight:900;color:#fff;text-align:center;
-  margin-bottom:5px;z-index:1;line-height:1.2}}
-.sub{{font-size:11.5px;color:#93c5fd;text-align:center;
-  margin-bottom:20px;z-index:1;font-weight:600}}
-.showcase{{width:100%;max-width:380px;
-  background:rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.1);
-  border-radius:14px;overflow:hidden;
-  height:210px;position:relative;margin-bottom:10px;z-index:1}}
-.slide{{position:absolute;inset:0;display:none;flex-direction:column;
-  align-items:center;justify-content:center;padding:12px}}
-.slide img{{max-height:155px;max-width:90%;object-fit:contain}}
-.sname{{position:absolute;bottom:0;left:0;right:0;
-  background:rgba(0,0,0,.45);color:#e2e8f0;
-  font-size:11px;font-weight:700;text-align:center;padding:6px 10px}}
-.slide.active{{display:flex;animation:fi .5s ease}}
-@keyframes fi{{from{{opacity:0;transform:translateX(10px)}}to{{opacity:1;transform:none}}}}
-.dots{{display:flex;gap:5px;justify-content:center;margin-bottom:18px;z-index:1}}
-.dot{{width:6px;height:6px;border-radius:50%;
-  background:rgba(255,255,255,.25);transition:all .3s}}
-.dot.active{{background:#60a5fa;width:18px;border-radius:3px}}
-.feats{{width:100%;max-width:360px;z-index:1}}
-.feat{{display:flex;align-items:center;gap:9px;
-  padding:8px 11px;margin-bottom:6px;
-  background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.07);border-radius:10px}}
-.fi{{font-size:15px;min-width:30px;height:30px;
-  background:rgba(37,99,235,.35);border-radius:7px;
-  display:flex;align-items:center;justify-content:center}}
-.ft{{color:#cbd5e1;font-size:12px;font-weight:600}}
-</style></head><body>
-<div class="panel">
-  <div class="g1"></div><div class="g2"></div>
-  {logo_html}
-  <h1>{title}</h1>
-  <p class="sub">{sub}</p>
-  <div class="showcase">{slides_html}</div>
-  <div class="dots" id="dots">{dots_html}</div>
-  <div class="feats">{feats_html}</div>
-</div>
-<script>
-var idx=0,slides=document.querySelectorAll('.slide'),dots=document.querySelectorAll('.dot');
-function show(i){{slides.forEach(function(s){{s.classList.remove('active')}});dots.forEach(function(d){{d.classList.remove('active')}});if(slides[i])slides[i].classList.add('active');if(dots[i])dots[i].classList.add('active');}}
-show(0);
-if(slides.length>1)setInterval(function(){{idx=(idx+1)%slides.length;show(idx);}},3500);
-</script>
-</body></html>"""
-
-# =====================================================================
 # AUTH FORM
 # =====================================================================
 def render_auth_form():
-    t_login, t_reg, t_forg = st.tabs([_("login_tab"), _("reg_tab"), _("forg_tab")])
+    with st.container(border=True):
+        t_login, t_reg, t_forg = st.tabs([_("login_tab"), _("reg_tab"), _("forg_tab")])
 
-    with t_login:
-        st.write("")
-        le = st.text_input(_("email"), key="l_e", placeholder="ornek@firma.com").strip().lower()
-        lp = st.text_input(_("pass"), type="password", key="l_p", placeholder="••••••••")
-        rem = st.checkbox(_("rem"), value=True, key="l_r")
-        st.write("")
-        if st.button(_("login_btn"), type="primary", use_container_width=True):
-            conn = sqlite3.connect("users.db")
-            user = conn.execute(
-                "SELECT id, user_type, is_approved, is_verified, role, allowed_menus FROM users WHERE email=? AND password=?",
-                (le, hash_password(lp))
-            ).fetchone()
-            if user:
-                if user[2] == 0:
-                    st.warning(_("sys_wait"))
-                    conn.close()
-                else:
-                    tok = str(uuid.uuid4())
-                    conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0]))
-                    if rem:
-                        st.query_params["session_token"] = tok
-                    st.session_state.logged_in = True
-                    st.session_state.user_id = user[0]
-                    st.session_state.user_role = "admin" if user[4] == "admin" else ("manufacturer" if user[1] == "Üretici" else "dealer")
-                    st.session_state.user_email = le
-                    st.session_state.allowed_menus = user[5]
-                    conn.commit()
-                    conn.close()
-                    st.rerun()
-            else:
-                st.error(_("sys_err"))
-                conn.close()
+        with t_login:
+            st.write("")
+            le = st.text_input(_("email"), key="l_e", placeholder="ornek@firma.com").strip().lower()
+            lp = st.text_input(_("pass"), type="password", key="l_p", placeholder="••••••••")
+            rem = st.checkbox(_("rem"), value=True, key="l_r")
 
-    with t_reg:
-        rt = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")], key="r_t")
-        rc = st.text_input(_("comp_name"), key="r_c")
-        rp = st.text_input(_("phone"), key="r_ph", placeholder="+90 5XX...")
-        re = st.text_input(_("email"), key="r_e", placeholder="ornek@firma.com").strip().lower()
-        rpw = st.text_input(_("pass"), type="password", key="r_p")
-        if st.button(_("reg_btn"), type="primary", use_container_width=True):
-            if all([rc, rp, re, rpw]):
-                c = sqlite3.connect("users.db")
-                if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone():
-                    st.error(_("email_in_use"))
-                else:
-                    c.execute(
-                        "INSERT INTO users (email, password, company_name, phone, user_type, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,1,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')",
-                        (re, hash_password(rpw), rc, rp, rt)
-                    )
-                    c.commit()
-                    st.success("Kayıt Başarılı! Sistem yöneticisi onayladıktan sonra giriş yapabilirsiniz.")
-                c.close()
-            else:
-                st.warning(_("req_fields"))
+            st.write("")
+            if st.button(_("login_btn"), type="primary", use_container_width=True):
+                conn = sqlite3.connect("users.db")
+                user = conn.execute(
+                    "SELECT id, user_type, is_approved, is_verified, role, allowed_menus FROM users WHERE email=? AND password=?",
+                    (le, hash_password(lp))
+                ).fetchone()
 
-    with t_forg:
-        if st.session_state.forgot_step == 1:
-            fe = st.text_input(_("f_email"), key="f_e", placeholder="Kayıtlı e-postanız...").strip().lower()
-            if st.button(_("send_reset"), type="primary", use_container_width=True):
-                c = sqlite3.connect("users.db")
-                user = c.execute("SELECT id FROM users WHERE email=?", (fe,)).fetchone()
                 if user:
-                    vc = generate_code()
-                    c.execute("UPDATE users SET auth_code=? WHERE email=?", (vc, fe))
-                    c.commit()
-                    if send_email(fe, vc, "Sifre Sifirlama / Password Reset"):
-                        st.session_state.temp_f_email = fe
-                        st.session_state.forgot_step = 2
-                        c.close()
+                    if user[2] == 0:
+                        st.warning(_("sys_wait"))
+                        conn.close()
+                    else:
+                        tok = str(uuid.uuid4())
+                        conn.execute("UPDATE users SET session_token=? WHERE id=?", (tok, user[0]))
+
+                        if rem:
+                            st.query_params["session_token"] = tok
+
+                        st.session_state.logged_in = True
+                        st.session_state.user_id = user[0]
+                        st.session_state.user_role = "admin" if user[4] == "admin" else ("manufacturer" if user[1] == "Üretici" else "dealer")
+                        st.session_state.user_email = le
+                        st.session_state.allowed_menus = user[5]
+
+                        conn.commit()
+                        conn.close()
                         st.rerun()
                 else:
-                    st.error(_("no_email"))
-                c.close()
-        elif st.session_state.forgot_step == 2:
-            fc = st.text_input(_("enter_code"), max_chars=6, key="f_c")
-            np = st.text_input(_("new_pass"), type="password", key="f_np")
-            if st.button(_("change_pass"), type="primary", use_container_width=True):
-                c = sqlite3.connect("users.db")
-                user = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_f_email,)).fetchone()
-                if user and user[0] == fc:
-                    c.execute(
-                        "UPDATE users SET password=?, auth_code=NULL WHERE email=?",
-                        (hash_password(np), st.session_state.temp_f_email)
-                    )
-                    c.commit()
-                    st.session_state.forgot_step = 1
-                    st.success(_("pass_changed"))
+                    st.error(_("sys_err"))
+                    conn.close()
+
+        with t_reg:
+            rt = st.selectbox(_("reg_type"), [_("dealer"), _("manuf")], key="r_t")
+            rc = st.text_input(_("comp_name"), key="r_c")
+            rp = st.text_input(_("phone"), key="r_ph", placeholder="+90 5XX...")
+            re = st.text_input(_("email"), key="r_e", placeholder="ornek@firma.com").strip().lower()
+            rpw = st.text_input(_("pass"), type="password", key="r_p")
+
+            if st.button(_("reg_btn"), type="primary", use_container_width=True):
+                if all([rc, rp, re, rpw]):
+                    c = sqlite3.connect("users.db")
+                    if c.execute("SELECT id FROM users WHERE email=?", (re,)).fetchone():
+                        st.error(_("email_in_use"))
+                    else:
+                        c.execute(
+                            "INSERT INTO users (email, password, company_name, phone, user_type, is_verified, is_approved, allowed_menus) VALUES (?,?,?,?,?,1,0,'m_dash,m_new,m_cust,m_past,m_order,m_prof')",
+                            (re, hash_password(rpw), rc, rp, rt)
+                        )
+                        c.commit()
+                        st.success("Kayıt Başarılı! Sistem yöneticisi onayladıktan sonra giriş yapabilirsiniz.")
+                    c.close()
                 else:
-                    st.error(_("wrong_code"))
-                c.close()
+                    st.warning(_("req_fields"))
+
+        with t_forg:
+            if st.session_state.forgot_step == 1:
+                fe = st.text_input(_("f_email"), key="f_e", placeholder="Kayıtlı e-postanız...").strip().lower()
+                if st.button(_("send_reset"), type="primary", use_container_width=True):
+                    c = sqlite3.connect("users.db")
+                    user = c.execute("SELECT id FROM users WHERE email=?", (fe,)).fetchone()
+                    if user:
+                        vc = generate_code()
+                        c.execute("UPDATE users SET auth_code=? WHERE email=?", (vc, fe))
+                        c.commit()
+                        if send_email(fe, vc, "Sifre Sifirlama / Password Reset"):
+                            st.session_state.temp_f_email = fe
+                            st.session_state.forgot_step = 2
+                            c.close()
+                            st.rerun()
+                    else:
+                        st.error(_("no_email"))
+                    c.close()
+
+            elif st.session_state.forgot_step == 2:
+                fc = st.text_input(_("enter_code"), max_chars=6, key="f_c")
+                np = st.text_input(_("new_pass"), type="password", key="f_np")
+                if st.button(_("change_pass"), type="primary", use_container_width=True):
+                    c = sqlite3.connect("users.db")
+                    user = c.execute("SELECT auth_code FROM users WHERE email=?", (st.session_state.temp_f_email,)).fetchone()
+                    if user and user[0] == fc:
+                        c.execute(
+                            "UPDATE users SET password=?, auth_code=NULL WHERE email=?",
+                            (hash_password(np), st.session_state.temp_f_email)
+                        )
+                        c.commit()
+                        st.session_state.forgot_step = 1
+                        st.success(_("pass_changed"))
+                    else:
+                        st.error(_("wrong_code"))
+                    c.close()
 
 # =====================================================================
 # LOGIN SCREEN
@@ -892,73 +719,40 @@ def render_auth_form():
 if not st.session_state.logged_in:
     lang_opts = {"tr": "🇹🇷 TR", "en": "🇬🇧 EN", "zh": "🇨🇳 ZH"}
 
-    try:
-        c_f = sqlite3.connect("factory_data.db")
-        mods = c_f.execute("SELECT name, image_path FROM models").fetchall()
-        c_f.close()
-    except:
-        mods = []
-
-    system_logo = get_system_logo()
-
-    # ---- MOBİL GİRİŞ ----
     if IS_MOBILE:
-        if st.session_state.lang == "zh":
-            title_txt, sub_txt = "B2B订单门户", "Ersan机器销售和报价系统"
-            welcome_txt = "登录"
-        elif st.session_state.lang == "en":
-            title_txt, sub_txt = "B2B Order Portal", "Ersan Machine Sales & Quotation"
-            welcome_txt = "Welcome Back"
-        else:
-            title_txt, sub_txt = "B2B Sipariş Portalı", "Ersan Makine Satış ve Teklif Sistemi"
-            welcome_txt = "Hoş Geldiniz"
+        st.markdown("<div class='mobile-login-shell'>", unsafe_allow_html=True)
+        sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x],
+                           index=list(lang_opts.keys()).index(st.session_state.lang),
+                           key="main_lang_sel_mobile", label_visibility="collapsed")
+        if sel != st.session_state.lang:
+            st.session_state.lang = sel
+            st.rerun()
 
-        logo_section = f'<div class="mlh-logo"><img src="{system_logo}"></div>' if system_logo else '<div class="mlh-icon">⚙️</div>'
-
-        st.markdown(f"""
-        <div class="mlh-wrap">
-            <div class="mlh-glow"></div>
-            {logo_section}
-            <div class="mlh-title">{title_txt}</div>
-            <div class="mlh-sub">{sub_txt}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        c_lang1, c_lang2 = st.columns([3, 1])
-        with c_lang2:
-            sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x],
-                               index=list(lang_opts.keys()).index(st.session_state.lang),
-                               key="main_lang_sel_mobile", label_visibility="collapsed")
-            if sel != st.session_state.lang:
-                st.session_state.lang = sel
-                st.rerun()
-
-        st.markdown(f"""
-        <div style='padding: 20px 4px 8px 4px;'>
-            <div style='font-size:22px; font-weight:900; color:#0f172a; margin-bottom:4px;'>{welcome_txt}</div>
-            <div style='font-size:13px; color:#64748b; font-weight:500; margin-bottom:8px;'>
-                {("Hesabınıza giriş yapın" if st.session_state.lang=="tr" else ("Sign in to your account" if st.session_state.lang=="en" else "登录您的账户"))}
+        mobile_logo = get_system_logo()
+        if mobile_logo and mobile_logo.startswith("data:image"):
+            st.markdown(f"""
+            <div class="mobile-login-logo-card">
+                <img src="{mobile_logo}">
+                <div class="mobile-login-title">B2B Sipariş Portalı</div>
+                <div class="mobile-login-subtitle">Ersan Makine Satış ve Teklif Sistemi</div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="mobile-login-logo-card">
+                <div class="mobile-login-icon">⚙️</div>
+                <div class="mobile-login-title">B2B Sipariş Portalı</div>
+                <div class="mobile-login-subtitle">Ersan Makine Satış ve Teklif Sistemi</div>
+            </div>
+            """, unsafe_allow_html=True)
 
+        st.markdown("<div class='mobile-login-card-title'>Giriş Yap</div>", unsafe_allow_html=True)
         render_auth_form()
+        st.markdown("</div>", unsafe_allow_html=True)
         st.stop()
 
-    # ---- MASAÜSTÜ GİRİŞ ----
-    if st.session_state.lang == "zh":
-        welcome_txt = "欢迎回来"
-        sub_welcome = "登录您的账户以继续"
-    elif st.session_state.lang == "en":
-        welcome_txt = "Welcome Back"
-        sub_welcome = "Sign in to your account to continue"
-    else:
-        welcome_txt = "Hoş Geldiniz"
-        sub_welcome = "Devam etmek için hesabınıza giriş yapın"
-
-    # Üst bar: boşluk + dil seçici
-    top_l, top_r = st.columns([9, 1])
-    with top_r:
+    c1, c2, c3 = st.columns([8, 1, 1])
+    with c3:
         sel = st.selectbox("🌍", list(lang_opts.keys()), format_func=lambda x: lang_opts[x],
                            index=list(lang_opts.keys()).index(st.session_state.lang),
                            key="main_lang_sel", label_visibility="collapsed")
@@ -966,139 +760,91 @@ if not st.session_state.logged_in:
             st.session_state.lang = sel
             st.rerun()
 
-    col_brand, col_form = st.columns([1.15, 1], gap="large")
+    st.write("")
+    st.write("")
 
-    with col_brand:
-        brand_html = build_brand_panel_html(mods, system_logo, st.session_state.lang)
-        components.html(brand_html, height=680, scrolling=False)
+    col_slider, col_form = st.columns([1.2, 1], gap="large")
+
+    with col_slider:
+        try:
+            c_f = sqlite3.connect("factory_data.db")
+            mods = c_f.execute("SELECT name, image_path FROM models").fetchall()
+            c_f.close()
+        except:
+            mods = []
+
+        s_h = ""
+        if mods:
+            for m in mods:
+                img_b64 = get_base64_image(m[1]) if m[1] else get_system_logo()
+                img_tag = f'<img src="{img_b64}">' if img_b64 else '<div style="font-size:80px; margin-top:100px;">⚙️</div>'
+                s_h += f'<div class="mySlides fade">{img_tag}<div class="slide-text">{m[0]}</div></div>'
+
+        if s_h:
+            slider_html = f"""
+            <html><head><style>
+            body {{ margin:0; padding:0; background:transparent; overflow:hidden; font-family:sans-serif; }}
+            .slideshow-container {{ position:relative; width:100%; height:450px; border-radius:20px; display:flex; align-items:center; justify-content:center; background:#ffffff; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; }}
+            .mySlides {{ display:none; text-align:center; width:100%; height:100%; position:relative; }}
+            img {{ max-height:380px; max-width:85%; object-fit:contain; position:absolute; top:45%; left:50%; transform:translate(-50%,-50%); }}
+            .slide-text {{ color:#0f172a; font-size:16px; font-weight:900; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.85); padding:10px 25px; border-radius:30px; }}
+            .fade {{ animation-name:fade; animation-duration:1.5s; }}
+            @keyframes fade {{ from {{opacity:0.3; transform:scale(0.95);}} to {{opacity:1; transform:scale(1);}} }}
+            </style></head><body>
+            <div class="slideshow-container">{s_h}</div>
+            <script>
+            let sI=0; show();
+            function show(){{
+                let s=document.getElementsByClassName("mySlides");
+                if(s.length===0)return;
+                for(let i=0;i<s.length;i++) s[i].style.display="none";
+                sI++; if(sI>s.length)sI=1;
+                s[sI-1].style.display="block";
+                setTimeout(show,3500);
+            }}
+            </script></body></html>
+            """
+            components.html(slider_html, height=480)
+        else:
+            st.info("Sistemde henüz kayıtlı makine bulunmuyor.")
 
     with col_form:
-        st.markdown("<div style='height:60px;'></div>", unsafe_allow_html=True)
-        st.markdown(f"""
-        <div style='margin-bottom:28px;'>
-            <div style='font-size:28px; font-weight:900; color:#0f172a; margin-bottom:7px; line-height:1.2;'>{welcome_txt}</div>
-            <div style='font-size:14px; color:#64748b; font-weight:500;'>{sub_welcome}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<h2 class='login-desktop-title'>B2B Sipariş Portalı</h2>", unsafe_allow_html=True)
         render_auth_form()
 
     st.stop()
 
 # =====================================================================
-# MENÜ ÖĞELERİ (mobil + masaüstü ortak)
+# KULLANICI BİLGİSİ (mobil üst bar + sidebar için ortak)
 # =====================================================================
-pending_count_txt = ""
-if st.session_state.user_role == "admin":
-    try:
-        conn_p = sqlite3.connect("sales_data.db")
-        p_count = conn_p.execute("SELECT COUNT(*) FROM offers WHERE status='Onay Bekliyor'").fetchone()[0]
-        conn_p.close()
-        if p_count > 0:
-            pending_count_txt = f" ({p_count})"
-    except:
-        pass
-
-if st.session_state.user_role == "admin":
-    menu_items_labels = [
-        _("m_dash"), _("m_new"), _("m_cust"),
-        _("m_past") + pending_count_txt, _("m_order"), _("m_prof"),
-        _("m_deal"), _("m_model"), _("m_profit"),
-    ]
-else:
-    allowed = st.session_state.allowed_menus.split(",") if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
-    v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model", "m_profit"]
-    menu_items_labels = [_(k.strip()) for k in allowed if k.strip() in v_keys]
-
-if not menu_items_labels:
-    menu_items_labels = [_("m_dash")]
-
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = menu_items_labels[0]
-
 r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
 role_color = {"admin": "#dc2626", "manufacturer": "#d97706"}.get(st.session_state.user_role, "#2563eb")
 u_init = (st.session_state.user_email or "U")[0].upper()
 
 # =====================================================================
-# MOBİL NAVİGASYON (Sidebar kullanılmıyor)
+# MOBİL ÜST MENÜ
 # =====================================================================
 if IS_MOBILE:
-    # ── Top bar ──────────────────────────────────────────────────────
     tb1, tb2, tb3 = st.columns([1, 5, 1], vertical_alignment="center")
-
     with tb1:
         ham_icon = "✕" if st.session_state.mobile_menu_open else "☰"
-        if st.button(ham_icon, key="mob_ham_btn", use_container_width=True):
+        if st.button(ham_icon, key="mobile_hamburger_btn", use_container_width=True):
             st.session_state.mobile_menu_open = not st.session_state.mobile_menu_open
             st.rerun()
-
     with tb2:
-        top_label = ("Menü" if st.session_state.lang == "tr" else "Menu") if st.session_state.mobile_menu_open else st.session_state.active_tab
-        st.markdown(f"<div class='mob-page-label'>{top_label}</div>", unsafe_allow_html=True)
-
+        active_label = st.session_state.get("active_tab", "B2B Portal")
+        page_label = ("Menü" if st.session_state.lang == "tr" else "Menu") if st.session_state.mobile_menu_open else active_label
+        st.markdown(f"<div class='mob-topbar-page'>{page_label}</div>", unsafe_allow_html=True)
     with tb3:
-        st.markdown(f"<div class='mob-avatar' style='background:{role_color};'>{u_init}</div>", unsafe_allow_html=True)
-
-    st.markdown("<div class='mob-topbar-divider'></div>", unsafe_allow_html=True)
-
-    # ── Menu overlay (menü açıksa sayfa içeriği yerine menü göster) ──
-    if st.session_state.mobile_menu_open:
-        # Kullanıcı kartı (rol badge'li)
-        st.markdown(f"""
-        <div class='mob-user-card'>
-            <div class='mob-user-av' style='background:{role_color};'>{u_init}</div>
-            <div style='overflow:hidden;'>
-                <div class='mob-user-email'>{st.session_state.user_email}</div>
-                <div class='mob-user-role' style='margin-top:4px;'>
-                    <span style='background:{role_color}22; color:{role_color}; padding:2px 9px; border-radius:6px; font-size:11px; font-weight:800;'>{r_text}</span>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        nav_title = "Sayfalar" if st.session_state.lang == "tr" else ("Pages" if st.session_state.lang == "en" else "页面")
-        st.markdown(f"<div class='mob-sec-title'>{nav_title}</div>", unsafe_allow_html=True)
-
-        # 2-sütun nav grid
-        items = menu_items_labels
-        for i in range(0, len(items), 2):
-            pair = items[i:i+2]
-            cols = st.columns(len(pair))
-            for col, label in zip(cols, pair):
-                is_active = st.session_state.active_tab in label or label in st.session_state.active_tab
-                with col:
-                    if st.button(label, key=f"mob_nav_{label}", use_container_width=True,
-                                 type="primary" if is_active else "secondary"):
-                        st.session_state.active_tab = label
-                        st.session_state.mobile_menu_open = False
-                        st.rerun()
-
-        # Dil + çıkış tek satırda
-        st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-        lang_title = "Dil Seçimi" if st.session_state.lang == "tr" else ("Language" if st.session_state.lang == "en" else "语言")
-        st.markdown(f"<div class='mob-sec-title'>{lang_title}</div>", unsafe_allow_html=True)
-
-        lc1, lc2, lc3, lc4 = st.columns(4)
-        for col, (lkey, lval) in zip([lc1, lc2, lc3], [("tr", "🇹🇷 TR"), ("en", "🇬🇧 EN"), ("zh", "🇨🇳 ZH")]):
-            with col:
-                if st.button(lval, key=f"mob_lang_{lkey}", use_container_width=True,
-                             type="primary" if st.session_state.lang == lkey else "secondary"):
-                    st.session_state.lang = lkey
-                    st.rerun()
-        with lc4:
-            logout_label = "🚪 Çıkış" if st.session_state.lang == "tr" else ("🚪 Exit" if st.session_state.lang == "en" else "🚪 退出")
-            if st.button(logout_label, key="mob_logout_btn", use_container_width=True):
-                c = sqlite3.connect("users.db")
-                c.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
-                c.commit(); c.close()
-                st.query_params.clear(); st.session_state.clear(); st.rerun()
-
-        st.stop()  # Sayfa içeriği menü açıkken render edilmesin
+        st.markdown(f"<div class='mob-topbar-avatar' style='background:{role_color};'>{u_init}</div>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:4px 0 14px 0; border:none; border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
 # =====================================================================
-# SIDEBAR (sadece masaüstü)
+# SIDEBAR
 # =====================================================================
-if not IS_MOBILE:
+show_sidebar = not (IS_MOBILE and not st.session_state.mobile_menu_open)
+
+if show_sidebar:
     with st.sidebar:
         c_user = sqlite3.connect("users.db")
         user_data = c_user.execute("SELECT logo_path, company_name FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
@@ -1112,21 +858,55 @@ if not IS_MOBILE:
             sidebar_logo = get_system_logo()
 
         if sidebar_logo and sidebar_logo.startswith("data:image"):
-            st.markdown(f"<div style='text-align:center; margin-bottom:15px; padding:10px 0;'><img src='{sidebar_logo}' style='max-width:90%; max-height:55px; object-fit:contain;'></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; margin-bottom:14px; padding:8px 0;'><img src='{sidebar_logo}' style='max-width:90%; max-height:52px; object-fit:contain;'></div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div style='text-align:center; margin-bottom:15px; padding:10px 0; font-weight:900; font-size:18px; color:#1e293b;'>{sidebar_text}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; margin-bottom:14px; padding:8px 0; font-weight:900; font-size:17px; color:#1e293b;'>{sidebar_text}</div>", unsafe_allow_html=True)
 
         st.markdown(f"""
-        <div style='background-color:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; margin-bottom:20px; display:flex; align-items:center; gap:10px;'>
-            <div style='background:{role_color}; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold;'>
-                {u_init}
-            </div>
-            <div style='overflow:hidden; width:100%;'>
-                <div style='font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div>
-                <div style='font-size:11px; color:#64748b; font-weight:700;'>{r_text}</div>
+        <div class='mob-user-card'>
+            <div class='mob-user-av' style='background:{role_color};'>{u_init}</div>
+            <div style='overflow:hidden; flex:1;'>
+                <div class='mob-user-email'>{st.session_state.user_email}</div>
+                <div class='mob-user-role'>
+                    <span style='background:{role_color}22; color:{role_color}; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:800;'>{r_text}</span>
+                </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+        pending_count_txt = ""
+        if st.session_state.user_role == "admin":
+            try:
+                conn_p = sqlite3.connect("sales_data.db")
+                p_count = conn_p.execute("SELECT COUNT(*) FROM offers WHERE status='Onay Bekliyor'").fetchone()[0]
+                conn_p.close()
+                if p_count > 0:
+                    pending_count_txt = f" ({p_count})"
+            except:
+                pass
+
+        if st.session_state.user_role == "admin":
+            menu_items_labels = [
+                _("m_dash"),
+                _("m_new"),
+                _("m_cust"),
+                _("m_past") + pending_count_txt,
+                _("m_order"),
+                _("m_prof"),
+                _("m_deal"),
+                _("m_model"),
+                _("m_profit"),
+            ]
+        else:
+            allowed = st.session_state.allowed_menus.split(",") if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
+            v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model", "m_profit"]
+            menu_items_labels = [_(k.strip()) for k in allowed if k.strip() in v_keys]
+
+        if not menu_items_labels:
+            menu_items_labels = [_("m_dash")]
+
+        if "active_tab" not in st.session_state:
+            st.session_state.active_tab = menu_items_labels[0]
 
         current_idx = 0
         for idx, label in enumerate(menu_items_labels):
@@ -1136,25 +916,34 @@ if not IS_MOBILE:
 
         def on_menu_change():
             st.session_state.active_tab = st.session_state.m_radio
+            if IS_MOBILE:
+                st.session_state.mobile_menu_open = False
 
-        st.radio("MENÜ", menu_items_labels, index=current_idx, key="m_radio",
-                 on_change=on_menu_change, label_visibility="collapsed")
+        st.radio("MENÜ", menu_items_labels, index=current_idx, key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
 
         st.markdown("<hr style='margin:15px 0; border:none; border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
-        lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
-        sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()),
-                           format_func=lambda x: lang_opts[x],
-                           index=list(lang_opts.keys()).index(st.session_state.lang), key="sb_lang")
-        if sel != st.session_state.lang:
-            st.session_state.lang = sel
-            st.rerun()
+        lc1, lc2, lc3 = st.columns(3)
+        for col, (lkey, lval) in zip([lc1, lc2, lc3], [("tr", "🇹🇷 TR"), ("en", "🇬🇧 EN"), ("zh", "🇨🇳 ZH")]):
+            with col:
+                if st.button(lval, key=f"sb_lang_{lkey}", use_container_width=True,
+                             type="primary" if st.session_state.lang == lkey else "secondary"):
+                    st.session_state.lang = lkey
+                    st.rerun()
+
+        st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
 
         if st.button(_("logout"), use_container_width=True):
             c = sqlite3.connect("users.db")
             c.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
-            c.commit(); c.close()
-            st.query_params.clear(); st.session_state.clear(); st.rerun()
+            c.commit()
+            c.close()
+            st.query_params.clear()
+            st.session_state.clear()
+            st.rerun()
+else:
+    if "active_tab" not in st.session_state:
+        st.session_state.active_tab = _("m_dash")
 
 # =====================================================================
 # SAYFA YÖNLENDİRME
@@ -1205,9 +994,8 @@ elif _("m_dash") in act_tab:
     </div>
     """, unsafe_allow_html=True)
 
-    r1c1, r1c2 = st.columns(2)
-    r1c1.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Teklif</div><div class='dash-value'>{tot_o}</div></div>", unsafe_allow_html=True)
-    r1c2.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Hacim</div><div class='dash-value dash-blue'>{tot_v:,.0f} $</div></div>", unsafe_allow_html=True)
-    r2c1, r2c2 = st.columns(2)
-    r2c1.markdown(f"<div class='dash-card'><div class='dash-label'>Onaylanan Sipariş</div><div class='dash-value dash-orange'>{ord_o}</div></div>", unsafe_allow_html=True)
-    r2c2.markdown(f"<div class='dash-card'><div class='dash-label'>Sipariş Hacmi</div><div class='dash-value dash-green'>{ord_v:,.0f} $</div></div>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Teklif</div><div class='dash-value'>{tot_o}</div></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='dash-card'><div class='dash-label'>Toplam Hacim</div><div class='dash-value dash-blue'>{tot_v:,.0f} $</div></div>", unsafe_allow_html=True)
+    c3.markdown(f"<div class='dash-card'><div class='dash-label'>Onaylanan Sipariş</div><div class='dash-value dash-orange'>{ord_o}</div></div>", unsafe_allow_html=True)
+    c4.markdown(f"<div class='dash-card'><div class='dash-label'>Sipariş Hacmi</div><div class='dash-value dash-green'>{ord_v:,.0f} $</div></div>", unsafe_allow_html=True)
