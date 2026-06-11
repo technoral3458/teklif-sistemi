@@ -192,45 +192,16 @@
 
   <script src="/static/js/app.js"></script>
   <script>
-  // Fade in on load
   document.addEventListener('DOMContentLoaded', function() {
-    document.body.style.transition = 'opacity .18s ease';
+    document.body.style.transition = 'opacity .2s ease';
     document.body.style.opacity = '1';
-  });
-
-  // Fade out before navigation
-  function _navigateTo(href) {
-    document.body.style.transition = 'opacity .13s ease';
-    document.body.style.opacity = '0';
-    setTimeout(function() { window.location.href = href; }, 130);
-  }
-
-  document.addEventListener('click', function(e) {
-    var link = e.target.closest('a[href]');
-    if (!link) return;
-    var href = link.getAttribute('href');
-    if (!href || href.startsWith('#') || href.startsWith('javascript') || href.startsWith('mailto') || link.target === '_blank' || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    e.preventDefault();
-    _navigateTo(href);
-  });
-
-  // Fade out on form submit (except file uploads)
-  document.addEventListener('submit', function(e) {
-    var form = e.target;
-    if (form.enctype === 'multipart/form-data') return;
-    document.body.style.transition = 'opacity .13s ease';
-    document.body.style.opacity = '0';
   });
 
   function setLang(code) {
     var fd = new FormData();
     fd.append('lang', code);
     fetch('/set-lang', {method:'POST', body:fd})
-      .then(function() {
-        document.body.style.transition = 'opacity .13s ease';
-        document.body.style.opacity = '0';
-        setTimeout(function() { location.reload(); }, 130);
-      });
+      .then(function() { location.reload(); });
   }
   </script>
   {% block scripts %}{% endblock %}
