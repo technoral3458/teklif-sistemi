@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 import db.users as udb
 import db.factory as fdb
 import auth
 
 router = APIRouter(prefix="/dealers")
-templates = Jinja2Templates(directory="templates")
+from tmpl import templates
 
 
 @router.get("")

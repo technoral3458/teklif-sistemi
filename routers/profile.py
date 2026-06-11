@@ -4,14 +4,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 import db.users as udb
 import auth
 from config import IMAGES_DIR, LANGS
 
 router = APIRouter(prefix="/profile")
-templates = Jinja2Templates(directory="templates")
+from tmpl import templates
 
 
 @router.get("")

@@ -3,14 +3,13 @@ import datetime
 
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse, Response
-from fastapi.templating import Jinja2Templates
 
 import db.factory as fdb
 import auth
 from config import OFFER_STATUSES, CURRENCIES, BASE_DIR
 
 router = APIRouter(prefix="/offers")
-templates = Jinja2Templates(directory="templates")
+from tmpl import templates
 
 
 @router.get("")

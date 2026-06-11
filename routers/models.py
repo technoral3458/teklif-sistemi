@@ -5,14 +5,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 import db.factory as fdb
 import auth
 from config import IMAGES_DIR, CURRENCIES
 
 router = APIRouter(prefix="/models")
-templates = Jinja2Templates(directory="templates")
+from tmpl import templates
 
 
 def _calc_cost(purchase_price, shipping_cost, customs_pct, extra_tax_pct,

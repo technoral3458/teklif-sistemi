@@ -1,14 +1,15 @@
 {% extends "base.html" %}
-{% block page_title %}Opsiyonlar{% endblock %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ T.options_title }}{% endblock %}
 
 {% block content %}
 {% set qty_labels = {'MANUAL':'Manuel (Adet girilebilir)','FIXED_1':'Sabit (1 adet)','PER_MACHINE':'Makine başına'} %}
 {% set scope_labels = {'GLOBAL':'Genel (Tüm modeller)','MODEL_SPECIFIC':'Modele özel'} %}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-  <input type="text" id="tableSearch" class="search-box" placeholder="Opsiyon ara..." style="max-width:280px;" />
+  <input type="text" id="tableSearch" class="search-box" placeholder="{{ T.btn_search }}..." style="max-width:280px;" />
   <button class="btn btn-primary" onclick="newOpt()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Yeni Opsiyon
+    {{ T.btn_new }} {{ T.options_title }}
   </button>
 </div>
 
@@ -17,13 +18,13 @@
     <table id="mainTable">
       <thead>
         <tr>
-          <th style="width:56px;">Resim</th>
-          <th>Opsiyon Adı</th>
-          <th>Kategori</th>
-          <th>Kapsam</th>
-          <th>Fiyat</th>
-          <th style="width:60px;text-align:center;">Öncelik</th>
-          <th>İşlemler</th>
+          <th style="width:56px;"></th>
+          <th>{{ T.option_name }}</th>
+          <th>{{ T.model_category }}</th>
+          <th>{{ T.option_scope }}</th>
+          <th>{{ T.option_price }}</th>
+          <th style="width:60px;text-align:center;"></th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -77,16 +78,16 @@
                 {{ (o.description_en or "")|tojson }},
                 {{ (o.name_zh or "")|tojson }},
                 {{ (o.description_zh or "")|tojson }}
-              )'>✏️ Düzenle</button>
+              )'>✏️ {{ T.btn_edit }}</button>
               <form method="post" action="/options/delete" onsubmit="return confirmDelete(this)">
                 <input type="hidden" name="id" value="{{ o.id }}" />
-                <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+                <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
               </form>
             </div>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">Henüz opsiyon eklenmedi</td></tr>
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">-</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -97,7 +98,7 @@
 <div id="optModal" class="modal-overlay">
   <div class="modal-box" style="max-width:560px;">
     <div class="modal-header">
-      <h3 class="modal-title" id="optModalTitle">Yeni Opsiyon</h3>
+      <h3 class="modal-title" id="optModalTitle">{{ T.btn_new }} {{ T.options_title }}</h3>
       <button class="modal-close" onclick="closeModal('optModal')">&times;</button>
     </div>
     <div class="modal-body">
@@ -108,44 +109,44 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
 
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">Opsiyon Adı *</label>
+            <label class="form-label">{{ T.option_name }} *</label>
             <input type="text" name="name" id="oname" class="form-control" required />
           </div>
 
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">Açıklama</label>
+            <label class="form-label">{{ T.option_desc }}</label>
             <textarea name="description" id="odesc" class="form-control" rows="2"></textarea>
           </div>
 
           <div class="form-group" style="grid-column:1/-1;border-left:3px solid var(--border);padding-left:12px;">
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">ÇEVİRİLER (isteğe bağlı)</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">{{ T.trans_section | upper }}</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div class="form-group">
-                <label class="form-label">🇬🇧 Ad (EN)</label>
+                <label class="form-label">🇬🇧 {{ T.trans_english }}</label>
                 <input type="text" name="name_en" id="oname_en" class="form-control" />
               </div>
               <div class="form-group">
-                <label class="form-label">🇬🇧 Açıklama (EN)</label>
+                <label class="form-label">🇬🇧 {{ T.trans_eng_desc }}</label>
                 <textarea name="description_en" id="odesc_en" class="form-control" rows="2"></textarea>
               </div>
               <div class="form-group">
-                <label class="form-label">🇨🇳 Ad (ZH)</label>
+                <label class="form-label">🇨🇳 {{ T.trans_chinese }}</label>
                 <input type="text" name="name_zh" id="oname_zh" class="form-control" />
               </div>
               <div class="form-group">
-                <label class="form-label">🇨🇳 Açıklama (ZH)</label>
+                <label class="form-label">🇨🇳 {{ T.trans_zh_desc }}</label>
                 <textarea name="description_zh" id="odesc_zh" class="form-control" rows="2"></textarea>
               </div>
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Fiyat</label>
+            <label class="form-label">{{ T.option_price }}</label>
             <input type="number" name="price" id="oprice" class="form-control" step="0.01" min="0" value="0" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">Para Birimi</label>
+            <label class="form-label">{{ T.offer_currency }}</label>
             <select name="currency" id="ocurrency" class="form-control">
               {% for cur in currencies %}
               <option value="{{ cur }}">{{ cur }}</option>
@@ -154,7 +155,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Kapsam</label>
+            <label class="form-label">{{ T.option_scope }}</label>
             <select name="scope" id="oscope" class="form-control">
               {% for sc in option_scopes %}
               <option value="{{ sc }}">{{ scope_labels.get(sc, sc) }}</option>
@@ -163,7 +164,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Adet Tipi</label>
+            <label class="form-label">{{ T.offer_count }}</label>
             <select name="qty_type" id="oqty_type" class="form-control">
               {% for qt in qty_types %}
               <option value="{{ qt }}">{{ qty_labels.get(qt, qt) }}</option>
@@ -172,9 +173,9 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Kategori</label>
+            <label class="form-label">{{ T.model_category }}</label>
             <select name="category_id" id="ocat" class="form-control">
-              <option value="0">Tümü</option>
+              <option value="0">{{ T.wiz_all_categories }}</option>
               {% for cat in categories %}
               <option value="{{ cat.id }}">{{ cat.name }}</option>
               {% endfor %}
@@ -182,8 +183,8 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Çakışma Grubu</label>
-            <input type="text" name="conflict_group" id="oconflict" class="form-control" placeholder="örn: renk_grubu" />
+            <label class="form-label">Conflict Group</label>
+            <input type="text" name="conflict_group" id="oconflict" class="form-control" placeholder="" />
           </div>
 
           <!-- Option thumbnail -->
@@ -230,8 +231,8 @@
 
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-          <button type="button" class="btn btn-ghost" onclick="closeModal('optModal')">İptal</button>
-          <button type="submit" class="btn btn-primary">Kaydet</button>
+          <button type="button" class="btn btn-ghost" onclick="closeModal('optModal')">{{ T.btn_cancel }}</button>
+          <button type="submit" class="btn btn-primary">{{ T.btn_save }}</button>
         </div>
       </form>
     </div>
@@ -268,7 +269,7 @@ function setImgPreview(previewId, clearBtnId, path) {
 }
 
 function newOpt() {
-  document.getElementById('optModalTitle').textContent = 'Yeni Opsiyon';
+  document.getElementById('optModalTitle').textContent = '{{ T.btn_new }} {{ T.options_title }}';
   document.getElementById('oid').value = '0';
   document.getElementById('oname').value = '';
   document.getElementById('odesc').value = '';
@@ -289,7 +290,7 @@ function newOpt() {
 }
 
 function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflict, imagePath, imagePriority, varImagePath, nameEn, descEn, nameZh, descZh) {
-  document.getElementById('optModalTitle').textContent = 'Opsiyon Düzenle';
+  document.getElementById('optModalTitle').textContent = '{{ T.btn_edit }} {{ T.options_title }}';
   document.getElementById('oid').value = id;
   document.getElementById('oname').value = name;
   document.getElementById('odesc').value = desc;

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block page_title %}{% if edit_offer %}Teklif Düzenle — {{ edit_offer.offer_no }}{% else %}Yeni Teklif{% endif %}{% endblock %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{% if edit_offer %}{{ T.offer_no }} {{ edit_offer.offer_no }}{% else %}{{ T.offer_new }}{% endif %}{% endblock %}
 
 {% block content %}
 {% macro tr(obj, field) %}{{ obj.get(field+'_'+user.lang, '') or obj.get(field, '') if user.lang != 'tr' else obj.get(field, '') }}{% endmacro %}
@@ -7,22 +8,22 @@
 <div class="wizard-steps" style="margin-bottom:32px;">
   <div class="step-item active" id="si1">
     <div class="step-circle">1</div>
-    <div class="step-label">Müşteri</div>
+    <div class="step-label">{{ T.wiz_step1 }}</div>
   </div>
   <div class="step-connector"></div>
   <div class="step-item" id="si2">
     <div class="step-circle">2</div>
-    <div class="step-label">Makine</div>
+    <div class="step-label">{{ T.wiz_step2 }}</div>
   </div>
   <div class="step-connector"></div>
   <div class="step-item" id="si3">
     <div class="step-circle">3</div>
-    <div class="step-label">Opsiyonlar</div>
+    <div class="step-label">{{ T.wiz_step3 }}</div>
   </div>
   <div class="step-connector"></div>
   <div class="step-item" id="si4">
     <div class="step-circle">4</div>
-    <div class="step-label">Özet</div>
+    <div class="step-label">{{ T.wiz_step4 }}</div>
   </div>
 </div>
 
@@ -32,17 +33,17 @@
 
   <!-- Step 1: Customer -->
   <div class="wizard-step-content card" id="wstep1">
-    <div class="card-header"><h3 class="card-title">Müşteri Seçimi</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.wiz_select_customer }}</h3></div>
     <div class="card-body">
       <div class="tabs" style="margin-bottom:20px;">
-        <button type="button" class="tab-btn active" data-tab="existing-cust" onclick="switchTab('existing-cust')">Mevcut Müşteri</button>
-        <button type="button" class="tab-btn" data-tab="new-cust" onclick="switchTab('new-cust')">Yeni Müşteri</button>
+        <button type="button" class="tab-btn active" data-tab="existing-cust" onclick="switchTab('existing-cust')">{{ T.wiz_select_customer }}</button>
+        <button type="button" class="tab-btn" data-tab="new-cust" onclick="switchTab('new-cust')">{{ T.wiz_new_customer }}</button>
       </div>
       <div id="existing-cust" class="tab-pane active">
         <div class="form-group">
-          <label class="form-label">Müşteri Seçin</label>
+          <label class="form-label">{{ T.wiz_select_customer }}</label>
           <select name="customer_id" id="wCustomerId" class="form-control" style="max-width:400px;">
-            <option value="">-- Müşteri Seçin --</option>
+            <option value="">-- {{ T.wiz_select_customer }} --</option>
             {% for c in customers %}
             <option value="{{ c.id }}" {% if edit_offer and edit_offer.customer_id == c.id %}selected{% endif %}>{{ c.name }} {% if c.city %}({{ c.city }}){% endif %}</option>
             {% endfor %}
@@ -52,19 +53,19 @@
       <div id="new-cust" class="tab-pane" style="display:none;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:600px;">
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">Firma Adı *</label>
+            <label class="form-label">{{ T.wiz_company }} *</label>
             <input type="text" name="new_customer_name" class="form-control" />
           </div>
           <div class="form-group">
-            <label class="form-label">İletişim Kişisi</label>
+            <label class="form-label">{{ T.wiz_contact }}</label>
             <input type="text" name="new_customer_contact" class="form-control" />
           </div>
           <div class="form-group">
-            <label class="form-label">E-posta</label>
+            <label class="form-label">{{ T.wiz_email }}</label>
             <input type="email" name="new_customer_email" class="form-control" />
           </div>
           <div class="form-group">
-            <label class="form-label">Telefon</label>
+            <label class="form-label">{{ T.wiz_phone }}</label>
             <input type="tel" name="new_customer_phone" class="form-control" />
           </div>
         </div>
@@ -72,11 +73,11 @@
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:400px;margin-top:16px;">
         <div class="form-group">
-          <label class="form-label">Adet</label>
+          <label class="form-label">{{ T.wiz_qty }}</label>
           <input type="number" name="machine_count" id="wMachineCount" class="form-control" value="{{ edit_offer.machine_count if edit_offer else 1 }}" min="1" />
         </div>
         <div class="form-group">
-          <label class="form-label">Para Birimi</label>
+          <label class="form-label">{{ T.offer_currency }}</label>
           <select name="currency" id="wCurrency" class="form-control">
             {% for cur in currencies %}
             <option value="{{ cur }}" {% if edit_offer and edit_offer.currency == cur %}selected{% endif %}>{{ cur }}</option>
@@ -86,17 +87,17 @@
       </div>
     </div>
     <div class="card-footer" style="display:flex;justify-content:flex-end;padding:16px;">
-      <button type="button" class="btn btn-primary" onclick="wizardNext()">İleri →</button>
+      <button type="button" class="btn btn-primary" onclick="wizardNext()">{{ T.wiz_next }}</button>
     </div>
   </div>
 
   <!-- Step 2: Model -->
   <div class="wizard-step-content card" id="wstep2" style="display:none;">
-    <div class="card-header"><h3 class="card-title">Makine Seçimi</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.wiz_step2 }}</h3></div>
     <div class="card-body">
       <!-- Category filter -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
-        <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat(0)">Tümü</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat(0)">{{ T.wiz_all_categories }}</button>
         {% for cat in categories %}
         <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat({{ cat.id }})">{{ tr(cat, 'name') }}</button>
         {% endfor %}
@@ -129,19 +130,19 @@
         {% endfor %}
       </div>
       <div id="selectedModelInfo" style="display:none;margin-top:20px;padding:16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--accent);">
-        <strong>Seçilen: </strong><span class="sel-model-name"></span> — <span class="sel-model-price" style="color:var(--accent);"></span>
+        <strong>{{ T.wiz_selected }}: </strong><span class="sel-model-name"></span> — <span class="sel-model-price" style="color:var(--accent);"></span>
       </div>
     </div>
     <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
-      <button type="button" class="btn btn-ghost" onclick="wizardBack()">← Geri</button>
-      <button type="button" class="btn btn-primary" onclick="wizardNext()">İleri →</button>
+      <button type="button" class="btn btn-ghost" onclick="wizardBack()">{{ T.wiz_prev }}</button>
+      <button type="button" class="btn btn-primary" onclick="wizardNext()">{{ T.wiz_next }}</button>
     </div>
   </div>
 
   <!-- Step 3: Options -->
   <div class="wizard-step-content card" id="wstep3" style="display:none;">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-      <h3 class="card-title">Opsiyon Seçimi</h3>
+      <h3 class="card-title">{{ T.wiz_options_title }}</h3>
       <div id="wVariationImageBox" style="display:none;text-align:center;">
         <img id="wVariationImage" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:2px solid var(--accent);" />
         <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Aktif varyasyon</div>
@@ -175,7 +176,7 @@
             </label>
             {% if o.qty_type == 'MANUAL' %}
             <div style="display:flex;align-items:center;gap:6px;">
-              <label style="font-size:12px;color:var(--text-muted);">Adet:</label>
+              <label style="font-size:12px;color:var(--text-muted);">{{ T.wiz_qty }}:</label>
               <input type="number" id="optqty_{{ o.id }}" value="1" min="1" max="99" class="form-control" style="width:70px;"
                      onchange="wizardQtyChange({{ o.id }}, {{ o.price|default(0) }}, '{{ o.name|e }}', '{{ o.currency }}')" />
             </div>
@@ -184,64 +185,64 @@
           </div>
         </div>
         {% else %}
-        <p style="color:var(--text-muted)">Bu model için opsiyon bulunamadı</p>
+        <p style="color:var(--text-muted)">-</p>
         {% endfor %}
       </div>
     </div>
     <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
-      <button type="button" class="btn btn-ghost" onclick="wizardBack()">← Geri</button>
-      <button type="button" class="btn btn-primary" onclick="wizardNext()">İleri →</button>
+      <button type="button" class="btn btn-ghost" onclick="wizardBack()">{{ T.wiz_prev }}</button>
+      <button type="button" class="btn btn-primary" onclick="wizardNext()">{{ T.wiz_next }}</button>
     </div>
   </div>
 
   <!-- Step 4: Summary -->
   <div class="wizard-step-content card" id="wstep4" style="display:none;">
-    <div class="card-header"><h3 class="card-title">Özet ve Onay</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.wiz_step4 }}</h3></div>
     <div class="card-body">
       <div id="wizardSummary" style="margin-bottom:20px;"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:600px;">
         <div class="form-group">
-          <label class="form-label">İskonto (%)</label>
+          <label class="form-label">{{ T.wiz_discount }}</label>
           <input type="number" name="discount_pct" id="wDiscount" class="form-control" value="{{ edit_offer.discount_pct if edit_offer else 0 }}" min="0" max="100" step="0.5" oninput="wizardBuildSummary()" />
         </div>
         <div class="form-group">
-          <label class="form-label">Geçerlilik Tarihi</label>
+          <label class="form-label">{{ T.offer_validity }}</label>
           <input type="date" name="validity_date" class="form-control" value="{{ edit_offer.validity_date if edit_offer else '' }}" />
         </div>
         <div class="form-group" style="grid-column:1/-1;">
-          <label class="form-label">Notlar</label>
-          <textarea name="notes" class="form-control" rows="2" placeholder="Müşteriye iletilecek notlar...">{{ edit_offer.notes if edit_offer else '' }}</textarea>
+          <label class="form-label">{{ T.offer_notes }}</label>
+          <textarea name="notes" class="form-control" rows="2" placeholder="...">{{ edit_offer.notes if edit_offer else '' }}</textarea>
         </div>
       </div>
 
       <!-- Delivery / Payment terms -->
       <div style="margin-top:16px;padding:14px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">Satış ve Teslimat Koşulları</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">{{ T.offer_delivery }} / {{ T.offer_payment }}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Teslimat Şekli</label>
-            <input type="text" name="delivery_method" id="wDeliveryMethod" class="form-control" placeholder="örn: Limandan Devir" value="{{ edit_offer.delivery_method if edit_offer else '' }}" />
+            <label class="form-label">{{ T.offer_delivery }}</label>
+            <input type="text" name="delivery_method" id="wDeliveryMethod" class="form-control" placeholder="" value="{{ edit_offer.delivery_method if edit_offer else '' }}" />
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Teslim Süresi</label>
-            <input type="text" name="delivery_time" id="wDeliveryTime" class="form-control" placeholder="örn: 90 gün" value="{{ edit_offer.delivery_time if edit_offer else '' }}" />
+            <label class="form-label">{{ T.offer_delivery_time }}</label>
+            <input type="text" name="delivery_time" id="wDeliveryTime" class="form-control" placeholder="" value="{{ edit_offer.delivery_time if edit_offer else '' }}" />
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Nakliye / Lojistik</label>
-            <input type="text" name="logistics" id="wLogistics" class="form-control" placeholder="örn: Alıcıya Aittir" value="{{ edit_offer.logistics if edit_offer else '' }}" />
+            <label class="form-label">{{ T.offer_logistics }}</label>
+            <input type="text" name="logistics" id="wLogistics" class="form-control" placeholder="" value="{{ edit_offer.logistics if edit_offer else '' }}" />
           </div>
           <div class="form-group" style="grid-column:1/-1;margin-bottom:0;">
-            <label class="form-label">Ödeme Notları</label>
-            <textarea name="payment_notes" id="wPaymentNotes" class="form-control" rows="3" placeholder="Peşinat, vade, ödeme planı...">{{ edit_offer.payment_notes if edit_offer else '' }}</textarea>
+            <label class="form-label">{{ T.offer_payment }}</label>
+            <textarea name="payment_notes" id="wPaymentNotes" class="form-control" rows="3" placeholder="...">{{ edit_offer.payment_notes if edit_offer else '' }}</textarea>
           </div>
         </div>
       </div>
     </div>
     <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
-      <button type="button" class="btn btn-ghost" onclick="wizardBack()">← Geri</button>
+      <button type="button" class="btn btn-ghost" onclick="wizardBack()">{{ T.wiz_prev }}</button>
       <button type="submit" class="btn btn-success" onclick="wizardBuildSummary()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><polyline points="20 6 9 17 4 12"/></svg>
-        {% if edit_offer %}Teklifi Güncelle{% else %}Teklifi Oluştur{% endif %}
+        {% if edit_offer %}{{ T.wiz_update }}{% else %}{{ T.wiz_create }}{% endif %}
       </button>
     </div>
   </div>
@@ -267,7 +268,7 @@ function wizardShowStep(n) {
 
 function wizardNext() {
   if (wizardCurrentStep === 2 && !wizardSelectedModel) {
-    showToast('Lütfen bir model seçiniz.', 'warning'); return;
+    showToast('{{ T.wiz_step2 }}', 'warning'); return;
   }
   wizardShowStep(wizardCurrentStep + 1);
   if (wizardCurrentStep === 3) wizardLoadOptions();
@@ -406,16 +407,16 @@ function wizardBuildSummary() {
       ${modelImgHtml}
       <div>
         <div style="font-size:18px;font-weight:700;margin-bottom:6px;">${wizardSelectedModel.name}</div>
-        <div style="font-size:13px;color:var(--text-muted);">Adet: ${qty} &nbsp;|&nbsp; Para Birimi: ${cur}</div>
+        <div style="font-size:13px;color:var(--text-muted);">{{ T.offer_count }}: ${qty} &nbsp;|&nbsp; {{ T.offer_currency }}: ${cur}</div>
       </div>
     </div>
     <table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
       <thead style="background:var(--surface-2);">
         <tr>
-          <th style="padding:10px;text-align:left;">Kalem</th>
-          <th style="padding:10px;text-align:center;">Adet</th>
-          <th style="padding:10px;text-align:right;">Birim</th>
-          <th style="padding:10px;text-align:right;">Toplam</th>
+          <th style="padding:10px;text-align:left;">{{ T.offer_item }}</th>
+          <th style="padding:10px;text-align:center;">{{ T.offer_count }}</th>
+          <th style="padding:10px;text-align:right;">{{ T.offer_unit_price }}</th>
+          <th style="padding:10px;text-align:right;">{{ T.offer_total }}</th>
         </tr>
       </thead>
       <tbody>
@@ -429,9 +430,9 @@ function wizardBuildSummary() {
       </tbody>
     </table>
     <div style="text-align:right;margin-top:12px;font-size:14px;">
-      <div>Ara Toplam: <strong>${subtotal.toFixed(2)} ${cur}</strong></div>
-      ${disc>0 ? `<div style="color:var(--success)">İskonto (${disc}%): -${(subtotal*disc/100).toFixed(2)} ${cur}</div>` : ''}
-      <div style="font-size:20px;margin-top:8px;color:var(--accent);">Genel Toplam: <strong>${total.toFixed(2)} ${cur}</strong></div>
+      <div>{{ T.offer_subtotal }}: <strong>${subtotal.toFixed(2)} ${cur}</strong></div>
+      ${disc>0 ? `<div style="color:var(--success)">{{ T.offer_discount }} (${disc}%): -${(subtotal*disc/100).toFixed(2)} ${cur}</div>` : ''}
+      <div style="font-size:20px;margin-top:8px;color:var(--accent);">{{ T.wiz_net_total }}: <strong>${total.toFixed(2)} ${cur}</strong></div>
     </div>`;
 
   document.getElementById('wOptionsJson').value = JSON.stringify(

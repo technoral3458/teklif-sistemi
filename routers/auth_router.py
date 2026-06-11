@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 import db.users as udb
 import auth
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
+from tmpl import templates
 
 
 def _admin_ctx():

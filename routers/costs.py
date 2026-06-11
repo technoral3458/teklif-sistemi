@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Request
-from fastapi.templating import Jinja2Templates
 import db.factory as fdb
 import auth
 
 router = APIRouter(prefix="/costs")
-templates = Jinja2Templates(directory="templates")
+from tmpl import templates
 
 
 @router.get("")
