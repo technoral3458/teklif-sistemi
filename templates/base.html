@@ -8,7 +8,6 @@
   <style>
     html[data-theme="dark"]  { background:#0f172a; color:#e2e8f0; }
     html[data-theme="light"] { background:#f1f5f9; color:#0f172a; }
-    body { opacity:0; }
   </style>
   <link rel="stylesheet" href="/static/css/style.css" />
 </head>
@@ -192,11 +191,6 @@
 
   <script src="/static/js/app.js"></script>
   <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    document.body.style.transition = 'opacity .2s ease';
-    document.body.style.opacity = '1';
-  });
-
   function setLang(code) {
     var fd = new FormData();
     fd.append('lang', code);
