@@ -267,7 +267,7 @@ function wizardSelectModel(modelId, modelName, basePrice, currency) {
 
 function filterModelCat(catId) {
   document.querySelectorAll('.model-card').forEach(card => {
-    card.parentElement.style.display = (catId === 0 || parseInt(card.dataset.cat) === catId) ? '' : 'none';
+    card.style.display = (catId === 0 || parseInt(card.dataset.cat) === catId) ? 'flex' : 'none';
   });
 }
 
