@@ -1,8 +1,11 @@
 import urllib.request
 import xml.etree.ElementTree as ET
+import base64
+import json
+import os
 
-from fastapi import APIRouter, Request, Form
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Request, Form, UploadFile, File
+from fastapi.responses import RedirectResponse, JSONResponse
 
 import db.factory as fdb
 import auth
@@ -191,3 +194,87 @@ async def clear_doors(request: Request):
     for door in fdb.get_membrane_doors():
         fdb.del_membrane_door(door["id"])
     return RedirectResponse("/membrane", 303)
+
+
+@router.post("/door/scan")
+async def scan_image(request: Request, image: UploadFile = File(...)):
+    auth.require_user(request)
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return JSONResponse({"error": "ANTHROPIC_API_KEY ayarlanmamış. Sunucuda bu ortam değişkenini tanımlayın."}, status_code=500)
+
+    content = await image.read()
+    b64 = base64.standard_b64encode(content).decode()
+    mime = image.content_type or "image/jpeg"
+
+    prompt = """Bu görselde el yazısıyla veya yazılı şekilde kapak/dolap kapağı ölçü listesi var.
+Her satırdaki ölçüleri dikkatli oku ve JSON array olarak çıkar.
+
+Her kapak için şu alanları çıkar:
+- width_mm: en/genişlik (sayısal, milimetre cinsinden)
+- height_mm: boy/yükseklik (sayısal, milimetre cinsinden)
+- quantity: adet (yoksa 1 kullan)
+- door_name: kapak adı veya kodu (varsa, yoksa "")
+- color: renk (varsa, yoksa "")
+
+ÖNEMLİ KURALLAR:
+1. Ölçüler cm olarak yazılmışsa mm'ye çevir (örn: 40x72 cm → 400x720 mm)
+2. Ölçüler mm olarak yazılmışsa doğrudan kullan (örn: 400x720)
+3. Ölçüler "En x Boy" veya "Boy x En" formatında olabilir — bağlama göre anla
+4. Sadece JSON döndür, başka açıklama yazma
+5. Türkçe renk adlarını koru (Beyaz, Siyah, Meşe, Ceviz vs.)
+
+Örnek çıktı:
+[
+  {"width_mm": 400, "height_mm": 720, "quantity": 2, "door_name": "Mutfak Üst", "color": "Beyaz"},
+  {"width_mm": 600, "height_mm": 1200, "quantity": 1, "door_name": "", "color": ""}
+]
+
+Sadece JSON array döndür:"""
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2048,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}},
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+        )
+        raw = response.content[0].text.strip()
+        # Extract JSON array from response
+        start = raw.find("[")
+        end = raw.rfind("]") + 1
+        if start == -1 or end == 0:
+            return JSONResponse({"error": f"Görüntüden ölçü çıkarılamadı. Model yanıtı: {raw[:200]}"}, status_code=422)
+        doors = json.loads(raw[start:end])
+        # Save all extracted doors
+        saved = []
+        for d in doors:
+            w = float(d.get("width_mm") or 0)
+            h = float(d.get("height_mm") or 0)
+            if w <= 0 or h <= 0:
+                continue
+            name = str(d.get("door_name") or "")
+            color = str(d.get("color") or "")
+            full_name = f"{name} - {color}".strip(" -") if (name or color) else ""
+            fdb.save_membrane_door(
+                project_name="",
+                door_name=full_name,
+                width_mm=w,
+                height_mm=h,
+                quantity=max(1, int(d.get("quantity") or 1)),
+            )
+            saved.append({"width_mm": w, "height_mm": h,
+                          "quantity": int(d.get("quantity") or 1),
+                          "door_name": full_name,
+                          "color": color})
+        return JSONResponse({"saved": saved, "count": len(saved)})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)

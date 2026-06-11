@@ -120,6 +120,7 @@
     <h3 class="card-title">🚪 Kapak Listesi</h3>
     <div style="display:flex;gap:8px;">
       <button class="btn btn-primary btn-sm" onclick="openDoorModal()">+ Kapak Ekle</button>
+      <button class="btn btn-outline btn-sm" onclick="openScanModal()">📷 Görselden Tara</button>
       {% if doors %}
       <form method="post" action="/membrane/door/clear" style="margin:0;">
         <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Tüm listeyi temizle?')" style="color:var(--danger)">🗑️ Listeyi Temizle</button>
@@ -304,6 +305,46 @@
   </div>
 </div>
 
+<!-- ── Görsel Tarama Modal ── -->
+<div id="scanModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">📷 Görselden Kapak Ölçüleri Tara</h3>
+      <button class="modal-close" onclick="closeScanModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        Elle yazılmış veya yazılı ölçü listesinin fotoğrafını yükleyin. Yapay zeka kapak ölçülerini (en, boy, adet, renk) otomatik olarak tespit edip listeye ekleyecektir.
+      </p>
+
+      <div id="scanDropzone"
+           style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:border-color .2s;"
+           onclick="document.getElementById('scanFileInput').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+           ondragleave="this.style.borderColor='var(--border)'"
+           ondrop="handleDrop(event)">
+        <div id="scanDropzoneContent">
+          <div style="font-size:36px;margin-bottom:8px;">📁</div>
+          <div style="font-size:14px;font-weight:600;">Resim seçmek için tıklayın</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">veya sürükleyip bırakın · JPG, PNG, WEBP</div>
+        </div>
+        <img id="scanPreviewImg" src="" alt="Önizleme"
+             style="display:none;max-width:100%;max-height:280px;border-radius:6px;margin-top:8px;" />
+      </div>
+      <input type="file" id="scanFileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(this)" />
+
+      <div id="scanResult" style="display:none;margin-top:16px;"></div>
+
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button id="scanBtn" class="btn btn-primary" style="flex:1;" onclick="doScan()" disabled>
+          <span id="scanBtnText">📷 Tara ve Ekle</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeScanModal()">İptal</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -388,5 +429,109 @@ function calcPreview() {
     document.getElementById('costPreview').textContent = '—';
   }
 }
+
+/* ── Scan modal ── */
+var _scanFile = null;
+
+function openScanModal() {
+  _scanFile = null;
+  document.getElementById('scanFileInput').value = '';
+  document.getElementById('scanPreviewImg').style.display = 'none';
+  document.getElementById('scanDropzoneContent').style.display = 'block';
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanResult').innerHTML = '';
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('scanBtnText').textContent = '📷 Tara ve Ekle';
+  openModal('scanModal');
+}
+
+function closeScanModal() {
+  closeModal('scanModal');
+}
+
+function handleFileSelect(input) {
+  if (input.files && input.files[0]) {
+    _scanFile = input.files[0];
+    showScanPreview(_scanFile);
+  }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('scanDropzone').style.borderColor = 'var(--border)';
+  var file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    _scanFile = file;
+    showScanPreview(file);
+  }
+}
+
+function showScanPreview(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = document.getElementById('scanPreviewImg');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.getElementById('scanDropzoneContent').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanResult').innerHTML = '';
+  document.getElementById('scanBtn').disabled = false;
+  document.getElementById('scanBtnText').textContent = '📷 Tara ve Ekle';
+}
+
+function doScan() {
+  if (!_scanFile) return;
+  var btn = document.getElementById('scanBtn');
+  var btnText = document.getElementById('scanBtnText');
+  btn.disabled = true;
+  btnText.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Taranıyor...';
+
+  var fd = new FormData();
+  fd.append('image', _scanFile);
+
+  fetch('/membrane/door/scan', {method: 'POST', body: fd})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btnText.textContent = '📷 Tara ve Ekle';
+      var res = document.getElementById('scanResult');
+      res.style.display = 'block';
+      if (data.error) {
+        res.innerHTML = '<div class="alert alert-danger" style="margin:0;"><strong>Hata:</strong> ' + data.error + '</div>';
+        return;
+      }
+      if (!data.count || data.count === 0) {
+        res.innerHTML = '<div class="alert alert-warning" style="margin:0;">Görselden ölçü çıkarılamadı. Daha net bir fotoğraf deneyin.</div>';
+        return;
+      }
+      var rows = data.saved.map(function(d) {
+        return '<tr><td>' + (d.door_name || '—') + '</td>' +
+               '<td style="text-align:center">' + d.width_mm + '</td>' +
+               '<td style="text-align:center">' + d.height_mm + '</td>' +
+               '<td style="text-align:center">' + d.quantity + '</td></tr>';
+      }).join('');
+      res.innerHTML = '<div class="alert alert-success" style="margin-bottom:10px;">✅ <strong>' + data.count + ' kapak</strong> listeye eklendi!</div>' +
+        '<div style="overflow:auto;max-height:200px;">' +
+        '<table style="width:100%;font-size:12px;border-collapse:collapse;">' +
+        '<thead><tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:4px 6px;">Ad/Renk</th>' +
+        '<th style="text-align:center;padding:4px 6px;">En (mm)</th>' +
+        '<th style="text-align:center;padding:4px 6px;">Boy (mm)</th>' +
+        '<th style="text-align:center;padding:4px 6px;">Adet</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table></div>' +
+        '<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="location.reload()">Listeyi Gör →</button>';
+    })
+    .catch(function(err) {
+      btn.disabled = false;
+      btnText.textContent = '📷 Tara ve Ekle';
+      var res = document.getElementById('scanResult');
+      res.style.display = 'block';
+      res.innerHTML = '<div class="alert alert-danger" style="margin:0;">Bağlantı hatası: ' + err.message + '</div>';
+    });
+}
 </script>
+<style>
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+</style>
 {% endblock %}
