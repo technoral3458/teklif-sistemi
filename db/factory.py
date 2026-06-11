@@ -138,9 +138,10 @@ def init():
             created_at TEXT DEFAULT(datetime('now'))
         )""")
 
-        # Option variation image columns
-        _acol(cur, "options", "image_path",     "TEXT DEFAULT ''")
-        _acol(cur, "options", "image_priority", "INTEGER DEFAULT 0")
+        # Option image columns
+        _acol(cur, "options", "image_path",           "TEXT DEFAULT ''")
+        _acol(cur, "options", "image_priority",       "INTEGER DEFAULT 0")
+        _acol(cur, "options", "variation_image_path", "TEXT DEFAULT ''")
 
         # New columns on offers for order workflow
         for col, typ in [
@@ -310,9 +311,10 @@ def del_model(mid):
 
 # ── Options ───────────────────────────────────────────────────────────────────
 
-_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,created_at"
+_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,created_at"
 _OKEYS = ["id", "name", "description", "price", "currency", "scope",
-          "category_id", "qty_type", "conflict_group", "image_path", "image_priority", "created_at"]
+          "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
+          "variation_image_path", "created_at"]
 
 
 def _ro(r):
@@ -339,7 +341,8 @@ def get_option(oid):
 
 def add_option(**kw):
     allowed = ["name", "description", "price", "currency", "scope",
-               "category_id", "qty_type", "conflict_group", "image_path", "image_priority"]
+               "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
+               "variation_image_path"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -350,7 +353,8 @@ def add_option(**kw):
 
 def upd_option(oid, **kw):
     allowed = ["name", "description", "price", "currency", "scope",
-               "category_id", "qty_type", "conflict_group", "image_path", "image_priority"]
+               "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
+               "variation_image_path"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return

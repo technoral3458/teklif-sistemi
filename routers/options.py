@@ -48,28 +48,36 @@ async def save_option(request: Request,
                       conflict_group: str = Form(""),
                       image_priority: int = Form(0),
                       current_image_path: str = Form(""),
-                      image: Optional[UploadFile] = File(None)):
+                      current_variation_image_path: str = Form(""),
+                      image: Optional[UploadFile] = File(None),
+                      variation_image: Optional[UploadFile] = File(None)):
     auth.require_user(request)
 
-    image_path = current_image_path
-    if image and image.filename:
-        try:
-            os.makedirs(IMAGES_DIR, exist_ok=True)
-            ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
-            fname = f"opt_{uuid.uuid4().hex[:10]}{ext}"
-            fpath = os.path.join(IMAGES_DIR, fname)
-            content = await image.read()
-            with open(fpath, "wb") as f:
-                f.write(content)
-            image_path = f"img/uploads/{fname}"
-        except Exception as e:
-            return RedirectResponse(f"/options?msg=Resim+kaydedilemedi:+{e}&msg_type=error", 303)
+    def _save_file(upload: UploadFile, prefix: str) -> str:
+        raise NotImplementedError
+
+    async def _save(upload, prefix):
+        if not (upload and upload.filename):
+            return None
+        os.makedirs(IMAGES_DIR, exist_ok=True)
+        ext = os.path.splitext(upload.filename)[1].lower() or ".jpg"
+        fname = f"{prefix}_{uuid.uuid4().hex[:10]}{ext}"
+        content = await upload.read()
+        with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
+            f.write(content)
+        return f"img/uploads/{fname}"
+
+    try:
+        image_path = (await _save(image, "opt")) or current_image_path
+        variation_image_path = (await _save(variation_image, "var")) or current_variation_image_path
+    except Exception as e:
+        return RedirectResponse(f"/options?msg=Resim+kaydedilemedi:+{e}&msg_type=error", 303)
 
     kw = dict(
         name=name, description=description, price=price, currency=currency,
         scope=scope, category_id=category_id or None, qty_type=qty_type,
         conflict_group=conflict_group, image_priority=image_priority,
-        image_path=image_path,
+        image_path=image_path, variation_image_path=variation_image_path,
     )
     try:
         if id:
