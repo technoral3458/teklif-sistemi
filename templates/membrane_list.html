@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% block page_title %}{{ lst.name }}{% endblock %}
+
+{% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
+
+<!-- Breadcrumb -->
+<div style="margin-bottom:16px;font-size:13px;color:var(--text-muted);">
+  <a href="/membrane" style="color:var(--accent);">Membran</a> › <span>{{ lst.name }}</span>
+</div>
+
+<!-- List header card -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    <div>
+      <div style="font-size:20px;font-weight:800;">{{ lst.name }}</div>
+      {% if lst.notes %}<div style="font-size:13px;color:var(--text-muted);margin-top:2px;">{{ lst.notes }}</div>{% endif %}
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Oluşturulma: {{ lst.created_at[:16] }}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/membrane/list/{{ lst.id }}/print" target="_blank" class="btn btn-outline btn-sm">🖨️ Yazdır</a>
+      <button class="btn btn-outline btn-sm" onclick="openEditModal()">✏️ Düzenle</button>
+      <form method="post" action="/membrane/list/delete" style="margin:0;">
+        <input type="hidden" name="id" value="{{ lst.id }}" />
+        <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Listeyi ve tüm kapakları sil?')" style="color:var(--danger)">🗑️ Listeyi Sil</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Cost summary bar -->
+{% if materials %}
+<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <div class="card" style="flex:1;min-width:160px;">
+    <div class="card-body" style="padding:12px 16px;">
+      <div style="font-size:11px;color:var(--text-muted);">MALİYET/m²</div>
+      <div style="font-size:22px;font-weight:800;color:var(--accent);">{{ "%.2f"|format(total_cost_per_m2) }} ₺</div>
+    </div>
+  </div>
+  <div class="card" style="flex:1;min-width:160px;">
+    <div class="card-body" style="padding:12px 16px;">
+      <div style="font-size:11px;color:var(--text-muted);">TOPLAM ALAN</div>
+      <div style="font-size:22px;font-weight:800;">{{ "%.3f"|format(grand_area) }} m²</div>
+    </div>
+  </div>
+  <div class="card" style="flex:1;min-width:160px;">
+    <div class="card-body" style="padding:12px 16px;">
+      <div style="font-size:11px;color:var(--text-muted);">TOPLAM MALİYET</div>
+      <div style="font-size:22px;font-weight:800;color:var(--accent);">{{ "%.2f"|format(grand_total) }} ₺</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Door list -->
+<div class="card">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3 class="card-title">🚪 Kapaklar ({{ doors|length }})</h3>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="openDoorModal()">+ Kapak Ekle</button>
+      <button class="btn btn-outline btn-sm" onclick="openScanModal()">📷 Görselden Tara</button>
+      {% if doors %}
+      <form method="post" action="/membrane/list/{{ lst.id }}/door/clear" style="margin:0;">
+        <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Tüm kapakları sil?')" style="color:var(--danger)">🗑️ Temizle</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Kapak Adı / Renk</th>
+          <th style="text-align:center">En <small style="color:var(--text-muted)">(mm)</small></th>
+          <th style="text-align:center">Boy <small style="color:var(--text-muted)">(mm)</small></th>
+          <th style="text-align:center">Alan <small style="color:var(--text-muted)">(m²)</small></th>
+          <th style="text-align:center">Adet</th>
+          <th style="text-align:right">Birim Maliyet</th>
+          <th style="text-align:right">Toplam</th>
+          <th style="text-align:center">İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for door in doors %}
+        <tr>
+          <td style="color:var(--text-muted);font-size:12px;">{{ loop.index }}</td>
+          <td><strong>{{ door.door_name or ('Kapak #' ~ door.id) }}</strong></td>
+          <td style="text-align:center">{{ door.width_mm|int }}</td>
+          <td style="text-align:center">{{ door.height_mm|int }}</td>
+          <td style="text-align:center;color:var(--text-muted);">{{ "%.4f"|format(door.area_m2) }}</td>
+          <td style="text-align:center">{{ door.quantity }}</td>
+          <td style="text-align:right">{{ "%.2f"|format(door.unit_cost) }} ₺</td>
+          <td style="text-align:right;font-weight:700;color:var(--accent);">{{ "%.2f"|format(door.total_cost) }} ₺</td>
+          <td style="text-align:center;">
+            <button class="btn btn-ghost btn-sm" onclick='editDoor({{ door|tojson }})'>✏️</button>
+            <form method="post" action="/membrane/list/{{ lst.id }}/door/delete" style="display:inline;">
+              <input type="hidden" name="id" value="{{ door.id }}" />
+              <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not doors %}
+        <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px;">Liste boş. "Kapak Ekle" veya "Görselden Tara" butonunu kullanın.</td></tr>
+        {% endif %}
+      </tbody>
+      {% if doors %}
+      <tfoot>
+        <tr style="font-weight:700;font-size:14px;background:var(--surface-2,var(--surface));">
+          <td colspan="4" style="text-align:right;color:var(--text-muted);">TOPLAM</td>
+          <td style="text-align:center;">{{ "%.4f"|format(grand_area) }} m²</td>
+          <td></td>
+          <td></td>
+          <td style="text-align:right;color:var(--accent);font-size:16px;">{{ "%.2f"|format(grand_total) }} ₺</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+<!-- Edit List Modal -->
+<div id="editListModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Listeyi Düzenle</h3>
+      <button class="modal-close" onclick="closeModal('editListModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/membrane/list/save">
+        <input type="hidden" name="id" value="{{ lst.id }}" />
+        <div class="form-group">
+          <label class="form-label">Liste Adı / Müşteri Adı *</label>
+          <input type="text" name="name" class="form-control" required value="{{ lst.name }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notlar</label>
+          <input type="text" name="notes" class="form-control" value="{{ lst.notes or '' }}" />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Kaydet</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Door Modal -->
+<div id="doorModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="doorModalTitle">Kapak Ekle</h3>
+      <button class="modal-close" onclick="closeModal('doorModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/membrane/list/{{ lst.id }}/door/save" id="doorForm">
+        <input type="hidden" name="id" id="door_id" value="0" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="grid-column:span 2;">
+            <label class="form-label">Kapak Adı / Renk</label>
+            <input type="text" name="door_name" id="door_name" class="form-control" placeholder="ör: Mutfak Üst - Beyaz" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">En <span style="color:var(--accent);font-size:11px;">mm</span> *</label>
+            <input type="number" name="width_mm" id="door_width" class="form-control" step="0.1" min="1" required placeholder="ör: 400" oninput="calcPreview()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Boy <span style="color:var(--accent);font-size:11px;">mm</span> *</label>
+            <input type="number" name="height_mm" id="door_height" class="form-control" step="0.1" min="1" required placeholder="ör: 720" oninput="calcPreview()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Adet</label>
+            <input type="number" name="quantity" id="door_qty" class="form-control" step="1" min="1" value="1" oninput="calcPreview()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tahmini Maliyet</label>
+            <div id="costPreview" style="padding:9px 12px;background:var(--surface-2,#1e293b);border-radius:6px;border:1px solid var(--border);font-weight:700;color:var(--accent);font-size:15px;">—</div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Listeye Ekle</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Scan Modal -->
+<div id="scanModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">📷 Görselden Kapak Ölçüleri Tara</h3>
+      <button class="modal-close" onclick="closeScanModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        Elle yazılmış ölçü listesinin fotoğrafını yükleyin. Yapay zeka kapak ölçülerini otomatik olarak tespit edip listeye ekleyecektir.
+      </p>
+      <div id="scanDropzone"
+           style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:border-color .2s;"
+           onclick="document.getElementById('scanFileInput').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+           ondragleave="this.style.borderColor='var(--border)'"
+           ondrop="handleDrop(event)">
+        <div id="scanDropzoneContent">
+          <div style="font-size:36px;margin-bottom:8px;">📁</div>
+          <div style="font-size:14px;font-weight:600;">Resim seçmek için tıklayın</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">veya sürükleyip bırakın · JPG, PNG, WEBP</div>
+        </div>
+        <img id="scanPreviewImg" src="" alt="Önizleme" style="display:none;max-width:100%;max-height:280px;border-radius:6px;margin-top:8px;" />
+      </div>
+      <input type="file" id="scanFileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(this)" />
+      <div id="scanResult" style="display:none;margin-top:16px;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button id="scanBtn" class="btn btn-primary" style="flex:1;" onclick="doScan()" disabled>
+          <span id="scanBtnText">📷 Tara ve Ekle</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeScanModal()">İptal</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const COST_PER_M2 = {{ total_cost_per_m2 }};
+const LIST_ID = {{ lst.id }};
+
+function openEditModal() { openModal('editListModal'); }
+
+function openDoorModal() {
+  document.getElementById('doorModalTitle').textContent = 'Kapak Ekle';
+  document.getElementById('door_id').value = '0';
+  document.getElementById('door_name').value = '';
+  document.getElementById('door_width').value = '';
+  document.getElementById('door_height').value = '';
+  document.getElementById('door_qty').value = '1';
+  document.getElementById('costPreview').textContent = '—';
+  openModal('doorModal');
+}
+
+function editDoor(door) {
+  document.getElementById('doorModalTitle').textContent = 'Kapak Düzenle';
+  document.getElementById('door_id').value = door.id;
+  document.getElementById('door_name').value = door.door_name || '';
+  document.getElementById('door_width').value = door.width_mm;
+  document.getElementById('door_height').value = door.height_mm;
+  document.getElementById('door_qty').value = door.quantity;
+  calcPreview();
+  openModal('doorModal');
+}
+
+function calcPreview() {
+  var w = parseFloat(document.getElementById('door_width').value) || 0;
+  var h = parseFloat(document.getElementById('door_height').value) || 0;
+  var q = parseInt(document.getElementById('door_qty').value) || 1;
+  if (w > 0 && h > 0) {
+    var area = (w/1000)*(h/1000);
+    var unitCost = COST_PER_M2 * area;
+    var total = unitCost * q;
+    var el = document.getElementById('costPreview');
+    el.innerHTML = (q>1 ? q+' × '+unitCost.toFixed(2)+' = <br>' : '') +
+      '<span style="font-size:18px">'+total.toFixed(2)+' ₺</span>' +
+      '<br><small style="color:var(--text-muted);font-size:11px;">'+(area*10000).toFixed(1)+' dm² = '+area.toFixed(4)+' m²</small>';
+  } else {
+    document.getElementById('costPreview').textContent = '—';
+  }
+}
+
+var _scanFile = null;
+
+function openScanModal() {
+  _scanFile = null;
+  document.getElementById('scanFileInput').value = '';
+  document.getElementById('scanPreviewImg').style.display = 'none';
+  document.getElementById('scanDropzoneContent').style.display = 'block';
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanResult').innerHTML = '';
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('scanBtnText').textContent = '📷 Tara ve Ekle';
+  openModal('scanModal');
+}
+
+function closeScanModal() { closeModal('scanModal'); }
+
+function handleFileSelect(input) {
+  if (input.files && input.files[0]) { _scanFile = input.files[0]; showScanPreview(_scanFile); }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('scanDropzone').style.borderColor = 'var(--border)';
+  var file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) { _scanFile = file; showScanPreview(file); }
+}
+
+function showScanPreview(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = document.getElementById('scanPreviewImg');
+    img.src = e.target.result; img.style.display = 'block';
+    document.getElementById('scanDropzoneContent').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanResult').innerHTML = '';
+  document.getElementById('scanBtn').disabled = false;
+  document.getElementById('scanBtnText').textContent = '📷 Tara ve Ekle';
+}
+
+function doScan() {
+  if (!_scanFile) return;
+  var btn = document.getElementById('scanBtn');
+  var btnText = document.getElementById('scanBtnText');
+  btn.disabled = true;
+  btnText.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Taranıyor...';
+  var fd = new FormData();
+  fd.append('image', _scanFile);
+  fetch('/membrane/list/'+LIST_ID+'/door/scan', {method:'POST', body:fd})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      btn.disabled = false; btnText.textContent = '📷 Tara ve Ekle';
+      var res = document.getElementById('scanResult');
+      res.style.display = 'block';
+      if (data.error) { res.innerHTML='<div class="alert alert-danger" style="margin:0;"><strong>Hata:</strong> '+data.error+'</div>'; return; }
+      if (!data.count||data.count===0) { res.innerHTML='<div class="alert alert-warning" style="margin:0;">Görselden ölçü çıkarılamadı. Daha net bir fotoğraf deneyin.</div>'; return; }
+      var rows=data.saved.map(function(d){
+        return '<tr><td>'+(d.door_name||'—')+'</td><td style="text-align:center">'+d.width_mm+'</td><td style="text-align:center">'+d.height_mm+'</td><td style="text-align:center">'+d.quantity+'</td></tr>';
+      }).join('');
+      res.innerHTML='<div class="alert alert-success" style="margin-bottom:10px;">✅ <strong>'+data.count+' kapak</strong> listeye eklendi!</div>'+
+        '<div style="overflow:auto;max-height:200px;"><table style="width:100%;font-size:12px;border-collapse:collapse;">'+
+        '<thead><tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:4px 6px;">Ad/Renk</th>'+
+        '<th style="text-align:center;padding:4px 6px;">En (mm)</th><th style="text-align:center;padding:4px 6px;">Boy (mm)</th>'+
+        '<th style="text-align:center;padding:4px 6px;">Adet</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+        '<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="location.reload()">Listeyi Gör →</button>';
+    })
+    .catch(function(err){
+      btn.disabled=false; btnText.textContent='📷 Tara ve Ekle';
+      var res=document.getElementById('scanResult');
+      res.style.display='block';
+      res.innerHTML='<div class="alert alert-danger" style="margin:0;">Bağlantı hatası: '+err.message+'</div>';
+    });
+}
+</script>
+<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+{% endblock %}

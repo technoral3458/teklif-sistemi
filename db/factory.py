@@ -867,6 +867,13 @@ def _init_membrane(c):
     for cur in ['USD', 'EUR', 'GBP']:
         if not c.execute("SELECT 1 FROM membrane_rates WHERE currency=?", (cur,)).fetchone():
             c.execute("INSERT INTO membrane_rates(currency,rate_to_try) VALUES(?,1)", (cur,))
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_lists(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        notes TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+    _acol(c, "membrane_doors", "list_id", "INTEGER DEFAULT NULL")
 
 def get_membrane_materials():
     with _c() as c:
@@ -902,13 +909,14 @@ def get_membrane_doors():
     return [dict(zip(cols, r)) for r in rows]
 
 def save_membrane_door(id=None, **kw):
-    fields = ["project_name","door_name","width_mm","height_mm","quantity"]
+    fields = ["project_name","door_name","width_mm","height_mm","quantity","list_id"]
     vals = [
         kw.get("project_name", ""),
         kw.get("door_name", ""),
         float(kw.get("width_mm", 0)),
         float(kw.get("height_mm", 0)),
         int(kw.get("quantity", 1)),
+        kw.get("list_id", None),
     ]
     with _c() as c:
         cur = c.cursor()
@@ -924,6 +932,49 @@ def save_membrane_door(id=None, **kw):
 def del_membrane_door(did):
     with _c() as c:
         c.execute("DELETE FROM membrane_doors WHERE id=?", (did,))
+
+def get_membrane_lists():
+    with _c() as c:
+        rows = c.execute("""
+            SELECT ml.id, ml.name, ml.notes, ml.created_at,
+                   COUNT(md.id) as door_count,
+                   COALESCE(SUM(md.quantity), 0) as total_qty
+            FROM membrane_lists ml
+            LEFT JOIN membrane_doors md ON md.list_id = ml.id
+            GROUP BY ml.id ORDER BY ml.id DESC
+        """).fetchall()
+    cols = ["id","name","notes","created_at","door_count","total_qty"]
+    return [dict(zip(cols, r)) for r in rows]
+
+def get_membrane_list(lid):
+    with _c() as c:
+        r = c.execute("SELECT id,name,notes,created_at FROM membrane_lists WHERE id=?", (lid,)).fetchone()
+    return dict(zip(["id","name","notes","created_at"], r)) if r else None
+
+def save_membrane_list(id=None, name="", notes=""):
+    with _c() as c:
+        cur = c.cursor()
+        if id:
+            cur.execute("UPDATE membrane_lists SET name=?,notes=? WHERE id=?", (name, notes, id))
+        else:
+            cur.execute("INSERT INTO membrane_lists(name,notes) VALUES(?,?)", (name, notes))
+            id = cur.lastrowid
+        c.commit()
+    return id
+
+def del_membrane_list(lid):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_doors WHERE list_id=?", (lid,))
+        c.execute("DELETE FROM membrane_lists WHERE id=?", (lid,))
+
+def get_membrane_doors_by_list(lid):
+    with _c() as c:
+        rows = c.execute(
+            "SELECT id,project_name,door_name,width_mm,height_mm,quantity FROM membrane_doors WHERE list_id=? ORDER BY id",
+            (lid,)
+        ).fetchall()
+    cols = ["id","project_name","door_name","width_mm","height_mm","quantity"]
+    return [dict(zip(cols, r)) for r in rows]
 
 def get_membrane_rates():
     with _c() as c:
