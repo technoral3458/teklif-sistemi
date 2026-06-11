@@ -15,7 +15,7 @@
     <table id="mainTable">
       <thead>
         <tr>
-          <th style="width:48px;">Resim</th>
+          <th style="width:56px;">Resim</th>
           <th>Opsiyon Adı</th>
           <th>Kategori</th>
           <th>Kapsam</th>
@@ -150,20 +150,21 @@
             <input type="text" name="conflict_group" id="oconflict" class="form-control" placeholder="örn: renk_grubu" />
           </div>
 
-          <!-- Variation image + priority -->
+          <!-- Option image + priority -->
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">Varyasyon Resmi</label>
+            <label class="form-label">Opsiyon Resmi</label>
             <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
-              Teklif hazırlarken bu opsiyon seçildiğinde makine resmi olarak kullanılır.
+              Bu opsiyon seçildiğinde teklif hazırlama ekranında kullanılacak varyasyon resmi. Öncelik belirlenirse, birden fazla resimli opsiyon seçildiğinde en yüksek öncelikli opsiyonun resmi gösterilir.
             </p>
+            <input type="file" name="image" id="oimage" accept="image/*" style="display:none;" onchange="previewOptImg(this)" />
             <div style="display:flex;align-items:center;gap:12px;">
-              <img id="oImgPreview" style="display:none;width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border);" />
-              <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">
-                Resim Seç
-                <input type="file" name="image" id="oimage" accept="image/*" style="display:none;"
-                  onchange="previewOptImg(this)" />
-              </label>
-              <button type="button" id="oClearImg" class="btn btn-ghost btn-sm" style="display:none;" onclick="clearOptImg()">Resmi Kaldır</button>
+              <img id="oImgPreview" style="display:none;width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border);" />
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('oimage').click()">
+                  📷 Resim Seç
+                </button>
+                <button type="button" id="oClearImg" class="btn btn-ghost btn-sm" style="display:none;" onclick="clearOptImg()">✕ Resmi Kaldır</button>
+              </div>
             </div>
           </div>
 
