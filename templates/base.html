@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="{{ user.lang if user else 'tr' }}" data-theme="{{ user.theme if user else 'dark' }}">
+<html data-theme="{{ user.theme if user else 'dark' }}" translate="no">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="google" content="notranslate" />
   <title>{{ page_title|default('B2B Sistem') }} | B2B Teklif</title>
   <link rel="stylesheet" href="/static/css/style.css" />
 </head>
@@ -142,10 +143,7 @@
       <!-- Language selector -->
       <div style="display:flex;gap:2px;align-items:center;margin-right:4px;">
         {% for code, flag in [('tr','🇹🇷'),('en','🇬🇧'),('zh','🇨🇳')] %}
-        <form method="post" action="/set-lang" style="display:inline;margin:0;">
-          <input type="hidden" name="lang" value="{{ code }}" />
-          <button type="submit" class="btn-icon" style="font-size:14px;padding:4px 7px;{% if user and user.lang == code %}opacity:1;box-shadow:0 0 0 2px var(--accent);border-radius:4px;{% else %}opacity:0.35;{% endif %}" title="{{ code.upper() }}">{{ flag }}</button>
-        </form>
+        <button type="button" class="btn-icon" onclick="setLang('{{ code }}')" style="font-size:14px;padding:4px 7px;{% if user and user.lang == code %}opacity:1;box-shadow:0 0 0 2px var(--accent);border-radius:4px;{% else %}opacity:0.35;{% endif %}" title="{{ code.upper() }}">{{ flag }}</button>
         {% endfor %}
       </div>
 
@@ -188,6 +186,14 @@
   </main>
 
   <script src="/static/js/app.js"></script>
+  <script>
+  function setLang(code) {
+    var fd = new FormData();
+    fd.append('lang', code);
+    fetch('/set-lang', {method:'POST', body:fd})
+      .then(function() { location.reload(); });
+  }
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
