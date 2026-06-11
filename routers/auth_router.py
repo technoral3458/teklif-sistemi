@@ -101,8 +101,9 @@ async def do_forgot(request: Request, email: str = Form(...)):
     if tok:
         return templates.TemplateResponse(request, "login.html", {
             **_admin_ctx(),
-            "msg": f"Sıfırlama kodu: {tok}  (Geliştirme modu — gerçek sistemde e-posta gönderilir)",
-            "msg_type": "info",
+            "show_reset": True,
+            "prefill_email": email.strip().lower(),
+            "reset_code": tok,
         })
     return templates.TemplateResponse(request, "login.html", {
         **_admin_ctx(),

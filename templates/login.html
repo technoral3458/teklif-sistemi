@@ -139,13 +139,20 @@
           <button type="submit" class="btn btn-primary" style="width:100%" data-i18n="send_reset">Sıfırlama Kodu Gönder</button>
         </form>
         <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
-          <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;" data-i18n="have_code">Kodunuz varsa buradan şifrenizi sıfırlayın:</p>
+          {% if reset_code %}
+          <div style="background:var(--surface-2,#1e293b);border:2px solid var(--accent);border-radius:8px;padding:12px 16px;margin-bottom:14px;text-align:center;">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;" data-i18n="your_code">Sıfırlama Kodunuz:</div>
+            <div style="font-size:28px;font-weight:900;letter-spacing:6px;color:var(--accent);">{{ reset_code }}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">30 dakika geçerlidir</div>
+          </div>
+          {% endif %}
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;" data-i18n="have_code">Kodu aşağıya girin ve yeni şifrenizi belirleyin:</p>
           <form method="post" action="/auth/reset">
             <div class="form-group">
-              <input type="email" name="email" class="form-control" data-i18n-ph="ph_email" placeholder="E-posta" required />
+              <input type="email" name="email" id="resetEmail" class="form-control" data-i18n-ph="ph_email" placeholder="E-posta" required value="{{ prefill_email or '' }}" />
             </div>
             <div class="form-group">
-              <input type="text" name="token" class="form-control" data-i18n-ph="ph_token" placeholder="6 haneli kod" required maxlength="6" />
+              <input type="text" name="token" id="resetToken" class="form-control" data-i18n-ph="ph_token" placeholder="6 haneli kod" required maxlength="6" value="{{ reset_code or '' }}" />
             </div>
             <div class="form-group">
               <input type="password" name="new_password" class="form-control" data-i18n-ph="ph_new_password" placeholder="Yeni Şifre" required minlength="6" />
@@ -158,6 +165,9 @@
   </div>
 
   <script src="/static/js/app.js"></script>
+  {% if show_reset %}
+  <script>document.addEventListener('DOMContentLoaded', function(){ openModal('forgotModal'); });</script>
+  {% endif %}
   <script>
     // ── i18n ────────────────────────────────────────────────────────
     const _i18n = {
