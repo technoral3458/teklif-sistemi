@@ -4,7 +4,7 @@
 {% block content %}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
   <input type="text" id="tableSearch" class="search-box" placeholder="Opsiyon ara..." style="max-width:280px;" />
-  <button class="btn btn-primary" onclick="openModal('optModal')">
+  <button class="btn btn-primary" onclick="newOpt()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Yeni Opsiyon
   </button>
@@ -15,11 +15,12 @@
     <table id="mainTable">
       <thead>
         <tr>
+          <th style="width:48px;">Resim</th>
           <th>Opsiyon Adı</th>
           <th>Kategori</th>
           <th>Kapsam</th>
-          <th>Adet Tipi</th>
           <th>Fiyat</th>
+          <th style="width:60px;text-align:center;">Öncelik</th>
           <th>İşlemler</th>
         </tr>
       </thead>
@@ -27,16 +28,43 @@
         {% for o in options %}
         <tr>
           <td>
+            {% if o.image_path %}
+            <img src="/static/{{ o.image_path }}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border);" />
+            {% else %}
+            <div style="width:40px;height:40px;background:var(--surface-2);border-radius:4px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            {% endif %}
+          </td>
+          <td>
             <strong>{{ o.name }}</strong>
             {% if o.description %}<br><small style="color:var(--text-muted)">{{ o.description[:60] }}{% if o.description|length > 60 %}...{% endif %}</small>{% endif %}
           </td>
           <td>{{ o.category_name or 'Genel' }}</td>
           <td><span class="badge badge-{{ 'blue' if o.scope == 'GLOBAL' else 'amber' }}">{{ o.scope }}</span></td>
-          <td><span class="badge badge-gray">{{ o.qty_type }}</span></td>
           <td>{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</td>
+          <td style="text-align:center;">
+            {% if o.image_priority %}
+            <span class="badge badge-amber">{{ o.image_priority }}</span>
+            {% else %}
+            <span style="color:var(--text-muted);font-size:12px;">—</span>
+            {% endif %}
+          </td>
           <td>
             <div style="display:flex;gap:6px;">
-              <button class="btn btn-ghost btn-sm" onclick="editOpt({{ o.id }}, '{{ o.name|e }}', '{{ o.description|e }}', {{ o.price|default(0) }}, '{{ o.currency }}', '{{ o.scope }}', {{ o.category_id|default(0) }}, '{{ o.qty_type }}', '{{ o.conflict_group|default('')|e }}')">Düzenle</button>
+              <button class="btn btn-ghost btn-sm" onclick="editOpt(
+                {{ o.id }},
+                {{ o.name|tojson }},
+                {{ o.description|tojson }},
+                {{ o.price|default(0) }},
+                '{{ o.currency }}',
+                '{{ o.scope }}',
+                {{ o.category_id|default(0) }},
+                '{{ o.qty_type }}',
+                {{ o.conflict_group|default('')|tojson }},
+                {{ o.image_path|default('')|tojson }},
+                {{ o.image_priority|default(0) }}
+              )">✏️ Düzenle</button>
               <form method="post" action="/options/delete" onsubmit="return confirmDelete(this)">
                 <input type="hidden" name="id" value="{{ o.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">Sil</button>
@@ -45,35 +73,41 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px">Henüz opsiyon eklenmedi</td></tr>
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">Henüz opsiyon eklenmedi</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
+<!-- Add/Edit Modal -->
 <div id="optModal" class="modal-overlay">
-  <div class="modal-box" style="max-width:520px;">
+  <div class="modal-box" style="max-width:560px;">
     <div class="modal-header">
       <h3 class="modal-title" id="optModalTitle">Yeni Opsiyon</h3>
       <button class="modal-close" onclick="closeModal('optModal')">&times;</button>
     </div>
     <div class="modal-body">
-      <form method="post" action="/options/save">
+      <form method="post" action="/options/save" enctype="multipart/form-data" id="optForm">
         <input type="hidden" name="id" id="oid" value="0" />
+        <input type="hidden" name="current_image_path" id="ocurrent_image" value="" />
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
           <div class="form-group" style="grid-column:1/-1;">
             <label class="form-label">Opsiyon Adı *</label>
             <input type="text" name="name" id="oname" class="form-control" required />
           </div>
+
           <div class="form-group" style="grid-column:1/-1;">
             <label class="form-label">Açıklama</label>
             <textarea name="description" id="odesc" class="form-control" rows="2"></textarea>
           </div>
+
           <div class="form-group">
             <label class="form-label">Fiyat</label>
             <input type="number" name="price" id="oprice" class="form-control" step="0.01" min="0" value="0" />
           </div>
+
           <div class="form-group">
             <label class="form-label">Para Birimi</label>
             <select name="currency" id="ocurrency" class="form-control">
@@ -82,6 +116,7 @@
               {% endfor %}
             </select>
           </div>
+
           <div class="form-group">
             <label class="form-label">Kapsam</label>
             <select name="scope" id="oscope" class="form-control">
@@ -90,6 +125,7 @@
               {% endfor %}
             </select>
           </div>
+
           <div class="form-group">
             <label class="form-label">Adet Tipi</label>
             <select name="qty_type" id="oqty_type" class="form-control">
@@ -98,6 +134,7 @@
               {% endfor %}
             </select>
           </div>
+
           <div class="form-group">
             <label class="form-label">Kategori</label>
             <select name="category_id" id="ocat" class="form-control">
@@ -107,10 +144,40 @@
               {% endfor %}
             </select>
           </div>
+
           <div class="form-group">
             <label class="form-label">Çakışma Grubu</label>
-            <input type="text" name="conflict_group" id="oconflict" class="form-control" placeholder="orn: renk_grubu" />
+            <input type="text" name="conflict_group" id="oconflict" class="form-control" placeholder="örn: renk_grubu" />
           </div>
+
+          <!-- Variation image + priority -->
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">Varyasyon Resmi</label>
+            <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+              Teklif hazırlarken bu opsiyon seçildiğinde makine resmi olarak kullanılır.
+            </p>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <img id="oImgPreview" style="display:none;width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border);" />
+              <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">
+                Resim Seç
+                <input type="file" name="image" id="oimage" accept="image/*" style="display:none;"
+                  onchange="previewOptImg(this)" />
+              </label>
+              <button type="button" id="oClearImg" class="btn btn-ghost btn-sm" style="display:none;" onclick="clearOptImg()">Resmi Kaldır</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              Resim Önceliği
+              <span style="font-size:11px;color:var(--text-muted);margin-left:4px;">(0 = yok, yüksek = öncelikli)</span>
+            </label>
+            <input type="number" name="image_priority" id="oimage_priority" class="form-control" min="0" max="100" value="0" />
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+              Birden fazla opsiyon seçildiğinde en yüksek öncelikli opsiyonun resmi gösterilir.
+            </p>
+          </div>
+
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
           <button type="button" class="btn btn-ghost" onclick="closeModal('optModal')">İptal</button>
@@ -124,7 +191,24 @@
 
 {% block scripts %}
 <script>
-function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflict) {
+function newOpt() {
+  document.getElementById('optModalTitle').textContent = 'Yeni Opsiyon';
+  document.getElementById('oid').value = '0';
+  document.getElementById('oname').value = '';
+  document.getElementById('odesc').value = '';
+  document.getElementById('oprice').value = '0';
+  document.getElementById('ocurrency').value = 'USD';
+  document.getElementById('oscope').value = 'GLOBAL';
+  document.getElementById('ocat').value = '0';
+  document.getElementById('oqty_type').value = 'MANUAL';
+  document.getElementById('oconflict').value = '';
+  document.getElementById('oimage_priority').value = '0';
+  document.getElementById('ocurrent_image').value = '';
+  clearOptImg();
+  openModal('optModal');
+}
+
+function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflict, imagePath, imagePriority) {
   document.getElementById('optModalTitle').textContent = 'Opsiyon Düzenle';
   document.getElementById('oid').value = id;
   document.getElementById('oname').value = name;
@@ -135,8 +219,45 @@ function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflic
   document.getElementById('ocat').value = catId;
   document.getElementById('oqty_type').value = qtyType;
   document.getElementById('oconflict').value = conflict;
+  document.getElementById('oimage_priority').value = imagePriority || 0;
+  document.getElementById('ocurrent_image').value = imagePath || '';
+
+  // Show existing image if any
+  const preview = document.getElementById('oImgPreview');
+  const clearBtn = document.getElementById('oClearImg');
+  if (imagePath) {
+    preview.src = '/static/' + imagePath;
+    preview.style.display = 'block';
+    clearBtn.style.display = 'inline-flex';
+  } else {
+    preview.style.display = 'none';
+    clearBtn.style.display = 'none';
+  }
+  // Reset file input
+  document.getElementById('oimage').value = '';
   openModal('optModal');
 }
+
+function previewOptImg(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const preview = document.getElementById('oImgPreview');
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      document.getElementById('oClearImg').style.display = 'inline-flex';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function clearOptImg() {
+  document.getElementById('oimage').value = '';
+  document.getElementById('ocurrent_image').value = '';
+  document.getElementById('oImgPreview').style.display = 'none';
+  document.getElementById('oClearImg').style.display = 'none';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   initTableSearch('tableSearch', 'mainTable');
 });

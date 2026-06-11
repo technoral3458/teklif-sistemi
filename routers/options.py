@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Request, Form
+import os
+import uuid
+from typing import Optional
+
+from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+
 import db.factory as fdb
 import auth
-from config import CURRENCIES, QTY_TYPES, OPTION_SCOPES
+from config import CURRENCIES, QTY_TYPES, OPTION_SCOPES, IMAGES_DIR
 
 router = APIRouter(prefix="/options")
 templates = Jinja2Templates(directory="templates")
@@ -38,12 +43,28 @@ async def save_option(request: Request,
                       scope: str = Form("GLOBAL"),
                       category_id: int = Form(0),
                       qty_type: str = Form("MANUAL"),
-                      conflict_group: str = Form("")):
+                      conflict_group: str = Form(""),
+                      image_priority: int = Form(0),
+                      current_image_path: str = Form(""),
+                      image: Optional[UploadFile] = File(None)):
     auth.require_user(request)
+
+    image_path = current_image_path
+    if image and image.filename:
+        os.makedirs(IMAGES_DIR, exist_ok=True)
+        ext = image.filename.rsplit(".", 1)[-1].lower()
+        fname = f"opt_{uuid.uuid4().hex[:10]}.{ext}"
+        fpath = os.path.join(IMAGES_DIR, fname)
+        content = await image.read()
+        with open(fpath, "wb") as f:
+            f.write(content)
+        image_path = f"img/uploads/{fname}"
+
     kw = dict(
         name=name, description=description, price=price, currency=currency,
         scope=scope, category_id=category_id or None, qty_type=qty_type,
-        conflict_group=conflict_group,
+        conflict_group=conflict_group, image_priority=image_priority,
+        image_path=image_path,
     )
     if id:
         fdb.upd_option(id, **kw)
