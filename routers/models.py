@@ -4,7 +4,7 @@ import json
 from typing import Optional
 
 from fastapi import APIRouter, Request, Form, UploadFile, File
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 import db.factory as fdb
@@ -159,6 +159,20 @@ async def save_model(request: Request,
     else:
         fdb.add_model(**kw)
     return RedirectResponse("/models", 303)
+
+
+@router.post("/spec-image")
+async def upload_spec_image(request: Request, image: UploadFile = File(...)):
+    auth.require_user(request)
+    if not image or not image.filename:
+        return JSONResponse({"error": "No file"}, status_code=400)
+    os.makedirs(IMAGES_DIR, exist_ok=True)
+    ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
+    fname = f"spec_{uuid.uuid4().hex[:10]}{ext}"
+    content = await image.read()
+    with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
+        f.write(content)
+    return JSONResponse({"path": f"img/uploads/{fname}"})
 
 
 @router.post("/delete")

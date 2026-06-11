@@ -6,7 +6,7 @@
   <a href="/models" class="btn btn-ghost btn-sm">← Modellere Dön</a>
 </div>
 
-<form method="post" action="/models/save" enctype="multipart/form-data">
+<form method="post" action="/models/save" enctype="multipart/form-data" onsubmit="serializeSpecs()">
   <input type="hidden" name="id" value="{{ model.id|default(0) }}" />
 
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;">
@@ -47,8 +47,13 @@
             <textarea name="description" class="form-control" rows="3">{{ model.description|default('') }}</textarea>
           </div>
           <div class="form-group">
-            <label class="form-label">Teknik Özellikler (JSON)</label>
-            <textarea name="specs" class="form-control" rows="4" placeholder='{"Güç": "15 kW", "Ağırlık": "250 kg"}'>{{ model.specs|default('') }}</textarea>
+            <label class="form-label">Teknik Özellikler</label>
+            <input type="hidden" name="specs" id="specsData" value="" />
+            <div id="specsRows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addSpecRow()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Özellik Ekle
+            </button>
           </div>
         </div>
       </div>
@@ -170,5 +175,110 @@ function calcTotalCost() {
   const el = document.getElementById('totalCostDisplay');
   if (el) el.textContent = total.toFixed(2);
 }
+
+// ── Teknik Özellikler row editor ──────────────────────────────────────────
+
+function _esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _escQ(s) { return (s||'').replace(/"/g,'&quot;'); }
+
+function addSpecRow(title, desc, imgPath) {
+  title   = title   || '';
+  desc    = desc    || '';
+  imgPath = imgPath || '';
+  const container = document.getElementById('specsRows');
+  const row = document.createElement('div');
+  row.className = 'spec-row';
+  row.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);';
+
+  const hasImg = !!imgPath;
+  row.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0;padding-top:2px;">
+      <button type="button" onclick="moveSpecRow(this,-1)" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:12px;line-height:1;">▲</button>
+      <button type="button" onclick="moveSpecRow(this,1)"  class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:12px;line-height:1;">▼</button>
+    </div>
+    <div class="spec-img-wrap" style="flex-shrink:0;width:64px;cursor:pointer;" onclick="this.querySelector('.spec-img-input').click()" title="Resim seç">
+      <img class="spec-img-preview" src="${hasImg ? '/static/'+imgPath : ''}"
+           style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);${hasImg ? '' : 'display:none;'}" />
+      <div class="spec-img-placeholder" style="width:64px;height:64px;background:var(--surface);border-radius:6px;border:1px dashed var(--border);display:${hasImg ? 'none' : 'flex'};align-items:center;justify-content:center;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      </div>
+      <input type="file" class="spec-img-input" accept="image/*" style="display:none;" onchange="uploadSpecImage(this)" />
+      <input type="hidden" class="spec-img-path" value="${_escQ(imgPath)}" />
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;">
+      <input type="text" class="spec-title form-control" placeholder="Özellik başlığı" value="${_escQ(title)}" style="font-size:13px;" />
+      <textarea class="spec-desc form-control" rows="2" placeholder="Açıklama" style="font-size:13px;">${_esc(desc)}</textarea>
+    </div>
+    <button type="button" onclick="removeSpecRow(this)" class="btn btn-danger btn-sm" style="flex-shrink:0;margin-top:2px;" title="Sil">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+async function uploadSpecImage(input) {
+  const row = input.closest('.spec-row');
+  if (!input.files[0]) return;
+  const fd = new FormData();
+  fd.append('image', input.files[0]);
+  try {
+    const res = await fetch('/models/spec-image', {method:'POST', body:fd});
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.path) {
+      const img = row.querySelector('.spec-img-preview');
+      const ph  = row.querySelector('.spec-img-placeholder');
+      img.src = '/static/' + data.path;
+      img.style.display = 'block';
+      ph.style.display  = 'none';
+      row.querySelector('.spec-img-path').value = data.path;
+    }
+  } catch(e) { console.error('Spec image upload failed', e); }
+}
+
+function removeSpecRow(btn) { btn.closest('.spec-row').remove(); }
+
+function moveSpecRow(btn, dir) {
+  const row    = btn.closest('.spec-row');
+  const parent = row.parentNode;
+  if (dir < 0 && row.previousElementSibling) {
+    parent.insertBefore(row, row.previousElementSibling);
+  } else if (dir > 0 && row.nextElementSibling) {
+    parent.insertBefore(row.nextElementSibling, row);
+  }
+}
+
+function serializeSpecs() {
+  const specs = [];
+  document.querySelectorAll('.spec-row').forEach(row => {
+    const title = row.querySelector('.spec-title').value.trim();
+    const desc  = row.querySelector('.spec-desc').value.trim();
+    const img   = row.querySelector('.spec-img-path').value;
+    specs.push({title, desc, img});
+  });
+  document.getElementById('specsData').value = JSON.stringify(specs);
+}
+
+function loadSpecs(raw) {
+  if (!raw || !raw.trim()) return;
+  raw = raw.trim();
+  let specs = [];
+  if (raw.startsWith('[')) {
+    try { specs = JSON.parse(raw); } catch(e) {}
+  } else if (raw.startsWith('{')) {
+    try {
+      const obj = JSON.parse(raw);
+      specs = Object.entries(obj).map(([k,v]) => ({title:k, desc:String(v), img:''}));
+    } catch(e) {}
+  } else if (raw.includes('|')) {
+    specs = raw.split('||').map(s => {
+      const p = s.trim().split('|').map(x => x.trim());
+      return {title:p[0]||'', desc:p[1]||'', img:p[2]||''};
+    }).filter(s => s.title || s.desc);
+  }
+  specs.forEach(s => addSpecRow(s.title||'', s.desc||'', s.img||''));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadSpecs({{ (model.specs or '')|tojson }});
+});
 </script>
 {% endblock %}
