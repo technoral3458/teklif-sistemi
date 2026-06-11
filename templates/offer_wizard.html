@@ -100,22 +100,22 @@
         <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat({{ cat.id }})">{{ cat.name }}</button>
         {% endfor %}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;">
         {% for m in models %}
         <div class="model-card option-card" data-id="{{ m.id }}" data-cat="{{ m.category_id or 0 }}"
              data-compat="{{ m.compatible_options_list|tojson }}"
              onclick="wizardSelectModel({{ m.id }}, '{{ m.name|e }}', {{ m.base_price|default(0) }}, '{{ m.currency }}')"
-             style="cursor:pointer;">
+             style="cursor:pointer;min-width:0;">
           {% if m.image_path %}
-          <img src="/static/{{ m.image_path }}" alt="{{ m.name }}" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;" />
+          <img src="/static/{{ m.image_path }}" alt="{{ m.name }}" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:8px;" />
           {% else %}
-          <div style="width:100%;height:120px;background:var(--surface-2);border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;color:var(--text-muted);">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          <div style="width:100%;height:130px;background:var(--surface-2);border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;color:var(--text-muted);">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
           </div>
           {% endif %}
-          <div style="font-weight:600;margin-bottom:4px;">{{ m.name }}</div>
+          <div style="font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ m.name }}">{{ m.name }}</div>
           <div style="color:var(--accent);font-size:15px;font-weight:700;">{{ "%.2f"|format(m.base_price|default(0)|float) }} {{ m.currency }}</div>
-          {% if m.category_name %}<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ m.category_name }}</div>{% endif %}
+          {% if m.category_name %}<div style="font-size:11px;color:var(--text-muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ m.category_name }}">{{ m.category_name }}</div>{% endif %}
         </div>
         {% else %}
         <p style="color:var(--text-muted)">Henüz model eklenmedi</p>
