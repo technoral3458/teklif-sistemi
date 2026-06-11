@@ -271,7 +271,7 @@ async def offer_detail(request: Request, offer_id: int):
 
 @router.get("/{offer_id}/print")
 async def offer_print(request: Request, offer_id: int):
-    auth.require_user(request)
+    user = auth.require_user(request)
     offer = fdb.get_offer(offer_id)
     if not offer:
         return RedirectResponse("/offers", 303)
@@ -281,9 +281,10 @@ async def offer_print(request: Request, offer_id: int):
     opts = {o["id"]: o for o in fdb.get_options()}
 
     best_prio, display_image = -1, (model.get("image_path", "") if model else "")
+    lang = user.get("lang", "tr")
     for item in items:
         opt = opts.get(item.get("option_id"), {})
-        item["option_name"] = opt.get("name", "-")
+        item["option_name"] = (opt.get(f"name_{lang}") or opt.get("name", "-")) if lang != "tr" else opt.get("name", "-")
         item["description"] = opt.get("description", "") or ""
         item["image_path"] = opt.get("image_path", "") or ""
         var_img = opt.get("variation_image_path", "")
@@ -317,7 +318,7 @@ async def offer_print(request: Request, offer_id: int):
 
 @router.get("/{offer_id}/pdf")
 async def offer_pdf(request: Request, offer_id: int):
-    auth.require_user(request)
+    user = auth.require_user(request)
     offer = fdb.get_offer(offer_id)
     if not offer:
         return RedirectResponse("/offers", 303)
@@ -327,9 +328,10 @@ async def offer_pdf(request: Request, offer_id: int):
     opts = {o["id"]: o for o in fdb.get_options()}
 
     best_prio, display_image = -1, (model.get("image_path", "") if model else "")
+    lang = user.get("lang", "tr")
     for item in items:
         opt = opts.get(item.get("option_id"), {})
-        item["option_name"] = opt.get("name", "-")
+        item["option_name"] = (opt.get(f"name_{lang}") or opt.get("name", "-")) if lang != "tr" else opt.get("name", "-")
         item["description"] = opt.get("description", "") or ""
         item["image_path"] = opt.get("image_path", "") or ""
         var_img = opt.get("variation_image_path", "")
