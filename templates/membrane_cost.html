@@ -132,9 +132,9 @@
       <thead>
         <tr>
           <th>Proje / Ad</th>
-          <th style="text-align:center">En (mm)</th>
-          <th style="text-align:center">Boy (mm)</th>
-          <th style="text-align:center">Alan (m²)</th>
+          <th style="text-align:center">En <small style="color:var(--text-muted)">(mm)</small></th>
+          <th style="text-align:center">Boy <small style="color:var(--text-muted)">(mm)</small></th>
+          <th style="text-align:center">Alan <small style="color:var(--text-muted)">(m²)</small></th>
           <th style="text-align:center">Adet</th>
           <th style="text-align:right">Birim Maliyet</th>
           <th style="text-align:right">Toplam Maliyet</th>
@@ -235,12 +235,14 @@
           </div>
           <div id="plakaFields" style="grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-group">
-              <label class="form-label">Plaka Eni (cm)</label>
+              <label class="form-label">Plaka Eni <span style="color:var(--accent);font-size:11px;">cm</span></label>
               <input type="number" name="sheet_width" id="mat_width" class="form-control" step="0.1" min="0" placeholder="ör: 244" />
+              <small style="color:var(--text-muted)">Standart MDF: 244 cm</small>
             </div>
             <div class="form-group">
-              <label class="form-label">Plaka Boyu (cm)</label>
+              <label class="form-label">Plaka Boyu <span style="color:var(--accent);font-size:11px;">cm</span></label>
               <input type="number" name="sheet_height" id="mat_height" class="form-control" step="0.1" min="0" placeholder="ör: 122" />
+              <small style="color:var(--text-muted)">Standart MDF: 122 cm</small>
             </div>
           </div>
           <div id="usageField" class="form-group" style="display:none;">
@@ -278,12 +280,12 @@
             <input type="text" name="door_name" id="door_name" class="form-control" placeholder="ör: Mutfak Üst" />
           </div>
           <div class="form-group">
-            <label class="form-label">En (mm) *</label>
-            <input type="number" name="width_mm" id="door_width" class="form-control" step="1" min="1" required placeholder="ör: 400" oninput="calcPreview()" />
+            <label class="form-label">En <span style="color:var(--accent);font-size:11px;">mm</span> *</label>
+            <input type="number" name="width_mm" id="door_width" class="form-control" step="0.1" min="1" required placeholder="ör: 400" oninput="calcPreview()" />
           </div>
           <div class="form-group">
-            <label class="form-label">Boy (mm) *</label>
-            <input type="number" name="height_mm" id="door_height" class="form-control" step="1" min="1" required placeholder="ör: 720" oninput="calcPreview()" />
+            <label class="form-label">Boy <span style="color:var(--accent);font-size:11px;">mm</span> *</label>
+            <input type="number" name="height_mm" id="door_height" class="form-control" step="0.1" min="1" required placeholder="ör: 720" oninput="calcPreview()" />
           </div>
           <div class="form-group">
             <label class="form-label">Adet</label>

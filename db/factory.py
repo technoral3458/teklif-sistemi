@@ -876,15 +876,19 @@ def get_membrane_materials():
 
 def save_membrane_material(id=None, **kw):
     fields = ["name","material_type","price","currency","unit","sheet_width","sheet_height","usage_per_m2","notes"]
+    numeric = {"price","sheet_width","sheet_height","usage_per_m2"}
+    vals = [float(kw.get(f, 0)) if f in numeric else kw.get(f, "") for f in fields]
     with _c() as c:
+        cur = c.cursor()
         if id:
             sets = ",".join(f"{f}=?" for f in fields)
-            c.execute(f"UPDATE membrane_materials SET {sets} WHERE id=?", [kw.get(f,0) for f in fields]+[id])
+            cur.execute(f"UPDATE membrane_materials SET {sets} WHERE id=?", vals + [id])
         else:
             cols = ",".join(fields)
             phs = ",".join("?" for _ in fields)
-            c.execute(f"INSERT INTO membrane_materials({cols}) VALUES({phs})", [kw.get(f,"") for f in fields])
-            id = c.lastrowid
+            cur.execute(f"INSERT INTO membrane_materials({cols}) VALUES({phs})", vals)
+            id = cur.lastrowid
+        c.commit()
     return id
 
 def del_membrane_material(mid):
@@ -899,14 +903,23 @@ def get_membrane_doors():
 
 def save_membrane_door(id=None, **kw):
     fields = ["project_name","door_name","width_mm","height_mm","quantity"]
+    vals = [
+        kw.get("project_name", ""),
+        kw.get("door_name", ""),
+        float(kw.get("width_mm", 0)),
+        float(kw.get("height_mm", 0)),
+        int(kw.get("quantity", 1)),
+    ]
     with _c() as c:
+        cur = c.cursor()
         if id:
             sets = ",".join(f"{f}=?" for f in fields)
-            c.execute(f"UPDATE membrane_doors SET {sets} WHERE id=?", [kw.get(f,"") for f in fields]+[id])
+            cur.execute(f"UPDATE membrane_doors SET {sets} WHERE id=?", vals + [id])
         else:
             cols = ",".join(fields)
             phs = ",".join("?" for _ in fields)
-            c.execute(f"INSERT INTO membrane_doors({cols}) VALUES({phs})", [kw.get(f,"") for f in fields])
+            cur.execute(f"INSERT INTO membrane_doors({cols}) VALUES({phs})", vals)
+        c.commit()
 
 def del_membrane_door(did):
     with _c() as c:
