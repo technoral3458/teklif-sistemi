@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block page_title %}Sistem Yönetimi{% endblock %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').admin_title }}{% endblock %}
 
 {% set role_tr = {'admin':'Admin','manufacturer':'Üretici','dealer':'Bayi'} %}
 {% set ALL_MENUS = [
@@ -10,18 +10,19 @@
 ] %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 <div class="tabs" style="margin-bottom:20px;">
   <button class="tab-btn {% if not request.query_params.get('tab') or request.query_params.get('tab')=='company' %}active{% endif %}"
-          data-tab="tab-company" onclick="switchTab('tab-company')">Şirket Profili</button>
+          data-tab="tab-company" onclick="switchTab('tab-company')">{{ T.admin_company_profile }}</button>
   <button class="tab-btn {% if request.query_params.get('tab')=='users' %}active{% endif %}"
-          data-tab="tab-users" onclick="switchTab('tab-users')">Kullanıcılar</button>
-  <button class="tab-btn" data-tab="tab-system" onclick="switchTab('tab-system')">Sistem</button>
+          data-tab="tab-users" onclick="switchTab('tab-users')">{{ T.admin_users }}</button>
+  <button class="tab-btn" data-tab="tab-system" onclick="switchTab('tab-system')">{{ T.admin_system }}</button>
 </div>
 
 <!-- ── Şirket Profili ── -->
 <div id="tab-company" class="tab-pane" {% if request.query_params.get('tab')=='users' %}style="display:none"{% endif %}>
   <div class="card" style="max-width:640px;">
-    <div class="card-header"><h3 class="card-title">Şirket Bilgileri</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.admin_company_info }}</h3></div>
     <div class="card-body">
       <form method="post" action="/admin/company" enctype="multipart/form-data">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
@@ -31,37 +32,37 @@
           <img id="cLogoPreview" style="display:none;width:80px;height:80px;object-fit:contain;border:1px solid var(--border);border-radius:8px;" />
           {% endif %}
           <label class="btn btn-outline btn-sm" style="cursor:pointer;">
-            Logo Yükle
+            {{ T.admin_logo_upload }}
             <input type="file" name="logo" accept="image/*" data-preview="cLogoPreview" style="display:none;" />
           </label>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">Şirket Adı</label>
+            <label class="form-label">{{ T.admin_company_name }}</label>
             <input type="text" name="company_name" class="form-control" value="{{ company.company_name if company else '' }}" />
           </div>
           <div class="form-group">
-            <label class="form-label">Telefon</label>
+            <label class="form-label">{{ T.admin_phone }}</label>
             <input type="tel" name="phone" class="form-control" value="{{ company.phone if company else '' }}" />
           </div>
           <div class="form-group">
-            <label class="form-label">E-posta</label>
+            <label class="form-label">{{ T.admin_email }}</label>
             <input type="email" name="email" class="form-control" value="{{ company.email if company else '' }}" />
           </div>
           <div class="form-group">
-            <label class="form-label">Vergi No</label>
+            <label class="form-label">{{ T.admin_tax_id }}</label>
             <input type="text" name="tax_id" class="form-control" value="{{ company.tax_id if company else '' }}" />
           </div>
           <div class="form-group">
-            <label class="form-label">Web Sitesi</label>
+            <label class="form-label">{{ T.admin_website }}</label>
             <input type="url" name="website" class="form-control" value="{{ company.website if company else '' }}" placeholder="https://" />
           </div>
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">Adres</label>
+            <label class="form-label">{{ T.admin_address }}</label>
             <textarea name="address" class="form-control" rows="2">{{ company.address if company else '' }}</textarea>
           </div>
         </div>
-        <div style="margin-top:16px;"><button type="submit" class="btn btn-primary">Kaydet</button></div>
+        <div style="margin-top:16px;"><button type="submit" class="btn btn-primary">{{ T.btn_save }}</button></div>
       </form>
     </div>
   </div>
@@ -79,12 +80,12 @@
     <table>
       <thead>
         <tr>
-          <th>E-posta</th>
-          <th>Firma</th>
-          <th>Rol</th>
-          <th>Durum</th>
-          <th>Kayıt</th>
-          <th>İşlem</th>
+          <th>{{ T.admin_email_col }}</th>
+          <th>{{ T.admin_company_col }}</th>
+          <th>{{ T.admin_role_col }}</th>
+          <th>{{ T.admin_status_col }}</th>
+          <th>{{ T.admin_reg_col }}</th>
+          <th>{{ T.admin_action_col }}</th>
         </tr>
       </thead>
       <tbody>
@@ -99,11 +100,11 @@
           </td>
           <td>
             {% if u.is_approved and u.is_active %}
-              <span class="badge badge-green">Aktif</span>
+              <span class="badge badge-green">{{ T.status_active }}</span>
             {% elif not u.is_approved %}
-              <span class="badge badge-amber">Bekliyor</span>
+              <span class="badge badge-amber">{{ T.status_waiting }}</span>
             {% else %}
-              <span class="badge badge-red">Pasif</span>
+              <span class="badge badge-red">{{ T.status_inactive }}</span>
             {% endif %}
           </td>
           <td>{{ u.created_at[:10] if u.created_at else '-' }}</td>
@@ -114,11 +115,11 @@
                 onclick="openUserModal({{ u.id }}, '{{ u.email|e }}', '{{ u.company_name|e }}', '{{ u.role }}',
                   {{ u.is_approved }}, {{ u.is_active }}, {{ u.can_view_costs }},
                   '{{ u.allowed_menus or '' }}', '{{ u.allowed_categories or '' }}')">
-                ✏️ Düzenle
+                ✏️ {{ T.btn_edit }}
               </button>
               <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)" style="margin:0;">
                 <input type="hidden" name="id" value="{{ u.id }}" />
-                <button class="btn btn-danger btn-sm">Sil</button>
+                <button class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
               </form>
             </div>
             {% else %}
@@ -136,14 +137,14 @@
 <div id="tab-system" class="tab-pane" style="display:none;">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:640px;">
     <div class="card">
-      <div class="card-header"><h3 class="card-title">Versiyon</h3></div>
+      <div class="card-header"><h3 class="card-title">{{ T.admin_version }}</h3></div>
       <div class="card-body" style="font-size:14px;">
         <div style="margin-bottom:8px;"><strong>B2B Teklif Sistemi</strong></div>
         <div style="color:var(--text-muted);">Versiyon: 3.0.0 — FastAPI + SQLite</div>
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><h3 class="card-title">Yedekleme</h3></div>
+      <div class="card-header"><h3 class="card-title">{{ T.admin_backup }}</h3></div>
       <div class="card-body">
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Veritabanı dosyaları <code>data/</code> klasöründe saklanır.</p>
         <p style="font-size:12px;color:var(--text-muted);">Manuel yedek için sunucudan <code>data/</code> klasörünü kopyalayın.</p>
@@ -157,7 +158,7 @@
   <div class="modal-box" style="max-width:600px;">
     <div class="modal-header">
       <div>
-        <h3 class="modal-title">Kullanıcı Düzenle</h3>
+        <h3 class="modal-title">{{ T.admin_edit_user }}</h3>
         <div id="uModalEmail" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
       </div>
       <button class="modal-close" onclick="closeModal('userEditModal')">&times;</button>
@@ -169,35 +170,35 @@
         <!-- Temel bilgiler -->
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
           <div class="form-group">
-            <label class="form-label">Rol</label>
+            <label class="form-label">{{ T.admin_role }}</label>
             <select name="role" id="uModalRole" class="form-control">
               <option value="manufacturer">Üretici</option>
               <option value="dealer">Bayi</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Durum</label>
+            <label class="form-label">{{ T.admin_status }}</label>
             <select name="is_approved" id="uModalApproved" class="form-control">
               <option value="1">Onaylı</option>
               <option value="0">Bekliyor</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Aktiflik</label>
+            <label class="form-label">{{ T.admin_active_status }}</label>
             <select name="is_active" id="uModalActive" class="form-control">
-              <option value="1">Aktif</option>
-              <option value="0">Pasif</option>
+              <option value="1">{{ T.status_active }}</option>
+              <option value="0">{{ T.status_inactive }}</option>
             </select>
           </div>
         </div>
 
         <!-- İzinler -->
         <div>
-          <label class="form-label" style="margin-bottom:8px;display:block;">Özel İzinler</label>
+          <label class="form-label" style="margin-bottom:8px;display:block;">{{ T.admin_permissions }}</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
               <input type="checkbox" name="can_view_costs_chk" id="uModalCosts" onchange="document.getElementById('uModalCostsHidden').value=this.checked?1:0" />
-              <span style="font-size:13px;">💰 Maliyet Analizi Görüntüle</span>
+              <span style="font-size:13px;">💰 {{ T.costs_title }}</span>
             </label>
             <input type="hidden" name="can_view_costs" id="uModalCostsHidden" value="0" />
           </div>
@@ -205,7 +206,7 @@
 
         <!-- Menü İzinleri -->
         <div>
-          <label class="form-label" style="margin-bottom:4px;display:block;">Menü İzinleri</label>
+          <label class="form-label" style="margin-bottom:4px;display:block;">{{ T.admin_menu_perms }}</label>
           <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Boş bırakılırsa tüm menüler erişilebilir olur.</p>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
             {% for key, label in ALL_MENUS %}
@@ -218,14 +219,14 @@
             {% endfor %}
           </div>
           <div style="display:flex;gap:8px;margin-top:8px;">
-            <button type="button" class="btn btn-ghost btn-sm" onclick="checkAllMenus(true)">Tümünü Seç</button>
-            <button type="button" class="btn btn-ghost btn-sm" onclick="checkAllMenus(false)">Temizle</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="checkAllMenus(true)">{{ T.admin_select_all }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="checkAllMenus(false)">{{ T.admin_clear }}</button>
           </div>
         </div>
 
         <!-- Kategori İzinleri -->
         <div>
-          <label class="form-label" style="margin-bottom:4px;display:block;">Kategori İzinleri</label>
+          <label class="form-label" style="margin-bottom:4px;display:block;">{{ T.admin_cat_perms }}</label>
           <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Boş bırakılırsa tüm kategoriler erişilebilir olur.</p>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             {% for cat in categories %}
@@ -239,8 +240,8 @@
 
       </div>
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('userEditModal')">İptal</button>
-        <button type="submit" class="btn btn-primary">Kaydet</button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('userEditModal')">{{ T.btn_cancel }}</button>
+        <button type="submit" class="btn btn-primary">{{ T.btn_save }}</button>
       </div>
     </form>
   </div>

@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block page_title %}Üretici Cari{% endblock %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').ledger_mfr_title }}{% endblock %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 <div style="margin-bottom:20px;display:flex;gap:12px;align-items:center;">
   <button class="btn btn-primary" onclick="openModal('newMfrModal')">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Yeni Üretici İşlemi
+    {{ T.ledger_mfr_new }}
   </button>
 </div>
 
@@ -14,11 +15,11 @@
     <table>
       <thead>
         <tr>
-          <th>Üretici</th>
-          <th>Toplam Alım</th>
-          <th>Toplam Ödeme</th>
-          <th>Bakiye</th>
-          <th>İşlem</th>
+          <th>{{ T.manufacturers_title }}</th>
+          <th>{{ T.ledger_mfr_total_purchase }}</th>
+          <th>{{ T.ledger_mfr_total_payment }}</th>
+          <th>{{ T.ledger_balance }}</th>
+          <th>{{ T.ledger_action }}</th>
         </tr>
       </thead>
       <tbody>
@@ -36,10 +37,10 @@
               {{ "%.2f"|format(bal) }}
             </strong>
           </td>
-          <td><a href="/ledger/manufacturers/{{ mfr }}" class="btn btn-primary btn-sm">Cari Görüntüle</a></td>
+          <td><a href="/ledger/manufacturers/{{ mfr }}" class="btn btn-primary btn-sm">{{ T.ledger_view }}</a></td>
         </tr>
         {% else %}
-        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">Henüz üretici işlemi yok</td></tr>
+        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.ledger_no_mfr }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -49,45 +50,45 @@
 <div id="newMfrModal" class="modal-overlay">
   <div class="modal-box" style="max-width:440px;">
     <div class="modal-header">
-      <h3 class="modal-title">Yeni Üretici İşlemi</h3>
+      <h3 class="modal-title">{{ T.ledger_mfr_new }}</h3>
       <button class="modal-close" onclick="closeModal('newMfrModal')">&times;</button>
     </div>
     <div class="modal-body">
       <form method="post" action="/ledger/manufacturers/__new__/add" id="newMfrForm">
         <div class="form-group">
-          <label class="form-label">Üretici Adı *</label>
+          <label class="form-label">{{ T.ledger_mfr_name }}</label>
           <input type="text" id="mfrNameInput" class="form-control" placeholder="Üretici firma adı" required />
         </div>
         <div class="form-group">
-          <label class="form-label">İşlem Türü</label>
+          <label class="form-label">{{ T.ledger_txn_type }}</label>
           <select name="txn_type" class="form-control">
-            <option value="purchase">Alım (Borç)</option>
-            <option value="payment">Ödeme (Alacak)</option>
+            <option value="purchase">{{ T.ledger_mfr_purchase_txn }}</option>
+            <option value="payment">{{ T.ledger_mfr_payment_txn }}</option>
           </select>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group">
-            <label class="form-label">Tutar *</label>
+            <label class="form-label">{{ T.ledger_amount }} *</label>
             <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Para Birimi</label>
+            <label class="form-label">{{ T.ledger_currency }}</label>
             <select name="currency" class="form-control">
               <option>USD</option><option>EUR</option><option>TRY</option><option>RMB</option>
             </select>
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Tarih</label>
+          <label class="form-label">{{ T.ledger_date }}</label>
           <input type="date" name="txn_date" class="form-control" />
         </div>
         <div class="form-group">
-          <label class="form-label">Açıklama</label>
+          <label class="form-label">{{ T.ledger_desc }}</label>
           <textarea name="description" class="form-control" rows="2"></textarea>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-          <button type="button" class="btn btn-ghost" onclick="closeModal('newMfrModal')">İptal</button>
-          <button type="button" class="btn btn-primary" onclick="submitMfrForm()">Kaydet</button>
+          <button type="button" class="btn btn-ghost" onclick="closeModal('newMfrModal')">{{ T.btn_cancel }}</button>
+          <button type="button" class="btn btn-primary" onclick="submitMfrForm()">{{ T.btn_save }}</button>
         </div>
       </form>
     </div>

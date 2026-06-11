@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% block page_title %}Cari: {{ dealer.company_name if dealer else '' }}{% endblock %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').ledger_title }}: {{ dealer.company_name if dealer else '' }}{% endblock %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 <div style="display:flex;gap:8px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
-  <a href="/ledger/dealers" class="btn btn-ghost btn-sm">← Bayi Cari Listesi</a>
+  <a href="/ledger/dealers" class="btn btn-ghost btn-sm">{{ T.ledger_dealer_back }}</a>
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px;">
@@ -13,7 +14,7 @@
     </div>
     <div class="stat-info">
       <div class="stat-value" style="font-size:16px;">{{ "%.2f"|format(txns|selectattr('txn_type','eq','debit')|map(attribute='amount')|list|sum) }}</div>
-      <div class="stat-label">Toplam Borç</div>
+      <div class="stat-label">{{ T.ledger_total_debit }}</div>
     </div>
   </div>
   <div class="stat-card">
@@ -22,7 +23,7 @@
     </div>
     <div class="stat-info">
       <div class="stat-value" style="font-size:16px;">{{ "%.2f"|format(txns|selectattr('txn_type','eq','credit')|map(attribute='amount')|list|sum) }}</div>
-      <div class="stat-label">Toplam Alacak</div>
+      <div class="stat-label">{{ T.ledger_total_credit }}</div>
     </div>
   </div>
   <div class="stat-card">
@@ -31,7 +32,7 @@
     </div>
     <div class="stat-info">
       <div class="stat-value" style="font-size:16px;color:{% if balance > 0 %}var(--danger){% elif balance < 0 %}var(--success){% else %}inherit{% endif %}">{{ "%.2f"|format(balance) }}</div>
-      <div class="stat-label">Net Bakiye (Borç - Alacak)</div>
+      <div class="stat-label">{{ T.ledger_net_balance }}</div>
     </div>
   </div>
 </div>
@@ -39,7 +40,7 @@
 <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
   <button class="btn btn-primary" onclick="openModal('txnModal')">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Yeni İşlem
+    {{ T.ledger_new_txn }}
   </button>
 </div>
 
@@ -48,13 +49,13 @@
     <table>
       <thead>
         <tr>
-          <th>Tarih</th>
-          <th>Tür</th>
-          <th>Tutar</th>
-          <th>Para Birimi</th>
-          <th>Ödeme Yöntemi</th>
-          <th>Açıklama</th>
-          <th>İşlem</th>
+          <th>{{ T.ledger_date }}</th>
+          <th>{{ T.ledger_type }}</th>
+          <th>{{ T.ledger_amount }}</th>
+          <th>{{ T.ledger_currency }}</th>
+          <th>{{ T.ledger_payment_method }}</th>
+          <th>{{ T.ledger_desc }}</th>
+          <th>{{ T.ledger_action }}</th>
         </tr>
       </thead>
       <tbody>
@@ -63,9 +64,9 @@
           <td>{{ t.txn_date or t.created_at[:10] }}</td>
           <td>
             {% if t.txn_type == 'debit' %}
-              <span class="badge badge-red">Borç</span>
+              <span class="badge badge-red">{{ T.ledger_debit }}</span>
             {% else %}
-              <span class="badge badge-green">Alacak</span>
+              <span class="badge badge-green">{{ T.ledger_credit }}</span>
             {% endif %}
           </td>
           <td><strong>{{ "%.2f"|format(t.amount|default(0)|float) }}</strong></td>
@@ -76,12 +77,12 @@
             <form method="post" action="/ledger/dealers/txn/delete" onsubmit="return confirmDelete(this)">
               <input type="hidden" name="id" value="{{ t.id }}" />
               <input type="hidden" name="dealer_id" value="{{ dealer.id }}" />
-              <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+              <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
             </form>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">Henüz işlem yok</td></tr>
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.ledger_no_txns }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -92,25 +93,25 @@
 <div id="txnModal" class="modal-overlay">
   <div class="modal-box" style="max-width:440px;">
     <div class="modal-header">
-      <h3 class="modal-title">Yeni İşlem</h3>
+      <h3 class="modal-title">{{ T.ledger_new_txn }}</h3>
       <button class="modal-close" onclick="closeModal('txnModal')">&times;</button>
     </div>
     <div class="modal-body">
       <form method="post" action="/ledger/dealers/{{ dealer.id }}/add">
         <div class="form-group">
-          <label class="form-label">İşlem Türü</label>
+          <label class="form-label">{{ T.ledger_txn_type }}</label>
           <select name="txn_type" class="form-control">
-            <option value="debit">Borç (Bayi borçlandı)</option>
-            <option value="credit">Alacak (Ödeme alındı)</option>
+            <option value="debit">{{ T.ledger_dealer_debit_txn }}</option>
+            <option value="credit">{{ T.ledger_dealer_credit_txn }}</option>
           </select>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group">
-            <label class="form-label">Tutar *</label>
+            <label class="form-label">{{ T.ledger_amount }} *</label>
             <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Para Birimi</label>
+            <label class="form-label">{{ T.ledger_currency }}</label>
             <select name="currency" class="form-control">
               {% for cur in currencies %}
               <option value="{{ cur }}">{{ cur }}</option>
@@ -119,11 +120,11 @@
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Tarih</label>
+          <label class="form-label">{{ T.ledger_date }}</label>
           <input type="date" name="txn_date" class="form-control" />
         </div>
         <div class="form-group">
-          <label class="form-label">Ödeme Yöntemi</label>
+          <label class="form-label">{{ T.ledger_payment_method }}</label>
           <select name="payment_method" class="form-control">
             <option value="">-- Seçiniz --</option>
             {% for pm in payment_methods %}
@@ -132,12 +133,12 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Açıklama</label>
+          <label class="form-label">{{ T.ledger_desc }}</label>
           <textarea name="description" class="form-control" rows="2"></textarea>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-          <button type="button" class="btn btn-ghost" onclick="closeModal('txnModal')">İptal</button>
-          <button type="submit" class="btn btn-primary">Kaydet</button>
+          <button type="button" class="btn btn-ghost" onclick="closeModal('txnModal')">{{ T.btn_cancel }}</button>
+          <button type="submit" class="btn btn-primary">{{ T.btn_save }}</button>
         </div>
       </form>
     </div>

@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% block page_title %}Müşteri Cari{% endblock %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').ledger_customer_title }}{% endblock %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 <div style="margin-bottom:20px;">
-  <input type="text" id="tableSearch" class="search-box" placeholder="Müşteri ara..." style="max-width:280px;" />
+  <input type="text" id="tableSearch" class="search-box" placeholder="{{ T.ledger_search }}" style="max-width:280px;" />
 </div>
 
 <div class="card">
@@ -11,11 +12,11 @@
     <table id="mainTable">
       <thead>
         <tr>
-          <th>Firma Adı</th>
-          <th>İletişim</th>
-          <th>Bakiye</th>
-          <th>Para Birimi</th>
-          <th>İşlem</th>
+          <th>{{ T.customer_name }}</th>
+          <th>{{ T.ledger_contact }}</th>
+          <th>{{ T.ledger_balance }}</th>
+          <th>{{ T.model_currency }}</th>
+          <th>{{ T.ledger_action }}</th>
         </tr>
       </thead>
       <tbody>
@@ -30,10 +31,10 @@
             </strong>
           </td>
           <td>{{ c.currency or 'USD' }}</td>
-          <td><a href="/ledger/customers/{{ c.id }}" class="btn btn-primary btn-sm">Cari Görüntüle</a></td>
+          <td><a href="/ledger/customers/{{ c.id }}" class="btn btn-primary btn-sm">{{ T.ledger_view }}</a></td>
         </tr>
         {% else %}
-        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">Henüz müşteri yok</td></tr>
+        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.ledger_no_customers }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

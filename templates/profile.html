@@ -1,17 +1,18 @@
 {% extends "base.html" %}
-{% block page_title %}Profil{% endblock %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').profile_title }}{% endblock %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 <div class="tabs" style="margin-bottom:20px;">
-  <button class="tab-btn active" data-tab="tab-general" onclick="switchTab('tab-general')">Genel Bilgiler</button>
-  <button class="tab-btn" data-tab="tab-security" onclick="switchTab('tab-security')">Güvenlik</button>
-  <button class="tab-btn" data-tab="tab-prefs" onclick="switchTab('tab-prefs')">Tercihler</button>
+  <button class="tab-btn active" data-tab="tab-general" onclick="switchTab('tab-general')">{{ T.profile_general }}</button>
+  <button class="tab-btn" data-tab="tab-security" onclick="switchTab('tab-security')">{{ T.profile_security }}</button>
+  <button class="tab-btn" data-tab="tab-prefs" onclick="switchTab('tab-prefs')">{{ T.profile_prefs }}</button>
 </div>
 
 <!-- General Info -->
 <div id="tab-general" class="tab-pane">
   <div class="card" style="max-width:640px;">
-    <div class="card-header"><h3 class="card-title">Firma Bilgileri</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.profile_company_info }}</h3></div>
     <div class="card-body">
       <form method="post" action="/profile/save" enctype="multipart/form-data">
         <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;">
@@ -25,7 +26,7 @@
           {% endif %}
           <div>
             <label class="btn btn-outline btn-sm" style="cursor:pointer;">
-              Logo Değiştir
+              {{ T.profile_logo_change }}
               <input type="file" name="logo" accept="image/*" data-preview="logoPreview" style="display:none;" onchange="this.closest('label').previousElementSibling && (document.getElementById('logoFallback') && (document.getElementById('logoFallback').style.display='none'))" />
             </label>
             <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">PNG/JPG, max 400×400px</p>
@@ -33,39 +34,39 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">Firma Adı</label>
+            <label class="form-label">{{ T.profile_company_name }}</label>
             <input type="text" name="company_name" class="form-control" value="{{ user.company_name or '' }}" />
           </div>
           <div class="form-group">
-            <label class="form-label">Telefon</label>
+            <label class="form-label">{{ T.profile_phone }}</label>
             <input type="tel" name="phone" class="form-control" value="{{ user.phone or '' }}" />
           </div>
           <div class="form-group">
-            <label class="form-label">Web Sitesi</label>
+            <label class="form-label">{{ T.profile_website }}</label>
             <input type="url" name="website" class="form-control" value="{{ user.website or '' }}" placeholder="https://" />
           </div>
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">Adres</label>
+            <label class="form-label">{{ T.profile_address }}</label>
             <textarea name="address" class="form-control" rows="2">{{ user.address or '' }}</textarea>
           </div>
         </div>
         <div style="margin-top:16px;">
-          <button type="submit" class="btn btn-primary">Kaydet</button>
+          <button type="submit" class="btn btn-primary">{{ T.btn_save }}</button>
         </div>
       </form>
     </div>
   </div>
   <!-- User info (read-only) -->
   <div class="card" style="max-width:640px;margin-top:16px;">
-    <div class="card-header"><h3 class="card-title">Hesap Bilgileri</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.profile_account_info }}</h3></div>
     <div class="card-body">
       <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;">
-        <div style="display:flex;gap:12px;"><span style="color:var(--text-muted);min-width:100px;">E-posta</span><strong>{{ user.email }}</strong></div>
-        <div style="display:flex;gap:12px;"><span style="color:var(--text-muted);min-width:100px;">Rol</span>
+        <div style="display:flex;gap:12px;"><span style="color:var(--text-muted);min-width:100px;">{{ T.profile_email }}</span><strong>{{ user.email }}</strong></div>
+        <div style="display:flex;gap:12px;"><span style="color:var(--text-muted);min-width:100px;">{{ T.profile_role }}</span>
           <span class="badge badge-{{ 'blue' if user.role == 'dealer' else ('red' if user.role == 'admin' else 'amber') }}">{{ user.role }}</span>
         </div>
-        <div style="display:flex;gap:12px;"><span style="color:var(--text-muted);min-width:100px;">Durum</span>
-          <span class="badge badge-{{ 'green' if user.is_active else 'red' }}">{{ 'Aktif' if user.is_active else 'Pasif' }}</span>
+        <div style="display:flex;gap:12px;"><span style="color:var(--text-muted);min-width:100px;">{{ T.offer_status }}</span>
+          <span class="badge badge-{{ 'green' if user.is_active else 'red' }}">{{ T.status_active if user.is_active else T.status_inactive }}</span>
         </div>
       </div>
     </div>
@@ -75,22 +76,22 @@
 <!-- Security -->
 <div id="tab-security" class="tab-pane" style="display:none;">
   <div class="card" style="max-width:480px;">
-    <div class="card-header"><h3 class="card-title">Şifre Değiştir</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.profile_change_password }}</h3></div>
     <div class="card-body">
       <form method="post" action="/profile/password">
         <div class="form-group">
-          <label class="form-label">Mevcut Şifre</label>
+          <label class="form-label">{{ T.profile_current_password }}</label>
           <input type="password" name="current_password" class="form-control" required />
         </div>
         <div class="form-group">
-          <label class="form-label">Yeni Şifre</label>
+          <label class="form-label">{{ T.profile_new_password }}</label>
           <input type="password" name="new_password" class="form-control" required minlength="6" />
         </div>
         <div class="form-group">
-          <label class="form-label">Yeni Şifre (Tekrar)</label>
+          <label class="form-label">{{ T.profile_confirm_password }}</label>
           <input type="password" name="confirm_password" class="form-control" required minlength="6" />
         </div>
-        <button type="submit" class="btn btn-primary">Şifreyi Güncelle</button>
+        <button type="submit" class="btn btn-primary">{{ T.profile_update_password }}</button>
       </form>
     </div>
   </div>
@@ -99,11 +100,11 @@
 <!-- Preferences -->
 <div id="tab-prefs" class="tab-pane" style="display:none;">
   <div class="card" style="max-width:440px;">
-    <div class="card-header"><h3 class="card-title">Görünüm Tercihleri</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.profile_appearance }}</h3></div>
     <div class="card-body">
       <form method="post" action="/profile/preferences">
         <div class="form-group">
-          <label class="form-label">Dil</label>
+          <label class="form-label">{{ T.profile_lang }}</label>
           <select name="lang" class="form-control">
             {% for code, label in langs.items() %}
             <option value="{{ code }}" {% if user.lang == code %}selected{% endif %}>{{ label }}</option>
@@ -111,13 +112,13 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Tema</label>
+          <label class="form-label">{{ T.profile_theme }}</label>
           <select name="theme" class="form-control">
             <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>🌙 Karanlık</option>
             <option value="light" {% if user.theme == 'light' %}selected{% endif %}>☀️ Aydınlık</option>
           </select>
         </div>
-        <button type="submit" class="btn btn-primary">Tercihleri Kaydet</button>
+        <button type="submit" class="btn btn-primary">{{ T.profile_save_prefs }}</button>
       </form>
     </div>
   </div>

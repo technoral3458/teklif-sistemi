@@ -2,6 +2,7 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 <div class="stats-grid">
   <div class="stat-card">
     <div class="stat-icon" style="background:rgba(59,130,246,.15);color:#3b82f6">
@@ -9,7 +10,7 @@
     </div>
     <div class="stat-info">
       <div class="stat-value">{{ stats.customer_count|default(0) }}</div>
-      <div class="stat-label">Müşteri</div>
+      <div class="stat-label">{{ T.dash_customer }}</div>
     </div>
   </div>
   <div class="stat-card">
@@ -18,7 +19,7 @@
     </div>
     <div class="stat-info">
       <div class="stat-value">{{ stats.offer_count|default(0) }}</div>
-      <div class="stat-label">Toplam Teklif</div>
+      <div class="stat-label">{{ T.dash_total_offers_count }}</div>
     </div>
   </div>
   <div class="stat-card">
@@ -27,7 +28,7 @@
     </div>
     <div class="stat-info">
       <div class="stat-value">{{ stats.pending_offers|default(0) }}</div>
-      <div class="stat-label">Bekleyen Teklif</div>
+      <div class="stat-label">{{ T.dash_pending }}</div>
     </div>
   </div>
   <div class="stat-card">
@@ -36,7 +37,7 @@
     </div>
     <div class="stat-info">
       <div class="stat-value">{{ stats.order_count|default(0) }}</div>
-      <div class="stat-label">Sipariş</div>
+      <div class="stat-label">{{ T.dash_order }}</div>
     </div>
   </div>
 </div>
@@ -44,29 +45,29 @@
 <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
   <a href="/offers/new" class="btn btn-primary">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Yeni Teklif
+    {{ T.dash_new_offer }}
   </a>
   <a href="/customers" class="btn btn-outline">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Yeni Müşteri
+    {{ T.dash_new_customer }}
   </a>
 </div>
 
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">Son Teklifler</h3>
-    <a href="/offers" class="btn btn-ghost btn-sm">Tümünü Gör →</a>
+    <h3 class="card-title">{{ T.dash_recent_offers }}</h3>
+    <a href="/offers" class="btn btn-ghost btn-sm">{{ T.dash_view_all }}</a>
   </div>
   <div class="table-wrap">
     <table id="mainTable">
       <thead>
         <tr>
-          <th>Teklif No</th>
-          <th>Müşteri</th>
-          <th>Model</th>
-          <th>Tutar</th>
-          <th>Durum</th>
-          <th>Tarih</th>
+          <th>{{ T.dash_offer_no }}</th>
+          <th>{{ T.offer_customer }}</th>
+          <th>{{ T.dash_model }}</th>
+          <th>{{ T.dash_amount }}</th>
+          <th>{{ T.offer_status }}</th>
+          <th>{{ T.dash_date }}</th>
           <th></th>
         </tr>
       </thead>
@@ -82,10 +83,10 @@
             <span class="badge badge-{{ sc.get(o.status, 'gray') }}">{{ o.status }}</span>
           </td>
           <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
-          <td><a href="/offers/{{ o.id }}" class="btn btn-ghost btn-sm">Görüntüle</a></td>
+          <td><a href="/offers/{{ o.id }}" class="btn btn-ghost btn-sm">{{ T.dash_view }}</a></td>
         </tr>
         {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">Henüz teklif yok</td></tr>
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.dash_no_offers }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

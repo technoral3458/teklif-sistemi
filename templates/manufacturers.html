@@ -1,20 +1,21 @@
 {% extends "base.html" %}
-{% block page_title %}Üreticiler{% endblock %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').manufacturers_title }}{% endblock %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
   <div class="tabs" style="margin-bottom:0;">
     <button class="tab-btn" data-tab="tab-pending" onclick="switchTab('tab-pending')">
-      Bekleyenler
+      {{ T.manufacturer_pending }}
       {% set pcount = manufacturers|selectattr('is_approved','eq',0)|list|length %}
       {% if pcount > 0 %}<span class="badge badge-amber" style="margin-left:6px">{{ pcount }}</span>{% endif %}
     </button>
-    <button class="tab-btn" data-tab="tab-approved" onclick="switchTab('tab-approved')">Onaylılar</button>
-    <button class="tab-btn active" data-tab="tab-all" onclick="switchTab('tab-all')">Tümü</button>
+    <button class="tab-btn" data-tab="tab-approved" onclick="switchTab('tab-approved')">{{ T.manufacturer_approved }}</button>
+    <button class="tab-btn active" data-tab="tab-all" onclick="switchTab('tab-all')">{{ T.manufacturer_all }}</button>
   </div>
   <div style="display:flex;gap:8px;">
-    <a href="/ledger/manufacturers" class="btn btn-outline btn-sm">📒 Cari Hesap</a>
-    <button class="btn btn-primary btn-sm" onclick="openModal('addMfrModal')">+ Üretici Ekle</button>
+    <a href="/ledger/manufacturers" class="btn btn-outline btn-sm">📒 {{ T.ledger_title }}</a>
+    <button class="btn btn-primary btn-sm" onclick="openModal('addMfrModal')">{{ T.manufacturer_add }}</button>
   </div>
 </div>
 
@@ -23,11 +24,11 @@
   <table>
     <thead>
       <tr>
-        <th>Firma Adı</th>
-        <th>E-posta</th>
-        <th>Durum</th>
-        <th>Kayıt Tarihi</th>
-        <th>İşlemler</th>
+        <th>{{ T.manufacturer_company }}</th>
+        <th>{{ T.manufacturer_email }}</th>
+        <th>{{ T.manufacturer_status }}</th>
+        <th>{{ T.manufacturer_reg_date }}</th>
+        <th>{{ T.manufacturer_actions }}</th>
       </tr>
     </thead>
     <tbody>
@@ -37,11 +38,11 @@
         <td>{{ m.email }}</td>
         <td>
           {% if m.is_approved and m.is_active %}
-            <span class="badge badge-green">Aktif</span>
+            <span class="badge badge-green">{{ T.status_active }}</span>
           {% elif not m.is_approved %}
-            <span class="badge badge-amber">Bekliyor</span>
+            <span class="badge badge-amber">{{ T.status_waiting }}</span>
           {% else %}
-            <span class="badge badge-red">Pasif</span>
+            <span class="badge badge-red">{{ T.status_inactive }}</span>
           {% endif %}
         </td>
         <td>{{ m.created_at[:10] if m.created_at else '-' }}</td>
@@ -50,28 +51,28 @@
             {% if not m.is_approved %}
             <form method="post" action="/manufacturers/approve" style="display:inline;">
               <input type="hidden" name="id" value="{{ m.id }}" />
-              <button type="submit" class="btn btn-success btn-sm">Onayla</button>
+              <button type="submit" class="btn btn-success btn-sm">{{ T.dealer_approve }}</button>
             </form>
             {% else %}
             <form method="post" action="/manufacturers/reject" style="display:inline;">
               <input type="hidden" name="id" value="{{ m.id }}" />
-              <button type="submit" class="btn btn-outline btn-sm">Pasif Yap</button>
+              <button type="submit" class="btn btn-outline btn-sm">{{ T.dealer_deactivate }}</button>
             </form>
             {% endif %}
-            <a href="/ledger/manufacturers/users/{{ m.id }}" class="btn btn-ghost btn-sm">📒 Cari</a>
+            <a href="/ledger/manufacturers/users/{{ m.id }}" class="btn btn-ghost btn-sm">📒 {{ T.ledger_title }}</a>
             <button class="btn btn-ghost btn-sm"
               onclick="editMfr({{ m.id }}, '{{ m.company_name|e }}', {{ m.can_view_costs or 0 }}, '{{ m.role }}', '{{ m.allowed_categories|e }}')">
-              ✏️ Düzenle
+              ✏️ {{ T.btn_edit }}
             </button>
             <form method="post" action="/manufacturers/delete" onsubmit="return confirmDelete(this)" data-confirm="Bu üreticiyi silmek istiyor musunuz?">
               <input type="hidden" name="id" value="{{ m.id }}" />
-              <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+              <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
             </form>
           </div>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">Kayıt bulunamadı</td></tr>
+      <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">{{ T.manufacturer_no_records }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -92,31 +93,31 @@
 <div id="addMfrModal" class="modal-overlay">
   <div class="modal-box" style="max-width:440px;">
     <div class="modal-header">
-      <h3 class="modal-title">Yeni Üretici Ekle</h3>
+      <h3 class="modal-title">{{ T.manufacturer_new_modal }}</h3>
       <button class="modal-close" onclick="closeModal('addMfrModal')">&times;</button>
     </div>
     <form method="post" action="/manufacturers/add">
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
         <div class="form-group">
-          <label class="form-label">E-posta *</label>
+          <label class="form-label">{{ T.manufacturer_email }} *</label>
           <input type="email" name="email" class="form-control" required placeholder="uretici@firma.com" />
         </div>
         <div class="form-group">
-          <label class="form-label">Şifre *</label>
+          <label class="form-label">{{ T.dealer_password }}</label>
           <input type="password" name="password" class="form-control" required placeholder="Geçici şifre" />
         </div>
         <div class="form-group">
-          <label class="form-label">Firma Adı</label>
+          <label class="form-label">{{ T.manufacturer_company }}</label>
           <input type="text" name="company_name" class="form-control" placeholder="Firma adı" />
         </div>
         <div class="form-group">
-          <label class="form-label">Telefon</label>
+          <label class="form-label">{{ T.dealer_phone }}</label>
           <input type="tel" name="phone" class="form-control" placeholder="Telefon numarası" />
         </div>
       </div>
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('addMfrModal')">İptal</button>
-        <button type="submit" class="btn btn-primary">Ekle</button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addMfrModal')">{{ T.btn_cancel }}</button>
+        <button type="submit" class="btn btn-primary">{{ T.btn_add }}</button>
       </div>
     </form>
   </div>
@@ -126,35 +127,35 @@
 <div id="mfrEditModal" class="modal-overlay">
   <div class="modal-box" style="max-width:480px;">
     <div class="modal-header">
-      <h3 class="modal-title">Üretici Düzenle</h3>
+      <h3 class="modal-title">{{ T.manufacturer_edit_modal }}</h3>
       <button class="modal-close" onclick="closeModal('mfrEditModal')">&times;</button>
     </div>
     <form method="post" action="/manufacturers/save">
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
         <input type="hidden" name="id" id="meid" value="" />
         <div class="form-group">
-          <label class="form-label">Firma Adı</label>
+          <label class="form-label">{{ T.manufacturer_company }}</label>
           <input type="text" name="company_name" id="mecompany" class="form-control" />
         </div>
         <div class="form-group">
-          <label class="form-label">Rol</label>
+          <label class="form-label">{{ T.dealer_role }}</label>
           <select name="role" id="merole" class="form-control">
             <option value="manufacturer">Üretici</option>
             <option value="dealer">Bayi olarak taşı →</option>
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">İzinli Kategoriler <small style="color:var(--text-muted)">(virgülle, boş=tümü)</small></label>
+          <label class="form-label">{{ T.dealer_allowed_cats }} <small style="color:var(--text-muted)">(virgülle, boş=tümü)</small></label>
           <input type="text" name="allowed_categories" id="mecat" class="form-control" />
         </div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
           <input type="checkbox" name="can_view_costs" id="mecosts" value="1" />
-          <span style="font-size:13px;">💰 Maliyet bilgilerini görebilir</span>
+          <span style="font-size:13px;">💰 {{ T.dealer_can_costs }}</span>
         </label>
       </div>
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('mfrEditModal')">İptal</button>
-        <button type="submit" class="btn btn-primary">Kaydet</button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('mfrEditModal')">{{ T.btn_cancel }}</button>
+        <button type="submit" class="btn btn-primary">{{ T.btn_save }}</button>
       </div>
     </form>
   </div>

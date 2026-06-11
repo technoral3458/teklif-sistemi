@@ -1,20 +1,21 @@
 {% extends "base.html" %}
-{% block page_title %}Modeller{% endblock %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').models_title }}{% endblock %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
   <form method="get" style="display:flex;gap:8px;align-items:center;">
     <select name="category_id" class="form-control" style="max-width:200px;" onchange="this.form.submit()">
-      <option value="0">Tüm Kategoriler</option>
+      <option value="0">{{ T.model_all_categories }}</option>
       {% for cat in categories %}
       <option value="{{ cat.id }}" {% if selected_cat == cat.id %}selected{% endif %}>{{ cat.name }}</option>
       {% endfor %}
     </select>
   </form>
-  <input type="text" id="tableSearch" class="search-box" placeholder="Model ara..." style="max-width:240px;" />
+  <input type="text" id="tableSearch" class="search-box" placeholder="{{ T.model_search_placeholder }}" style="max-width:240px;" />
   <a href="/models/new" class="btn btn-primary">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Yeni Model
+    {{ T.model_new }}
   </a>
 </div>
 
@@ -23,12 +24,12 @@
     <table id="mainTable">
       <thead>
         <tr>
-          <th>Resim</th>
-          <th>Model Adı</th>
-          <th>Kategori</th>
-          <th>Fiyat</th>
-          <th>Para Birimi</th>
-          <th>İşlemler</th>
+          <th>{{ T.model_image }}</th>
+          <th>{{ T.model_name }}</th>
+          <th>{{ T.model_category }}</th>
+          <th>{{ T.model_price }}</th>
+          <th>{{ T.model_currency }}</th>
+          <th>{{ T.model_actions }}</th>
         </tr>
       </thead>
       <tbody>
@@ -49,16 +50,16 @@
           <td>{{ m.currency or 'USD' }}</td>
           <td>
             <div style="display:flex;gap:6px;">
-              <a href="/models/{{ m.id }}/edit" class="btn btn-ghost btn-sm">Düzenle</a>
+              <a href="/models/{{ m.id }}/edit" class="btn btn-ghost btn-sm">{{ T.btn_edit }}</a>
               <form method="post" action="/models/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ m.name }}' modelini silmek istiyor musunuz?">
                 <input type="hidden" name="id" value="{{ m.id }}" />
-                <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+                <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
               </form>
             </div>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px">Henüz model eklenmedi</td></tr>
+        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.model_no_records }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

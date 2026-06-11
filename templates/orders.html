@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block page_title %}Siparişler{% endblock %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').orders_title }}{% endblock %}
 
 {% set STATUS_COLOR = {
   'Sipariş Verildi': 'blue',
@@ -11,21 +11,22 @@
 } %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 <div class="card">
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>No</th>
-          <th>Müşteri</th>
-          <th>Model</th>
-          <th>Adet</th>
-          <th>Tutar</th>
-          {% if user.role == 'admin' %}<th>Bayi</th>{% endif %}
-          {% if user.role in ('admin','dealer') %}<th>Üretici</th>{% endif %}
-          <th>Durum</th>
-          <th>Tarih</th>
-          <th>İşlem</th>
+          <th>{{ T.order_no }}</th>
+          <th>{{ T.order_customer }}</th>
+          <th>{{ T.order_model }}</th>
+          <th>{{ T.order_qty }}</th>
+          <th>{{ T.order_amount }}</th>
+          {% if user.role == 'admin' %}<th>{{ T.order_dealer }}</th>{% endif %}
+          {% if user.role in ('admin','dealer') %}<th>{{ T.order_manufacturer }}</th>{% endif %}
+          <th>{{ T.order_status }}</th>
+          <th>{{ T.order_date }}</th>
+          <th>{{ T.order_action }}</th>
         </tr>
       </thead>
       <tbody>
@@ -40,10 +41,10 @@
           {% if user.role in ('admin','dealer') %}<td>{{ o.manufacturer_name }}</td>{% endif %}
           <td><span class="badge badge-{{ STATUS_COLOR.get(o.status, 'blue') }}">{{ o.status }}</span></td>
           <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
-          <td><a href="/orders/{{ o.id }}" class="btn btn-outline btn-sm">Detay</a></td>
+          <td><a href="/orders/{{ o.id }}" class="btn btn-outline btn-sm">{{ T.order_detail }}</a></td>
         </tr>
         {% else %}
-        <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:32px">Henüz sipariş yok</td></tr>
+        <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.order_no_records }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
