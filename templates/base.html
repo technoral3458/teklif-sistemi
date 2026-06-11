@@ -193,10 +193,14 @@
   <script src="/static/js/app.js"></script>
   <script>
   function setLang(code) {
-    var fd = new FormData();
-    fd.append('lang', code);
-    fetch('/set-lang', {method:'POST', body:fd})
-      .then(function() { location.reload(); });
+    var f = document.createElement('form');
+    f.method = 'POST';
+    f.action = '/set-lang';
+    var i = document.createElement('input');
+    i.type = 'hidden'; i.name = 'lang'; i.value = code;
+    f.appendChild(i);
+    document.body.appendChild(f);
+    f.submit();
   }
   </script>
   {% block scripts %}{% endblock %}
