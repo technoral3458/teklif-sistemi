@@ -2,12 +2,12 @@ import json
 import datetime
 
 from fastapi import APIRouter, Request, Form
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 import db.factory as fdb
 import auth
-from config import OFFER_STATUSES, CURRENCIES
+from config import OFFER_STATUSES, CURRENCIES, BASE_DIR
 
 router = APIRouter(prefix="/offers")
 templates = Jinja2Templates(directory="templates")
@@ -80,6 +80,10 @@ async def create_offer(request: Request,
                        discount_pct: float = Form(0.0),
                        notes: str = Form(""),
                        validity_date: str = Form(""),
+                       delivery_method: str = Form(""),
+                       delivery_time: str = Form(""),
+                       logistics: str = Form(""),
+                       payment_notes: str = Form(""),
                        options_json: str = Form("[]")):
     user = auth.require_user(request)
 
@@ -120,6 +124,10 @@ async def create_offer(request: Request,
         status="Beklemede",
         notes=notes,
         validity_date=validity_date,
+        delivery_method=delivery_method,
+        delivery_time=delivery_time,
+        logistics=logistics,
+        payment_notes=payment_notes,
         dealer_id=user["id"],
     )
 
@@ -182,6 +190,10 @@ async def update_offer(request: Request,
                        discount_pct: float = Form(0.0),
                        notes: str = Form(""),
                        validity_date: str = Form(""),
+                       delivery_method: str = Form(""),
+                       delivery_time: str = Form(""),
+                       logistics: str = Form(""),
+                       payment_notes: str = Form(""),
                        options_json: str = Form("[]")):
     auth.require_user(request)
 
@@ -209,6 +221,10 @@ async def update_offer(request: Request,
         total_price=total_price,
         notes=notes,
         validity_date=validity_date,
+        delivery_method=delivery_method,
+        delivery_time=delivery_time,
+        logistics=logistics,
+        payment_notes=payment_notes,
     )
 
     fdb.save_offer_items(offer_id, [
@@ -248,6 +264,57 @@ async def offer_detail(request: Request, offer_id: int):
         "statuses": OFFER_STATUSES,
         "active_page": "offers",
     })
+
+
+@router.get("/{offer_id}/pdf")
+async def offer_pdf(request: Request, offer_id: int):
+    auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+    items = fdb.get_offer_items(offer_id)
+    customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
+    model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
+    opts = {o["id"]: o for o in fdb.get_options()}
+
+    best_prio, display_image = -1, (model.get("image_path", "") if model else "")
+    for item in items:
+        opt = opts.get(item.get("option_id"), {})
+        item["option_name"] = opt.get("name", "-")
+        item["description"] = opt.get("description", "") or ""
+        item["image_path"] = opt.get("image_path", "") or ""
+        var_img = opt.get("variation_image_path", "")
+        prio = opt.get("image_priority") or 0
+        if var_img and prio > best_prio:
+            display_image, best_prio = var_img, prio
+
+    specs = []
+    raw = (model.get("specs", "") or "") if model else ""
+    if raw.strip().startswith("["):
+        try:
+            specs = json.loads(raw)
+        except Exception:
+            pass
+    elif raw.strip().startswith("{"):
+        try:
+            obj = json.loads(raw)
+            specs = [{"title": k, "desc": str(v), "img": ""} for k, v in obj.items()]
+        except Exception:
+            pass
+
+    html_str = templates.get_template("offer_pdf.html").render(
+        offer=offer,
+        customer=customer or {},
+        model=model or {},
+        items=items,
+        specs=specs,
+        display_image=display_image,
+    )
+    from weasyprint import HTML as WH
+    pdf_bytes = WH(string=html_str, base_url=f"file://{BASE_DIR}/").write_pdf()
+    fname = f"Teklif_{offer['offer_no']}.pdf"
+    return Response(pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 
 @router.post("/{offer_id}/status")

@@ -154,6 +154,15 @@ def init():
         ]:
             _acol(cur, "offers", col, typ)
 
+        # Delivery / payment terms on offers
+        for col, typ in [
+            ("delivery_method", "TEXT DEFAULT ''"),
+            ("delivery_time",   "TEXT DEFAULT ''"),
+            ("logistics",       "TEXT DEFAULT ''"),
+            ("payment_notes",   "TEXT DEFAULT ''"),
+        ]:
+            _acol(cur, "offers", col, typ)
+
         # Add order_id to manufacturer_transactions
         _acol(cur, "manufacturer_transactions", "order_id", "INTEGER DEFAULT NULL")
 
@@ -429,11 +438,13 @@ def del_customer(cid):
 _OFCOLS = ("id,offer_no,customer_id,model_id,machine_count,currency,"
            "base_price,options_total,discount_pct,total_price,status,"
            "notes,validity_date,dealer_id,manufacturer_id,admin_status,"
-           "admin_notes,termin_date,mfr_status,mfr_notes,created_at")
+           "admin_notes,termin_date,mfr_status,mfr_notes,"
+           "delivery_method,delivery_time,logistics,payment_notes,created_at")
 _OFKEYS = ["id","offer_no","customer_id","model_id","machine_count","currency",
            "base_price","options_total","discount_pct","total_price","status",
            "notes","validity_date","dealer_id","manufacturer_id","admin_status",
-           "admin_notes","termin_date","mfr_status","mfr_notes","created_at"]
+           "admin_notes","termin_date","mfr_status","mfr_notes",
+           "delivery_method","delivery_time","logistics","payment_notes","created_at"]
 
 
 def _rof(r):
@@ -475,7 +486,8 @@ def get_offer(oid):
 def create_offer(**kw):
     allowed = ["offer_no", "customer_id", "model_id", "machine_count", "currency",
                "base_price", "options_total", "discount_pct", "total_price",
-               "status", "notes", "validity_date", "dealer_id"]
+               "status", "notes", "validity_date", "dealer_id",
+               "delivery_method", "delivery_time", "logistics", "payment_notes"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -492,7 +504,8 @@ def upd_offer_status(oid, status):
 def upd_offer(oid, **kw):
     allowed = ["customer_id", "model_id", "machine_count", "currency",
                "base_price", "options_total", "discount_pct", "total_price",
-               "status", "notes", "validity_date"]
+               "status", "notes", "validity_date",
+               "delivery_method", "delivery_time", "logistics", "payment_notes"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return

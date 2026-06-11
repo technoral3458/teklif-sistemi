@@ -155,6 +155,7 @@
         <div class="option-row" data-opt-id="{{ o.id }}" data-conflict="{{ o.conflict_group or '' }}"
              data-varimg="{{ (o.variation_image_path or '')|e }}"
              data-priority="{{ o.image_priority or 0 }}"
+             data-imgpath="{{ (o.image_path or '')|e }}"
              style="padding:12px 16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <input type="checkbox" id="opt_{{ o.id }}"
@@ -208,7 +209,30 @@
         </div>
         <div class="form-group" style="grid-column:1/-1;">
           <label class="form-label">Notlar</label>
-          <textarea name="notes" class="form-control" rows="3" placeholder="Müşteriye iletilecek notlar...">{{ edit_offer.notes if edit_offer else '' }}</textarea>
+          <textarea name="notes" class="form-control" rows="2" placeholder="Müşteriye iletilecek notlar...">{{ edit_offer.notes if edit_offer else '' }}</textarea>
+        </div>
+      </div>
+
+      <!-- Delivery / Payment terms -->
+      <div style="margin-top:16px;padding:14px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">Satış ve Teslimat Koşulları</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Teslimat Şekli</label>
+            <input type="text" name="delivery_method" id="wDeliveryMethod" class="form-control" placeholder="örn: Limandan Devir" value="{{ edit_offer.delivery_method if edit_offer else '' }}" />
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Teslim Süresi</label>
+            <input type="text" name="delivery_time" id="wDeliveryTime" class="form-control" placeholder="örn: 90 gün" value="{{ edit_offer.delivery_time if edit_offer else '' }}" />
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Nakliye / Lojistik</label>
+            <input type="text" name="logistics" id="wLogistics" class="form-control" placeholder="örn: Alıcıya Aittir" value="{{ edit_offer.logistics if edit_offer else '' }}" />
+          </div>
+          <div class="form-group" style="grid-column:1/-1;margin-bottom:0;">
+            <label class="form-label">Ödeme Notları</label>
+            <textarea name="payment_notes" id="wPaymentNotes" class="form-control" rows="3" placeholder="Peşinat, vade, ödeme planı...">{{ edit_offer.payment_notes if edit_offer else '' }}</textarea>
+          </div>
         </div>
       </div>
     </div>
@@ -342,32 +366,73 @@ function wizardCheckConflicts() {
 
 function wizardBuildSummary() {
   if (!wizardSelectedModel) return;
-  const qty = parseInt(document.getElementById('wMachineCount')?.value) || 1;
-  const disc = parseFloat(document.getElementById('wDiscount')?.value) || 0;
+  const qty    = parseInt(document.getElementById('wMachineCount')?.value) || 1;
+  const disc   = parseFloat(document.getElementById('wDiscount')?.value) || 0;
   const baseTotal = wizardSelectedModel.price * qty;
   let optTotal = 0, optRows = '';
+
   Object.values(wizardSelectedOptions).forEach(o => {
     const lt = o.price * (o.qty || 1);
     optTotal += lt;
-    optRows += `<tr><td style="padding:8px">${o.name}</td><td style="padding:8px;text-align:center">${o.qty||1}</td><td style="padding:8px;text-align:right">${o.price.toFixed(2)}</td><td style="padding:8px;text-align:right">${lt.toFixed(2)}</td></tr>`;
+    const optRow  = document.querySelector(`.option-row[data-opt-id="${o.id}"]`);
+    const imgPath = optRow ? optRow.dataset.imgpath : '';
+    const imgHtml = imgPath
+      ? `<img src="/static/${imgPath}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;flex-shrink:0;" />`
+      : '';
+    optRows += `<tr>
+      <td style="padding:8px;display:flex;align-items:center;">${imgHtml}<span>${o.name}</span></td>
+      <td style="padding:8px;text-align:center;">${o.qty||1}</td>
+      <td style="padding:8px;text-align:right;">${o.price.toFixed(2)}</td>
+      <td style="padding:8px;text-align:right;">${lt.toFixed(2)}</td>
+    </tr>`;
   });
+
   const subtotal = baseTotal + optTotal;
-  const total = subtotal * (1 - disc / 100);
-  const cur = wizardSelectedModel.currency;
+  const total    = subtotal * (1 - disc / 100);
+  const cur      = wizardSelectedModel.currency;
+
+  // Get machine image
+  const modelCard = document.querySelector(`.model-card[data-id="${wizardSelectedModel.id}"]`);
+  const modelImg  = modelCard ? modelCard.querySelector('img') : null;
+  const modelImgHtml = modelImg
+    ? `<img src="${modelImg.src}" style="width:200px;height:140px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0;" />`
+    : '';
+
   const summaryEl = document.getElementById('wizardSummary');
-  if (summaryEl) summaryEl.innerHTML = `
-    <table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden">
-      <thead style="background:var(--surface-2)"><tr><th style="padding:10px;text-align:left">Kalem</th><th style="padding:10px;text-align:center">Adet</th><th style="padding:10px;text-align:right">Birim</th><th style="padding:10px;text-align:right">Toplam</th></tr></thead>
+  if (!summaryEl) return;
+  summaryEl.innerHTML = `
+    <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;">
+      ${modelImgHtml}
+      <div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:6px;">${wizardSelectedModel.name}</div>
+        <div style="font-size:13px;color:var(--text-muted);">Adet: ${qty} &nbsp;|&nbsp; Para Birimi: ${cur}</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <thead style="background:var(--surface-2);">
+        <tr>
+          <th style="padding:10px;text-align:left;">Kalem</th>
+          <th style="padding:10px;text-align:center;">Adet</th>
+          <th style="padding:10px;text-align:right;">Birim</th>
+          <th style="padding:10px;text-align:right;">Toplam</th>
+        </tr>
+      </thead>
       <tbody>
-        <tr style="background:var(--surface)"><td style="padding:8px"><strong>${wizardSelectedModel.name}</strong></td><td style="padding:8px;text-align:center">${qty}</td><td style="padding:8px;text-align:right">${wizardSelectedModel.price.toFixed(2)}</td><td style="padding:8px;text-align:right">${baseTotal.toFixed(2)}</td></tr>
+        <tr style="background:var(--surface);">
+          <td style="padding:8px;"><strong>${wizardSelectedModel.name}</strong></td>
+          <td style="padding:8px;text-align:center;">${qty}</td>
+          <td style="padding:8px;text-align:right;">${wizardSelectedModel.price.toFixed(2)}</td>
+          <td style="padding:8px;text-align:right;">${baseTotal.toFixed(2)}</td>
+        </tr>
         ${optRows}
       </tbody>
     </table>
     <div style="text-align:right;margin-top:12px;font-size:14px;">
       <div>Ara Toplam: <strong>${subtotal.toFixed(2)} ${cur}</strong></div>
-      ${disc>0?`<div style="color:var(--success)">İskonto (${disc}%): -${(subtotal*disc/100).toFixed(2)} ${cur}</div>`:''}
-      <div style="font-size:20px;margin-top:8px;color:var(--accent)">Genel Toplam: <strong>${total.toFixed(2)} ${cur}</strong></div>
+      ${disc>0 ? `<div style="color:var(--success)">İskonto (${disc}%): -${(subtotal*disc/100).toFixed(2)} ${cur}</div>` : ''}
+      <div style="font-size:20px;margin-top:8px;color:var(--accent);">Genel Toplam: <strong>${total.toFixed(2)} ${cur}</strong></div>
     </div>`;
+
   document.getElementById('wOptionsJson').value = JSON.stringify(
     Object.values(wizardSelectedOptions).map(o => ({id:o.id, qty:o.qty||1, price:o.price, line_total:o.price*(o.qty||1)}))
   );

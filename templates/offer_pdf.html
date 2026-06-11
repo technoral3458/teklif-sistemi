@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+@page { size:A4; margin:15mm 18mm 18mm; }
+body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a; line-height:1.4; }
+
+/* ── Page breaks ─────────────────────────────────── */
+.page-break { break-before:page; page-break-before:always; }
+
+/* ── Cover ──────────────────────────────────────── */
+.cover-wrap { min-height:230mm; display:flex; flex-direction:column; justify-content:center; }
+.cover-img-box { text-align:center; margin-bottom:14mm; }
+.cover-img-box img { max-width:90%; max-height:105mm; object-fit:contain; }
+.cover-model { font-size:16pt; font-weight:bold; letter-spacing:.5px; margin-bottom:8mm; }
+.info-tbl { width:100%; border-collapse:collapse; }
+.info-tbl td { padding:7px 12px; border:1px solid #ccc; }
+.info-tbl td:first-child { background:#f3f4f6; font-weight:600; width:130px; }
+
+/* ── Section header ─────────────────────────────── */
+.sec-hdr { background:#1e2b4a; color:#fff; padding:9px 14px; font-size:11pt; font-weight:bold; margin-bottom:2px; }
+
+/* ── Spec rows ───────────────────────────────────── */
+.spec-row { display:table; width:100%; border-bottom:1px solid #e8e8e8; padding:12px 0; }
+.spec-row:last-child { border-bottom:none; }
+.spec-img-cell { display:table-cell; width:140px; vertical-align:top; padding-right:14px; }
+.spec-img-cell img { width:130px; height:88px; object-fit:cover; border-radius:3px; }
+.spec-img-empty { width:130px; height:88px; background:#f3f4f6; border-radius:3px; border:1px solid #e0e0e0; display:table-cell; }
+.spec-body { display:table-cell; vertical-align:top; }
+.spec-title { font-weight:bold; font-size:11pt; margin-bottom:5px; }
+.spec-desc { font-size:9.5pt; color:#444; line-height:1.45; }
+
+/* ── Options table ───────────────────────────────── */
+.opt-tbl { width:100%; border-collapse:collapse; }
+.opt-tbl thead tr { background:#f3f4f6; }
+.opt-tbl th { padding:8px 10px; text-align:left; font-size:9.5pt; border-bottom:2px solid #ddd; font-weight:700; }
+.opt-tbl th.r { text-align:right; }
+.opt-tbl td { padding:11px 10px; border-bottom:1px solid #eeeeee; vertical-align:middle; }
+.opt-tbl tr:last-child td { border-bottom:none; }
+.opt-img-wrap { width:120px; }
+.opt-img-wrap img { width:115px; height:78px; object-fit:cover; border-radius:3px; }
+.opt-img-empty { width:115px; height:78px; background:#f3f4f6; border-radius:3px; border:1px solid #e0e0e0; }
+.opt-name { font-weight:bold; font-size:10.5pt; }
+.opt-qty-badge { color:#e67e22; font-size:9pt; }
+.opt-desc-txt { font-size:9pt; color:#666; margin-top:3px; }
+.opt-unit-price { font-size:8.5pt; color:#999; }
+.opt-total-price { font-size:11.5pt; font-weight:bold; color:#e67e22; }
+
+/* ── Price summary ───────────────────────────────── */
+.price-block { width:58%; margin-left:auto; border-top:2px solid #eee; padding-top:10px; }
+.price-line { display:table; width:100%; padding:3px 0; font-size:10pt; }
+.price-line-label { display:table-cell; }
+.price-line-val { display:table-cell; text-align:right; }
+.strike { text-decoration:line-through; color:#aaa; }
+.disc-line { color:#e67e22; }
+.net-label { font-size:12pt; font-weight:bold; border-top:2px solid #333; padding-top:8px; margin-top:6px; display:block; }
+.net-amount { font-size:26pt; font-weight:bold; color:#e67e22; text-align:right; padding:6px 0 14px; }
+
+/* ── Terms ───────────────────────────────────────── */
+.terms-tbl { width:100%; border-collapse:collapse; margin-top:0; }
+.terms-tbl td { padding:8px 12px; border-bottom:1px solid #eee; font-size:9.5pt; }
+.terms-tbl td:first-child { font-weight:600; width:150px; background:#fafafa; }
+.terms-delivery-val { color:#e67e22; font-weight:600; }
+.payment-pre { white-space:pre-line; }
+
+/* ── Notes / footer ──────────────────────────────── */
+.notes-box { margin-top:14px; padding:10px 14px; background:#fffdf0; border:1px solid #f0e8c0; border-radius:4px; }
+.notes-box-title { font-weight:600; font-size:9.5pt; margin-bottom:4px; }
+.footer-note { text-align:center; font-size:8pt; color:#aaa; margin-top:18px; border-top:1px solid #eee; padding-top:8px; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════ KAPAK ════════════════════ -->
+<div class="cover-wrap">
+  {% if display_image %}
+  <div class="cover-img-box">
+    <img src="/static/{{ display_image }}" />
+  </div>
+  {% endif %}
+
+  <div class="cover-model">MODEL: {{ model.name if model else '' }}</div>
+
+  <table class="info-tbl">
+    <tr><td>Sayın Yetkili:</td><td><strong>{{ customer.name if customer else '-' }}</strong></td></tr>
+    {% if customer and customer.contact_person %}
+    <tr><td>İlgili:</td><td>{{ customer.contact_person }}</td></tr>
+    {% endif %}
+    <tr><td>Tarih:</td><td>{{ offer.created_at[:10] if offer.created_at else '' }}</td></tr>
+    <tr><td>Teklif No:</td><td><strong>{{ offer.offer_no }}</strong></td></tr>
+    {% if offer.validity_date %}<tr><td>Geçerlilik:</td><td>{{ offer.validity_date }}</td></tr>{% endif %}
+  </table>
+</div>
+
+{% if specs %}
+<!-- ════════════════ TEKNİK ÖZELLİKLER ════════════ -->
+<div class="page-break">
+  <div class="sec-hdr">&#9881; MAKİNE STANDART ÖZELLİKLERİ</div>
+  {% for spec in specs %}
+  {% if spec.title or spec.desc %}
+  <div class="spec-row">
+    <div class="spec-img-cell">
+      {% if spec.img %}
+      <img src="/static/{{ spec.img }}" />
+      {% else %}
+      <div class="spec-img-empty"></div>
+      {% endif %}
+    </div>
+    <div class="spec-body">
+      <div class="spec-title">{{ spec.title }}</div>
+      <div class="spec-desc">{{ spec.desc }}</div>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if items %}
+<!-- ════════════════ SEÇİLEN OPSİYONLAR ══════════ -->
+<div class="page-break">
+  <div class="sec-hdr">&#11042; SEÇİLEN OPSİYONLAR</div>
+  <table class="opt-tbl">
+    <thead>
+      <tr>
+        <th style="width:125px;">Görsel</th>
+        <th>Donanım Açıklaması</th>
+        <th class="r">Fiyat</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td class="opt-img-wrap">
+          {% if item.image_path %}
+          <img src="/static/{{ item.image_path }}" />
+          {% else %}
+          <div class="opt-img-empty"></div>
+          {% endif %}
+        </td>
+        <td>
+          <div class="opt-name">
+            {{ item.option_name }}
+            {% if item.qty > 1 %}<span class="opt-qty-badge"> ({{ item.qty }} Adet)</span>{% endif %}
+          </div>
+          {% if item.description %}<div class="opt-desc-txt">{{ item.description }}</div>{% endif %}
+          {% if item.qty > 1 %}
+          <div class="opt-unit-price">{{ item.qty }} x {{ "%.2f"|format(item.unit_price|default(0)|float) }} {{ offer.currency }}</div>
+          {% endif %}
+        </td>
+        <td style="text-align:right;white-space:nowrap;vertical-align:middle;">
+          <div class="opt-total-price">{{ "%.2f"|format(item.line_total|default(0)|float) }} {{ offer.currency }}</div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ════════════════ FİYAT + KOŞULLAR ════════════ -->
+<div class="page-break">
+
+  <!-- Price block -->
+  <div class="price-block">
+    {% set base_total = (offer.base_price|default(0)|float) * (offer.machine_count|default(1)|int) %}
+    {% set subtotal   = base_total + (offer.options_total|default(0)|float) %}
+    <div class="price-line">
+      <span class="price-line-label">Makine Baz Fiyatı:</span>
+      <span class="price-line-val">{{ "%.2f"|format(base_total) }} {{ offer.currency }}</span>
+    </div>
+    {% if (offer.options_total|default(0)|float) > 0 %}
+    <div class="price-line">
+      <span class="price-line-label">Sistem Liste Toplamı:</span>
+      <span class="price-line-val strike">{{ "%.2f"|format(subtotal) }} {{ offer.currency }}</span>
+    </div>
+    {% endif %}
+    {% if (offer.discount_pct|default(0)|float) > 0 %}
+    <div class="price-line disc-line">
+      <span class="price-line-label">Uygulanan İskonto: %{{ offer.discount_pct }}</span>
+      <span class="price-line-val">-{{ "%.2f"|format(subtotal * (offer.discount_pct|default(0)|float) / 100) }} {{ offer.currency }}</span>
+    </div>
+    {% endif %}
+    <span class="net-label">NET FİYAT (KDV Hariç)</span>
+    <div class="net-amount">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</div>
+  </div>
+
+  {% if offer.delivery_method or offer.delivery_time or offer.logistics or offer.payment_notes %}
+  <div class="sec-hdr" style="margin-top:4px;">&#10022; SATIŞ VE TESLİMAT ŞARTLARI</div>
+  <table class="terms-tbl">
+    {% if offer.delivery_method %}
+    <tr><td>Teslimat Şekli:</td><td class="terms-delivery-val">{{ offer.delivery_method }}</td></tr>
+    {% endif %}
+    {% if offer.delivery_time %}
+    <tr><td>Teslim Süresi:</td><td>{{ offer.delivery_time }}</td></tr>
+    {% endif %}
+    {% if offer.logistics %}
+    <tr><td>Nakliye / Lojistik:</td><td>{{ offer.logistics }}</td></tr>
+    {% endif %}
+    {% if offer.payment_notes %}
+    <tr><td style="vertical-align:top;padding-top:10px;">Ödeme Notları:</td>
+        <td class="payment-pre">{{ offer.payment_notes }}</td></tr>
+    {% endif %}
+  </table>
+  {% endif %}
+
+  {% if offer.notes %}
+  <div class="notes-box">
+    <div class="notes-box-title">Notlar:</div>
+    <div style="font-size:9.5pt;white-space:pre-line;">{{ offer.notes }}</div>
+  </div>
+  {% endif %}
+
+  <div class="footer-note">* Bu teklif {{ offer.created_at[:10] if offer.created_at else '' }} tarihinde oluşturulmuştur.</div>
+</div>
+
+</body>
+</html>
