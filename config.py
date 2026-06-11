@@ -21,6 +21,12 @@ ADMIN_EMAIL   = os.getenv("ADMIN_EMAIL",   "admin@example.com")
 ADMIN_PASS    = os.getenv("ADMIN_PASS",    "Admin123!")
 ADMIN_COMPANY = os.getenv("ADMIN_COMPANY", "Yönetim")
 
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+SMTP_FROM = os.getenv("SMTP_FROM", os.getenv("ADMIN_EMAIL", "noreply@example.com"))
+
 CURRENCIES       = ["USD", "EUR", "TRY", "RMB"]
 OFFER_STATUSES   = ["Beklemede", "Onaylandı", "Reddedildi", "Sipariş Verildi", "İptal"]
 PAYMENT_METHODS  = ["Nakit", "Banka Havalesi / EFT", "Çek", "Senet", "Kredi Kartı", "Diğer"]

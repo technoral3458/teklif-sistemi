@@ -97,19 +97,40 @@ async def do_logout():
 
 @router.post("/auth/forgot")
 async def do_forgot(request: Request, email: str = Form(...)):
-    tok = udb.reset_token(email.strip().lower())
-    if tok:
+    from email_utils import send_reset_email
+    from config import SMTP_HOST, ADMIN_COMPANY
+
+    clean_email = email.strip().lower()
+    tok = udb.reset_token(clean_email)
+    if not tok:
+        return templates.TemplateResponse(request, "login.html", {
+            **_admin_ctx(),
+            "msg": "Bu e-posta ile kayıtlı hesap bulunamadı.",
+            "msg_type": "danger",
+        })
+
+    if not SMTP_HOST:
+        return templates.TemplateResponse(request, "login.html", {
+            **_admin_ctx(),
+            "msg": "E-posta servisi yapılandırılmamış. Lütfen yöneticiye başvurun.",
+            "msg_type": "warning",
+        })
+
+    ok, err = send_reset_email(clean_email, tok, ADMIN_COMPANY)
+    if ok:
         return templates.TemplateResponse(request, "login.html", {
             **_admin_ctx(),
             "show_reset": True,
-            "prefill_email": email.strip().lower(),
-            "reset_code": tok,
+            "prefill_email": clean_email,
+            "msg": f"Sıfırlama kodu {clean_email} adresine gönderildi. E-postanızı kontrol edin.",
+            "msg_type": "success",
         })
-    return templates.TemplateResponse(request, "login.html", {
-        **_admin_ctx(),
-        "msg": "Bu e-posta ile kayıtlı hesap bulunamadı.",
-        "msg_type": "danger",
-    })
+    else:
+        return templates.TemplateResponse(request, "login.html", {
+            **_admin_ctx(),
+            "msg": f"E-posta gönderilemedi: {err}",
+            "msg_type": "danger",
+        })
 
 
 @router.post("/auth/reset")
