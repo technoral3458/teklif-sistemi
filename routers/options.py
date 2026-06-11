@@ -30,6 +30,8 @@ async def options_list(request: Request):
         "qty_types": QTY_TYPES,
         "option_scopes": OPTION_SCOPES,
         "active_page": "options",
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
     })
 
 
@@ -51,14 +53,17 @@ async def save_option(request: Request,
 
     image_path = current_image_path
     if image and image.filename:
-        os.makedirs(IMAGES_DIR, exist_ok=True)
-        ext = image.filename.rsplit(".", 1)[-1].lower()
-        fname = f"opt_{uuid.uuid4().hex[:10]}.{ext}"
-        fpath = os.path.join(IMAGES_DIR, fname)
-        content = await image.read()
-        with open(fpath, "wb") as f:
-            f.write(content)
-        image_path = f"img/uploads/{fname}"
+        try:
+            os.makedirs(IMAGES_DIR, exist_ok=True)
+            ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
+            fname = f"opt_{uuid.uuid4().hex[:10]}{ext}"
+            fpath = os.path.join(IMAGES_DIR, fname)
+            content = await image.read()
+            with open(fpath, "wb") as f:
+                f.write(content)
+            image_path = f"img/uploads/{fname}"
+        except Exception as e:
+            return RedirectResponse(f"/options?msg=Resim+kaydedilemedi:+{e}&msg_type=error", 303)
 
     kw = dict(
         name=name, description=description, price=price, currency=currency,
@@ -66,11 +71,14 @@ async def save_option(request: Request,
         conflict_group=conflict_group, image_priority=image_priority,
         image_path=image_path,
     )
-    if id:
-        fdb.upd_option(id, **kw)
-    else:
-        fdb.add_option(**kw)
-    return RedirectResponse("/options", 303)
+    try:
+        if id:
+            fdb.upd_option(id, **kw)
+        else:
+            fdb.add_option(**kw)
+    except Exception as e:
+        return RedirectResponse(f"/options?msg=Kayıt+hatası:+{e}&msg_type=error", 303)
+    return RedirectResponse("/options?msg=Kaydedildi&msg_type=success", 303)
 
 
 @router.post("/delete")
