@@ -139,6 +139,16 @@
         </svg>
       </button>
 
+      <!-- Language selector -->
+      <div style="display:flex;gap:2px;align-items:center;margin-right:4px;">
+        {% for code, flag in [('tr','🇹🇷'),('en','🇬🇧'),('zh','🇨🇳')] %}
+        <form method="post" action="/set-lang" style="display:inline;margin:0;">
+          <input type="hidden" name="lang" value="{{ code }}" />
+          <button type="submit" class="btn-icon" style="font-size:14px;padding:4px 7px;{% if user and user.lang == code %}opacity:1;box-shadow:0 0 0 2px var(--accent);border-radius:4px;{% else %}opacity:0.35;{% endif %}" title="{{ code.upper() }}">{{ flag }}</button>
+        </form>
+        {% endfor %}
+      </div>
+
       <!-- Profile link -->
       <a href="/profile" class="btn-icon" title="Profil">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

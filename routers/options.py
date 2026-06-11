@@ -50,7 +50,11 @@ async def save_option(request: Request,
                       current_image_path: str = Form(""),
                       current_variation_image_path: str = Form(""),
                       image: Optional[UploadFile] = File(None),
-                      variation_image: Optional[UploadFile] = File(None)):
+                      variation_image: Optional[UploadFile] = File(None),
+                      name_en: str = Form(""),
+                      description_en: str = Form(""),
+                      name_zh: str = Form(""),
+                      description_zh: str = Form("")):
     auth.require_user(request)
 
     def _save_file(upload: UploadFile, prefix: str) -> str:
@@ -78,6 +82,8 @@ async def save_option(request: Request,
         scope=scope, category_id=category_id or None, qty_type=qty_type,
         conflict_group=conflict_group, image_priority=image_priority,
         image_path=image_path, variation_image_path=variation_image_path,
+        name_en=name_en, description_en=description_en,
+        name_zh=name_zh, description_zh=description_zh,
     )
     try:
         if id:

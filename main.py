@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 
 import db.users as udb
 import db.factory as fdb
+import auth
 from config import BASE_DIR
 
 
@@ -59,6 +60,18 @@ for r in [
     admin_router,
 ]:
     app.include_router(r)
+
+
+from fastapi import Form as _Form
+from fastapi.responses import RedirectResponse as _Redir
+from db.users import update_profile as _upd_profile
+
+
+@app.post("/set-lang")
+async def set_lang(request: Request, lang: str = _Form("tr")):
+    user = auth.require_user(request)
+    _upd_profile(user["id"], lang=lang)
+    return _Redir(request.headers.get("referer", "/"), 303)
 
 
 @app.exception_handler(302)

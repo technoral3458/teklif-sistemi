@@ -46,6 +46,27 @@
             <label class="form-label">Açıklama</label>
             <textarea name="description" class="form-control" rows="3">{{ model.description|default('') }}</textarea>
           </div>
+          <div style="border-left:3px solid var(--border);padding-left:12px;margin-bottom:12px;">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">ÇEVİRİLER</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="form-group">
+                <label class="form-label">🇬🇧 Model Adı (EN)</label>
+                <input type="text" name="name_en" class="form-control" value="{{ model.name_en|default('') }}" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇨🇳 Model Adı (ZH)</label>
+                <input type="text" name="name_zh" class="form-control" value="{{ model.name_zh|default('') }}" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇬🇧 Açıklama (EN)</label>
+                <textarea name="description_en" class="form-control" rows="2">{{ model.description_en|default('') }}</textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇨🇳 Açıklama (ZH)</label>
+                <textarea name="description_zh" class="form-control" rows="2">{{ model.description_zh|default('') }}</textarea>
+              </div>
+            </div>
+          </div>
           <div class="form-group">
             <label class="form-label">Teknik Özellikler</label>
             <input type="hidden" name="specs" id="specsData" value="" />

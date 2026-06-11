@@ -44,7 +44,7 @@
             </div>
           </td>
           <td>
-            <strong>{{ o.name }}</strong>
+            <strong>{% if user.lang != 'tr' and o.get('name_'+user.lang) %}{{ o['name_'+user.lang] }}{% else %}{{ o.name }}{% endif %}</strong>
             {% if o.description %}<br><small style="color:var(--text-muted)">{{ o.description[:60] }}{% if o.description|length > 60 %}...{% endif %}</small>{% endif %}
           </td>
           <td>{{ o.category_name or 'Genel' }}</td>
@@ -72,7 +72,11 @@
                 {{ (o.conflict_group or "")|tojson }},
                 {{ (o.image_path or "")|tojson }},
                 {{ o.image_priority or 0 }},
-                {{ (o.variation_image_path or "")|tojson }}
+                {{ (o.variation_image_path or "")|tojson }},
+                {{ (o.name_en or "")|tojson }},
+                {{ (o.description_en or "")|tojson }},
+                {{ (o.name_zh or "")|tojson }},
+                {{ (o.description_zh or "")|tojson }}
               )'>✏️ Düzenle</button>
               <form method="post" action="/options/delete" onsubmit="return confirmDelete(this)">
                 <input type="hidden" name="id" value="{{ o.id }}" />
@@ -111,6 +115,28 @@
           <div class="form-group" style="grid-column:1/-1;">
             <label class="form-label">Açıklama</label>
             <textarea name="description" id="odesc" class="form-control" rows="2"></textarea>
+          </div>
+
+          <div class="form-group" style="grid-column:1/-1;border-left:3px solid var(--border);padding-left:12px;">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">ÇEVİRİLER (isteğe bağlı)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="form-group">
+                <label class="form-label">🇬🇧 Ad (EN)</label>
+                <input type="text" name="name_en" id="oname_en" class="form-control" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇬🇧 Açıklama (EN)</label>
+                <textarea name="description_en" id="odesc_en" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇨🇳 Ad (ZH)</label>
+                <input type="text" name="name_zh" id="oname_zh" class="form-control" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇨🇳 Açıklama (ZH)</label>
+                <textarea name="description_zh" id="odesc_zh" class="form-control" rows="2"></textarea>
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
@@ -255,10 +281,14 @@ function newOpt() {
   document.getElementById('oimage_priority').value = '0';
   clearImg('oimage', 'ocurrent_image', 'oImgPreview', 'oClearImg');
   clearImg('ovarimage', 'ocurrent_varimage', 'oVarImgPreview', 'oClearVarImg');
+  document.getElementById('oname_en').value = '';
+  document.getElementById('odesc_en').value = '';
+  document.getElementById('oname_zh').value = '';
+  document.getElementById('odesc_zh').value = '';
   openModal('optModal');
 }
 
-function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflict, imagePath, imagePriority, varImagePath) {
+function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflict, imagePath, imagePriority, varImagePath, nameEn, descEn, nameZh, descZh) {
   document.getElementById('optModalTitle').textContent = 'Opsiyon Düzenle';
   document.getElementById('oid').value = id;
   document.getElementById('oname').value = name;
@@ -274,6 +304,10 @@ function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflic
   document.getElementById('ocurrent_varimage').value = varImagePath || '';
   document.getElementById('oimage').value = '';
   document.getElementById('ovarimage').value = '';
+  document.getElementById('oname_en').value = nameEn || '';
+  document.getElementById('odesc_en').value = descEn || '';
+  document.getElementById('oname_zh').value = nameZh || '';
+  document.getElementById('odesc_zh').value = descZh || '';
   setImgPreview('oImgPreview', 'oClearImg', imagePath);
   setImgPreview('oVarImgPreview', 'oClearVarImg', varImagePath);
   openModal('optModal');

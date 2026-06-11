@@ -102,7 +102,13 @@ async def save_model(request: Request,
                      document_cost: float = Form(0.0),
                      installation_cost: float = Form(0.0),
                      other_cost: float = Form(0.0),
-                     image: Optional[UploadFile] = File(None)):
+                     image: Optional[UploadFile] = File(None),
+                     name_en: str = Form(""),
+                     description_en: str = Form(""),
+                     name_zh: str = Form(""),
+                     description_zh: str = Form(""),
+                     specs_en: str = Form(""),
+                     specs_zh: str = Form("")):
     auth.require_user(request)
 
     total_cost = _calc_cost(
@@ -150,6 +156,12 @@ async def save_model(request: Request,
         other_cost=other_cost,
         total_cost=total_cost,
         compatible_options=compatible_json,
+        name_en=name_en,
+        description_en=description_en,
+        name_zh=name_zh,
+        description_zh=description_zh,
+        specs_en=specs_en,
+        specs_zh=specs_zh,
     )
     if image_path:
         kw["image_path"] = image_path

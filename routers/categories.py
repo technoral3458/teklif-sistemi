@@ -23,12 +23,14 @@ async def categories_list(request: Request):
 async def save_category(request: Request,
                         id: int = Form(0),
                         name: str = Form(...),
-                        description: str = Form("")):
+                        description: str = Form(""),
+                        name_en: str = Form(""),
+                        name_zh: str = Form("")):
     auth.require_user(request)
     if id:
-        fdb.upd_cat(id, name, description)
+        fdb.upd_cat(id, name, description, name_en=name_en, name_zh=name_zh)
     else:
-        fdb.add_cat(name, description)
+        fdb.add_cat(name, description, name_en=name_en, name_zh=name_zh)
     return RedirectResponse("/categories", 303)
 
 

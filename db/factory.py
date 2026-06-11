@@ -154,6 +154,14 @@ def init():
         ]:
             _acol(cur, "offers", col, typ)
 
+        # Translation columns
+        for col in ["name_en", "name_zh"]:
+            _acol(cur, "categories", col, "TEXT DEFAULT ''")
+        for col in ["name_en", "description_en", "name_zh", "description_zh"]:
+            _acol(cur, "options", col, "TEXT DEFAULT ''")
+        for col in ["name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh"]:
+            _acol(cur, "models", col, "TEXT DEFAULT ''")
+
         # Delivery / payment terms on offers
         for col, typ in [
             ("delivery_method", "TEXT DEFAULT ''"),
@@ -233,18 +241,18 @@ def save_company(**kw):
 
 def get_cats():
     with _c() as c:
-        rows = c.execute("SELECT id,name,description FROM categories ORDER BY name").fetchall()
-    return [{"id": r[0], "name": r[1], "description": r[2]} for r in rows]
+        rows = c.execute("SELECT id,name,description,name_en,name_zh FROM categories ORDER BY name").fetchall()
+    return [dict(zip(["id","name","description","name_en","name_zh"], r)) for r in rows]
 
 
-def add_cat(name, description=""):
+def add_cat(name, description="", name_en="", name_zh=""):
     with _c() as c:
-        c.execute("INSERT OR IGNORE INTO categories(name,description) VALUES(?,?)", (name, description))
+        c.execute("INSERT OR IGNORE INTO categories(name,description,name_en,name_zh) VALUES(?,?,?,?)", (name, description, name_en, name_zh))
 
 
-def upd_cat(cid, name, description=""):
+def upd_cat(cid, name, description="", name_en="", name_zh=""):
     with _c() as c:
-        c.execute("UPDATE categories SET name=?,description=? WHERE id=?", (name, description, cid))
+        c.execute("UPDATE categories SET name=?,description=?,name_en=?,name_zh=? WHERE id=?", (name, description, name_en, name_zh, cid))
 
 
 def del_cat(cid):
@@ -257,12 +265,15 @@ def del_cat(cid):
 _MCOLS = ("id,name,category_id,description,base_price,currency,specs,"
           "purchase_price,purchase_currency,shipping_cost,customs_pct,extra_tax_pct,"
           "port_cost,document_cost,installation_cost,other_cost,total_cost,"
-          "image_path,compatible_options,created_at")
+          "image_path,compatible_options,"
+          "name_en,description_en,name_zh,description_zh,specs_en,specs_zh,created_at")
 
 _MKEYS = ["id", "name", "category_id", "description", "base_price", "currency", "specs",
           "purchase_price", "purchase_currency", "shipping_cost", "customs_pct", "extra_tax_pct",
           "port_cost", "document_cost", "installation_cost", "other_cost", "total_cost",
-          "image_path", "compatible_options", "created_at"]
+          "image_path", "compatible_options",
+          "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh",
+          "created_at"]
 
 
 def _rm(r):
@@ -291,7 +302,8 @@ def add_model(**kw):
     allowed = ["name", "category_id", "description", "base_price", "currency", "specs",
                "purchase_price", "purchase_currency", "shipping_cost", "customs_pct",
                "extra_tax_pct", "port_cost", "document_cost", "installation_cost",
-               "other_cost", "total_cost", "image_path", "compatible_options"]
+               "other_cost", "total_cost", "image_path", "compatible_options",
+               "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -304,7 +316,8 @@ def upd_model(mid, **kw):
     allowed = ["name", "category_id", "description", "base_price", "currency", "specs",
                "purchase_price", "purchase_currency", "shipping_cost", "customs_pct",
                "extra_tax_pct", "port_cost", "document_cost", "installation_cost",
-               "other_cost", "total_cost", "image_path", "compatible_options"]
+               "other_cost", "total_cost", "image_path", "compatible_options",
+               "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return
@@ -320,10 +333,11 @@ def del_model(mid):
 
 # ── Options ───────────────────────────────────────────────────────────────────
 
-_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,created_at"
+_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,name_en,description_en,name_zh,description_zh,created_at"
 _OKEYS = ["id", "name", "description", "price", "currency", "scope",
           "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
-          "variation_image_path", "created_at"]
+          "variation_image_path", "name_en", "description_en", "name_zh", "description_zh",
+          "created_at"]
 
 
 def _ro(r):
@@ -351,7 +365,7 @@ def get_option(oid):
 def add_option(**kw):
     allowed = ["name", "description", "price", "currency", "scope",
                "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
-               "variation_image_path"]
+               "variation_image_path", "name_en", "description_en", "name_zh", "description_zh"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -363,7 +377,7 @@ def add_option(**kw):
 def upd_option(oid, **kw):
     allowed = ["name", "description", "price", "currency", "scope",
                "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
-               "variation_image_path"]
+               "variation_image_path", "name_en", "description_en", "name_zh", "description_zh"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return

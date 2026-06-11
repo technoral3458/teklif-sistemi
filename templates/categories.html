@@ -24,11 +24,11 @@
         {% for c in categories %}
         <tr>
           <td>{{ c.id }}</td>
-          <td><strong>{{ c.name }}</strong></td>
+          <td><strong>{% if user.lang != 'tr' and c.get('name_'+user.lang) %}{{ c['name_'+user.lang] }}{% else %}{{ c.name }}{% endif %}</strong></td>
           <td>{{ c.description or '-' }}</td>
           <td>
             <div style="display:flex;gap:6px;">
-              <button class="btn btn-ghost btn-sm" onclick="editCat({{ c.id }}, '{{ c.name|e }}', '{{ c.description|e }}')">Düzenle</button>
+              <button class="btn btn-ghost btn-sm" onclick='editCat({{ c.id }}, {{ c.name|tojson }}, {{ (c.description or '')|tojson }}, {{ (c.name_en or '')|tojson }}, {{ (c.name_zh or '')|tojson }})'>Düzenle</button>
               <form method="post" action="/categories/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ c.name }}' kategorisini silmek istiyor musunuz?">
                 <input type="hidden" name="id" value="{{ c.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">Sil</button>
@@ -61,6 +61,17 @@
           <label class="form-label">Açıklama</label>
           <textarea name="description" id="catDesc" class="form-control" rows="3"></textarea>
         </div>
+          <div style="border-left:3px solid var(--border);padding-left:12px;margin-top:4px;">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">ÇEVİRİLER</div>
+            <div class="form-group">
+              <label class="form-label">🇬🇧 İngilizce Ad</label>
+              <input type="text" name="name_en" id="cname_en" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">🇨🇳 Çince Ad</label>
+              <input type="text" name="name_zh" id="cname_zh" class="form-control" />
+            </div>
+          </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
           <button type="button" class="btn btn-ghost" onclick="closeModal('catModal')">İptal</button>
           <button type="submit" class="btn btn-primary">Kaydet</button>
@@ -73,11 +84,13 @@
 
 {% block scripts %}
 <script>
-function editCat(id, name, desc) {
+function editCat(id, name, desc, nameEn, nameZh) {
   document.getElementById('catModalTitle').textContent = 'Kategori Düzenle';
   document.getElementById('catId').value = id;
   document.getElementById('catName').value = name;
   document.getElementById('catDesc').value = desc;
+  document.getElementById('cname_en').value = nameEn || '';
+  document.getElementById('cname_zh').value = nameZh || '';
   openModal('catModal');
 }
 </script>

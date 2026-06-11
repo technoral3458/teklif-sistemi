@@ -2,6 +2,7 @@
 {% block page_title %}{% if edit_offer %}Teklif Düzenle — {{ edit_offer.offer_no }}{% else %}Yeni Teklif{% endif %}{% endblock %}
 
 {% block content %}
+{% macro tr(obj, field) %}{{ obj.get(field+'_'+user.lang, '') or obj.get(field, '') if user.lang != 'tr' else obj.get(field, '') }}{% endmacro %}
 <!-- Wizard Steps Indicator -->
 <div class="wizard-steps" style="margin-bottom:32px;">
   <div class="step-item active" id="si1">
@@ -97,7 +98,7 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
         <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat(0)">Tümü</button>
         {% for cat in categories %}
-        <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat({{ cat.id }})">{{ cat.name }}</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat({{ cat.id }})">{{ tr(cat, 'name') }}</button>
         {% endfor %}
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
@@ -119,7 +120,7 @@
             {% endif %}
           </div>
           <div style="padding:11px 12px 13px;">
-            <div style="font-weight:700;font-size:13px;margin-bottom:5px;line-height:1.3;">{{ m.name }}</div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:5px;line-height:1.3;">{{ tr(m, 'name') }}</div>
             <div style="color:var(--accent);font-size:15px;font-weight:700;letter-spacing:.3px;">{{ "%.2f"|format(m.base_price|default(0)|float) }} {{ m.currency }}</div>
           </div>
         </div>
@@ -165,8 +166,8 @@
               <img src="/static/{{ o.image_path }}" style="width:32px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0;" />
               {% endif %}
               <span>
-                <strong>{{ o.name }}</strong>
-                {% if o.description %}<br><small style="color:var(--text-muted)">{{ o.description }}</small>{% endif %}
+                <strong>{{ tr(o, 'name') }}</strong>
+                {% if o.description %}<br><small style="color:var(--text-muted)">{{ tr(o, 'description') }}</small>{% endif %}
               </span>
               {% if o.variation_image_path %}
               <span title="Varyasyon resmi var" style="font-size:10px;color:var(--accent);background:var(--surface);padding:2px 5px;border-radius:4px;border:1px solid var(--accent);">Var.Resim</span>
