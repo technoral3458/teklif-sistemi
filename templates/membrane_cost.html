@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% block page_title %}Membran Kapak Maliyet{% endblock %}
+
+{% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+
+  <!-- ── Döviz Kurları ── -->
+  <div class="card">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 class="card-title">💱 Döviz Kurları (1 birim → TRY)</h3>
+      <form method="post" action="/membrane/rates/fetch" style="margin:0;">
+        <button type="submit" class="btn btn-outline btn-sm">🔄 Güncel Kur Al</button>
+      </form>
+    </div>
+    <div class="card-body">
+      <form method="post" action="/membrane/rates/save">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px;">
+          {% for cur, sym in [('USD','$'),('EUR','€'),('GBP','£')] %}
+          {% set info = rates.get(cur, {}) %}
+          <div>
+            <label class="form-label" style="font-size:13px;">{{ sym }} {{ cur }}/TRY</label>
+            <input type="number" name="{{ cur|lower }}" class="form-control" step="0.0001"
+                   value="{{ '%.4f'|format(info.rate|default(1)|float) }}" required />
+            {% if info.updated_at %}
+            <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">{{ info.updated_at[:16] }}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Kurları Kaydet</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Özet ── -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">📊 Maliyet Özeti</h3></div>
+    <div class="card-body">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">TOPLAM MALİYET / m²</div>
+        <div style="font-size:32px;font-weight:800;color:var(--accent);">{{ "%.2f"|format(total_cost_per_m2) }} ₺</div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:12px;">
+        {% for mat in materials %}
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;">
+          <span style="color:var(--text-muted);">{{ mat.name }}</span>
+          <span>{{ "%.2f"|format(mat.cost_per_m2_try) }} ₺/m²</span>
+        </div>
+        {% endfor %}
+        {% if not materials %}
+        <div style="color:var(--text-muted);font-size:13px;text-align:center;">Henüz malzeme eklenmedi</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Malzemeler ── -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3 class="card-title">🧱 Malzemeler</h3>
+    <button class="btn btn-primary btn-sm" onclick="openMatModal()">+ Malzeme Ekle</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Malzeme Adı</th>
+          <th>Tür</th>
+          <th style="text-align:right">Fiyat</th>
+          <th>Birim</th>
+          <th>Plaka Boyutu</th>
+          <th>Kullanım/m²</th>
+          <th style="text-align:right">Maliyet/m²</th>
+          <th style="text-align:center">İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mat in materials %}
+        <tr>
+          <td><strong>{{ mat.name }}</strong>{% if mat.notes %}<br><small style="color:var(--text-muted)">{{ mat.notes }}</small>{% endif %}</td>
+          <td>
+            <span class="badge badge-{% if mat.material_type=='mdf' %}blue{% elif mat.material_type=='foil' %}green{% elif mat.material_type=='adhesive' %}amber{% else %}gray{% endif %}">
+              {% if mat.material_type=='mdf' %}MDF Plaka{% elif mat.material_type=='foil' %}Membran Folyo{% elif mat.material_type=='adhesive' %}Yapıştırıcı{% else %}Diğer{% endif %}
+            </span>
+          </td>
+          <td style="text-align:right">{{ "%.2f"|format(mat.price|float) }} {{ mat.currency }}</td>
+          <td>{{ mat.unit }}</td>
+          <td style="color:var(--text-muted);font-size:12px;">
+            {% if mat.unit == 'plaka' and mat.sheet_width and mat.sheet_height %}
+            {{ mat.sheet_width|int }}×{{ mat.sheet_height|int }} cm
+            <br>= {{ "%.4f"|format((mat.sheet_width/100)*(mat.sheet_height/100)) }} m²
+            {% else %}—{% endif %}
+          </td>
+          <td style="text-align:center">{{ mat.usage_per_m2 if mat.unit not in ['m2','plaka'] else '—' }}</td>
+          <td style="text-align:right;font-weight:600;color:var(--accent);">{{ "%.2f"|format(mat.cost_per_m2_try) }} ₺</td>
+          <td style="text-align:center;">
+            <button class="btn btn-ghost btn-sm" onclick='editMat({{ mat|tojson }})'>✏️</button>
+            <form method="post" action="/membrane/material/delete" style="display:inline;">
+              <input type="hidden" name="id" value="{{ mat.id }}" />
+              <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('Malzemeyi sil?')" style="color:var(--danger)">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not materials %}
+        <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Henüz malzeme eklenmedi. "Malzeme Ekle" butonuna tıklayın.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Kapak Listesi ── -->
+<div class="card">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3 class="card-title">🚪 Kapak Listesi</h3>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="openDoorModal()">+ Kapak Ekle</button>
+      {% if doors %}
+      <form method="post" action="/membrane/door/clear" style="margin:0;">
+        <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Tüm listeyi temizle?')" style="color:var(--danger)">🗑️ Listeyi Temizle</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Proje / Ad</th>
+          <th style="text-align:center">En (mm)</th>
+          <th style="text-align:center">Boy (mm)</th>
+          <th style="text-align:center">Alan (m²)</th>
+          <th style="text-align:center">Adet</th>
+          <th style="text-align:right">Birim Maliyet</th>
+          <th style="text-align:right">Toplam Maliyet</th>
+          <th style="text-align:center">İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set ns = namespace(grand_total=0, grand_area=0) %}
+        {% for door in doors %}
+        {% set ns.grand_total = ns.grand_total + door.total_cost %}
+        {% set ns.grand_area = ns.grand_area + (door.area_m2 * door.quantity) %}
+        <tr>
+          <td>
+            {% if door.project_name %}<div style="font-size:11px;color:var(--accent);">{{ door.project_name }}</div>{% endif %}
+            <strong>{{ door.door_name or ('Kapak #' ~ door.id) }}</strong>
+          </td>
+          <td style="text-align:center">{{ door.width_mm|int }}</td>
+          <td style="text-align:center">{{ door.height_mm|int }}</td>
+          <td style="text-align:center;color:var(--text-muted);">{{ "%.4f"|format(door.area_m2) }}</td>
+          <td style="text-align:center">{{ door.quantity }}</td>
+          <td style="text-align:right">{{ "%.2f"|format(door.unit_cost) }} ₺</td>
+          <td style="text-align:right;font-weight:700;color:var(--accent);">{{ "%.2f"|format(door.total_cost) }} ₺</td>
+          <td style="text-align:center;">
+            <button class="btn btn-ghost btn-sm" onclick='editDoor({{ door|tojson }})'>✏️</button>
+            <form method="post" action="/membrane/door/delete" style="display:inline;">
+              <input type="hidden" name="id" value="{{ door.id }}" />
+              <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not doors %}
+        <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Liste boş. Kapak ekleyerek maliyet hesaplayın.</td></tr>
+        {% endif %}
+      </tbody>
+      {% if doors %}
+      <tfoot>
+        <tr style="font-weight:700;font-size:14px;background:var(--surface-2,var(--surface));">
+          <td colspan="3" style="text-align:right;color:var(--text-muted);">TOPLAM</td>
+          <td style="text-align:center;">{{ "%.4f"|format(ns.grand_area) }} m²</td>
+          <td></td>
+          <td></td>
+          <td style="text-align:right;color:var(--accent);font-size:16px;">{{ "%.2f"|format(ns.grand_total) }} ₺</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+<!-- ── Malzeme Modal ── -->
+<div id="matModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="matModalTitle">Malzeme Ekle</h3>
+      <button class="modal-close" onclick="closeModal('matModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/membrane/material/save" id="matForm">
+        <input type="hidden" name="id" id="mat_id" value="0" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="grid-column:span 2;">
+            <label class="form-label">Malzeme Adı *</label>
+            <input type="text" name="name" id="mat_name" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tür</label>
+            <select name="material_type" id="mat_type" class="form-control" onchange="togglePlaka()">
+              <option value="mdf">MDF Plaka</option>
+              <option value="foil">Membran Folyo</option>
+              <option value="adhesive">Yapıştırıcı</option>
+              <option value="other">Diğer</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Birim</label>
+            <select name="unit" id="mat_unit" class="form-control" onchange="togglePlaka()">
+              <option value="plaka">Plaka (boyuta göre m² hesapla)</option>
+              <option value="m2">m² (direkt m² fiyatı)</option>
+              <option value="kg">kg</option>
+              <option value="lt">litre</option>
+              <option value="adet">adet</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fiyat *</label>
+            <input type="number" name="price" id="mat_price" class="form-control" step="0.01" min="0" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Para Birimi</label>
+            <select name="currency" id="mat_currency" class="form-control">
+              <option value="TRY">TRY ₺</option>
+              <option value="USD">USD $</option>
+              <option value="EUR">EUR €</option>
+              <option value="GBP">GBP £</option>
+            </select>
+          </div>
+          <div id="plakaFields" style="grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label class="form-label">Plaka Eni (cm)</label>
+              <input type="number" name="sheet_width" id="mat_width" class="form-control" step="0.1" min="0" placeholder="ör: 244" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Plaka Boyu (cm)</label>
+              <input type="number" name="sheet_height" id="mat_height" class="form-control" step="0.1" min="0" placeholder="ör: 122" />
+            </div>
+          </div>
+          <div id="usageField" class="form-group" style="display:none;">
+            <label class="form-label">Kullanım Katsayısı (birim/m²)</label>
+            <input type="number" name="usage_per_m2" id="mat_usage" class="form-control" step="0.001" min="0" value="1" />
+          </div>
+          <div class="form-group" style="grid-column:span 2;">
+            <label class="form-label">Notlar</label>
+            <input type="text" name="notes" id="mat_notes" class="form-control" placeholder="ör: 18mm, E1 kalite..." />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Kaydet</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Kapak Modal ── -->
+<div id="doorModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="doorModalTitle">Kapak Ekle</h3>
+      <button class="modal-close" onclick="closeModal('doorModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/membrane/door/save" id="doorForm">
+        <input type="hidden" name="id" id="door_id" value="0" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Proje / Müşteri</label>
+            <input type="text" name="project_name" id="door_project" class="form-control" placeholder="ör: Villa A" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Kapak Adı / Kodu</label>
+            <input type="text" name="door_name" id="door_name" class="form-control" placeholder="ör: Mutfak Üst" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">En (mm) *</label>
+            <input type="number" name="width_mm" id="door_width" class="form-control" step="1" min="1" required placeholder="ör: 400" oninput="calcPreview()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Boy (mm) *</label>
+            <input type="number" name="height_mm" id="door_height" class="form-control" step="1" min="1" required placeholder="ör: 720" oninput="calcPreview()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Adet</label>
+            <input type="number" name="quantity" id="door_qty" class="form-control" step="1" min="1" value="1" oninput="calcPreview()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tahmini Maliyet</label>
+            <div id="costPreview" style="padding:9px 12px;background:var(--surface-2,#1e293b);border-radius:6px;border:1px solid var(--border);font-weight:700;color:var(--accent);font-size:15px;">
+              —
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Listeye Ekle</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const COST_PER_M2 = {{ total_cost_per_m2 }};
+
+function togglePlaka() {
+  var unit = document.getElementById('mat_unit').value;
+  document.getElementById('plakaFields').style.display = (unit === 'plaka') ? 'grid' : 'none';
+  document.getElementById('usageField').style.display = (unit !== 'plaka' && unit !== 'm2') ? 'block' : 'none';
+}
+
+function openMatModal() {
+  document.getElementById('matModalTitle').textContent = 'Malzeme Ekle';
+  document.getElementById('mat_id').value = '0';
+  document.getElementById('mat_name').value = '';
+  document.getElementById('mat_type').value = 'mdf';
+  document.getElementById('mat_unit').value = 'plaka';
+  document.getElementById('mat_price').value = '';
+  document.getElementById('mat_currency').value = 'TRY';
+  document.getElementById('mat_width').value = '';
+  document.getElementById('mat_height').value = '';
+  document.getElementById('mat_usage').value = '1';
+  document.getElementById('mat_notes').value = '';
+  togglePlaka();
+  openModal('matModal');
+}
+
+function editMat(mat) {
+  document.getElementById('matModalTitle').textContent = 'Malzeme Düzenle';
+  document.getElementById('mat_id').value = mat.id;
+  document.getElementById('mat_name').value = mat.name;
+  document.getElementById('mat_type').value = mat.material_type;
+  document.getElementById('mat_unit').value = mat.unit;
+  document.getElementById('mat_price').value = mat.price;
+  document.getElementById('mat_currency').value = mat.currency;
+  document.getElementById('mat_width').value = mat.sheet_width;
+  document.getElementById('mat_height').value = mat.sheet_height;
+  document.getElementById('mat_usage').value = mat.usage_per_m2;
+  document.getElementById('mat_notes').value = mat.notes || '';
+  togglePlaka();
+  openModal('matModal');
+}
+
+function openDoorModal() {
+  document.getElementById('doorModalTitle').textContent = 'Kapak Ekle';
+  document.getElementById('door_id').value = '0';
+  document.getElementById('door_project').value = '';
+  document.getElementById('door_name').value = '';
+  document.getElementById('door_width').value = '';
+  document.getElementById('door_height').value = '';
+  document.getElementById('door_qty').value = '1';
+  document.getElementById('costPreview').textContent = '—';
+  openModal('doorModal');
+}
+
+function editDoor(door) {
+  document.getElementById('doorModalTitle').textContent = 'Kapak Düzenle';
+  document.getElementById('door_id').value = door.id;
+  document.getElementById('door_project').value = door.project_name || '';
+  document.getElementById('door_name').value = door.door_name || '';
+  document.getElementById('door_width').value = door.width_mm;
+  document.getElementById('door_height').value = door.height_mm;
+  document.getElementById('door_qty').value = door.quantity;
+  calcPreview();
+  openModal('doorModal');
+}
+
+function calcPreview() {
+  var w = parseFloat(document.getElementById('door_width').value) || 0;
+  var h = parseFloat(document.getElementById('door_height').value) || 0;
+  var q = parseInt(document.getElementById('door_qty').value) || 1;
+  if (w > 0 && h > 0) {
+    var area = (w / 1000) * (h / 1000);
+    var unitCost = COST_PER_M2 * area;
+    var total = unitCost * q;
+    var el = document.getElementById('costPreview');
+    el.innerHTML = (q > 1 ? q + ' × ' + unitCost.toFixed(2) + ' = <br>' : '') +
+      '<span style="font-size:18px">' + total.toFixed(2) + ' ₺</span>' +
+      '<br><small style="color:var(--text-muted);font-size:11px;">' + (area*10000).toFixed(1) + ' dm² = ' + area.toFixed(4) + ' m²</small>';
+  } else {
+    document.getElementById('costPreview').textContent = '—';
+  }
+}
+</script>
+{% endblock %}

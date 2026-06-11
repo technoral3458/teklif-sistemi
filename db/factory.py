@@ -212,6 +212,7 @@ def init():
             created_at TEXT DEFAULT(datetime('now'))
         )""")
 
+        _init_membrane(cur)
         c.commit()
 
 
@@ -814,6 +815,7 @@ def all_mfr_user_balances():
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 
+
 def get_stats():
     with _c() as c:
         customer_count = c.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
@@ -830,3 +832,91 @@ def get_stats():
         "pending_offers": pending_offers,
         "order_count": order_count,
     }
+
+
+# ── Membrane Cost Calculator ──────────────────────────────────────────────────
+
+def _init_membrane(c):
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_materials(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        material_type TEXT DEFAULT 'other',
+        price REAL DEFAULT 0,
+        currency TEXT DEFAULT 'TRY',
+        unit TEXT DEFAULT 'm2',
+        sheet_width REAL DEFAULT 0,
+        sheet_height REAL DEFAULT 0,
+        usage_per_m2 REAL DEFAULT 1,
+        notes TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_doors(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_name TEXT DEFAULT '',
+        door_name TEXT DEFAULT '',
+        width_mm REAL NOT NULL,
+        height_mm REAL NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_rates(
+        currency TEXT PRIMARY KEY,
+        rate_to_try REAL NOT NULL DEFAULT 1,
+        updated_at TEXT DEFAULT (datetime('now'))
+    )""")
+    for cur in ['USD', 'EUR', 'GBP']:
+        if not c.execute("SELECT 1 FROM membrane_rates WHERE currency=?", (cur,)).fetchone():
+            c.execute("INSERT INTO membrane_rates(currency,rate_to_try) VALUES(?,1)", (cur,))
+
+def get_membrane_materials():
+    with _c() as c:
+        rows = c.execute("SELECT id,name,material_type,price,currency,unit,sheet_width,sheet_height,usage_per_m2,notes FROM membrane_materials ORDER BY material_type,name").fetchall()
+    cols = ["id","name","material_type","price","currency","unit","sheet_width","sheet_height","usage_per_m2","notes"]
+    return [dict(zip(cols, r)) for r in rows]
+
+def save_membrane_material(id=None, **kw):
+    fields = ["name","material_type","price","currency","unit","sheet_width","sheet_height","usage_per_m2","notes"]
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{f}=?" for f in fields)
+            c.execute(f"UPDATE membrane_materials SET {sets} WHERE id=?", [kw.get(f,0) for f in fields]+[id])
+        else:
+            cols = ",".join(fields)
+            phs = ",".join("?" for _ in fields)
+            c.execute(f"INSERT INTO membrane_materials({cols}) VALUES({phs})", [kw.get(f,"") for f in fields])
+            id = c.lastrowid
+    return id
+
+def del_membrane_material(mid):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_materials WHERE id=?", (mid,))
+
+def get_membrane_doors():
+    with _c() as c:
+        rows = c.execute("SELECT id,project_name,door_name,width_mm,height_mm,quantity FROM membrane_doors ORDER BY id").fetchall()
+    cols = ["id","project_name","door_name","width_mm","height_mm","quantity"]
+    return [dict(zip(cols, r)) for r in rows]
+
+def save_membrane_door(id=None, **kw):
+    fields = ["project_name","door_name","width_mm","height_mm","quantity"]
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{f}=?" for f in fields)
+            c.execute(f"UPDATE membrane_doors SET {sets} WHERE id=?", [kw.get(f,"") for f in fields]+[id])
+        else:
+            cols = ",".join(fields)
+            phs = ",".join("?" for _ in fields)
+            c.execute(f"INSERT INTO membrane_doors({cols}) VALUES({phs})", [kw.get(f,"") for f in fields])
+
+def del_membrane_door(did):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_doors WHERE id=?", (did,))
+
+def get_membrane_rates():
+    with _c() as c:
+        rows = c.execute("SELECT currency,rate_to_try,updated_at FROM membrane_rates").fetchall()
+    return {r[0]: {"rate": r[1], "updated_at": r[2]} for r in rows}
+
+def set_membrane_rate(currency, rate):
+    with _c() as c:
+        c.execute("INSERT OR REPLACE INTO membrane_rates(currency,rate_to_try,updated_at) VALUES(?,?,datetime('now'))", (currency, rate))

@@ -42,6 +42,7 @@ from routers.dealers import router as dealers_router
 from routers.manufacturers import router as manufacturers_router
 from routers.profile import router as profile_router
 from routers.admin_router import router as admin_router
+from routers.membrane import router as membrane_router
 
 for r in [
     auth_router,
@@ -58,6 +59,7 @@ for r in [
     manufacturers_router,
     profile_router,
     admin_router,
+    membrane_router,
 ]:
     app.include_router(r)
 
