@@ -208,37 +208,37 @@ async def scan_image(request: Request, image: UploadFile = File(...)):
     b64 = base64.standard_b64encode(content).decode()
     mime = image.content_type or "image/jpeg"
 
-    prompt = """Bu görselde el yazısıyla veya yazılı şekilde kapak/dolap kapağı ölçü listesi var.
-Her satırdaki ölçüleri dikkatli oku ve JSON array olarak çıkar.
+    prompt = """Bu görselde Türk mobilya/mutfak sektörüne ait el yazısıyla yazılmış membran kapak ölçü listesi var.
+Tüm satırları tek tek oku ve kapak ölçülerini JSON array olarak çıkar.
 
-Her kapak için şu alanları çıkar:
-- width_mm: en/genişlik (sayısal, milimetre cinsinden)
-- height_mm: boy/yükseklik (sayısal, milimetre cinsinden)
-- quantity: adet (yoksa 1 kullan)
-- door_name: kapak adı veya kodu (varsa, yoksa "")
-- color: renk (varsa, yoksa "")
+OKUMA KURALLARI (çok önemli):
+1. FORMAT: Genellikle "Boy x En = Adet" ya da "En x Boy = Adet" sırasında yazılır.
+   Sütun başlıklarına bak (Boy/En/Adet gibi) — yoksa bağlamdan anla.
+2. AYRAÇLAR: "x", "X", "×" ölçü ayracı; "=" ya da "-" ise adeti gösterir.
+   Örn: "85X38=8" → boy=85, en=38, adet=8
+3. ÖLÇÜ BİRİMİ TESPİTİ:
+   - 2 haneli sayılar (10-99): büyük ihtimalle cm → mm'ye çevir (×10)
+   - 3 haneli sayılar (100-999): büyük ihtimalle mm → direkt kullan
+   - Şüpheliyse: tipik kapak en 150-1200mm, boy 150-2500mm aralığında olur
+4. KESME / TAKSIM İŞARETİ: "/" rakamın parçası olabilir.
+   Örn: "29/2" → 292, "11'5" veya "11.5" → 115, "14X59/7" → en=14cm=140mm, boy=597mm
+5. ÜZERİ ÇİZİLİ SATIRLARI ATLA — iptal edilmiştir.
+6. RENK/MODEL NOTU: Sayfanın kenarında renk kodu veya model adı varsa
+   (örn: "STN Mercan", "Beyaz", "VR-805") tüm kapaklar için color alanına yaz.
+7. AÇIKLAMALAR: "Tay lazım", "baca", "topuz" gibi notlar door_name'e yaz, ölçü olarak alma.
 
-ÖNEMLİ KURALLAR:
-1. Ölçüler cm olarak yazılmışsa mm'ye çevir (örn: 40x72 cm → 400x720 mm)
-2. Ölçüler mm olarak yazılmışsa doğrudan kullan (örn: 400x720)
-3. Ölçüler "En x Boy" veya "Boy x En" formatında olabilir — bağlama göre anla
-4. Sadece JSON döndür, başka açıklama yazma
-5. Türkçe renk adlarını koru (Beyaz, Siyah, Meşe, Ceviz vs.)
-
-Örnek çıktı:
+ÇIKTI — yalnızca geçerli JSON array döndür, başka hiçbir şey yazma:
 [
-  {"width_mm": 400, "height_mm": 720, "quantity": 2, "door_name": "Mutfak Üst", "color": "Beyaz"},
-  {"width_mm": 600, "height_mm": 1200, "quantity": 1, "door_name": "", "color": ""}
-]
-
-Sadece JSON array döndür:"""
+  {"width_mm": 380, "height_mm": 850, "quantity": 8, "door_name": "", "color": "STN Mercan"},
+  {"width_mm": 650, "height_mm": 250, "quantity": 1, "door_name": "", "color": "STN Mercan"}
+]"""
 
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
+            model="claude-sonnet-4-6",
+            max_tokens=4096,
             messages=[{
                 "role": "user",
                 "content": [
@@ -252,7 +252,7 @@ Sadece JSON array döndür:"""
         start = raw.find("[")
         end = raw.rfind("]") + 1
         if start == -1 or end == 0:
-            return JSONResponse({"error": f"Görüntüden ölçü çıkarılamadı. Model yanıtı: {raw[:200]}"}, status_code=422)
+            return JSONResponse({"error": f"Model ölçü listesi bulamadı. Ham yanıt: {raw[:400]}"}, status_code=422)
         doors = json.loads(raw[start:end])
         # Save all extracted doors
         saved = []
