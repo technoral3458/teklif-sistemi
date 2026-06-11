@@ -266,6 +266,52 @@ async def offer_detail(request: Request, offer_id: int):
     })
 
 
+@router.get("/{offer_id}/print")
+async def offer_print(request: Request, offer_id: int):
+    auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+    items = fdb.get_offer_items(offer_id)
+    customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
+    model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
+    opts = {o["id"]: o for o in fdb.get_options()}
+
+    best_prio, display_image = -1, (model.get("image_path", "") if model else "")
+    for item in items:
+        opt = opts.get(item.get("option_id"), {})
+        item["option_name"] = opt.get("name", "-")
+        item["description"] = opt.get("description", "") or ""
+        item["image_path"] = opt.get("image_path", "") or ""
+        var_img = opt.get("variation_image_path", "")
+        prio = opt.get("image_priority") or 0
+        if var_img and prio > best_prio:
+            display_image, best_prio = var_img, prio
+
+    specs = []
+    raw = (model.get("specs", "") or "") if model else ""
+    if raw.strip().startswith("["):
+        try:
+            specs = json.loads(raw)
+        except Exception:
+            pass
+    elif raw.strip().startswith("{"):
+        try:
+            obj = json.loads(raw)
+            specs = [{"title": k, "desc": str(v), "img": ""} for k, v in obj.items()]
+        except Exception:
+            pass
+
+    return templates.TemplateResponse(request, "offer_print.html", {
+        "offer": offer,
+        "customer": customer or {},
+        "model": model or {},
+        "items": items,
+        "specs": specs,
+        "display_image": display_image,
+    })
+
+
 @router.get("/{offer_id}/pdf")
 async def offer_pdf(request: Request, offer_id: int):
     auth.require_user(request)
