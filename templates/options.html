@@ -52,19 +52,19 @@
           </td>
           <td>
             <div style="display:flex;gap:6px;">
-              <button class="btn btn-ghost btn-sm" onclick="editOpt(
+              <button class="btn btn-ghost btn-sm" onclick='editOpt(
                 {{ o.id }},
                 {{ o.name|tojson }},
-                {{ (o.description or '')|tojson }},
-                {{ o.price|float if o.price != None else 0 }},
-                {{ (o.currency or 'USD')|tojson }},
-                {{ (o.scope or 'GLOBAL')|tojson }},
+                {{ (o.description or "")|tojson }},
+                {{ o.price|float if o.price != none else 0 }},
+                {{ (o.currency or "USD")|tojson }},
+                {{ (o.scope or "GLOBAL")|tojson }},
                 {{ o.category_id or 0 }},
-                {{ (o.qty_type or 'MANUAL')|tojson }},
-                {{ (o.conflict_group or '')|tojson }},
-                {{ (o.image_path or '')|tojson }},
+                {{ (o.qty_type or "MANUAL")|tojson }},
+                {{ (o.conflict_group or "")|tojson }},
+                {{ (o.image_path or "")|tojson }},
                 {{ o.image_priority or 0 }}
-              )">✏️ Düzenle</button>
+              )'>✏️ Düzenle</button>
               <form method="post" action="/options/delete" onsubmit="return confirmDelete(this)">
                 <input type="hidden" name="id" value="{{ o.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">Sil</button>
