@@ -45,9 +45,16 @@
       <div class="card-header"><h3 class="card-title">Fiyat Detayı</h3></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Kalem</th><th style="text-align:center">Adet</th><th style="text-align:right">Birim Fiyat</th><th style="text-align:right">Toplam</th></tr></thead>
+          <thead><tr><th style="width:52px;"></th><th>Kalem</th><th style="text-align:center">Adet</th><th style="text-align:right">Birim Fiyat</th><th style="text-align:right">Toplam</th></tr></thead>
           <tbody>
             <tr>
+              <td>
+                {% if model and model.image_path %}
+                <img src="/static/{{ model.image_path }}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block;" />
+                {% else %}
+                <div style="width:44px;height:44px;background:var(--surface-2);border-radius:6px;border:1px dashed var(--border);"></div>
+                {% endif %}
+              </td>
               <td><strong>{{ model.name if model else 'Model' }}</strong></td>
               <td style="text-align:center">{{ offer.machine_count }}</td>
               <td style="text-align:right">{{ "%.2f"|format(offer.base_price|default(0)|float) }} {{ offer.currency }}</td>
@@ -55,7 +62,17 @@
             </tr>
             {% for item in items %}
             <tr>
-              <td style="padding-left:24px;color:var(--text-muted);">{{ item.option_name }}</td>
+              <td>
+                {% if item.image_path %}
+                <img src="/static/{{ item.image_path }}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block;" />
+                {% else %}
+                <div style="width:44px;height:44px;background:var(--surface-2);border-radius:6px;border:1px dashed var(--border);"></div>
+                {% endif %}
+              </td>
+              <td>
+                <div>{{ item.option_name }}</div>
+                {% if item.description %}<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ item.description[:80] }}{% if item.description|length > 80 %}...{% endif %}</div>{% endif %}
+              </td>
               <td style="text-align:center">{{ item.qty }}</td>
               <td style="text-align:right">{{ "%.2f"|format(item.unit_price|default(0)|float) }}</td>
               <td style="text-align:right">{{ "%.2f"|format(item.line_total|default(0)|float) }}</td>

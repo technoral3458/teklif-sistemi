@@ -250,6 +250,8 @@ async def offer_detail(request: Request, offer_id: int):
     for item in items:
         opt = opts.get(item.get("option_id"), {})
         item["option_name"] = opt.get("name", "-")
+        item["image_path"]  = opt.get("image_path", "") or ""
+        item["description"] = opt.get("description", "") or ""
         var_img = opt.get("variation_image_path", "")
         prio = opt.get("image_priority") or 0
         if var_img and prio > best_prio:
