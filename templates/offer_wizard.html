@@ -314,6 +314,22 @@ function wizardToggleOption(optId, price, name, currency) {
     const qtyEl = document.getElementById('optqty_' + optId);
     const qty = qtyEl ? parseInt(qtyEl.value) || 1 : 1;
     wizardSelectedOptions[optId] = { id: optId, name, price: parseFloat(price), qty, currency, line_total: parseFloat(price) * qty };
+
+    // Auto-deselect other options in the same conflict group
+    const thisRow = document.querySelector(`.option-row[data-opt-id="${optId}"]`);
+    const cg = thisRow ? thisRow.dataset.conflict : '';
+    if (cg) {
+      document.querySelectorAll(`.option-row[data-conflict="${cg}"]`).forEach(row => {
+        const otherId = parseInt(row.dataset.optId);
+        if (otherId !== optId) {
+          const otherCb = document.getElementById('opt_' + otherId);
+          if (otherCb && otherCb.checked) {
+            otherCb.checked = false;
+            delete wizardSelectedOptions[otherId];
+          }
+        }
+      });
+    }
   } else {
     delete wizardSelectedOptions[optId];
   }
