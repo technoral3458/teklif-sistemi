@@ -12,6 +12,23 @@ router = APIRouter(prefix="/offers")
 from tmpl import templates
 
 
+def _filter_specs(specs, items, opts):
+    """Hide standard specs that are replaced by selected options with a conflict_group."""
+    hidden = set()
+    for item in items:
+        opt = opts.get(item.get("option_id"), {})
+        if not opt.get("conflict_group"):
+            continue
+        # Match by option name or conflict_group value (case-insensitive)
+        for key in (opt.get("name") or "", opt.get("conflict_group") or ""):
+            k = key.lower().strip()
+            if k:
+                hidden.add(k)
+    if not hidden:
+        return specs
+    return [s for s in specs if s.get("title", "").lower().strip() not in hidden]
+
+
 @router.get("")
 async def offers_list(request: Request, status: str = "", q: str = ""):
     user = auth.require_user(request)
@@ -305,6 +322,8 @@ async def offer_print(request: Request, offer_id: int):
         except Exception:
             pass
 
+    specs = _filter_specs(specs, items, opts)
+
     return templates.TemplateResponse(request, "offer_print.html", {
         "offer": offer,
         "customer": customer or {},
@@ -351,6 +370,8 @@ async def offer_pdf(request: Request, offer_id: int):
             specs = [{"title": k, "desc": str(v), "img": ""} for k, v in obj.items()]
         except Exception:
             pass
+
+    specs = _filter_specs(specs, items, opts)
 
     html_str = templates.get_template("offer_pdf.html").render(
         offer=offer,
