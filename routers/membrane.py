@@ -1,8 +1,8 @@
 import urllib.request
-import json
+import xml.etree.ElementTree as ET
 
 from fastapi import APIRouter, Request, Form
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse
 
 import db.factory as fdb
 import auth
@@ -12,16 +12,25 @@ router = APIRouter(prefix="/membrane")
 
 
 def _fetch_live_rates():
-    """Fetch USD/TRY and EUR/TRY from frankfurter.app (no API key needed)."""
+    """Fetch USD/EUR/GBP rates from TCMB (Merkez Bankası) XML feed."""
     try:
-        url = "https://api.frankfurter.app/latest?base=TRY&symbols=USD,EUR,GBP"
-        with urllib.request.urlopen(url, timeout=5) as r:
-            data = json.loads(r.read())
-        # data.rates = {USD: x, EUR: y} meaning 1 TRY = x USD
-        # We want 1 USD = ? TRY  →  1 / rate
+        url = "https://www.tcmb.gov.tr/kurlar/today.xml"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = r.read()
+        root = ET.fromstring(data)
         result = {}
-        for cur, rate in data.get("rates", {}).items():
-            result[cur] = round(1 / rate, 4) if rate else 1
+        for cur_el in root.findall("Currency"):
+            code = cur_el.get("CurrencyCode") or cur_el.get("Kod", "")
+            if code not in ("USD", "EUR", "GBP"):
+                continue
+            unit_el = cur_el.find("Unit")
+            unit = int(unit_el.text) if unit_el is not None and unit_el.text else 1
+            # Use ForexSelling (döviz satış kuru)
+            selling_el = cur_el.find("ForexSelling")
+            if selling_el is not None and selling_el.text:
+                rate = float(selling_el.text.replace(",", ".")) / unit
+                result[code] = round(rate, 4)
         return result, None
     except Exception as e:
         return None, str(e)
@@ -88,7 +97,26 @@ async def fetch_rates(request: Request):
     if result:
         for cur, rate in result.items():
             fdb.set_membrane_rate(cur, rate)
-    return RedirectResponse("/membrane", 303)
+        msg, msg_type = f"Merkez Bankası kurları güncellendi ({', '.join(f'{c}: {r:.4f} ₺' for c,r in result.items())})", "success"
+    else:
+        msg, msg_type = f"Merkez Bankası'na bağlanılamadı: {err}. Kurları elle giriniz.", "danger"
+    materials = fdb.get_membrane_materials()
+    doors = fdb.get_membrane_doors()
+    rates = fdb.get_membrane_rates()
+    for mat in materials:
+        mat["cost_per_m2_try"] = _material_cost_per_m2(mat, rates)
+    total_cost_per_m2 = sum(m["cost_per_m2_try"] for m in materials)
+    for door in doors:
+        area = (float(door["width_mm"]) / 1000) * (float(door["height_mm"]) / 1000)
+        door["area_m2"] = round(area, 4)
+        door["unit_cost"] = round(total_cost_per_m2 * area, 2)
+        door["total_cost"] = round(door["unit_cost"] * int(door["quantity"]), 2)
+    user = auth.require_user(request)
+    return templates.TemplateResponse(request, "membrane_cost.html", {
+        "user": user, "materials": materials, "doors": doors, "rates": rates,
+        "total_cost_per_m2": round(total_cost_per_m2, 2),
+        "active_page": "membrane", "msg": msg, "msg_type": msg_type,
+    })
 
 
 @router.post("/rates/save")
