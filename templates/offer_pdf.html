@@ -182,21 +182,17 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
           </div>
           {% if item.description %}<div class="opt-desc-txt">{{ item.description }}</div>{% endif %}
           {% if item.qty > 1 %}
-            {% set disc_unit = (item.unit_price|default(0)|float) * (1 - (offer.discount_pct|default(0)|float)/100) %}
             {% if (offer.discount_pct|default(0)|float) > 0 %}
-            <div class="opt-unit-price">
-              <span style="text-decoration:line-through;color:#bbb;">{{ item.qty }} x {{ "%.2f"|format(item.unit_price|default(0)|float) }}</span>
-              &rarr; {{ item.qty }} x {{ "%.2f"|format(disc_unit) }} {{ offer.currency }}
-            </div>
+            {% set disc_unit = (item.unit_price|default(0)|float) * (1 - (offer.discount_pct|default(0)|float)/100) %}
+            <div class="opt-unit-price">{{ item.qty }} x {{ "%.2f"|format(disc_unit) }} {{ offer.currency }}</div>
             {% else %}
             <div class="opt-unit-price">{{ item.qty }} x {{ "%.2f"|format(item.unit_price|default(0)|float) }} {{ offer.currency }}</div>
             {% endif %}
           {% endif %}
         </td>
         <td style="text-align:right;white-space:nowrap;vertical-align:middle;">
-          {% set disc_line = (item.line_total|default(0)|float) * (1 - (offer.discount_pct|default(0)|float)/100) %}
           {% if (offer.discount_pct|default(0)|float) > 0 %}
-          <div style="font-size:9pt;color:#bbb;text-decoration:line-through;">{{ "%.2f"|format(item.line_total|default(0)|float) }} {{ offer.currency }}</div>
+          {% set disc_line = (item.line_total|default(0)|float) * (1 - (offer.discount_pct|default(0)|float)/100) %}
           <div class="opt-total-price">{{ "%.2f"|format(disc_line) }} {{ offer.currency }}</div>
           {% else %}
           <div class="opt-total-price">{{ "%.2f"|format(item.line_total|default(0)|float) }} {{ offer.currency }}</div>
@@ -218,36 +214,21 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
     {% set base_total = (offer.base_price|default(0)|float) * (offer.machine_count|default(1)|int) %}
     {% set opts_total = (offer.options_total|default(0)|float) %}
     {% set subtotal   = base_total + opts_total %}
+    <div class="price-line">
+      <span class="price-line-label">Makine Baz Fiyatı:</span>
+      <span class="price-line-val">{{ "%.2f"|format(base_total*(1-disc/100)) }} {{ offer.currency }}</span>
+    </div>
+    {% if opts_total > 0 %}
+    <div class="price-line">
+      <span class="price-line-label">Opsiyonlar Toplamı:</span>
+      <span class="price-line-val">{{ "%.2f"|format(opts_total*(1-disc/100)) }} {{ offer.currency }}</span>
+    </div>
+    {% endif %}
     {% if disc > 0 %}
-    <div class="price-line">
-      <span class="price-line-label">Makine Baz Fiyatı:</span>
-      <span class="price-line-val"><span class="strike">{{ "%.2f"|format(base_total) }}</span> &rarr; {{ "%.2f"|format(base_total*(1-disc/100)) }} {{ offer.currency }}</span>
+    <div class="price-line disc-line" style="font-size:9pt;border-top:1px solid #eee;padding-top:5px;margin-top:3px;">
+      <span class="price-line-label">Uygulanan İskonto: %{{ "%.0f"|format(disc) }}</span>
+      <span class="price-line-val"></span>
     </div>
-    {% if opts_total > 0 %}
-    <div class="price-line">
-      <span class="price-line-label">Opsiyonlar Toplamı:</span>
-      <span class="price-line-val"><span class="strike">{{ "%.2f"|format(opts_total) }}</span> &rarr; {{ "%.2f"|format(opts_total*(1-disc/100)) }} {{ offer.currency }}</span>
-    </div>
-    {% endif %}
-    <div class="price-line" style="border-top:1px solid #eee;padding-top:6px;margin-top:4px;">
-      <span class="price-line-label">Liste Toplamı (İskontosuz):</span>
-      <span class="price-line-val strike">{{ "%.2f"|format(subtotal) }} {{ offer.currency }}</span>
-    </div>
-    <div class="price-line disc-line">
-      <span class="price-line-label">İskonto %{{ "%.0f"|format(disc) }}:</span>
-      <span class="price-line-val">- {{ "%.2f"|format(subtotal * disc / 100) }} {{ offer.currency }}</span>
-    </div>
-    {% else %}
-    <div class="price-line">
-      <span class="price-line-label">Makine Baz Fiyatı:</span>
-      <span class="price-line-val">{{ "%.2f"|format(base_total) }} {{ offer.currency }}</span>
-    </div>
-    {% if opts_total > 0 %}
-    <div class="price-line">
-      <span class="price-line-label">Opsiyonlar Toplamı:</span>
-      <span class="price-line-val">{{ "%.2f"|format(opts_total) }} {{ offer.currency }}</span>
-    </div>
-    {% endif %}
     {% endif %}
     <span class="net-label">NET FİYAT (KDV Hariç)</span>
     <div class="net-amount">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</div>
