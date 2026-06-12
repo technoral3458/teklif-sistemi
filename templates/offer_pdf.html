@@ -181,7 +181,9 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
             {% if item.qty > 1 %}<span class="opt-qty-badge"> ({{ item.qty }} Adet)</span>{% endif %}
           </div>
           {% if item.description %}<div class="opt-desc-txt">{{ item.description }}</div>{% endif %}
-          {% if item.video_url %}<div style="font-size:8pt;color:#3b82f6;margin-top:3px;">▶ Video: {{ item.video_url }}</div>{% endif %}
+          {% if item.video_url %}
+          <a href="{{ item.video_url }}" style="display:inline-block;margin-top:5px;padding:4px 12px;background:#e67e22;color:#fff;border-radius:4px;font-size:8.5pt;text-decoration:none;font-weight:600;">▶ Video İzle</a>
+          {% endif %}
           {% if item.qty > 1 %}
             {% if (offer.discount_pct|default(0)|float) > 0 %}
             {% set disc_unit = (item.unit_price|default(0)|float) * (1 - (offer.discount_pct|default(0)|float)/100) %}
