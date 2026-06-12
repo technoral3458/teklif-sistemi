@@ -382,7 +382,7 @@ async def offer_pdf(request: Request, offer_id: int):
         display_image=display_image,
     )
     from weasyprint import HTML as WH
-    pdf_bytes = WH(string=html_str, base_url=f"file://{BASE_DIR}/").write_pdf()
+    pdf_bytes = WH(string=html_str, base_url="http://127.0.0.1:8501/").write_pdf()
     fname = f"Teklif_{offer['offer_no']}.pdf"
     return Response(pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{fname}"'})
