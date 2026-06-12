@@ -6,158 +6,121 @@
   <title>Teklif {{ offer.offer_no }}</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: Arial, sans-serif; background: #1a1a2e; min-height: 100vh; }
+    html, body { height:100%; overflow:hidden; }
+    body { font-family: Arial, sans-serif; background:#f1f5f9; display:flex; flex-direction:column; }
 
+    /* ── Top bar ── */
     .top-bar {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      background: #1e2b4a;
-      padding: 10px 16px;
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      box-shadow: 0 2px 8px rgba(0,0,0,.4);
+      flex-shrink:0;
+      background:#1e2b4a;
+      padding:10px 14px;
+      display:flex; align-items:center; gap:10px;
+      box-shadow:0 2px 8px rgba(0,0,0,.35);
+      z-index:10;
     }
-    .top-bar .offer-info { flex: 1; min-width: 0; }
-    .top-bar .offer-info .no { font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .top-bar .offer-info .cust { font-size: 11px; color: #94a3b8; }
-    .top-bar .actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .top-bar .offer-info { flex:1; min-width:0; }
+    .top-bar .offer-info .no  { font-size:13px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .top-bar .offer-info .sub { font-size:11px; color:#94a3b8; }
+    .top-bar .actions { display:flex; gap:8px; flex-shrink:0; }
 
     .btn-dl {
-      display: flex; align-items: center; gap: 6px;
-      padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer;
-      font-size: 14px; font-weight: 600; text-decoration: none;
-      background: #3b82f6; color: #fff;
-      -webkit-tap-highlight-color: transparent;
+      display:flex; align-items:center; gap:5px;
+      padding:8px 16px; border-radius:8px; border:none; cursor:pointer;
+      font-size:14px; font-weight:600; text-decoration:none;
+      background:#3b82f6; color:#fff;
     }
-    .btn-dl:active { opacity: .8; }
     .btn-share {
-      display: flex; align-items: center; gap: 6px;
-      padding: 9px 18px; border-radius: 8px; border: 2px solid #3b82f6; cursor: pointer;
-      font-size: 14px; font-weight: 600;
-      background: transparent; color: #fff;
-      -webkit-tap-highlight-color: transparent;
+      display:flex; align-items:center; gap:5px;
+      padding:8px 16px; border-radius:8px; border:2px solid #3b82f6; cursor:pointer;
+      font-size:14px; font-weight:600; background:transparent; color:#fff;
     }
-    .btn-share:active { background: rgba(59,130,246,.2); }
+    .back-link { color:#94a3b8; font-size:13px; text-decoration:none; white-space:nowrap; }
 
-    .back-link { color: #94a3b8; font-size: 13px; text-decoration: none; white-space: nowrap; }
-    .back-link:hover { color: #fff; }
-
-    /* Desktop: iframe preview */
-    .pdf-frame-wrap {
-      position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
+    /* ── Preview frame ── */
+    .preview-wrap {
+      flex:1; overflow:hidden; position:relative;
     }
-    .pdf-frame-wrap iframe {
-      width: 100%; height: 100%; border: none;
+    .preview-wrap iframe {
+      width:100%; height:100%; border:none; display:block;
+      background:#fff;
     }
 
-    /* Mobile: centered card with buttons */
-    .mobile-card {
-      display: none;
-      margin: 80px auto 0;
-      max-width: 420px;
-      padding: 24px 20px;
-      background: #243050;
-      border-radius: 16px;
-      text-align: center;
-      color: #fff;
-    }
-    .mobile-card .doc-icon { font-size: 56px; margin-bottom: 12px; }
-    .mobile-card h2 { font-size: 16px; margin-bottom: 4px; }
-    .mobile-card p { font-size: 13px; color: #94a3b8; margin-bottom: 24px; }
-    .mobile-card .btn-dl-big {
-      display: block; width: 100%; padding: 14px;
-      background: #3b82f6; color: #fff; border: none; border-radius: 10px;
-      font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none;
-      margin-bottom: 12px;
-    }
-    .mobile-card .btn-share-big {
-      display: block; width: 100%; padding: 14px;
-      background: transparent; color: #fff;
-      border: 2px solid #3b82f6; border-radius: 10px;
-      font-size: 16px; font-weight: 700; cursor: pointer;
-    }
-    .mobile-card .hint {
-      font-size: 11px; color: #64748b; margin-top: 16px; line-height: 1.5;
-    }
-
-    @media (max-width: 768px) {
-      .pdf-frame-wrap { display: none !important; }
-      .mobile-card { display: block; }
-      body { background: #111827; }
+    /* Mobile: scale iframe content to fit narrow screen */
+    @media (max-width:768px) {
+      .preview-wrap iframe {
+        /* render at 900px wide then scale down to device width */
+        width: 900px;
+        transform-origin: top left;
+      }
     }
   </style>
 </head>
 <body>
 
-<!-- Top action bar (always visible) -->
 <div class="top-bar">
   <a href="/offers/{{ offer.id }}" class="back-link">← Geri</a>
   <div class="offer-info">
     <div class="no">{{ offer.offer_no }}</div>
-    <div class="cust">{{ customer.name or '' }}</div>
+    <div class="sub">{{ customer.name or '' }}</div>
   </div>
   <div class="actions">
     <a class="btn-dl" href="/offers/{{ offer.id }}/pdf?dl=1" download="Teklif_{{ offer.offer_no }}.pdf">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       İndir
     </a>
     <button class="btn-share" onclick="sharePdf()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
       Paylaş
     </button>
   </div>
 </div>
 
-<!-- Desktop PDF iframe -->
-<div class="pdf-frame-wrap">
-  <iframe src="/offers/{{ offer.id }}/pdf" title="PDF Önizleme"></iframe>
-</div>
-
-<!-- Mobile card -->
-<div class="mobile-card">
-  <div class="doc-icon">📄</div>
-  <h2>{{ offer.offer_no }}</h2>
-  <p>{{ customer.name or '' }}{% if customer.name and offer.created_at %} · {% endif %}{{ offer.created_at[:10] if offer.created_at else '' }}</p>
-
-  <a class="btn-dl-big" href="/offers/{{ offer.id }}/pdf?dl=1" download="Teklif_{{ offer.offer_no }}.pdf">
-    ↓ PDF İndir
-  </a>
-  <button class="btn-share-big" onclick="sharePdf()">
-    ↗ Paylaş (WhatsApp, E-posta…)
-  </button>
-  <p class="hint">PDF dosyası cihazınıza indirilir veya doğrudan paylaşım uygulamalarına gönderilir.</p>
+<div class="preview-wrap" id="previewWrap">
+  <iframe id="previewFrame" title="Teklif Önizleme"></iframe>
 </div>
 
 <script>
-async function sharePdf() {
-  const fname = "Teklif_{{ offer.offer_no }}.pdf";
-  const url   = "/offers/{{ offer.id }}/pdf?dl=1";
+  // Desktop → real PDF, Mobile → HTML print view (PDF can't be iframed on mobile Chrome)
+  const isMobile = window.innerWidth <= 768;
+  const frame = document.getElementById('previewFrame');
+  const wrap  = document.getElementById('previewWrap');
 
-  if (navigator.share) {
-    try {
-      // Try native file share (Android Chrome, iOS Safari 15+)
-      const res  = await fetch(url);
-      const blob = await res.blob();
-      const file = new File([blob], fname, { type: "application/pdf" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: fname });
-        return;
-      }
-      // Fallback: share URL
-      await navigator.share({ title: fname, url: window.location.href });
-    } catch (e) {
-      if (e.name !== "AbortError") fallbackShare(url, fname);
-    }
+  if (isMobile) {
+    frame.src = '/offers/{{ offer.id }}/print';
+    // Scale 900px-wide iframe down to actual screen width
+    const scale = window.innerWidth / 900;
+    frame.style.transform = `scale(${scale})`;
+    frame.style.height = (window.innerHeight / scale) + 'px';
+    wrap.style.overflow = 'hidden';
   } else {
-    fallbackShare(url, fname);
+    frame.src = '/offers/{{ offer.id }}/pdf';
   }
-}
 
-function fallbackShare(url, fname) {
-  // Desktop fallback: open download
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fname;
-  a.click();
-}
+  async function sharePdf() {
+    const fname = "Teklif_{{ offer.offer_no }}.pdf";
+    const url   = "/offers/{{ offer.id }}/pdf?dl=1";
+    if (navigator.share) {
+      try {
+        const res  = await fetch(url);
+        const blob = await res.blob();
+        const file = new File([blob], fname, { type: "application/pdf" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: fname });
+          return;
+        }
+        await navigator.share({ title: fname, url: window.location.href });
+      } catch(e) {
+        if (e.name !== "AbortError") triggerDownload(url, fname);
+      }
+    } else {
+      triggerDownload(url, fname);
+    }
+  }
+
+  function triggerDownload(url, fname) {
+    const a = document.createElement('a');
+    a.href = url; a.download = fname; a.click();
+  }
 </script>
 </body>
 </html>
