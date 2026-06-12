@@ -184,7 +184,7 @@
             <span style="font-weight:600;color:var(--accent);white-space:nowrap;">{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</span>
             {% if o.video_url %}
             <button type="button" class="btn btn-ghost btn-sm" style="color:#e67e22;border-color:#e67e22;padding:3px 10px;"
-                    onclick="openVideoModal({{ o.video_url|tojson }})">▶ Video</button>
+                    onclick='openVideoModal({{ o.video_url|tojson }})'>▶ Video</button>
             {% endif %}
           </div>
         </div>

@@ -74,7 +74,7 @@
                 <div>{{ item.option_name }}</div>
                 {% if item.description %}<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ item.description[:80] }}{% if item.description|length > 80 %}...{% endif %}</div>{% endif %}
                 {% if item.video_url %}
-                <button class="btn btn-ghost btn-sm" style="margin-top:4px;color:#e67e22;border-color:#e67e22;" onclick="openVideoModal({{ item.video_url|tojson }})">▶ Video İzle</button>
+                <button class="btn btn-ghost btn-sm" style="margin-top:4px;color:#e67e22;border-color:#e67e22;" onclick='openVideoModal({{ item.video_url|tojson }})'>▶ Video İzle</button>
                 {% endif %}
               </td>
               <td style="text-align:center">{{ item.qty }}</td>
