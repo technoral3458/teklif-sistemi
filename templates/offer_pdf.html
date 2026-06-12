@@ -4,29 +4,27 @@
 <meta charset="UTF-8">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-@page {
-  size: A4;
-  margin: 28mm 18mm 18mm;
-  @top-left {
-    content: element(page-header);
-  }
-}
-/* First page keeps same top margin but header still shows */
+@page { size:A4; margin:26mm 18mm 18mm; }
 body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a; line-height:1.4; }
 
-/* ── Running page header ─────────────────────────── */
+/* ── Fixed page header (repeats on every page in WeasyPrint) ── */
 #page-header {
-  position: running(page-header);
+  position: fixed;
+  top: -22mm;
+  left: 0;
+  right: 0;
+  height: 18mm;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   border-bottom: 2px solid #1e2b4a;
-  padding-bottom: 5px;
-  width: 100%;
+  padding: 0 0 4px 0;
+  background: #fff;
 }
-#page-header img { max-height: 14mm; max-width: 48mm; object-fit: contain; }
-#page-header .hdr-company { font-size: 11pt; font-weight: bold; color: #1e2b4a; }
-#page-header .hdr-right { margin-left: auto; font-size: 8pt; color: #888; text-align: right; }
+#page-header .hdr-left { display:flex; align-items:center; gap:8px; }
+#page-header .hdr-left img { max-height:13mm; max-width:44mm; object-fit:contain; }
+#page-header .hdr-company { font-size:11pt; font-weight:bold; color:#1e2b4a; }
+#page-header .hdr-right { font-size:8pt; color:#888; text-align:right; line-height:1.6; }
 
 /* ── Page breaks ─────────────────────────────────── */
 .page-break { break-before:page; page-break-before:always; }
@@ -94,15 +92,20 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
 </head>
 <body>
 
-<!-- Running header (rendered once, repeated on every page by WeasyPrint) -->
+<!-- Fixed header – repeats on every page -->
 <div id="page-header">
-  {% if admin_logo %}
-  <img src="/static/{{ admin_logo }}" alt="{{ admin_company }}" />
-  {% endif %}
-  {% if admin_company %}
-  <span class="hdr-company">{{ admin_company }}</span>
-  {% endif %}
-  <span class="hdr-right">Teklif No: {{ offer.offer_no }}<br>{{ offer.created_at[:10] if offer.created_at else '' }}</span>
+  <div class="hdr-left">
+    {% if admin_logo %}
+    <img src="/static/{{ admin_logo }}" alt="" />
+    {% endif %}
+    {% if admin_company %}
+    <span class="hdr-company">{{ admin_company }}</span>
+    {% endif %}
+  </div>
+  <div class="hdr-right">
+    Teklif No: <strong>{{ offer.offer_no }}</strong><br>
+    {{ offer.created_at[:10] if offer.created_at else '' }}
+  </div>
 </div>
 
 <!-- ════════════════════ KAPAK ════════════════════ -->
