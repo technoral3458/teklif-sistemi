@@ -5,7 +5,6 @@ from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse, Response
 
 import db.factory as fdb
-import db.users as udb
 import auth
 from config import OFFER_STATUSES, CURRENCIES, BASE_DIR
 
@@ -374,7 +373,7 @@ async def offer_pdf(request: Request, offer_id: int):
 
     specs = _filter_specs(specs, items, opts)
 
-    admin = udb.get_admin() or {}
+    company = fdb.get_company() or {}
     html_str = templates.get_template("offer_pdf.html").render(
         offer=offer,
         customer=customer or {},
@@ -382,8 +381,8 @@ async def offer_pdf(request: Request, offer_id: int):
         items=items,
         specs=specs,
         display_image=display_image,
-        admin_logo=admin.get("logo_path", "") or "",
-        admin_company=admin.get("company_name", "") or "",
+        admin_logo=company.get("logo_path", "") or "",
+        admin_company=company.get("company_name", "") or "",
     )
     from weasyprint import HTML as WH
     pdf_bytes = WH(string=html_str, base_url="http://127.0.0.1:8501/").write_pdf()
