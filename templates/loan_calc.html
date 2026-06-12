@@ -10,21 +10,25 @@
   background:var(--surface-2); border:1px solid var(--border); border-radius:10px;
   padding:14px 16px; display:flex; flex-direction:column; gap:4px;
 }
-.loan-card .lc-vade { font-size:13px; color:var(--text-muted); font-weight:600; }
-.loan-card .lc-monthly { font-size:26px; font-weight:800; color:var(--accent); line-height:1.1; }
-.loan-card .lc-sub { font-size:11px; color:var(--text-muted); }
-.loan-card .lc-details { display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
-.loan-card .lc-detail-item { font-size:11px; }
+.loan-card .lc-vade { font-size:11px; color:var(--text-muted); font-weight:600; letter-spacing:.5px; }
+.loan-card .lc-monthly { font-size:20px; font-weight:800; color:var(--accent); line-height:1.2; word-break:break-all; }
+.loan-card .lc-sub { font-size:10px; color:var(--text-muted); }
+.loan-card .lc-details { display:grid; grid-template-columns:1fr 1fr; gap:3px 8px; margin-top:6px; padding-top:6px; border-top:1px solid var(--border); }
+.loan-card .lc-detail-item { font-size:10px; }
 .loan-card .lc-detail-item span { color:var(--text-muted); }
-.loan-card .lc-total { font-weight:700; font-size:13px; grid-column:1/-1; margin-top:2px; }
+.loan-card .lc-total { font-weight:700; font-size:11px; grid-column:1/-1; margin-top:2px; }
 
 /* ── Admin rate table mobile ── */
 @media (max-width:600px) {
   .rate-tbl-hide { display:none; }
-  .loan-cards { grid-template-columns:1fr 1fr; }
+  .loan-cards { grid-template-columns:1fr 1fr; gap:8px; }
+  .loan-card { padding:10px 12px; gap:3px; }
+  .loan-card .lc-monthly { font-size:17px; }
 }
 @media (max-width:380px) {
-  .loan-cards { grid-template-columns:1fr; }
+  .loan-cards { grid-template-columns:1fr 1fr; gap:6px; }
+  .loan-card { padding:8px 10px; }
+  .loan-card .lc-monthly { font-size:15px; }
 }
 </style>
 
