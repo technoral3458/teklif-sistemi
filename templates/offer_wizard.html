@@ -217,47 +217,47 @@
   <!-- Step 4: Summary -->
   <div class="wizard-step-content card" id="wstep4" style="display:none;">
     <div class="card-header"><h3 class="card-title">{{ T.wiz_step4 }}</h3></div>
-    <div class="card-body">
-      <div id="wizardSummary" style="margin-bottom:20px;"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:600px;">
-        <div class="form-group">
+    <div class="card-body" style="padding:12px;">
+      <div id="wizardSummary" style="margin-bottom:16px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">{{ T.wiz_discount }}</label>
           <input type="number" name="discount_pct" id="wDiscount" class="form-control" value="{{ edit_offer.discount_pct if edit_offer else 0 }}" min="0" max="100" step="0.5" oninput="wizardBuildSummary()" />
         </div>
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">{{ T.offer_validity }}</label>
           <input type="date" name="validity_date" class="form-control" value="{{ edit_offer.validity_date if edit_offer else '' }}" />
         </div>
-        <div class="form-group" style="grid-column:1/-1;">
+        <div class="form-group" style="grid-column:1/-1;margin-bottom:0;">
           <label class="form-label">{{ T.offer_notes }}</label>
           <textarea name="notes" class="form-control" rows="2" placeholder="...">{{ edit_offer.notes if edit_offer else '' }}</textarea>
         </div>
       </div>
 
       <!-- Delivery / Payment terms -->
-      <div style="margin-top:16px;padding:14px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">{{ T.offer_delivery }} / {{ T.offer_payment }}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">{{ T.offer_delivery }} / {{ T.offer_payment }}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">{{ T.offer_delivery }}</label>
-            <input type="text" name="delivery_method" id="wDeliveryMethod" class="form-control" placeholder="" value="{{ edit_offer.delivery_method if edit_offer else '' }}" />
+            <input type="text" name="delivery_method" id="wDeliveryMethod" class="form-control" value="{{ edit_offer.delivery_method if edit_offer else '' }}" />
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">{{ T.offer_delivery_time }}</label>
-            <input type="text" name="delivery_time" id="wDeliveryTime" class="form-control" placeholder="" value="{{ edit_offer.delivery_time if edit_offer else '' }}" />
+            <input type="text" name="delivery_time" id="wDeliveryTime" class="form-control" value="{{ edit_offer.delivery_time if edit_offer else '' }}" />
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">{{ T.offer_logistics }}</label>
-            <input type="text" name="logistics" id="wLogistics" class="form-control" placeholder="" value="{{ edit_offer.logistics if edit_offer else '' }}" />
+            <input type="text" name="logistics" id="wLogistics" class="form-control" value="{{ edit_offer.logistics if edit_offer else '' }}" />
           </div>
-          <div class="form-group" style="grid-column:1/-1;margin-bottom:0;">
+          <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">{{ T.offer_payment }}</label>
-            <textarea name="payment_notes" id="wPaymentNotes" class="form-control" rows="3" placeholder="...">{{ edit_offer.payment_notes if edit_offer else '' }}</textarea>
+            <textarea name="payment_notes" id="wPaymentNotes" class="form-control" rows="2" placeholder="...">{{ edit_offer.payment_notes if edit_offer else '' }}</textarea>
           </div>
         </div>
       </div>
     </div>
-    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:12px;">
       <button type="button" class="btn btn-ghost" onclick="wizardBack()">{{ T.wiz_prev }}</button>
       <button type="submit" class="btn btn-success" onclick="wizardBuildSummary()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><polyline points="20 6 9 17 4 12"/></svg>
@@ -520,15 +520,48 @@ function wizardBuildSummary() {
 
   const summaryEl = document.getElementById('wizardSummary');
   if (!summaryEl) return;
-  summaryEl.innerHTML = `
-    <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;">
-      ${modelImgHtml}
-      <div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:6px;">${wizardSelectedModel.name}</div>
-        <div style="font-size:13px;color:var(--text-muted);">{{ T.offer_count }}: ${qty} &nbsp;|&nbsp; {{ T.offer_currency }}: ${cur}</div>
-      </div>
+
+  const isMobile = window.innerWidth <= 600;
+
+  // Model info header
+  let html = `<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+    ${modelImgHtml ? modelImgHtml.replace('width:200px;height:140px;', 'width:72px;height:54px;') : ''}
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${wizardSelectedModel.name}</div>
+      <div style="font-size:12px;color:var(--text-muted);">{{ T.offer_count }}: <strong>${qty}</strong> &nbsp;|&nbsp; ${cur}</div>
     </div>
-    <table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+  </div>`;
+
+  // Item rows as cards on mobile, table on desktop
+  if (isMobile) {
+    html += `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">`;
+    // Machine row
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:13px;">${wizardSelectedModel.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${qty} adet × ${wizardSelectedModel.price.toFixed(2)}</div>
+      </div>
+      <div style="font-weight:700;font-size:13px;color:var(--accent);flex-shrink:0;margin-left:8px;">${baseTotal.toFixed(2)}</div>
+    </div>`;
+    // Option rows
+    Object.values(wizardSelectedOptions).forEach(o => {
+      const lt = o.price * (o.qty || 1);
+      const imgPath = document.querySelector(`.option-row[data-opt-id="${o.id}"]`)?.dataset.imgpath || '';
+      const imgHtml = imgPath ? `<img src="/static/${imgPath}" style="width:28px;height:28px;object-fit:cover;border-radius:4px;flex-shrink:0;" />` : '';
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+          ${imgHtml}
+          <div style="min-width:0;">
+            <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.name}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${o.qty||1} adet × ${o.price.toFixed(2)}</div>
+          </div>
+        </div>
+        <div style="font-weight:700;font-size:13px;color:var(--accent);flex-shrink:0;margin-left:8px;">${lt.toFixed(2)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
       <thead style="background:var(--surface-2);">
         <tr>
           <th style="padding:10px;text-align:left;">{{ T.offer_item }}</th>
@@ -546,12 +579,25 @@ function wizardBuildSummary() {
         </tr>
         ${optRows}
       </tbody>
-    </table>
-    <div style="text-align:right;margin-top:12px;font-size:14px;">
-      <div>{{ T.offer_subtotal }}: <strong>${subtotal.toFixed(2)} ${cur}</strong></div>
-      ${disc>0 ? `<div style="color:var(--success)">{{ T.offer_discount }} (${disc}%): -${(subtotal*disc/100).toFixed(2)} ${cur}</div>` : ''}
-      <div style="font-size:20px;margin-top:8px;color:var(--accent);">{{ T.wiz_net_total }}: <strong>${total.toFixed(2)} ${cur}</strong></div>
-    </div>`;
+    </table>`;
+  }
+
+  html += `<div style="padding:10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);margin-top:8px;">
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+      <span style="color:var(--text-muted);">{{ T.offer_subtotal }}</span>
+      <strong>${subtotal.toFixed(2)} ${cur}</strong>
+    </div>
+    ${disc>0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:var(--success);">
+      <span>{{ T.offer_discount }} (${disc}%)</span>
+      <span>-${(subtotal*disc/100).toFixed(2)} ${cur}</span>
+    </div>` : ''}
+    <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:800;color:var(--accent);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
+      <span>{{ T.wiz_net_total }}</span>
+      <span>${total.toFixed(2)} ${cur}</span>
+    </div>
+  </div>`;
+
+  summaryEl.innerHTML = html;
 
   document.getElementById('wOptionsJson').value = JSON.stringify(
     Object.values(wizardSelectedOptions).map(o => ({id:o.id, qty:o.qty||1, price:o.price, line_total:o.price*(o.qty||1)}))
