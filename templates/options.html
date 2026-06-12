@@ -48,7 +48,7 @@
             <strong>{% if user.lang != 'tr' and o.get('name_'+user.lang) %}{{ o['name_'+user.lang] }}{% else %}{{ o.name }}{% endif %}</strong>
             {% if o.description %}<br><small style="color:var(--text-muted)">{{ o.description[:60] }}{% if o.description|length > 60 %}...{% endif %}</small>{% endif %}
           </td>
-          <td>{{ o.category_name or 'Genel' }}</td>
+          <td>{{ o.category_names or 'Genel' }}</td>
           {% set scope_labels = {'GLOBAL':'Genel','MODEL_SPECIFIC':'Modele Özel'} %}
           <td><span class="badge badge-{{ 'blue' if o.scope == 'GLOBAL' else 'amber' }}">{{ scope_labels.get(o.scope, o.scope) }}</span></td>
           <td>{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</td>
@@ -68,7 +68,7 @@
                 {{ o.price|float if o.price != none else 0 }},
                 {{ (o.currency or "USD")|tojson }},
                 {{ (o.scope or "GLOBAL")|tojson }},
-                {{ o.category_id or 0 }},
+                {{ (o.category_ids or "")|tojson }},
                 {{ (o.qty_type or "MANUAL")|tojson }},
                 {{ (o.conflict_group or "")|tojson }},
                 {{ (o.image_path or "")|tojson }},
@@ -173,14 +173,16 @@
             </select>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">{{ T.model_category }}</label>
-            <select name="category_id" id="ocat" class="form-control">
-              <option value="0">{{ T.wiz_all_categories }}</option>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">{{ T.model_category }} <span style="font-size:11px;color:var(--text-muted);">(Boş = tüm kategorilerde görünür)</span></label>
+            <div id="ocatChecks" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
               {% for cat in categories %}
-              <option value="{{ cat.id }}">{{ cat.name }}</option>
+              <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="category_ids" value="{{ cat.id }}" class="ocat-cb" />
+                {{ cat.name }}
+              </label>
               {% endfor %}
-            </select>
+            </div>
           </div>
 
           <div class="form-group">
@@ -278,6 +280,13 @@ function setImgPreview(previewId, clearBtnId, path) {
   else       { p.style.display = 'none'; b.style.display = 'none'; }
 }
 
+function _setCatChecks(catIdsStr) {
+  const selected = (catIdsStr || '').split(',').map(s => s.trim()).filter(Boolean);
+  document.querySelectorAll('.ocat-cb').forEach(cb => {
+    cb.checked = selected.includes(cb.value);
+  });
+}
+
 function newOpt() {
   document.getElementById('optModalTitle').textContent = '{{ T.btn_new }} {{ T.options_title }}';
   document.getElementById('oid').value = '0';
@@ -286,7 +295,7 @@ function newOpt() {
   document.getElementById('oprice').value = '0';
   document.getElementById('ocurrency').value = 'USD';
   document.getElementById('oscope').value = 'GLOBAL';
-  document.getElementById('ocat').value = '0';
+  _setCatChecks('');
   document.getElementById('oqty_type').value = 'MANUAL';
   document.getElementById('oconflict').value = '';
   document.getElementById('oimage_priority').value = '0';
@@ -300,7 +309,7 @@ function newOpt() {
   openModal('optModal');
 }
 
-function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh) {
+function editOpt(id, name, desc, price, currency, scope, catIds, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh) {
   document.getElementById('optModalTitle').textContent = '{{ T.btn_edit }} {{ T.options_title }}';
   document.getElementById('oid').value = id;
   document.getElementById('oname').value = name;
@@ -308,7 +317,7 @@ function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflic
   document.getElementById('oprice').value = price;
   document.getElementById('ocurrency').value = currency;
   document.getElementById('oscope').value = scope;
-  document.getElementById('ocat').value = catId;
+  _setCatChecks(catIds);
   document.getElementById('oqty_type').value = qtyType;
   document.getElementById('oconflict').value = conflict;
   document.getElementById('oimage_priority').value = imagePriority || 0;

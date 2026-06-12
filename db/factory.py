@@ -143,6 +143,13 @@ def init():
         _acol(cur, "options", "image_priority",       "INTEGER DEFAULT 0")
         _acol(cur, "options", "variation_image_path", "TEXT DEFAULT ''")
         _acol(cur, "options", "video_url",            "TEXT DEFAULT ''")
+        _acol(cur, "options", "category_ids",         "TEXT DEFAULT ''")
+        # Migrate old single category_id to category_ids
+        cur.execute("""
+            UPDATE options SET category_ids = CAST(category_id AS TEXT)
+            WHERE (category_ids IS NULL OR category_ids = '')
+              AND category_id IS NOT NULL AND category_id != 0
+        """)
 
         # New columns on offers for order workflow
         for col, typ in [
@@ -414,11 +421,11 @@ def del_model(mid):
 
 # ── Options ───────────────────────────────────────────────────────────────────
 
-_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,video_url,name_en,description_en,name_zh,description_zh,created_at"
+_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,video_url,name_en,description_en,name_zh,description_zh,created_at,category_ids"
 _OKEYS = ["id", "name", "description", "price", "currency", "scope",
           "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
           "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-          "created_at"]
+          "created_at", "category_ids"]
 
 
 def _ro(r):
@@ -445,7 +452,7 @@ def get_option(oid):
 
 def add_option(**kw):
     allowed = ["name", "description", "price", "currency", "scope",
-               "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
+               "category_ids", "qty_type", "conflict_group", "image_path", "image_priority",
                "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
@@ -457,7 +464,7 @@ def add_option(**kw):
 
 def upd_option(oid, **kw):
     allowed = ["name", "description", "price", "currency", "scope",
-               "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
+               "category_ids", "qty_type", "conflict_group", "image_path", "image_priority",
                "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:

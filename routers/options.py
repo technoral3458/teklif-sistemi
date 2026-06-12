@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import RedirectResponse
@@ -20,7 +20,8 @@ async def options_list(request: Request):
     cats = fdb.get_cats()
     cat_map = {c["id"]: c["name"] for c in cats}
     for o in options:
-        o["category_name"] = cat_map.get(o.get("category_id"), "Genel")
+        cids = [int(x) for x in (o.get("category_ids") or "").split(",") if x.strip().isdigit()]
+        o["category_names"] = ", ".join(cat_map[c] for c in cids if c in cat_map) or "Genel"
     return templates.TemplateResponse(request, "options.html", {
         "user": user,
         "options": options,
@@ -42,7 +43,7 @@ async def save_option(request: Request,
                       price: float = Form(0.0),
                       currency: str = Form("USD"),
                       scope: str = Form("GLOBAL"),
-                      category_id: int = Form(0),
+                      category_ids: List[int] = Form([]),
                       qty_type: str = Form("MANUAL"),
                       conflict_group: str = Form(""),
                       image_priority: int = Form(0),
@@ -79,7 +80,7 @@ async def save_option(request: Request,
 
     kw = dict(
         name=name, description=description, price=price, currency=currency,
-        scope=scope, category_id=category_id or None, qty_type=qty_type,
+        scope=scope, category_ids=",".join(str(c) for c in category_ids), qty_type=qty_type,
         conflict_group=conflict_group, image_priority=image_priority,
         image_path=image_path, variation_image_path=variation_image_path,
         video_url=video_url.strip(),

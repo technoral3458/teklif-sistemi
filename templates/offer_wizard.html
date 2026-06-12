@@ -155,6 +155,7 @@
       <div style="display:flex;flex-direction:column;gap:8px;">
         {% for o in options %}
         <div class="option-row" data-opt-id="{{ o.id }}" data-conflict="{{ o.conflict_group or '' }}"
+             data-cats="{{ (o.category_ids or '')|e }}"
              data-varimg="{{ (o.variation_image_path or '')|e }}"
              data-priority="{{ o.image_priority or 0 }}"
              data-imgpath="{{ (o.image_path or '')|e }}"
@@ -306,9 +307,13 @@ function wizardLoadOptions() {
   const card = document.querySelector('.model-card[data-id="' + wizardSelectedModel.id + '"]');
   let compat = [];
   if (card) { try { compat = JSON.parse(card.dataset.compat || '[]'); } catch(e) {} }
+  const modelCatId = card ? card.dataset.cat : '0';
   document.querySelectorAll('.option-row').forEach(row => {
     const optId = parseInt(row.dataset.optId);
-    row.style.display = (compat.length === 0 || compat.includes(optId)) ? '' : 'none';
+    const catIds = (row.dataset.cats || '').split(',').map(s => s.trim()).filter(Boolean);
+    const catMatch = catIds.length === 0 || catIds.includes(modelCatId);
+    const compatMatch = compat.length === 0 || compat.includes(optId);
+    row.style.display = (catMatch && compatMatch) ? '' : 'none';
   });
 }
 
