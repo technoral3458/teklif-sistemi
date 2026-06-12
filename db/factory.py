@@ -214,6 +214,85 @@ def init():
         )""")
 
         _init_membrane(cur)
+        _init_loan_rates(cur)
+        c.commit()
+
+
+def _init_loan_rates(cur):
+    cur.execute("""CREATE TABLE IF NOT EXISTS loan_rates(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_name    TEXT DEFAULT 'Standart',
+        grace_months INTEGER DEFAULT 0,
+        term_months  INTEGER NOT NULL,
+        rate_tl      REAL DEFAULT 0,
+        rate_usd     REAL DEFAULT 0,
+        rate_eur     REAL DEFAULT 0,
+        file_fee_pct REAL DEFAULT 0.5,
+        is_active    INTEGER DEFAULT 1,
+        updated_at   TEXT DEFAULT(datetime('now'))
+    )""")
+    # Seed default rates if table is empty
+    count = cur.execute("SELECT COUNT(*) FROM loan_rates").fetchone()[0]
+    if count == 0:
+        rows = [
+            # Standart plan
+            ("Standart", 0, 12, 19.61, 4.16, 3.67, 0.5),
+            ("Standart", 0, 18, 26.60, 6.09, 5.39, 0.5),
+            ("Standart", 0, 24, 32.24, 7.91, 7.01, 0.5),
+            ("Standart", 0, 36, 41.90, 12.03, 10.78, 0.5),
+            ("Standart", 0, 48, 49.34, 15.51, 14.53, 0.5),
+            ("Standart", 0, 60, 54.94, 18.80, 17.65, 0.5),
+            # 3 Ay Ödemesiz plan
+            ("3 Ay Ödemesiz", 3, 12, 27.72, 6.40, 5.66, 0.5),
+            ("3 Ay Ödemesiz", 3, 18, 33.21, 8.21, 7.28, 0.5),
+            ("3 Ay Ödemesiz", 3, 24, 37.90, 10.52, 9.42, 0.5),
+            ("3 Ay Ödemesiz", 3, 36, 46.17, 14.08, 13.19, 0.5),
+            ("3 Ay Ödemesiz", 3, 48, 52.39, 17.45, 16.37, 0.5),
+        ]
+        cur.executemany(
+            "INSERT INTO loan_rates(plan_name,grace_months,term_months,rate_tl,rate_usd,rate_eur,file_fee_pct) VALUES(?,?,?,?,?,?,?)",
+            rows
+        )
+
+
+# ── Loan Rates ────────────────────────────────────────────────────────────────
+
+_LR_KEYS = ["id","plan_name","grace_months","term_months","rate_tl","rate_usd","rate_eur","file_fee_pct","is_active","updated_at"]
+_LR_COLS = ",".join(_LR_KEYS)
+
+def _rl(r): return dict(zip(_LR_KEYS, r)) if r else None
+
+def get_loan_rates(active_only=True):
+    q = f"SELECT {_LR_COLS} FROM loan_rates"
+    if active_only:
+        q += " WHERE is_active=1"
+    q += " ORDER BY plan_name, term_months"
+    with _c() as c:
+        return [_rl(r) for r in c.execute(q).fetchall()]
+
+def get_loan_rate(rid):
+    with _c() as c:
+        return _rl(c.execute(f"SELECT {_LR_COLS} FROM loan_rates WHERE id=?", (rid,)).fetchone())
+
+def save_loan_rate(id=None, **kw):
+    allowed = ["plan_name","grace_months","term_months","rate_tl","rate_usd","rate_eur","file_fee_pct","is_active"]
+    f = {k: v for k, v in kw.items() if k in allowed}
+    f["updated_at"] = "datetime('now')"
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{k}=?" for k in f if k != "updated_at")
+            vals = [v for k, v in f.items() if k != "updated_at"]
+            c.execute(f"UPDATE loan_rates SET {sets}, updated_at=datetime('now') WHERE id=?", vals + [id])
+        else:
+            cols = ",".join(k for k in f if k != "updated_at")
+            phs  = ",".join("?" for k in f if k != "updated_at")
+            vals = [v for k, v in f.items() if k != "updated_at"]
+            c.execute(f"INSERT INTO loan_rates({cols},updated_at) VALUES({phs},datetime('now'))", vals)
+        c.commit()
+
+def del_loan_rate(rid):
+    with _c() as c:
+        c.execute("DELETE FROM loan_rates WHERE id=?", (rid,))
         c.commit()
 
 

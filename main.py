@@ -43,6 +43,7 @@ from routers.manufacturers import router as manufacturers_router
 from routers.profile import router as profile_router
 from routers.admin_router import router as admin_router
 from routers.membrane import router as membrane_router
+from routers.loan import router as loan_router
 
 for r in [
     auth_router,
@@ -60,6 +61,7 @@ for r in [
     profile_router,
     admin_router,
     membrane_router,
+    loan_router,
 ]:
     app.include_router(r)
 
