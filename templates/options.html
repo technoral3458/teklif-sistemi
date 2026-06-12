@@ -74,6 +74,7 @@
                 {{ (o.image_path or "")|tojson }},
                 {{ o.image_priority or 0 }},
                 {{ (o.variation_image_path or "")|tojson }},
+                {{ (o.video_url or "")|tojson }},
                 {{ (o.name_en or "")|tojson }},
                 {{ (o.description_en or "")|tojson }},
                 {{ (o.name_zh or "")|tojson }},
@@ -229,6 +230,15 @@
             </p>
           </div>
 
+          <!-- Video URL -->
+          <div class="form-group" style="grid-column:1/-1;border-left:3px solid #e67e22;padding-left:12px;">
+            <label class="form-label">▶ Video URL <span style="font-size:11px;color:var(--text-muted);">(YouTube, Vimeo veya doğrudan mp4 linki)</span></label>
+            <input type="url" name="video_url" id="ovideo_url" class="form-control" placeholder="https://youtube.com/watch?v=... veya https://youtu.be/..." />
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+              Teklif ekranında müşteriye "Video İzle" butonu gösterilir. YouTube gizli (unlisted) videolar da desteklenir.
+            </p>
+          </div>
+
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
           <button type="button" class="btn btn-ghost" onclick="closeModal('optModal')">{{ T.btn_cancel }}</button>
@@ -286,10 +296,11 @@ function newOpt() {
   document.getElementById('odesc_en').value = '';
   document.getElementById('oname_zh').value = '';
   document.getElementById('odesc_zh').value = '';
+  document.getElementById('ovideo_url').value = '';
   openModal('optModal');
 }
 
-function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflict, imagePath, imagePriority, varImagePath, nameEn, descEn, nameZh, descZh) {
+function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh) {
   document.getElementById('optModalTitle').textContent = '{{ T.btn_edit }} {{ T.options_title }}';
   document.getElementById('oid').value = id;
   document.getElementById('oname').value = name;
@@ -309,6 +320,7 @@ function editOpt(id, name, desc, price, currency, scope, catId, qtyType, conflic
   document.getElementById('odesc_en').value = descEn || '';
   document.getElementById('oname_zh').value = nameZh || '';
   document.getElementById('odesc_zh').value = descZh || '';
+  document.getElementById('ovideo_url').value = videoUrl || '';
   setImgPreview('oImgPreview', 'oClearImg', imagePath);
   setImgPreview('oVarImgPreview', 'oClearVarImg', varImagePath);
   openModal('optModal');

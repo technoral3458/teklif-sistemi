@@ -148,6 +148,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
             {% if item.qty > 1 %}<span class="opt-qty-clr"> ({{ item.qty }} Adet)</span>{% endif %}
           </div>
           {% if item.description %}<div class="opt-desc-txt">{{ item.description }}</div>{% endif %}
+          {% if item.video_url %}<div style="font-size:9px;color:#3b82f6;margin-top:2px;">▶ Video: {{ item.video_url }}</div>{% endif %}
           {% if item.qty > 1 %}
             {% if (offer.discount_pct|default(0)|float) > 0 %}
             {% set disc_unit = (item.unit_price|default(0)|float) * (1 - (offer.discount_pct|default(0)|float)/100) %}

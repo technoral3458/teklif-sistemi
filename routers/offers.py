@@ -269,6 +269,7 @@ async def offer_detail(request: Request, offer_id: int):
         item["option_name"] = (opt.get(f"name_{lang}") or opt.get("name", "-")) if lang != "tr" else opt.get("name", "-")
         item["image_path"]  = opt.get("image_path", "") or ""
         item["description"] = opt.get("description", "") or ""
+        item["video_url"]   = opt.get("video_url", "") or ""
         var_img = opt.get("variation_image_path", "")
         prio = opt.get("image_priority") or 0
         if var_img and prio > best_prio:
