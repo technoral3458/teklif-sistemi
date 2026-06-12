@@ -361,7 +361,7 @@ function wizardSelectLine(lc) {
       }
     }
   });
-  wizardUpdateTotal();
+  wizardBuildSummary();
 }
 
 function filterModelCat(catId) {
@@ -376,12 +376,16 @@ function wizardLoadOptions() {
   let compat = [];
   if (card) { try { compat = JSON.parse(card.dataset.compat || '[]'); } catch(e) {} }
   const modelCatId = card ? card.dataset.cat : '0';
+  const machineQty = wizardLineCount || parseInt(document.getElementById('wMachineCount')?.value) || 1;
   document.querySelectorAll('.option-row').forEach(row => {
     const optId = parseInt(row.dataset.optId);
     const catIds = (row.dataset.cats || '').split(',').map(s => s.trim()).filter(Boolean);
     const catMatch = catIds.length === 0 || catIds.includes(modelCatId);
     const compatMatch = compat.length === 0 || compat.includes(optId);
     row.style.display = (catMatch && compatMatch) ? '' : 'none';
+    // PER_MACHINE etiketini güncelle
+    const pmLabel = row.querySelector('.per-machine-qty');
+    if (pmLabel) pmLabel.textContent = machineQty + ' adet';
   });
 }
 
@@ -390,9 +394,10 @@ function wizardToggleOption(optId, price, name, currency) {
   if (cb.checked) {
     const row = document.querySelector(`.option-row[data-opt-id="${optId}"]`);
     const qtyType = row?.dataset.qtyType || 'MANUAL';
+    const machineQty = wizardLineCount || parseInt(document.getElementById('wMachineCount')?.value) || 1;
     let qty = 1;
     if (qtyType === 'PER_MACHINE') {
-      qty = wizardLineCount || parseInt(document.getElementById('wMachineCount')?.value) || 1;
+      qty = machineQty;
     } else if (qtyType === 'FIXED_1') {
       qty = 1;
     } else {
