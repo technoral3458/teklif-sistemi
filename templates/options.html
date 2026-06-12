@@ -3,8 +3,7 @@
 {% block page_title %}{{ T.options_title }}{% endblock %}
 
 {% block content %}
-{% set qty_labels = {'MANUAL':'Manuel (Adet girilebilir)','FIXED_1':'Sabit (1 adet)','PER_MACHINE':'Makine başına'} %}
-{% set scope_labels = {'GLOBAL':'Genel (Tüm modeller)','MODEL_SPECIFIC':'Modele özel'} %}
+{% set qty_labels = {'MANUAL':'Elle Giriş','FIXED_1':'Sabit 1 Adet','PER_MACHINE':'Makine Adeti Kadar'} %}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
   <input type="text" id="tableSearch" class="search-box" placeholder="{{ T.btn_search }}..." style="max-width:280px;" />
   <button class="btn btn-primary" onclick="newOpt()">
@@ -21,7 +20,7 @@
           <th style="width:56px;"></th>
           <th>{{ T.option_name }}</th>
           <th>{{ T.model_category }}</th>
-          <th>{{ T.option_scope }}</th>
+          <th>Adet Tipi</th>
           <th>{{ T.option_price }}</th>
           <th style="width:60px;text-align:center;"></th>
           <th></th>
@@ -49,8 +48,7 @@
             {% if o.description %}<br><small style="color:var(--text-muted)">{{ o.description[:60] }}{% if o.description|length > 60 %}...{% endif %}</small>{% endif %}
           </td>
           <td>{{ o.category_names or 'Genel' }}</td>
-          {% set scope_labels = {'GLOBAL':'Genel','MODEL_SPECIFIC':'Modele Özel'} %}
-          <td><span class="badge badge-{{ 'blue' if o.scope == 'GLOBAL' else 'amber' }}">{{ scope_labels.get(o.scope, o.scope) }}</span></td>
+          <td><span class="badge badge-{{ 'blue' if o.qty_type == 'MANUAL' else ('amber' if o.qty_type == 'PER_MACHINE' else 'green') }}">{{ qty_labels.get(o.qty_type, o.qty_type) }}</span></td>
           <td>{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</td>
           <td style="text-align:center;">
             {% if o.image_priority %}
@@ -67,7 +65,6 @@
                 {{ (o.description or "")|tojson }},
                 {{ o.price|float if o.price != none else 0 }},
                 {{ (o.currency or "USD")|tojson }},
-                {{ (o.scope or "GLOBAL")|tojson }},
                 {{ (o.category_ids or "")|tojson }},
                 {{ (o.qty_type or "MANUAL")|tojson }},
                 {{ (o.conflict_group or "")|tojson }},
@@ -156,16 +153,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">{{ T.option_scope }}</label>
-            <select name="scope" id="oscope" class="form-control">
-              {% for sc in option_scopes %}
-              <option value="{{ sc }}">{{ scope_labels.get(sc, sc) }}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">{{ T.offer_count }}</label>
+            <label class="form-label">Adet Tipi</label>
             <select name="qty_type" id="oqty_type" class="form-control">
               {% for qt in qty_types %}
               <option value="{{ qt }}">{{ qty_labels.get(qt, qt) }}</option>
@@ -294,7 +282,7 @@ function newOpt() {
   document.getElementById('odesc').value = '';
   document.getElementById('oprice').value = '0';
   document.getElementById('ocurrency').value = 'USD';
-  document.getElementById('oscope').value = 'GLOBAL';
+  document.getElementById('oqty_type').value = 'MANUAL';
   _setCatChecks('');
   document.getElementById('oqty_type').value = 'MANUAL';
   document.getElementById('oconflict').value = '';
@@ -309,14 +297,13 @@ function newOpt() {
   openModal('optModal');
 }
 
-function editOpt(id, name, desc, price, currency, scope, catIds, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh) {
+function editOpt(id, name, desc, price, currency, catIds, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh) {
   document.getElementById('optModalTitle').textContent = '{{ T.btn_edit }} {{ T.options_title }}';
   document.getElementById('oid').value = id;
   document.getElementById('oname').value = name;
   document.getElementById('odesc').value = desc;
   document.getElementById('oprice').value = price;
   document.getElementById('ocurrency').value = currency;
-  document.getElementById('oscope').value = scope;
   _setCatChecks(catIds);
   document.getElementById('oqty_type').value = qtyType;
   document.getElementById('oconflict').value = conflict;

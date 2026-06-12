@@ -106,6 +106,9 @@
         {% for m in models %}
         <div class="model-card" data-id="{{ m.id }}" data-cat="{{ m.category_id or 0 }}"
              data-compat="{{ m.compatible_options_list|tojson }}"
+             data-is-line="{{ m.is_line or 0 }}"
+             data-line-configs="{{ m.line_configs or '2,3,4' }}"
+             data-line-images='{{ m.line_images_map|tojson }}'
              onclick="wizardSelectModel({{ m.id }}, '{{ m.name|e }}', {{ m.base_price|default(0) }}, '{{ m.currency }}')"
              style="cursor:pointer;display:flex;flex-direction:column;border-radius:12px;border:2px solid var(--border);overflow:hidden;transition:border-color .15s,box-shadow .15s;background:var(--surface);">
           <div style="position:relative;height:150px;background:var(--surface-2);flex-shrink:0;">
@@ -131,6 +134,12 @@
       </div>
       <div id="selectedModelInfo" style="display:none;margin-top:20px;padding:16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--accent);">
         <strong>{{ T.wiz_selected }}: </strong><span class="sel-model-name"></span> — <span class="sel-model-price" style="color:var(--accent);"></span>
+      </div>
+
+      <!-- Hat Konfigürasyonu -->
+      <div id="lineConfigSection" style="display:none;margin-top:16px;padding:16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-weight:700;margin-bottom:10px;">🔗 Hat Konfigürasyonu</div>
+        <div id="lineConfigBtns" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
       </div>
     </div>
     <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
@@ -159,6 +168,7 @@
              data-varimg="{{ (o.variation_image_path or '')|e }}"
              data-priority="{{ o.image_priority or 0 }}"
              data-imgpath="{{ (o.image_path or '')|e }}"
+             data-qty-type="{{ o.qty_type or 'MANUAL' }}"
              style="padding:12px 16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <input type="checkbox" id="opt_{{ o.id }}"
@@ -181,6 +191,10 @@
               <input type="number" id="optqty_{{ o.id }}" value="1" min="1" max="99" class="form-control" style="width:70px;"
                      onchange="wizardQtyChange({{ o.id }}, {{ o.price|default(0) }}, '{{ o.name|e }}', '{{ o.currency }}')" />
             </div>
+            {% elif o.qty_type == 'PER_MACHINE' %}
+            <span class="per-machine-qty" style="font-size:12px;color:var(--accent);font-weight:600;white-space:nowrap;">hat sayısı kadar</span>
+            {% elif o.qty_type == 'FIXED_1' %}
+            <span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">1 adet</span>
             {% endif %}
             <span style="font-weight:600;color:var(--accent);white-space:nowrap;">{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</span>
             {% if o.video_url %}
@@ -282,6 +296,8 @@ function wizardNext() {
 
 function wizardBack() { wizardShowStep(wizardCurrentStep - 1); }
 
+let wizardLineCount = 0;
+
 function wizardSelectModel(modelId, modelName, basePrice, currency) {
   wizardSelectedModel = { id: modelId, name: modelName, price: parseFloat(basePrice) || 0, currency };
   document.querySelectorAll('.model-card').forEach(c => { c.style.borderColor = 'var(--border)'; c.style.background = 'var(--surface)'; c.style.boxShadow = ''; });
@@ -294,6 +310,58 @@ function wizardSelectModel(modelId, modelName, basePrice, currency) {
     info.querySelector('.sel-model-name').textContent = modelName;
     info.querySelector('.sel-model-price').textContent = basePrice + ' ' + currency;
   }
+
+  // Hat konfigürasyonu
+  const lineSection = document.getElementById('lineConfigSection');
+  const isLine = parseInt(card?.dataset.isLine || '0');
+  wizardLineCount = 0;
+  if (isLine && card) {
+    const configs = (card.dataset.lineConfigs || '2,3,4').split(',').map(s => parseInt(s.trim())).filter(n => n > 0);
+    const btns = document.getElementById('lineConfigBtns');
+    btns.innerHTML = configs.map(lc =>
+      `<button type="button" class="btn btn-outline btn-sm line-cfg-btn" data-lc="${lc}" onclick="wizardSelectLine(${lc})">${lc}li Hat</button>`
+    ).join('');
+    lineSection.style.display = '';
+  } else {
+    lineSection.style.display = 'none';
+    document.getElementById('wMachineCount').value = 1;
+  }
+}
+
+function wizardSelectLine(lc) {
+  wizardLineCount = lc;
+  document.querySelectorAll('.line-cfg-btn').forEach(b => {
+    b.style.background = parseInt(b.dataset.lc) === lc ? 'var(--accent)' : '';
+    b.style.color = parseInt(b.dataset.lc) === lc ? '#fff' : '';
+    b.style.borderColor = parseInt(b.dataset.lc) === lc ? 'var(--accent)' : '';
+  });
+  document.getElementById('wMachineCount').value = lc;
+
+  // Hat resmi varsa göster
+  const card = document.querySelector('.model-card[data-id="' + wizardSelectedModel?.id + '"]');
+  let lineImages = {};
+  try { lineImages = JSON.parse(card?.dataset.lineImages || '{}'); } catch(e) {}
+  const li = lineImages[lc];
+  if (li?.image_path) {
+    const box = document.getElementById('wVariationImageBox');
+    const img = document.getElementById('wVariationImage');
+    img.src = '/static/' + li.image_path;
+    box.style.display = 'block';
+  }
+
+  // PER_MACHINE opsiyonlarını güncelle
+  document.querySelectorAll('.option-row').forEach(row => {
+    const qtyInput = row.querySelector('.per-machine-qty');
+    if (qtyInput) {
+      qtyInput.textContent = lc + ' adet';
+      const optId = parseInt(row.dataset.optId);
+      if (wizardSelectedOptions[optId]) {
+        wizardSelectedOptions[optId].qty = lc;
+        wizardSelectedOptions[optId].line_total = wizardSelectedOptions[optId].price * lc;
+      }
+    }
+  });
+  wizardUpdateTotal();
 }
 
 function filterModelCat(catId) {
@@ -320,8 +388,17 @@ function wizardLoadOptions() {
 function wizardToggleOption(optId, price, name, currency) {
   const cb = document.getElementById('opt_' + optId);
   if (cb.checked) {
-    const qtyEl = document.getElementById('optqty_' + optId);
-    const qty = qtyEl ? parseInt(qtyEl.value) || 1 : 1;
+    const row = document.querySelector(`.option-row[data-opt-id="${optId}"]`);
+    const qtyType = row?.dataset.qtyType || 'MANUAL';
+    let qty = 1;
+    if (qtyType === 'PER_MACHINE') {
+      qty = wizardLineCount || parseInt(document.getElementById('wMachineCount')?.value) || 1;
+    } else if (qtyType === 'FIXED_1') {
+      qty = 1;
+    } else {
+      const qtyEl = document.getElementById('optqty_' + optId);
+      qty = qtyEl ? parseInt(qtyEl.value) || 1 : 1;
+    }
     wizardSelectedOptions[optId] = { id: optId, name, price: parseFloat(price), qty, currency, line_total: parseFloat(price) * qty };
 
     // Auto-deselect other options in the same conflict group
@@ -356,6 +433,17 @@ function wizardUpdateVariationImage() {
     const prio = parseInt(row.dataset.priority) || 0;
     if (varImg && prio > bestPrio) { bestImg = varImg; bestPrio = prio; }
   });
+  // Hat resmi varsa öncelik yarışmasına dahil et
+  if (wizardLineCount) {
+    const card = wizardSelectedModel ? document.querySelector('.model-card[data-id="' + wizardSelectedModel.id + '"]') : null;
+    let lineImages = {};
+    try { lineImages = JSON.parse(card?.dataset.lineImages || '{}'); } catch(e) {}
+    const li = lineImages[wizardLineCount];
+    if (li?.image_path && (li.priority || 0) > bestPrio) {
+      bestImg = li.image_path;
+      bestPrio = li.priority || 0;
+    }
+  }
   // Fall back to model image if no variation image
   if (!bestImg) {
     const modelCard = wizardSelectedModel ? document.querySelector('.model-card[data-id="' + wizardSelectedModel.id + '"]') : null;

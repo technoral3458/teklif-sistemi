@@ -72,6 +72,7 @@ async def offer_new(request: Request):
             except Exception:
                 pass
         m["compatible_options_list"] = compat
+        m["line_images_map"] = {img["line_count"]: img for img in fdb.get_model_line_images(m["id"])}
     return templates.TemplateResponse(request, "offer_wizard.html", {
         "user": user,
         "customers": customers,
@@ -183,6 +184,7 @@ async def offer_edit(request: Request, offer_id: int):
             except Exception:
                 pass
         m["compatible_options_list"] = compat
+        m["line_images_map"] = {img["line_count"]: img for img in fdb.get_model_line_images(m["id"])}
     return templates.TemplateResponse(request, "offer_wizard.html", {
         "user": user,
         "customers": customers,

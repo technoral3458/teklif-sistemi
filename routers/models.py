@@ -55,6 +55,7 @@ async def model_new(request: Request):
         "compatible_options_selected": [],
         "currencies": CURRENCIES,
         "active_page": "models",
+        "line_images": {},
     })
 
 
@@ -72,6 +73,7 @@ async def model_edit(request: Request, model_id: int):
             compatible = json.loads(m["compatible_options"])
         except Exception:
             pass
+    line_images = fdb.get_model_line_images(model_id)
     return templates.TemplateResponse(request, "model_form.html", {
         "user": user,
         "model": m,
@@ -80,6 +82,7 @@ async def model_edit(request: Request, model_id: int):
         "compatible_options_selected": compatible,
         "currencies": CURRENCIES,
         "active_page": "models",
+        "line_images": {img["line_count"]: img for img in line_images},
     })
 
 
@@ -107,7 +110,9 @@ async def save_model(request: Request,
                      name_zh: str = Form(""),
                      description_zh: str = Form(""),
                      specs_en: str = Form(""),
-                     specs_zh: str = Form("")):
+                     specs_zh: str = Form(""),
+                     is_line: int = Form(0),
+                     line_configs: str = Form("2,3,4")):
     auth.require_user(request)
 
     total_cost = _calc_cost(
@@ -161,14 +166,47 @@ async def save_model(request: Request,
         description_zh=description_zh,
         specs_en=specs_en,
         specs_zh=specs_zh,
+        is_line=is_line,
+        line_configs=line_configs.strip(),
     )
     if image_path:
         kw["image_path"] = image_path
 
     if id:
         fdb.upd_model(id, **kw)
+        model_id = id
     else:
-        fdb.add_model(**kw)
+        model_id = fdb.add_model(**kw)
+
+    # Save line images
+    form_data = await request.form()
+    for key in form_data.keys():
+        if key.startswith("line_img_count_"):
+            lc = int(key.replace("line_img_count_", ""))
+            prio = int(form_data.get(f"line_img_prio_{lc}", 0) or 0)
+            img_file = form_data.get(f"line_img_{lc}")
+            if img_file and hasattr(img_file, "filename") and img_file.filename:
+                ext = os.path.splitext(img_file.filename)[1].lower() or ".jpg"
+                fname = f"line_{model_id}_{lc}_{uuid.uuid4().hex[:8]}{ext}"
+                fpath = os.path.join(IMAGES_DIR, fname)
+                content = await img_file.read()
+                try:
+                    from PIL import Image as PILImage
+                    import io as _io
+                    img_obj = PILImage.open(_io.BytesIO(content))
+                    img_obj.thumbnail((800, 800))
+                    img_obj.save(fpath, "JPEG", quality=85)
+                except Exception:
+                    with open(fpath, "wb") as f:
+                        f.write(content)
+                fdb.save_model_line_image(model_id, lc, f"img/uploads/{fname}", prio)
+            else:
+                # Update priority only if image already exists
+                existing = fdb.get_model_line_images(model_id)
+                for ei in existing:
+                    if ei["line_count"] == lc:
+                        fdb.save_model_line_image(model_id, lc, ei["image_path"], prio)
+
     return RedirectResponse("/models", 303)
 
 
@@ -184,6 +222,13 @@ async def upload_spec_image(request: Request, image: UploadFile = File(...)):
     with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
         f.write(content)
     return JSONResponse({"path": f"img/uploads/{fname}"})
+
+
+@router.post("/line-image/delete")
+async def delete_line_image(request: Request, id: int = Form(...), model_id: int = Form(...)):
+    auth.require_user(request)
+    fdb.del_model_line_image(id)
+    return RedirectResponse(f"/models/{model_id}/edit", 303)
 
 
 @router.post("/delete")

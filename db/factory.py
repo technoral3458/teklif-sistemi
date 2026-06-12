@@ -151,6 +151,17 @@ def init():
               AND category_id IS NOT NULL AND category_id != 0
         """)
 
+        # Hat (line) machine support
+        _acol(cur, "models", "is_line",      "INTEGER DEFAULT 0")
+        _acol(cur, "models", "line_configs", "TEXT DEFAULT '2,3,4'")
+        cur.execute("""CREATE TABLE IF NOT EXISTS model_line_images(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            model_id INTEGER NOT NULL,
+            line_count INTEGER NOT NULL,
+            image_path TEXT DEFAULT '',
+            priority INTEGER DEFAULT 0
+        )""")
+
         # New columns on offers for order workflow
         for col, typ in [
             ("manufacturer_id", "INTEGER DEFAULT NULL"),
@@ -354,14 +365,15 @@ _MCOLS = ("id,name,category_id,description,base_price,currency,specs,"
           "purchase_price,purchase_currency,shipping_cost,customs_pct,extra_tax_pct,"
           "port_cost,document_cost,installation_cost,other_cost,total_cost,"
           "image_path,compatible_options,"
-          "name_en,description_en,name_zh,description_zh,specs_en,specs_zh,created_at")
+          "name_en,description_en,name_zh,description_zh,specs_en,specs_zh,created_at,"
+          "is_line,line_configs")
 
 _MKEYS = ["id", "name", "category_id", "description", "base_price", "currency", "specs",
           "purchase_price", "purchase_currency", "shipping_cost", "customs_pct", "extra_tax_pct",
           "port_cost", "document_cost", "installation_cost", "other_cost", "total_cost",
           "image_path", "compatible_options",
           "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh",
-          "created_at"]
+          "created_at", "is_line", "line_configs"]
 
 
 def _rm(r):
@@ -391,7 +403,8 @@ def add_model(**kw):
                "purchase_price", "purchase_currency", "shipping_cost", "customs_pct",
                "extra_tax_pct", "port_cost", "document_cost", "installation_cost",
                "other_cost", "total_cost", "image_path", "compatible_options",
-               "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh"]
+               "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh",
+               "is_line", "line_configs"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -405,7 +418,8 @@ def upd_model(mid, **kw):
                "purchase_price", "purchase_currency", "shipping_cost", "customs_pct",
                "extra_tax_pct", "port_cost", "document_cost", "installation_cost",
                "other_cost", "total_cost", "image_path", "compatible_options",
-               "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh"]
+               "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh",
+               "is_line", "line_configs"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return
@@ -417,6 +431,38 @@ def upd_model(mid, **kw):
 def del_model(mid):
     with _c() as c:
         c.execute("DELETE FROM models WHERE id=?", (mid,))
+
+
+def get_model_line_images(model_id):
+    with _c() as c:
+        rows = c.execute(
+            "SELECT id,model_id,line_count,image_path,priority FROM model_line_images WHERE model_id=? ORDER BY line_count",
+            (model_id,)
+        ).fetchall()
+    return [{"id": r[0], "model_id": r[1], "line_count": r[2], "image_path": r[3], "priority": r[4]} for r in rows]
+
+
+def save_model_line_image(model_id, line_count, image_path, priority=0):
+    with _c() as c:
+        existing = c.execute(
+            "SELECT id FROM model_line_images WHERE model_id=? AND line_count=?",
+            (model_id, line_count)
+        ).fetchone()
+        if existing:
+            c.execute(
+                "UPDATE model_line_images SET image_path=?,priority=? WHERE id=?",
+                (image_path, priority, existing[0])
+            )
+        else:
+            c.execute(
+                "INSERT INTO model_line_images(model_id,line_count,image_path,priority) VALUES(?,?,?,?)",
+                (model_id, line_count, image_path, priority)
+            )
+
+
+def del_model_line_image(image_id):
+    with _c() as c:
+        c.execute("DELETE FROM model_line_images WHERE id=?", (image_id,))
 
 
 # ── Options ───────────────────────────────────────────────────────────────────
