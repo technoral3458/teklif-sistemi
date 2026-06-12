@@ -4,8 +4,29 @@
 <meta charset="UTF-8">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-@page { size:A4; margin:15mm 18mm 18mm; }
+@page {
+  size: A4;
+  margin: 28mm 18mm 18mm;
+  @top-left {
+    content: element(page-header);
+  }
+}
+/* First page keeps same top margin but header still shows */
 body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a; line-height:1.4; }
+
+/* ── Running page header ─────────────────────────── */
+#page-header {
+  position: running(page-header);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 2px solid #1e2b4a;
+  padding-bottom: 5px;
+  width: 100%;
+}
+#page-header img { max-height: 14mm; max-width: 48mm; object-fit: contain; }
+#page-header .hdr-company { font-size: 11pt; font-weight: bold; color: #1e2b4a; }
+#page-header .hdr-right { margin-left: auto; font-size: 8pt; color: #888; text-align: right; }
 
 /* ── Page breaks ─────────────────────────────────── */
 .page-break { break-before:page; page-break-before:always; }
@@ -72,6 +93,17 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
 </style>
 </head>
 <body>
+
+<!-- Running header (rendered once, repeated on every page by WeasyPrint) -->
+<div id="page-header">
+  {% if admin_logo %}
+  <img src="/static/{{ admin_logo }}" alt="{{ admin_company }}" />
+  {% endif %}
+  {% if admin_company %}
+  <span class="hdr-company">{{ admin_company }}</span>
+  {% endif %}
+  <span class="hdr-right">Teklif No: {{ offer.offer_no }}<br>{{ offer.created_at[:10] if offer.created_at else '' }}</span>
+</div>
 
 <!-- ════════════════════ KAPAK ════════════════════ -->
 <div class="cover-wrap">
