@@ -336,8 +336,22 @@ async def offer_print(request: Request, offer_id: int):
     })
 
 
+@router.get("/{offer_id}/pdf-view")
+async def offer_pdf_view(request: Request, offer_id: int):
+    user = auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+    customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
+    return templates.TemplateResponse(request, "offer_pdf_view.html", {
+        "user": user,
+        "offer": offer,
+        "customer": customer or {},
+    })
+
+
 @router.get("/{offer_id}/pdf")
-async def offer_pdf(request: Request, offer_id: int):
+async def offer_pdf(request: Request, offer_id: int, dl: int = 0):
     user = auth.require_user(request)
     offer = fdb.get_offer(offer_id)
     if not offer:
@@ -390,8 +404,9 @@ async def offer_pdf(request: Request, offer_id: int):
     from weasyprint import HTML as WH
     pdf_bytes = WH(string=html_str, base_url="http://127.0.0.1:8501/").write_pdf()
     fname = f"Teklif_{offer['offer_no']}.pdf"
+    disposition = "attachment" if dl else "inline"
     return Response(pdf_bytes, media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{fname}"'})
+                    headers={"Content-Disposition": f'{disposition}; filename="{fname}"'})
 
 
 @router.post("/{offer_id}/status")
