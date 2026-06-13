@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 import db.users as udb
+import db.factory as fdb
 import auth
 
 router = APIRouter()
@@ -8,10 +9,10 @@ from tmpl import templates
 
 
 def _admin_ctx():
-    admin = udb.get_admin()
+    company = fdb.get_company() or {}
     return {
-        "admin_logo": (admin.get("logo_path") or "") if admin else "",
-        "admin_company": (admin.get("company_name") or "") if admin else "",
+        "admin_logo": company.get("logo_path") or "",
+        "admin_company": company.get("company_name") or "",
     }
 
 
