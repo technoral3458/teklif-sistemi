@@ -381,7 +381,8 @@ function wizardLoadOptions() {
     const optId = parseInt(row.dataset.optId);
     const catIds = (row.dataset.cats || '').split(',').map(s => s.trim()).filter(Boolean);
     const catMatch = catIds.length === 0 || catIds.includes(modelCatId);
-    const compatMatch = compat.length === 0 || compat.includes(optId);
+    // Global options (no category restriction) always show regardless of compat whitelist
+    const compatMatch = catIds.length === 0 || compat.length === 0 || compat.includes(optId);
     row.style.display = (catMatch && compatMatch) ? '' : 'none';
     // PER_MACHINE etiketini güncelle
     const pmLabel = row.querySelector('.per-machine-qty');
