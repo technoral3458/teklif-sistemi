@@ -14,7 +14,20 @@
     <!-- Left column -->
     <div>
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-header"><h3 class="card-title">{{ T.model_basic_info }}</h3></div>
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <h3 class="card-title" style="margin:0;">{{ T.model_basic_info }}</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <a href="/models/excel-template" class="btn btn-ghost btn-sm" download title="Excel şablonunu indir">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Şablonu İndir
+            </a>
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;" title="Excel dosyasından verileri yükle">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Excel'den Yükle
+              <input type="file" id="excelImportInput" accept=".xlsx,.xls" style="display:none;" onchange="importFromExcel(this)" />
+            </label>
+          </div>
+        </div>
         <div class="card-body">
           <div class="form-group">
             <label class="form-label">{{ T.model_name }} *</label>
@@ -326,6 +339,80 @@ document.addEventListener('DOMContentLoaded', function() {
   loadSpecs({{ (model.specs or '')|tojson }});
   if (document.getElementById('isLineCb')?.checked) renderLineImageInputs();
 });
+
+// ── Excel şablonundan yükleme ─────────────────────────────────────────────
+async function importFromExcel(input) {
+  if (!input.files[0]) return;
+  const btn = input.closest('label');
+  const origText = btn.querySelector('svg').nextSibling.textContent;
+  btn.querySelector('svg').nextSibling.textContent = ' Yükleniyor...';
+
+  const fd = new FormData();
+  fd.append('excel_file', input.files[0]);
+
+  let data;
+  try {
+    const res = await fetch('/models/excel-import', {method:'POST', body:fd});
+    data = await res.json();
+    if (data.error) { alert('Hata: ' + data.error); return; }
+  } catch(e) {
+    alert('Dosya işlenirken hata oluştu.');
+    return;
+  } finally {
+    btn.querySelector('svg').nextSibling.textContent = ' Excel\'den Yükle';
+    input.value = '';
+  }
+
+  // Temel alanlar
+  const setVal = (name, val) => {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el && val !== undefined && val !== null) el.value = val;
+  };
+  setVal('name',           data.name           || '');
+  setVal('name_en',        data.name_en        || '');
+  setVal('name_zh',        data.name_zh        || '');
+  setVal('description',    data.description    || '');
+  setVal('description_en', data.description_en || '');
+  setVal('description_zh', data.description_zh || '');
+  if (data.base_price !== undefined) setVal('base_price', data.base_price);
+
+  // Para birimi
+  if (data.currency) {
+    const sel = document.querySelector('[name="currency"]');
+    if (sel) {
+      for (const opt of sel.options) {
+        if (opt.value === data.currency) { sel.value = data.currency; break; }
+      }
+    }
+  }
+
+  // Kategori (ad eşleştirmesi)
+  if (data.category_name) {
+    const sel = document.querySelector('[name="category_id"]');
+    if (sel) {
+      const needle = data.category_name.trim().toLowerCase();
+      for (const opt of sel.options) {
+        if (opt.textContent.trim().toLowerCase() === needle) {
+          sel.value = opt.value;
+          break;
+        }
+      }
+    }
+  }
+
+  // Teknik özellikler
+  if (data.specs && data.specs.length > 0) {
+    document.getElementById('specsRows').innerHTML = '';
+    data.specs.forEach(s => addSpecRow(s.title || '', s.desc || '', s.img || ''));
+  }
+
+  // Başarı bildirimi
+  const notice = document.createElement('div');
+  notice.style.cssText = 'position:fixed;top:20px;right:20px;background:#059669;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.2);';
+  notice.textContent = 'Excel verileri yüklendi. Kontrol edip kaydedebilirsiniz.';
+  document.body.appendChild(notice);
+  setTimeout(() => notice.remove(), 3500);
+}
 
 // ── Hat Makinesi ──────────────────────────────────────────────────────────────
 const EXISTING_LINE_IMAGES = {{ (line_images or {})|tojson }};

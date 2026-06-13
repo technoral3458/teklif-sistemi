@@ -1,10 +1,11 @@
 import os
 import uuid
 import json
+from io import BytesIO
 from typing import Optional
 
 from fastapi import APIRouter, Request, Form, UploadFile, File
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 import db.factory as fdb
 import auth
@@ -236,3 +237,134 @@ async def delete_model(request: Request, id: int = Form(...)):
     auth.require_user(request)
     fdb.del_model(id)
     return RedirectResponse("/models", 303)
+
+
+@router.get("/excel-template")
+async def excel_template_download(request: Request):
+    auth.require_user(request)
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        return Response("openpyxl kurulu değil. pip install openpyxl", status_code=500, media_type="text/plain")
+
+    wb = openpyxl.Workbook()
+
+    # ── Sheet 1: Model temel bilgileri ────────────────────────────────────────
+    ws1 = wb.active
+    ws1.title = "Model Bilgileri"
+
+    hdr_font  = Font(bold=True, color="FFFFFF")
+    hdr_fill  = PatternFill("solid", fgColor="2563EB")
+    hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    headers1 = [
+        "Makine Adı (TR) *",
+        "Makine Adı (EN)",
+        "Makine Adı (ZH)",
+        "Açıklama (TR)",
+        "Açıklama (EN)",
+        "Açıklama (ZH)",
+        "Satış Fiyatı",
+        "Para Birimi\n(USD/EUR/TRY)",
+        "Kategori Adı",
+    ]
+    col_widths1 = [28, 28, 28, 35, 35, 35, 14, 16, 20]
+
+    for col, (h, w) in enumerate(zip(headers1, col_widths1), 1):
+        cell = ws1.cell(row=1, column=col, value=h)
+        cell.font  = hdr_font
+        cell.fill  = hdr_fill
+        cell.alignment = hdr_align
+        ws1.column_dimensions[chr(64 + col)].width = w
+
+    # Örnek satır
+    example = ["Örnek Makine Model A", "Example Machine A", "", "Türkçe açıklama...", "", "", 15000.00, "USD", "Kategori Adı"]
+    for col, v in enumerate(example, 1):
+        ws1.cell(row=2, column=col, value=v)
+
+    ws1.row_dimensions[1].height = 35
+
+    # ── Sheet 2: Teknik özellikler ─────────────────────────────────────────────
+    ws2 = wb.create_sheet("Teknik Özellikler")
+    hdr_fill2 = PatternFill("solid", fgColor="059669")
+
+    headers2 = ["Başlık", "Açıklama"]
+    col_widths2 = [30, 60]
+
+    for col, (h, w) in enumerate(zip(headers2, col_widths2), 1):
+        cell = ws2.cell(row=1, column=col, value=h)
+        cell.font  = hdr_font
+        cell.fill  = hdr_fill2
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws2.column_dimensions[chr(64 + col)].width = w
+
+    # Örnek satırlar
+    examples2 = [
+        ("Motor Gücü", "3.5 kW / 4.8 HP"),
+        ("Kesim Genişliği", "1600 mm"),
+        ("Tabla Boyutu", "1600 x 1250 mm"),
+        ("Max. Kesim Hızı", "60 m/min"),
+        ("Ağırlık", "850 kg"),
+    ]
+    for row_idx, (t, d) in enumerate(examples2, 2):
+        ws2.cell(row=row_idx, column=1, value=t)
+        ws2.cell(row=row_idx, column=2, value=d)
+
+    ws2.row_dimensions[1].height = 28
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return Response(
+        buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="model_sablonu.xlsx"'},
+    )
+
+
+@router.post("/excel-import")
+async def excel_import(request: Request, excel_file: UploadFile = File(...)):
+    auth.require_user(request)
+    try:
+        import openpyxl
+    except ImportError:
+        return JSONResponse({"error": "openpyxl kurulu değil"}, status_code=500)
+
+    content = await excel_file.read()
+    try:
+        wb = openpyxl.load_workbook(BytesIO(content), data_only=True)
+    except Exception as e:
+        return JSONResponse({"error": f"Dosya okunamadı: {e}"}, status_code=400)
+
+    result = {}
+
+    # ── Sheet 1 ───────────────────────────────────────────────────────────────
+    ws1_name = next((s for s in wb.sheetnames if "Model" in s or "Bilgi" in s), wb.sheetnames[0])
+    ws1 = wb[ws1_name]
+    keys1 = ["name", "name_en", "name_zh", "description", "description_en", "description_zh",
+             "base_price", "currency", "category_name"]
+    row2 = [cell.value for cell in ws1[2]]
+    for k, v in zip(keys1, row2):
+        if v is None:
+            continue
+        if k == "base_price":
+            try:
+                result[k] = float(v)
+            except Exception:
+                result[k] = 0.0
+        else:
+            result[k] = str(v).strip()
+
+    # ── Sheet 2 ───────────────────────────────────────────────────────────────
+    specs = []
+    if len(wb.sheetnames) > 1:
+        ws2 = wb[wb.sheetnames[1]]
+        for row in ws2.iter_rows(min_row=2, values_only=True):
+            title = str(row[0] or "").strip() if row[0] is not None else ""
+            desc  = str(row[1] or "").strip() if len(row) > 1 and row[1] is not None else ""
+            if title:
+                specs.append({"title": title, "desc": desc, "img": ""})
+    result["specs"] = specs
+
+    return JSONResponse(result)
