@@ -3,7 +3,7 @@
 {% block page_title %}{{ T.customers_title }}{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+<div class="page-toolbar" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
   <input type="text" id="tableSearch" class="search-box" placeholder="{{ T.btn_search }}..." style="max-width:280px;" />
   <button class="btn btn-primary" onclick="openModal('customerModal')">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
