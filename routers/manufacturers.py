@@ -13,10 +13,12 @@ async def manufacturers_list(request: Request):
     user = auth.require_admin(request)
     manufacturers = [u for u in udb.all_users() if u["role"] == "manufacturer"]
     cats = fdb.get_cats()
+    models = fdb.get_models()
     return templates.TemplateResponse(request, "manufacturers.html", {
         "user": user,
         "manufacturers": manufacturers,
         "categories": cats,
+        "models": models,
         "active_page": "manufacturers",
         "msg": request.query_params.get("msg"),
         "msg_type": request.query_params.get("msg_type", "info"),
@@ -64,6 +66,7 @@ async def save_mfr(request: Request,
     allowed_menus = ",".join(form.getlist("allowed_menus"))
     allowed_categories = ",".join(form.getlist("allowed_categories"))
     allowed_actions = ",".join(form.getlist("allowed_actions"))
+    allowed_models = ",".join(form.getlist("allowed_models"))
     udb.update_admin(
         id,
         company_name=company_name,
@@ -75,6 +78,7 @@ async def save_mfr(request: Request,
         allowed_categories=allowed_categories,
         parent_id=parent_id if parent_id else None,
         allowed_actions=allowed_actions,
+        allowed_models=allowed_models,
     )
     if role == "dealer":
         return RedirectResponse("/dealers?msg=Kullanıcı+bayi+olarak+taşındı&msg_type=info", 303)

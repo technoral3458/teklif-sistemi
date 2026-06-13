@@ -17,6 +17,8 @@ from tmpl import templates
 @router.get("")
 async def options_list(request: Request):
     user = auth.require_user(request)
+    if user["role"] == "manufacturer":
+        return RedirectResponse("/", 303)
     options = fdb.get_options()
     cats = fdb.get_cats()
     cat_map = {c["id"]: c["name"] for c in cats}

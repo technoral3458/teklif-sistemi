@@ -30,6 +30,12 @@ async def models_list(request: Request, category_id: int = 0):
     user = auth.require_user(request)
     cats = fdb.get_cats()
     models = fdb.get_models(category_id if category_id else None)
+    if user["role"] == "manufacturer":
+        allowed_ids = [int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit()]
+        if allowed_ids:
+            models = [m for m in models if m["id"] in allowed_ids]
+        else:
+            models = []
     cat_map = {c["id"]: c["name"] for c in cats}
     for m in models:
         m["category_name"] = cat_map.get(m.get("category_id"), "-")
@@ -66,6 +72,10 @@ async def model_edit(request: Request, model_id: int):
     m = fdb.get_model(model_id)
     if not m:
         return RedirectResponse("/models", 303)
+    if user["role"] == "manufacturer":
+        allowed_ids = [int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit()]
+        if allowed_ids and model_id not in allowed_ids:
+            return RedirectResponse("/models", 303)
     cats = fdb.get_cats()
     options = fdb.get_options()
     compatible = []

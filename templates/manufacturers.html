@@ -62,7 +62,8 @@
               onclick="editMfr({{ m.id }}, '{{ m.email|e }}', '{{ m.company_name|e }}', '{{ m.role }}',
                 {{ m.is_approved }}, {{ m.is_active }}, {{ m.can_view_costs or 0 }},
                 '{{ m.allowed_menus or '' }}', '{{ m.allowed_categories or '' }}',
-                {{ m.parent_id or 0 }}, '{{ m.allowed_actions or '' }}')">
+                {{ m.parent_id or 0 }}, '{{ m.allowed_actions or '' }}',
+                '{{ m.allowed_models or '' }}')">
               ✏️ {{ T.btn_edit }}
             </button>
             <form method="post" action="/admin/impersonate/{{ m.id }}" style="display:inline;">
@@ -254,6 +255,24 @@
           </div>
         </div>
 
+        <!-- Model Permissions -->
+        <div>
+          <label class="form-label" style="margin-bottom:4px;display:block;">{{ T.admin_model_perms }}</label>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">{{ T.admin_model_hint }}</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            {% for mdl in models %}
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="allowed_models" value="{{ mdl.id }}" class="me-model-chk" />
+              <span style="font-size:13px;">{{ mdl.name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="meCheckAll('.me-model-chk',true)">{{ T.admin_select_all }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="meCheckAll('.me-model-chk',false)">{{ T.admin_clear }}</button>
+          </div>
+        </div>
+
       </div>
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
         <button type="button" class="btn btn-ghost" onclick="closeModal('mfrEditModal')">{{ T.btn_cancel }}</button>
@@ -266,7 +285,7 @@
 
 {% block scripts %}
 <script>
-function editMfr(id, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions) {
+function editMfr(id, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions, allowedModels) {
   document.getElementById('meid').value = id;
   document.getElementById('meModalEmail').textContent = email + (company ? ' — ' + company : '');
   document.getElementById('mecompany').value = company;
@@ -298,6 +317,12 @@ function editMfr(id, email, company, role, approved, active, costs, allowedMenus
     cb.checked = actionList.includes(cb.value);
   });
   document.getElementById('meActionSection').style.display = parentId ? '' : 'none';
+
+  // Model permissions
+  const modelList = allowedModels ? allowedModels.split(',') : [];
+  document.querySelectorAll('.me-model-chk').forEach(cb => {
+    cb.checked = modelList.includes(cb.value);
+  });
 
   openModal('mfrEditModal');
 }

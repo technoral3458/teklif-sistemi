@@ -44,6 +44,7 @@ def init():
             ("theme","TEXT DEFAULT 'dark'"),("allowed_menus","TEXT DEFAULT ''"),
             ("parent_id","INTEGER DEFAULT NULL"),
             ("allowed_actions","TEXT DEFAULT ''"),
+            ("allowed_models","TEXT DEFAULT ''"),
         ]:
             _acol(c.cursor(),"users",col,typ)
         h = bcrypt.hashpw(ADMIN_PASS.encode(), bcrypt.gensalt()).decode()
@@ -62,10 +63,10 @@ def init():
 def _row(r):
     if not r: return None
     keys=["id","email","password","company_name","role","is_approved","is_active",
-          "phone","logo_path","website","address","allowed_categories","can_view_costs","lang","theme","allowed_menus","created_at","parent_id","allowed_actions"]
+          "phone","logo_path","website","address","allowed_categories","can_view_costs","lang","theme","allowed_menus","created_at","parent_id","allowed_actions","allowed_models"]
     return dict(zip(keys,r))
 
-_SEL = "id,email,password,company_name,role,is_approved,is_active,phone,logo_path,website,address,allowed_categories,can_view_costs,lang,theme,allowed_menus,created_at,parent_id,allowed_actions"
+_SEL = "id,email,password,company_name,role,is_approved,is_active,phone,logo_path,website,address,allowed_categories,can_view_costs,lang,theme,allowed_menus,created_at,parent_id,allowed_actions,allowed_models"
 
 def by_email(email):
     with _c() as c:
@@ -151,7 +152,7 @@ def has_action(user, action_key):
     return action_key in allowed
 
 def update_admin(uid,**kw):
-    allowed=["is_approved","is_active","role","allowed_categories","can_view_costs","company_name","allowed_menus","parent_id","allowed_actions"]
+    allowed=["is_approved","is_active","role","allowed_categories","can_view_costs","company_name","allowed_menus","parent_id","allowed_actions","allowed_models"]
     f={k:v for k,v in kw.items() if k in allowed}
     if not f: return
     sets=",".join(f"{k}=?" for k in f)

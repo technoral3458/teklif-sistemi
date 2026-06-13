@@ -380,6 +380,8 @@ TRANSLATIONS = {
         'admin_waiting_opt': 'Bekliyor',
         'admin_menu_hint': 'Boş bırakılırsa tüm menüler erişilebilir olur.',
         'admin_cat_hint': 'Boş bırakılırsa tüm kategoriler erişilebilir olur.',
+        'admin_model_perms': 'Model İzinleri',
+        'admin_model_hint': 'Üreticinin görebileceği makine modellerini seçin.',
         # Sub-user / parent linking
         'admin_parent_account': 'Bağlı Üretici (Alt Hesap)',
         'admin_no_parent': '— Bağımsız Hesap —',
@@ -760,6 +762,8 @@ TRANSLATIONS = {
         'admin_waiting_opt': 'Pending',
         'admin_menu_hint': 'If empty, all menus are accessible.',
         'admin_cat_hint': 'If empty, all categories are accessible.',
+        'admin_model_perms': 'Model Permissions',
+        'admin_model_hint': 'Select which machine models this manufacturer can see.',
         # Sub-user / parent linking
         'admin_parent_account': 'Linked Manufacturer (Sub-account)',
         'admin_no_parent': '— Independent Account —',
@@ -1140,6 +1144,8 @@ TRANSLATIONS = {
         'admin_waiting_opt': '待审核',
         'admin_menu_hint': '如果为空，则所有菜单均可访问。',
         'admin_cat_hint': '如果为空，则所有类别均可访问。',
+        'admin_model_perms': '机型权限',
+        'admin_model_hint': '选择该制造商可以查看的机器型号。',
         # Sub-user / parent linking
         'admin_parent_account': '关联制造商（子账户）',
         'admin_no_parent': '— 独立账户 —',

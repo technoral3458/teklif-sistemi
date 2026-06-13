@@ -105,6 +105,7 @@ async def order_detail(request: Request, oid: int):
         "can_confirm": udb.has_action(user, "order_confirm"),
         "can_status":  udb.has_action(user, "order_status"),
         "can_stage":   udb.has_action(user, "order_stage"),
+        "show_prices": user["role"] != "manufacturer",
     })
 
 

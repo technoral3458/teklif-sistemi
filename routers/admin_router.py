@@ -24,12 +24,14 @@ async def admin_page(request: Request):
     company = fdb.get_company()
     categories = fdb.get_cats()
     manufacturers = udb.all_manufacturers()
+    models = fdb.get_models()
     return templates.TemplateResponse(request, "admin.html", {
         "user": user,
         "users": users,
         "company": company,
         "categories": categories,
         "manufacturers": manufacturers,
+        "models": models,
         "active_page": "admin",
     })
 
