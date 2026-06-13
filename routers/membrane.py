@@ -124,6 +124,35 @@ def _generate_nc(model, paths, variables):
     ]
     return "\n".join(lines)
 
+
+def _eval_paths(model, paths, variables):
+    """Return evaluated path coordinates for frontend simulation."""
+    ev = lambda expr: _eval_expr(expr, variables)
+    safe_z = float(model.get("safe_z") or 5.0)
+    result = []
+    for p in paths:
+        try:
+            ep = {
+                "label": p.get("label") or "",
+                "type": p.get("path_type", "LINE"),
+                "x1": round(ev(p["x1"]), 4),
+                "y1": round(ev(p["y1"]), 4),
+                "x2": round(ev(p["x2"]), 4),
+                "y2": round(ev(p["y2"]), 4),
+                "z2": round(ev(p["z2"]), 4),
+            }
+            if ep["type"] in ("ARC_CW", "ARC_CCW"):
+                ep["cx"] = round(ev(p.get("ix") or "0"), 4)
+                ep["cy"] = round(ev(p.get("jy") or "0"), 4)
+            if ep["type"] == "POCKET":
+                ep["tool_dia"] = float(p.get("tool_dia") or 8.0)
+                ep["step_over"] = float(p.get("step_over") or 0.5)
+            result.append(ep)
+        except Exception as exc:
+            result.append({"type": "ERROR", "label": str(exc),
+                           "x1": 0, "y1": 0, "x2": 0, "y2": 0, "z2": 0})
+    return {"paths": result, "safe_z": safe_z}
+
 router = APIRouter(prefix="/membrane")
 
 
@@ -572,7 +601,8 @@ async def cap_generate(request: Request, mid: int,
     constants = model.get("constants") or {}
     variables.update({k: float(v) for k, v in constants.items()})
     nc = _generate_nc(model, paths, variables)
-    return JSONResponse({"nc": nc})
+    sim = _eval_paths(model, paths, variables)
+    return JSONResponse({"nc": nc, "sim": sim, "W": W, "H": H, "T": T})
 
 
 @router.get("/caps/{mid}/download")

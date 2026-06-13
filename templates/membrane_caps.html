@@ -181,7 +181,20 @@
 
         <div id="ncStatus" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;background:var(--surface-2);"></div>
 
-        <div style="position:relative;">
+        {# Tab switcher: G-Code / Simülasyon #}
+        <div style="display:flex;border-bottom:1px solid var(--border);gap:0;">
+          <button id="tabGcode" onclick="switchTab('gcode')"
+            style="padding:6px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);">
+            G-Code
+          </button>
+          <button id="tabSim" onclick="switchTab('sim')"
+            style="padding:6px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);">
+            🎬 Simülasyon
+          </button>
+        </div>
+
+        {# G-Code panel #}
+        <div id="panelGcode" style="position:relative;">
           <textarea id="ncOutput" readonly
             style="width:100%;height:340px;font-family:monospace;font-size:11px;line-height:1.5;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text-primary);resize:vertical;box-sizing:border-box;"
             placeholder="Parametreleri girin → Ön İzleme..."></textarea>
@@ -189,6 +202,30 @@
             style="position:absolute;top:8px;right:8px;padding:3px 9px;font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-muted);">
             📋 Kopyala
           </button>
+        </div>
+
+        {# Simulation panel #}
+        <div id="panelSim" style="display:none;">
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <canvas id="simCanvas" width="480" height="340"
+              style="width:100%;display:block;background:#0f172a;"></canvas>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+            <button id="simPlayBtn" class="btn btn-primary btn-sm" onclick="simPlay()" disabled>▶ Oynat</button>
+            <button class="btn btn-ghost btn-sm" onclick="simReset()">↺ Sıfırla</button>
+            <div style="flex:1;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:11px;color:var(--text-muted);">Hız:</span>
+              <input type="range" id="simSpeed" min="1" max="10" value="5" style="flex:1;" />
+            </div>
+            <div id="simInfo" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">—</div>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;flex-wrap:wrap;">
+            <span>⬜ Hızlı hareket</span>
+            <span style="color:#3b82f6;">━ Düz kesim</span>
+            <span style="color:#a855f7;">━ Yay kesim</span>
+            <span style="color:#22c55e;">━ Cep kesim</span>
+            <span style="color:#ef4444;">● Takım</span>
+          </div>
         </div>
 
       </div>
@@ -549,6 +586,18 @@ document.addEventListener('DOMContentLoaded', function() {
   updatePathFields();
 });
 
+// ── Tab switcher ─────────────────────────────────────────────────────────
+function switchTab(t) {
+  const isGcode = t === 'gcode';
+  document.getElementById('panelGcode').style.display = isGcode ? '' : 'none';
+  document.getElementById('panelSim').style.display   = isGcode ? 'none' : '';
+  document.getElementById('tabGcode').style.borderBottomColor = isGcode ? 'var(--accent)' : 'transparent';
+  document.getElementById('tabGcode').style.color     = isGcode ? 'var(--accent)' : 'var(--text-muted)';
+  document.getElementById('tabSim').style.borderBottomColor   = isGcode ? 'transparent' : 'var(--accent)';
+  document.getElementById('tabSim').style.color       = isGcode ? 'var(--text-muted)' : 'var(--accent)';
+  if (!isGcode && simState.waypoints.length) simDrawStatic();
+}
+
 // ── NC Generator ──────────────────────────────────────────────────────────
 function getNCVars() {
   const W = parseFloat(document.getElementById('ncW')?.value) || 0;
@@ -577,11 +626,16 @@ async function generateNC() {
     if (data.error) {
       statusEl.style.color = 'var(--danger)';
       statusEl.textContent = '⚠️ ' + data.error;
-    } else {
-      document.getElementById('ncOutput').value = data.nc;
-      const lines = data.nc.split('\n').length;
-      statusEl.style.color = 'var(--success, #22c55e)';
-      statusEl.textContent = '✅ ' + lines + ' satır G-code üretildi';
+      return;
+    }
+    document.getElementById('ncOutput').value = data.nc;
+    const lines = data.nc.split('\n').length;
+    statusEl.style.color = 'var(--success, #22c55e)';
+    statusEl.textContent = '✅ ' + lines + ' satır G-code üretildi — Simülasyon sekmesinden izleyin';
+    // Build simulation
+    if (data.sim) {
+      simBuild(data.sim.paths, data.W, data.H, data.sim.safe_z);
+      document.getElementById('simPlayBtn').disabled = false;
     }
   } catch(e) {
     statusEl.style.color = 'var(--danger)';
@@ -602,6 +656,257 @@ function copyNC() {
   navigator.clipboard.writeText(val).then(() => {
     if (typeof showToast === 'function') showToast('Kopyalandı', 'success');
   });
+}
+
+// ── Simulation Engine ─────────────────────────────────────────────────────
+const simState = {
+  waypoints: [], W: 0, H: 0,
+  animId: null, wpIdx: 0, progress: 0,
+  drawn: [],  // line segments already drawn
+};
+
+const SIM_COLORS = {
+  RAPID: '#94a3b8', LINE: '#3b82f6',
+  ARC_CW: '#a855f7', ARC_CCW: '#a855f7', POCKET: '#22c55e',
+};
+
+function simBuild(paths, W, H, safe_z) {
+  simState.W = W; simState.H = H;
+  const wps = [];
+
+  const pushRapid = (x, y, z) => wps.push({ type:'RAPID', x, y, z, color:SIM_COLORS.RAPID });
+  const pushCut   = (x, y, z, color) => wps.push({ type:'CUT', x, y, z, color });
+
+  pushRapid(0, 0, safe_z);
+
+  for (const p of paths) {
+    const color = SIM_COLORS[p.type] || '#ffffff';
+    pushRapid(p.x1, p.y1, safe_z);
+    pushCut(p.x1, p.y1, p.z2, color);  // plunge
+
+    if (p.type === 'LINE') {
+      pushCut(p.x2, p.y2, p.z2, color);
+
+    } else if (p.type === 'ARC_CW' || p.type === 'ARC_CCW') {
+      const cx = p.cx, cy = p.cy;
+      const r  = Math.hypot(cx - p.x1, cy - p.y1);
+      let sa = Math.atan2(p.y1 - cy, p.x1 - cx);
+      let ea = Math.atan2(p.y2 - cy, p.x2 - cx);
+      const steps = 48;
+      if (p.type === 'ARC_CW') {
+        if (ea > sa) sa += Math.PI * 2;
+        for (let i = 1; i <= steps; i++) {
+          const a = sa + (ea - sa) * (i / steps);
+          pushCut(cx + r * Math.cos(a), cy + r * Math.sin(a), p.z2, color);
+        }
+      } else {
+        if (ea < sa) ea += Math.PI * 2;
+        for (let i = 1; i <= steps; i++) {
+          const a = sa + (ea - sa) * (i / steps);
+          pushCut(cx + r * Math.cos(a), cy + r * Math.sin(a), p.z2, color);
+        }
+      }
+
+    } else if (p.type === 'POCKET') {
+      const td = p.tool_dia || 8, so = p.step_over || 0.5;
+      const step = td * so, r2 = td / 2;
+      const lx = Math.min(p.x1,p.x2)+r2, rx = Math.max(p.x1,p.x2)-r2;
+      const by = Math.min(p.y1,p.y2)+r2, ty2 = Math.max(p.y1,p.y2)-r2;
+      let dir = 1;
+      for (let y = by; y <= ty2 + 0.001; y += step) {
+        pushRapid(dir===1?lx:rx, y, safe_z);
+        pushCut(dir===1?lx:rx, y, p.z2, color);
+        pushCut(dir===1?rx:lx, y, p.z2, color);
+        dir *= -1;
+      }
+      // Contour finish
+      pushRapid(lx, by, safe_z);
+      pushCut(lx, by, p.z2, color);
+      pushCut(rx, by, p.z2, color);
+      pushCut(rx, ty2, p.z2, color);
+      pushCut(lx, ty2, p.z2, color);
+      pushCut(lx, by, p.z2, color);
+    }
+    pushRapid(p.x2, p.y2, safe_z);
+  }
+
+  simState.waypoints = wps;
+  simState.drawn = [];
+  simState.wpIdx = 0;
+  simState.progress = 0;
+  simDrawStatic();
+  document.getElementById('simInfo').textContent = `${wps.length} hareket noktası`;
+}
+
+// Canvas helpers
+function simCtx() {
+  const c = document.getElementById('simCanvas');
+  return { ctx: c.getContext('2d'), cw: c.width, ch: c.height };
+}
+
+function simTransform(x, y, W, H, cw, ch) {
+  const mg = 28;
+  const scale = Math.min((cw - 2*mg) / (W||1), (ch - 2*mg) / (H||1));
+  return { tx: mg + x * scale, ty: ch - mg - y * scale, scale };
+}
+
+function simDrawPlate(ctx, cw, ch, W, H) {
+  const mg = 28;
+  const scale = Math.min((cw - 2*mg) / (W||1), (ch - 2*mg) / (H||1));
+  const pw = W * scale, ph = H * scale;
+  const ox = mg, oy = ch - mg - ph;
+  // Background
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(ox, oy, pw, ph);
+  // Grid
+  ctx.strokeStyle = 'rgba(100,116,139,0.2)';
+  ctx.lineWidth = 1;
+  const gridStep = scale * (W >= 500 ? 100 : 50);
+  for (let gx = ox; gx <= ox + pw; gx += gridStep) {
+    ctx.beginPath(); ctx.moveTo(gx, oy); ctx.lineTo(gx, oy+ph); ctx.stroke();
+  }
+  for (let gy = oy; gy <= oy + ph; gy += gridStep) {
+    ctx.beginPath(); ctx.moveTo(ox, gy); ctx.lineTo(ox+pw, gy); ctx.stroke();
+  }
+  // Border
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(ox, oy, pw, ph);
+  // Dimension labels
+  ctx.fillStyle = '#64748b';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`W=${W}`, ox + pw/2, oy - 6);
+  ctx.save(); ctx.translate(ox - 6, oy + ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(`H=${H}`, 0, 0); ctx.restore();
+  // Origin cross
+  const {tx: ox2, ty: oy2} = simTransform(0, 0, W, H, cw, ch);
+  ctx.strokeStyle = '#ef444466'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(ox2-8,oy2); ctx.lineTo(ox2+8,oy2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox2,oy2-8); ctx.lineTo(ox2,oy2+8); ctx.stroke();
+}
+
+function simDrawStatic() {
+  const {ctx, cw, ch} = simCtx();
+  const {W, H, waypoints} = simState;
+  ctx.clearRect(0, 0, cw, ch);
+  simDrawPlate(ctx, cw, ch, W, H);
+  if (!waypoints.length) return;
+
+  // Draw all paths faded
+  let px = waypoints[0].x, py = waypoints[0].y;
+  for (let i = 1; i < waypoints.length; i++) {
+    const wp = waypoints[i];
+    const {tx:ax, ty:ay} = simTransform(px, py, W, H, cw, ch);
+    const {tx:bx, ty:by} = simTransform(wp.x, wp.y, W, H, cw, ch);
+    ctx.beginPath();
+    ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+    if (wp.type === 'RAPID') {
+      ctx.strokeStyle = 'rgba(148,163,184,0.3)';
+      ctx.setLineDash([4,4]);
+      ctx.lineWidth = 1;
+    } else {
+      ctx.strokeStyle = wp.color + '60';
+      ctx.setLineDash([]);
+      ctx.lineWidth = 2;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    px = wp.x; py = wp.y;
+  }
+  document.getElementById('simPlayBtn').textContent = '▶ Oynat';
+}
+
+function simDrawFrame() {
+  const {ctx, cw, ch} = simCtx();
+  const {W, H, waypoints, drawn} = simState;
+  ctx.clearRect(0, 0, cw, ch);
+  simDrawPlate(ctx, cw, ch, W, H);
+
+  // Draw completed segments
+  for (const seg of drawn) {
+    const {ax,ay,bx,by,color,isRapid} = seg;
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by);
+    if (isRapid) { ctx.strokeStyle = 'rgba(148,163,184,0.4)'; ctx.setLineDash([4,4]); ctx.lineWidth = 1; }
+    else          { ctx.strokeStyle = color; ctx.setLineDash([]); ctx.lineWidth = 2.5; }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // Draw tool head
+  const wp = waypoints[Math.min(simState.wpIdx, waypoints.length-1)];
+  if (wp) {
+    const {tx, ty} = simTransform(wp.x, wp.y, W, H, cw, ch);
+    // Shadow
+    ctx.beginPath(); ctx.arc(tx, ty, 8, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(239,68,68,0.25)'; ctx.fill();
+    // Tool body
+    ctx.beginPath(); ctx.arc(tx, ty, 5, 0, Math.PI*2);
+    ctx.fillStyle = '#ef4444'; ctx.fill();
+    ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 1.5; ctx.stroke();
+    // Cross hair
+    ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tx-9,ty); ctx.lineTo(tx+9,ty); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tx,ty-9); ctx.lineTo(tx,ty+9); ctx.stroke();
+  }
+}
+
+let _animRunning = false;
+function simPlay() {
+  if (_animRunning) { simPause(); return; }
+  if (simState.wpIdx >= simState.waypoints.length - 1) simReset();
+  _animRunning = true;
+  document.getElementById('simPlayBtn').textContent = '⏸ Durdur';
+  _animStep();
+}
+
+function simPause() {
+  _animRunning = false;
+  if (simState.animId) cancelAnimationFrame(simState.animId);
+  document.getElementById('simPlayBtn').textContent = '▶ Oynat';
+}
+
+function simReset() {
+  simPause();
+  simState.wpIdx = 0;
+  simState.drawn = [];
+  simDrawStatic();
+  document.getElementById('simPlayBtn').textContent = '▶ Oynat';
+  document.getElementById('simInfo').textContent = `${simState.waypoints.length} hareket noktası`;
+}
+
+let _lastTime = 0;
+function _animStep(ts = 0) {
+  if (!_animRunning) return;
+  const speed = parseInt(document.getElementById('simSpeed').value) || 5;
+  const dt = ts - _lastTime;
+  // Steps per frame based on speed (1=slow, 10=fast)
+  const stepsPerFrame = Math.max(1, Math.floor(speed * speed / 5));
+  _lastTime = ts;
+
+  const {waypoints, W, H} = simState;
+  const {cw, ch} = simCtx();
+
+  for (let s = 0; s < stepsPerFrame && simState.wpIdx < waypoints.length - 1; s++) {
+    const i = simState.wpIdx;
+    const from = waypoints[i], to = waypoints[i+1];
+    const {tx:ax, ty:ay} = simTransform(from.x, from.y, W, H, cw, ch);
+    const {tx:bx, ty:by} = simTransform(to.x, to.y, W, H, cw, ch);
+    simState.drawn.push({ ax, ay, bx, by, color: to.color, isRapid: to.type === 'RAPID' });
+    simState.wpIdx++;
+  }
+
+  simDrawFrame();
+
+  const pct = Math.round(simState.wpIdx / (waypoints.length-1) * 100);
+  document.getElementById('simInfo').textContent =
+    `${simState.wpIdx}/${waypoints.length-1} nokta (%${pct})`;
+
+  if (simState.wpIdx >= waypoints.length - 1) {
+    _animRunning = false;
+    document.getElementById('simPlayBtn').textContent = '▶ Tekrar';
+    return;
+  }
+  simState.animId = requestAnimationFrame(_animStep);
 }
 </script>
 {% endblock %}
