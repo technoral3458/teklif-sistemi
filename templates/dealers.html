@@ -66,7 +66,7 @@
                 {{ d.is_approved }}, {{ d.is_active }}, {{ d.can_view_costs or 0 }},
                 '{{ d.allowed_menus or '' }}', '{{ d.allowed_categories or '' }}',
                 {{ d.parent_id or 0 }}, '{{ d.allowed_actions or '' }}')">
-              ✏️ {{ T.btn_edit }}
+              ✏️ <span class="btn-text">{{ T.btn_edit }}</span>
             </button>
             <form method="post" action="/admin/impersonate/{{ d.id }}" style="display:inline;">
               <button type="submit" class="btn btn-ghost btn-sm" title="Bu kullanıcı olarak görüntüle">👁️</button>
@@ -74,18 +74,18 @@
             {% if not d.is_approved %}
             <form method="post" action="/dealers/approve" style="display:inline;">
               <input type="hidden" name="id" value="{{ d.id }}" />
-              <button type="submit" class="btn btn-success btn-sm">{{ T.dealer_approve }}</button>
+              <button type="submit" class="btn btn-success btn-sm">✅ <span class="btn-text">{{ T.dealer_approve }}</span></button>
             </form>
             {% else %}
             <form method="post" action="/dealers/reject" style="display:inline;">
               <input type="hidden" name="id" value="{{ d.id }}" />
-              <button type="submit" class="btn btn-outline btn-sm">{{ T.dealer_deactivate }}</button>
+              <button type="submit" class="btn btn-outline btn-sm">⏸ <span class="btn-text">{{ T.dealer_deactivate }}</span></button>
             </form>
             {% endif %}
             <a href="/ledger/dealers/{{ d.id }}" class="btn btn-ghost btn-sm">📒</a>
             <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ d.company_name or d.email }}'?">
               <input type="hidden" name="id" value="{{ d.id }}" />
-              <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
+              <button type="submit" class="btn btn-danger btn-sm">🗑 <span class="btn-text">{{ T.btn_delete }}</span></button>
             </form>
           </div>
         </td>

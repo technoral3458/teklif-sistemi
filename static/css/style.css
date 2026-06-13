@@ -729,7 +729,7 @@ input.search-box:focus { outline: none; border-color: var(--accent); }
   }
   .step-connector { display: none; }
   .table-wrap { overflow-x: auto; }
-  table { min-width: 480px; }
+  table { min-width: 0; }
 }
 
 /* ── Responsive column helpers ──────────────────────────────────── */
@@ -757,11 +757,13 @@ input.search-box:focus { outline: none; border-color: var(--accent); }
   .main-content { padding: 10px; }
 
   /* Table: compact rows */
-  td, th { padding: 8px 8px; }
-  table  { font-size: .78rem; min-width: 400px; }
+  td, th { padding: 6px 6px; }
+  table  { font-size: .78rem; min-width: 0; }
 
-  /* Action button groups in tables */
-  .btn-sm { padding: 4px 8px; font-size: .72rem; }
+  /* Action button groups in tables: icon-only on mobile */
+  .btn-sm { padding: 4px 7px; font-size: .72rem; }
+  td .btn-text { display: none; }
+  td { word-break: break-word; max-width: 160px; }
 
   /* Cards */
   .card { padding: 14px; }
