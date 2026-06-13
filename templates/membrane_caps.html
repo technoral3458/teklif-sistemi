@@ -659,12 +659,281 @@ function copyNC() {
   });
 }
 
-// ── Simulation Engine ─────────────────────────────────────────────────────
-const simState = {
-  waypoints: [], W: 0, H: 0,
-  animId: null, wpIdx: 0, progress: 0,
-  drawn: [],  // line segments already drawn
+// ── Simulation Engine (smooth interpolation) ──────────────────────────────
+const SIM_COLORS = {
+  RAPID: '#94a3b8', LINE: '#3b82f6',
+  ARC_CW: '#a855f7', ARC_CCW: '#a855f7', POCKET: '#22c55e',
 };
+
+const simState = {
+  segments: [],   // pixel-space: {ax,ay,bx,by,len,color,isRapid}
+  totalLen: 0,
+  currentDist: 0, // how far along total path (pixels)
+  W: 0, H: 0,
+  animId: null,
+};
+
+// ── Build waypoints & convert to pixel segments ───────────────────────────
+function simBuild(paths, W, H, safe_z) {
+  simState.W = W; simState.H = H;
+  const wps = [];
+
+  const rapid = (x,y) => wps.push({type:'RAPID', x, y, color: SIM_COLORS.RAPID});
+  const cut   = (x,y,color) => wps.push({type:'CUT',   x, y, color});
+
+  rapid(0, 0);
+  for (const p of paths) {
+    const col = SIM_COLORS[p.type] || '#fff';
+    rapid(p.x1, p.y1);
+    cut(p.x1, p.y1, col); // plunge (same XY, just marks cut start)
+
+    if (p.type === 'LINE') {
+      cut(p.x2, p.y2, col);
+
+    } else if (p.type === 'ARC_CW' || p.type === 'ARC_CCW') {
+      const {cx, cy} = p;
+      const r = Math.hypot(cx - p.x1, cy - p.y1);
+      let sa = Math.atan2(p.y1 - cy, p.x1 - cx);
+      let ea = Math.atan2(p.y2 - cy, p.x2 - cx);
+      const steps = 64;
+      if (p.type === 'ARC_CW')  { if (ea > sa) sa += Math.PI*2; }
+      else                       { if (ea < sa) ea += Math.PI*2; }
+      for (let i = 1; i <= steps; i++) {
+        const a = sa + (ea - sa) * (i / steps);
+        cut(cx + r*Math.cos(a), cy + r*Math.sin(a), col);
+      }
+
+    } else if (p.type === 'POCKET') {
+      const td = p.tool_dia||8, so = p.step_over||0.5;
+      const step = td*so, r2 = td/2;
+      const lx = Math.min(p.x1,p.x2)+r2, rx = Math.max(p.x1,p.x2)-r2;
+      const by = Math.min(p.y1,p.y2)+r2, ty2 = Math.max(p.y1,p.y2)-r2;
+      let dir = 1;
+      for (let y = by; y <= ty2+0.001; y += step) {
+        rapid(dir===1?lx:rx, y);
+        cut(dir===1?lx:rx, y, col);
+        cut(dir===1?rx:lx, y, col);
+        dir *= -1;
+      }
+      rapid(lx, by);
+      cut(lx, by, col); cut(rx, by, col); cut(rx, ty2, col); cut(lx, ty2, col); cut(lx, by, col);
+    }
+    rapid(p.x2, p.y2);
+  }
+
+  // Convert to pixel-space segments for smooth interpolation
+  const {cw, ch} = simCtx();
+  const segs = [];
+  let totalLen = 0;
+  for (let i = 0; i < wps.length - 1; i++) {
+    const f = wps[i], t = wps[i+1];
+    const {tx:ax,ty:ay} = simTransform(f.x, f.y, W, H, cw, ch);
+    const {tx:bx,ty:by} = simTransform(t.x, t.y, W, H, cw, ch);
+    const len = Math.hypot(bx-ax, by-ay) || 0;
+    segs.push({ax,ay,bx,by,len,color:t.color,isRapid:t.type==='RAPID'});
+    totalLen += len;
+  }
+  simState.segments = segs;
+  simState.totalLen = totalLen;
+  simState.currentDist = 0;
+  simDrawStatic();
+  document.getElementById('simPlayBtn').disabled = false;
+  document.getElementById('simInfo').textContent = `${segs.length} segment — ▶ başlatın`;
+}
+
+// ── Canvas helpers ─────────────────────────────────────────────────────────
+function simCtx() {
+  const c = document.getElementById('simCanvas');
+  return { ctx: c.getContext('2d'), cw: c.width, ch: c.height };
+}
+
+function simTransform(x, y, W, H, cw, ch) {
+  const mg = 32;
+  const scale = Math.min((cw-2*mg)/(W||1), (ch-2*mg)/(H||1));
+  return { tx: mg + x*scale, ty: ch - mg - y*scale, scale };
+}
+
+function simDrawPlate(ctx, cw, ch, W, H) {
+  const mg = 32;
+  const scale = Math.min((cw-2*mg)/(W||1), (ch-2*mg)/(H||1));
+  const pw = W*scale, ph = H*scale;
+  const ox = mg, oy = ch - mg - ph;
+
+  // Wood/material texture fill
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(ox, oy, pw, ph);
+  // Subtle grain lines
+  ctx.strokeStyle = 'rgba(51,65,85,0.6)';
+  ctx.lineWidth = 1;
+  for (let gx = ox + scale*50; gx < ox+pw; gx += scale*(W>=500?100:50)) {
+    ctx.beginPath(); ctx.moveTo(gx,oy); ctx.lineTo(gx,oy+ph); ctx.stroke();
+  }
+  for (let gy = oy + scale*50; gy < oy+ph; gy += scale*(H>=500?100:50)) {
+    ctx.beginPath(); ctx.moveTo(ox,gy); ctx.lineTo(ox+pw,gy); ctx.stroke();
+  }
+  ctx.strokeStyle = '#475569'; ctx.lineWidth = 2;
+  ctx.strokeRect(ox, oy, pw, ph);
+
+  // Labels
+  ctx.fillStyle = '#64748b'; ctx.font = '11px monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`W=${W}mm`, ox+pw/2, oy-8);
+  ctx.save(); ctx.translate(ox-10, oy+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(`H=${H}mm`, 0, 0); ctx.restore();
+
+  // Origin marker
+  const {tx:ox2, ty:oy2} = simTransform(0,0,W,H,cw,ch);
+  ctx.strokeStyle = 'rgba(239,68,68,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(ox2-8,oy2); ctx.lineTo(ox2+8,oy2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox2,oy2-8); ctx.lineTo(ox2,oy2+8); ctx.stroke();
+}
+
+// ── Draw all segments faded (overview before play) ─────────────────────────
+function simDrawStatic() {
+  const {ctx, cw, ch} = simCtx();
+  const {W, H, segments} = simState;
+  ctx.clearRect(0, 0, cw, ch);
+  simDrawPlate(ctx, cw, ch, W, H);
+  for (const seg of segments) {
+    if (seg.len < 0.5) continue;
+    ctx.beginPath(); ctx.moveTo(seg.ax,seg.ay); ctx.lineTo(seg.bx,seg.by);
+    if (seg.isRapid) { ctx.strokeStyle='rgba(148,163,184,0.2)'; ctx.setLineDash([3,3]); ctx.lineWidth=1; }
+    else             { ctx.strokeStyle=seg.color+'40';          ctx.setLineDash([]);    ctx.lineWidth=2; }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  // Tool at origin
+  const {tx, ty} = simTransform(0, 0, W, H, cw, ch);
+  _drawTool(ctx, tx, ty);
+}
+
+// ── Core draw: interpolate tool position along path ────────────────────────
+function simDrawFrame() {
+  const {ctx, cw, ch} = simCtx();
+  const {W, H, segments, currentDist} = simState;
+  ctx.clearRect(0, 0, cw, ch);
+  simDrawPlate(ctx, cw, ch, W, H);
+
+  let remaining = currentDist;
+  let toolX = segments[0]?.ax ?? 0;
+  let toolY = segments[0]?.ay ?? 0;
+  let currentColor = SIM_COLORS.RAPID;
+  let isCurrentRapid = true;
+
+  for (const seg of segments) {
+    if (seg.len < 0.5) { remaining -= seg.len; continue; }
+    const draw = remaining > 0;
+    const partial = draw && remaining < seg.len;
+
+    let ex = seg.bx, ey = seg.by;
+    if (partial) {
+      const t = remaining / seg.len;
+      ex = seg.ax + (seg.bx - seg.ax) * t;
+      ey = seg.ay + (seg.by - seg.ay) * t;
+    }
+
+    if (draw) {
+      ctx.beginPath(); ctx.moveTo(seg.ax, seg.ay); ctx.lineTo(ex, ey);
+      if (seg.isRapid) {
+        ctx.strokeStyle = 'rgba(148,163,184,0.45)'; ctx.setLineDash([5,4]); ctx.lineWidth = 1.5;
+      } else {
+        ctx.strokeStyle = seg.color; ctx.setLineDash([]); ctx.lineWidth = 2.5;
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+      toolX = ex; toolY = ey;
+      currentColor = seg.color; isCurrentRapid = seg.isRapid;
+      if (partial) break;
+    }
+    remaining -= seg.len;
+  }
+
+  _drawTool(ctx, toolX, toolY, isCurrentRapid ? '#94a3b8' : currentColor);
+}
+
+function _drawTool(ctx, x, y, color='#ef4444') {
+  // Glow
+  const grad = ctx.createRadialGradient(x,y,0,x,y,14);
+  grad.addColorStop(0, color+'55');
+  grad.addColorStop(1, 'transparent');
+  ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2);
+  ctx.fillStyle = grad; ctx.fill();
+  // Body
+  ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2);
+  ctx.fillStyle = color; ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth=1.5; ctx.stroke();
+  // Crosshair
+  ctx.strokeStyle = color+'99'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x-13,y); ctx.lineTo(x+13,y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x,y-13); ctx.lineTo(x,y+13); ctx.stroke();
+}
+
+// ── Speed → pixels/second on canvas ───────────────────────────────────────
+// speed 0: ~40px/s, speed 3: ~200px/s, speed 7: ~1000px/s, speed 10: ~4000px/s
+function _pxPerSec(speed) {
+  return 40 * Math.pow(10, speed * 0.2);
+}
+
+function updateSpeedLabel() {
+  const s = parseInt(document.getElementById('simSpeed').value) || 0;
+  const labels = ['🐢', '×¼', '×½', '×1', '×2', '×4', '×8', '×16', '×32', '×64', '⚡'];
+  const el = document.getElementById('simSpeedLabel');
+  if (el) el.textContent = labels[s] ?? s;
+}
+
+// ── Animation loop ─────────────────────────────────────────────────────────
+let _animRunning = false;
+let _lastRafTime = 0;
+
+function simPlay() {
+  if (_animRunning) { simPause(); return; }
+  if (simState.currentDist >= simState.totalLen) { simState.currentDist = 0; }
+  _animRunning = true;
+  _lastRafTime = 0;
+  document.getElementById('simPlayBtn').textContent = '⏸ Durdur';
+  updateSpeedLabel();
+  requestAnimationFrame(_animStep);
+}
+
+function simPause() {
+  _animRunning = false;
+  if (simState.animId) cancelAnimationFrame(simState.animId);
+  document.getElementById('simPlayBtn').textContent = '▶ Devam';
+}
+
+function simReset() {
+  simPause();
+  simState.currentDist = 0;
+  simDrawStatic();
+  document.getElementById('simPlayBtn').textContent = '▶ Oynat';
+  document.getElementById('simInfo').textContent = `${simState.segments.length} segment — ▶ başlatın`;
+}
+
+function _animStep(ts) {
+  if (!_animRunning) return;
+  if (_lastRafTime === 0) _lastRafTime = ts;
+  const dt = Math.min((ts - _lastRafTime) / 1000, 0.1); // cap at 100ms (tab switch protection)
+  _lastRafTime = ts;
+
+  const speed = parseInt(document.getElementById('simSpeed').value) ?? 3;
+  const pxPerSec = _pxPerSec(speed);
+
+  simState.currentDist = Math.min(
+    simState.currentDist + pxPerSec * dt,
+    simState.totalLen
+  );
+
+  simDrawFrame();
+
+  const pct = simState.totalLen > 0
+    ? Math.round(simState.currentDist / simState.totalLen * 100) : 100;
+  document.getElementById('simInfo').textContent = `%${pct} tamamlandı`;
+
+  if (simState.currentDist >= simState.totalLen) {
+    _animRunning = false;
+    document.getElementById('simPlayBtn').textContent = '↺ Tekrar';
+    return;
+  }
+  simState.animId = requestAnimationFrame(_animStep);
+}
+</script>
 
 const SIM_COLORS = {
   RAPID: '#94a3b8', LINE: '#3b82f6',
