@@ -269,7 +269,11 @@ def _nest(items, sheet_w, sheet_h, margin=5.0):
         if w > sheet_w - 2*margin or h > sheet_h - 2*margin:
             return None
         for row in sheets[si]:
-            if row['next_x'] + w + margin <= sheet_w and row['y'] + h <= sheet_h - margin:
+            row_empty = row['row_h'] == 0
+            fits_height = row_empty or h <= row['row_h']
+            if (row['next_x'] + w + margin <= sheet_w
+                    and row['y'] + h <= sheet_h - margin
+                    and fits_height):
                 pos = (row['next_x'], row['y'])
                 row['row_h'] = max(row['row_h'], h)
                 row['next_x'] += w + margin

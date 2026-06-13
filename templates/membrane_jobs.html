@@ -610,7 +610,7 @@ function _drawNest(sheetIdx) {
   const {sheet_w:sw, sheet_h:sh, placements} = _nestData;
   ctx.clearRect(0,0,cw,ch);
   _drawSheet(ctx,cw,ch,sw,sh,`Levha ${sheetIdx+1}/${_nestData.sheet_count} — ${(placements||[]).filter(p=>p.sheet===sheetIdx).length} parça`);
-  _drawPieces(ctx,cw,ch,sw,sh,(placements||[]).filter(p=>p.sheet===sheetIdx));
+  _drawPieces(ctx,cw,ch,sw,sh,(placements||[]).filter(p=>p.sheet===sheetIdx), 1);
 }
 
 // ── Simulation Engine (adapted from caps page, uses simCanvas) ─────────────
