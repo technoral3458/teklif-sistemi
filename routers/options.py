@@ -129,32 +129,26 @@ async def options_excel_template(request: Request):
     ws.row_dimensions[1].height = 32
 
     cols = [
-        ("Opsiyon Adı (TR) *",             "7C3AED", 30),
-        ("Opsiyon Adı (EN)",               "7C3AED", 30),
-        ("Opsiyon Adı (ZH)",               "7C3AED", 30),
-        ("Açıklama (TR)",                  "7C3AED", 35),
-        ("Açıklama (EN)",                  "7C3AED", 35),
-        ("Açıklama (ZH)",                  "7C3AED", 35),
-        ("Fiyat",                          "7C3AED", 12),
-        ("Para Birimi (USD/EUR/TRY)",       "7C3AED", 18),
-        ("Miktar Tipi\n(MANUAL/FIXED_1/PER_MACHINE)", "7C3AED", 22),
-        ("Kategori Adı\n(virgülle ayırın)", "7C3AED", 25),
-        ("Conflict Group",                 "7C3AED", 18),
-        ("Video URL",                      "7C3AED", 30),
+        ("Opsiyon Adı (TR) *", "7C3AED", 30),
+        ("Opsiyon Adı (EN)",   "7C3AED", 30),
+        ("Opsiyon Adı (ZH)",   "7C3AED", 30),
+        ("Açıklama (TR)",      "7C3AED", 40),
+        ("Açıklama (EN)",      "7C3AED", 40),
+        ("Açıklama (ZH)",      "7C3AED", 40),
     ]
     for col, (title, color, width) in enumerate(cols, 1):
         _hdr(ws, col, title, color, width)
 
     # Not satırı
-    note = ws.cell(row=2, column=1, value="⚠ Resimler Excel'e eklenemez — opsiyon kaydedildikten sonra düzenleme ekranından yüklenir.")
+    note = ws.cell(row=2, column=1, value="⚠ Resimler, fiyat ve diğer ayarlar opsiyon kaydedildikten sonra düzenleme ekranından girilir.")
     note.font = Font(italic=True, color="B45309")
-    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=12)
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=6)
 
     # Örnek satırlar
     examples = [
-        ("Otomatik Besleme",  "Automatic Feeder",   "", "Otomatik malzeme besleme sistemi",  "Automatic material feeding system", "", 1200.00, "USD", "MANUAL",      "Ek Donanım", "", ""),
-        ("Lazer İşaretleme",  "Laser Marking",      "", "Lazer ile ürün işaretleme modülü",  "Laser product marking module",      "", 2500.00, "USD", "FIXED_1",     "Ek Donanım", "", ""),
-        ("Ekstra Bıçak Seti", "Extra Blade Set",    "", "Yedek bıçak takımı (5 adet)",       "Spare blade set (5 pcs)",           "", 350.00,  "USD", "PER_MACHINE", "",           "", ""),
+        ("Otomatik Besleme",  "Automatic Feeder",  "", "Otomatik malzeme besleme sistemi", "Automatic material feeding system", ""),
+        ("Lazer İşaretleme",  "Laser Marking",     "", "Lazer ile ürün işaretleme modülü", "Laser product marking module",      ""),
+        ("Ekstra Bıçak Seti", "Extra Blade Set",   "", "Yedek bıçak takımı (5 adet)",      "Spare blade set (5 pcs)",           ""),
     ]
     for row_idx, row_data in enumerate(examples, 3):
         for col, v in enumerate(row_data, 1):
@@ -184,9 +178,6 @@ async def options_excel_import(request: Request, excel_file: UploadFile = File(.
     except Exception as e:
         return RedirectResponse(f"/options?msg=Dosya+okunamadı:+{e}&msg_type=error", 303)
 
-    cats = fdb.get_cats()
-    cat_map = {c["name"].strip().lower(): c["id"] for c in cats}
-
     def _sv(v):
         return str(v).strip() if v is not None else ""
 
@@ -201,42 +192,19 @@ async def options_excel_import(request: Request, excel_file: UploadFile = File(.
         if not name:
             continue
 
-        name_en      = _sv(row[1])
-        name_zh      = _sv(row[2])
-        description  = _sv(row[3])
-        desc_en      = _sv(row[4])
-        desc_zh      = _sv(row[5])
-
-        try:
-            price = float(row[6]) if row[6] is not None else 0.0
-        except Exception:
-            price = 0.0
-
-        currency     = _sv(row[7]) or "USD"
-        qty_type_raw = _sv(row[8]).upper()
-        qty_type     = qty_type_raw if qty_type_raw in ("MANUAL", "FIXED_1", "PER_MACHINE") else "MANUAL"
-        cat_names    = _sv(row[9])
-        conflict_grp = _sv(row[10])
-        video_url    = _sv(row[11])
-
-        # Resolve category IDs
-        cat_ids = []
-        for cn in cat_names.split(","):
-            cid = cat_map.get(cn.strip().lower())
-            if cid:
-                cat_ids.append(str(cid))
-        category_ids_str = ",".join(cat_ids)
+        name_en     = _sv(row[1])
+        name_zh     = _sv(row[2])
+        description = _sv(row[3])
+        desc_en     = _sv(row[4])
+        desc_zh     = _sv(row[5])
 
         try:
             fdb.add_option(
                 name=name, name_en=name_en, name_zh=name_zh,
                 description=description, description_en=desc_en, description_zh=desc_zh,
-                price=price, currency=currency, qty_type=qty_type,
-                category_ids=category_ids_str,
-                conflict_group=conflict_grp,
-                video_url=video_url,
-                scope="GLOBAL",
-                image_path="", variation_image_path="", image_priority=0,
+                price=0.0, currency="USD", qty_type="MANUAL",
+                category_ids="", conflict_group="", video_url="",
+                scope="GLOBAL", image_path="", variation_image_path="", image_priority=0,
             )
             added += 1
         except Exception as e:
