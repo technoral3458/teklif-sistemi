@@ -617,11 +617,22 @@ def get_offers(status=None, customer_id=None, dealer_id=None):
     return [_rof(r) for r in rows]
 
 
-def get_recent_offers(limit=10):
+def get_recent_offers(limit=10, dealer_id=None, manufacturer_id=None):
     with _c() as c:
-        rows = c.execute(
-            f"SELECT {_OFCOLS} FROM offers ORDER BY id DESC LIMIT ?", (limit,)
-        ).fetchall()
+        if manufacturer_id:
+            rows = c.execute(
+                f"SELECT {_OFCOLS} FROM offers WHERE manufacturer_id=? ORDER BY id DESC LIMIT ?",
+                (manufacturer_id, limit)
+            ).fetchall()
+        elif dealer_id:
+            rows = c.execute(
+                f"SELECT {_OFCOLS} FROM offers WHERE dealer_id=? ORDER BY id DESC LIMIT ?",
+                (dealer_id, limit)
+            ).fetchall()
+        else:
+            rows = c.execute(
+                f"SELECT {_OFCOLS} FROM offers ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
     return [_rof(r) for r in rows]
 
 
@@ -949,16 +960,44 @@ def all_mfr_user_balances():
 # ── Stats ─────────────────────────────────────────────────────────────────────
 
 
-def get_stats():
+def get_stats(dealer_id=None, manufacturer_id=None):
     with _c() as c:
-        customer_count = c.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
-        offer_count = c.execute("SELECT COUNT(*) FROM offers").fetchone()[0]
-        pending_offers = c.execute(
-            "SELECT COUNT(*) FROM offers WHERE status='Beklemede'"
-        ).fetchone()[0]
-        order_count = c.execute(
-            "SELECT COUNT(*) FROM offers WHERE status='Sipariş Verildi'"
-        ).fetchone()[0]
+        if manufacturer_id:
+            customer_count = c.execute(
+                "SELECT COUNT(DISTINCT customer_id) FROM offers WHERE manufacturer_id=?", (manufacturer_id,)
+            ).fetchone()[0]
+            offer_count = c.execute(
+                "SELECT COUNT(*) FROM offers WHERE manufacturer_id=? AND status NOT IN ('Beklemede')", (manufacturer_id,)
+            ).fetchone()[0]
+            pending_offers = c.execute(
+                "SELECT COUNT(*) FROM offers WHERE manufacturer_id=? AND admin_status='approved' AND (mfr_status IS NULL OR mfr_status='')",
+                (manufacturer_id,)
+            ).fetchone()[0]
+            order_count = c.execute(
+                "SELECT COUNT(*) FROM offers WHERE manufacturer_id=? AND mfr_status='in_production'", (manufacturer_id,)
+            ).fetchone()[0]
+        elif dealer_id:
+            customer_count = c.execute(
+                "SELECT COUNT(DISTINCT customer_id) FROM offers WHERE dealer_id=?", (dealer_id,)
+            ).fetchone()[0]
+            offer_count = c.execute(
+                "SELECT COUNT(*) FROM offers WHERE dealer_id=?", (dealer_id,)
+            ).fetchone()[0]
+            pending_offers = c.execute(
+                "SELECT COUNT(*) FROM offers WHERE dealer_id=? AND status='Beklemede'", (dealer_id,)
+            ).fetchone()[0]
+            order_count = c.execute(
+                "SELECT COUNT(*) FROM offers WHERE dealer_id=? AND status='Sipariş Verildi'", (dealer_id,)
+            ).fetchone()[0]
+        else:
+            customer_count = c.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
+            offer_count = c.execute("SELECT COUNT(*) FROM offers").fetchone()[0]
+            pending_offers = c.execute(
+                "SELECT COUNT(*) FROM offers WHERE status='Beklemede'"
+            ).fetchone()[0]
+            order_count = c.execute(
+                "SELECT COUNT(*) FROM offers WHERE status='Sipariş Verildi'"
+            ).fetchone()[0]
     return {
         "customer_count": customer_count,
         "offer_count": offer_count,

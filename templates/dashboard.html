@@ -3,6 +3,9 @@
 
 {% block content %}
 {% set T = _T(user.lang if user else 'tr') %}
+{% set is_mfr = user.role == 'manufacturer' %}
+{% set is_dealer = user.role == 'dealer' %}
+
 <div class="stats-grid">
   <div class="stat-card">
     <div class="stat-icon" style="background:rgba(59,130,246,.15);color:#3b82f6">
@@ -19,7 +22,7 @@
     </div>
     <div class="stat-info">
       <div class="stat-value">{{ stats.offer_count|default(0) }}</div>
-      <div class="stat-label">{{ T.dash_total_offers_count }}</div>
+      <div class="stat-label">{% if is_mfr %}{{ T.dash_my_orders }}{% else %}{{ T.dash_total_offers_count }}{% endif %}</div>
     </div>
   </div>
   <div class="stat-card">
@@ -28,7 +31,7 @@
     </div>
     <div class="stat-info">
       <div class="stat-value">{{ stats.pending_offers|default(0) }}</div>
-      <div class="stat-label">{{ T.dash_pending }}</div>
+      <div class="stat-label">{% if is_mfr %}{{ T.dash_awaiting_confirm }}{% else %}{{ T.dash_pending }}{% endif %}</div>
     </div>
   </div>
   <div class="stat-card">
@@ -37,11 +40,12 @@
     </div>
     <div class="stat-info">
       <div class="stat-value">{{ stats.order_count|default(0) }}</div>
-      <div class="stat-label">{{ T.dash_order }}</div>
+      <div class="stat-label">{% if is_mfr %}{{ T.dash_in_production }}{% else %}{{ T.dash_order }}{% endif %}</div>
     </div>
   </div>
 </div>
 
+{% if not is_mfr %}
 <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
   <a href="/offers/new" class="btn btn-primary">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -52,11 +56,19 @@
     {{ T.dash_new_customer }}
   </a>
 </div>
+{% else %}
+<div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+  <a href="/orders" class="btn btn-primary">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+    {{ T.dash_view_orders }}
+  </a>
+</div>
+{% endif %}
 
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">{{ T.dash_recent_offers }}</h3>
-    <a href="/offers" class="btn btn-ghost btn-sm">{{ T.dash_view_all }}</a>
+    <h3 class="card-title">{% if is_mfr %}{{ T.dash_recent_orders }}{% else %}{{ T.dash_recent_offers }}{% endif %}</h3>
+    <a href="{% if is_mfr %}/orders{% else %}/offers{% endif %}" class="btn btn-ghost btn-sm">{{ T.dash_view_all }}</a>
   </div>
   <div class="table-wrap">
     <table id="mainTable">
@@ -65,7 +77,7 @@
           <th>{{ T.dash_offer_no }}</th>
           <th>{{ T.offer_customer }}</th>
           <th>{{ T.dash_model }}</th>
-          <th>{{ T.dash_amount }}</th>
+          {% if not is_mfr %}<th>{{ T.dash_amount }}</th>{% endif %}
           <th>{{ T.offer_status }}</th>
           <th>{{ T.dash_date }}</th>
           <th></th>
@@ -77,16 +89,16 @@
           <td><code>{{ o.offer_no }}</code></td>
           <td>{{ o.customer_name }}</td>
           <td>{{ o.model_name }}</td>
-          <td>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</td>
+          {% if not is_mfr %}<td>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</td>{% endif %}
           <td>
             {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray'} %}
             <span class="badge badge-{{ sc.get(o.status, 'gray') }}">{{ o.status }}</span>
           </td>
           <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
-          <td><a href="/offers/{{ o.id }}" class="btn btn-ghost btn-sm">{{ T.dash_view }}</a></td>
+          <td><a href="{% if is_mfr %}/orders/{{ o.id }}{% else %}/offers/{{ o.id }}{% endif %}" class="btn btn-ghost btn-sm">{{ T.dash_view }}</a></td>
         </tr>
         {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.dash_no_offers }}</td></tr>
+        <tr><td colspan="{{ 6 if is_mfr else 7 }}" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.dash_no_offers }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
