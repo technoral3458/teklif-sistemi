@@ -1377,8 +1377,8 @@ def del_cap_job_item(item_id):
 
 # ── Cap Ops (structured path editor) ─────────────────────────────────────────
 
-_CO_KEYS = ["id","model_id","name","tool_no","depth","feed","ref_corner","seq"]
-_CM_KEYS = ["id","op_id","move_type","x","y","cx","cy","seq"]
+_COP_KEYS = ["id","model_id","name","tool_no","depth","feed","ref_corner","seq"]
+_CMV_KEYS = ["id","op_id","move_type","x","y","cx","cy","seq"]
 
 def get_cap_moves(op_id):
     with _c() as c:
@@ -1386,7 +1386,7 @@ def get_cap_moves(op_id):
             "SELECT id,op_id,move_type,x,y,cx,cy,seq FROM membrane_cap_moves WHERE op_id=? ORDER BY seq",
             (op_id,)
         ).fetchall()
-    return [dict(zip(_CM_KEYS, r)) for r in rows]
+    return [dict(zip(_CMV_KEYS, r)) for r in rows]
 
 def get_cap_ops(model_id):
     with _c() as c:
@@ -1394,7 +1394,7 @@ def get_cap_ops(model_id):
             "SELECT id,model_id,name,tool_no,depth,feed,ref_corner,seq FROM membrane_cap_ops WHERE model_id=? ORDER BY seq",
             (model_id,)
         ).fetchall()
-    ops = [dict(zip(_CO_KEYS, r)) for r in rows]
+    ops = [dict(zip(_COP_KEYS, r)) for r in rows]
     for op in ops:
         op['moves'] = get_cap_moves(op['id'])
     return ops
