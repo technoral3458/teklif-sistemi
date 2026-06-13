@@ -83,7 +83,9 @@
           </div>
           <div class="form-group">
             <label class="form-label">{{ T.model_specs }}</label>
-            <input type="hidden" name="specs" id="specsData" value="" />
+            <input type="hidden" name="specs"    id="specsData"    value="" />
+            <input type="hidden" name="specs_en" id="specsData_en" value="" />
+            <input type="hidden" name="specs_zh" id="specsData_zh" value="" />
             <div id="specsRows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
             <button type="button" class="btn btn-ghost btn-sm" onclick="addSpecRow()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -239,10 +241,12 @@ function calcTotalCost() {
 function _esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function _escQ(s) { return (s||'').replace(/"/g,'&quot;'); }
 
-function addSpecRow(title, desc, imgPath) {
+function addSpecRow(title, desc, imgPath, descEn, descZh) {
   title   = title   || '';
   desc    = desc    || '';
   imgPath = imgPath || '';
+  descEn  = descEn  || '';
+  descZh  = descZh  || '';
   const container = document.getElementById('specsRows');
   const row = document.createElement('div');
   row.className = 'spec-row';
@@ -263,9 +267,11 @@ function addSpecRow(title, desc, imgPath) {
       <input type="file" class="spec-img-input" accept="image/*" style="display:none;" onchange="uploadSpecImage(this)" />
       <input type="hidden" class="spec-img-path" value="${_escQ(imgPath)}" />
     </div>
-    <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;">
-      <input type="text" class="spec-title form-control" placeholder="Özellik başlığı" value="${_escQ(title)}" style="font-size:13px;" />
-      <textarea class="spec-desc form-control" rows="2" placeholder="Açıklama" style="font-size:13px;">${_esc(desc)}</textarea>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;">
+      <input type="text" class="spec-title form-control" placeholder="Özellik başlığı" value="${_escQ(title)}" style="font-size:13px;font-weight:600;" />
+      <textarea class="spec-desc    form-control" rows="1" placeholder="🇹🇷 Açıklama (TR)" style="font-size:12px;">${_esc(desc)}</textarea>
+      <textarea class="spec-desc-en form-control" rows="1" placeholder="🇬🇧 Description (EN)" style="font-size:12px;">${_esc(descEn)}</textarea>
+      <textarea class="spec-desc-zh form-control" rows="1" placeholder="🇨🇳 说明 (ZH)" style="font-size:12px;">${_esc(descZh)}</textarea>
     </div>
     <button type="button" onclick="removeSpecRow(this)" class="btn btn-danger btn-sm" style="flex-shrink:0;margin-top:2px;" title="Sil">✕</button>
   `;
@@ -305,38 +311,62 @@ function moveSpecRow(btn, dir) {
 }
 
 function serializeSpecs() {
-  const specs = [];
+  const specs = [], specsEn = [], specsZh = [];
   document.querySelectorAll('.spec-row').forEach(row => {
-    const title = row.querySelector('.spec-title').value.trim();
-    const desc  = row.querySelector('.spec-desc').value.trim();
-    const img   = row.querySelector('.spec-img-path').value;
+    const title  = row.querySelector('.spec-title').value.trim();
+    const desc   = row.querySelector('.spec-desc').value.trim();
+    const descEn = row.querySelector('.spec-desc-en').value.trim();
+    const descZh = row.querySelector('.spec-desc-zh').value.trim();
+    const img    = row.querySelector('.spec-img-path').value;
     specs.push({title, desc, img});
+    specsEn.push({title, desc: descEn, img});
+    specsZh.push({title, desc: descZh, img});
   });
-  document.getElementById('specsData').value = JSON.stringify(specs);
+  document.getElementById('specsData').value    = JSON.stringify(specs);
+  document.getElementById('specsData_en').value = JSON.stringify(specsEn);
+  document.getElementById('specsData_zh').value = JSON.stringify(specsZh);
 }
 
-function loadSpecs(raw) {
-  if (!raw || !raw.trim()) return;
+function _parseSpecsRaw(raw) {
+  if (!raw || !raw.trim()) return [];
   raw = raw.trim();
-  let specs = [];
-  if (raw.startsWith('[')) {
-    try { specs = JSON.parse(raw); } catch(e) {}
-  } else if (raw.startsWith('{')) {
+  if (raw.startsWith('[')) { try { return JSON.parse(raw); } catch(e) {} }
+  if (raw.startsWith('{')) {
     try {
       const obj = JSON.parse(raw);
-      specs = Object.entries(obj).map(([k,v]) => ({title:k, desc:String(v), img:''}));
+      return Object.entries(obj).map(([k,v]) => ({title:k, desc:String(v), img:''}));
     } catch(e) {}
-  } else if (raw.includes('|')) {
-    specs = raw.split('||').map(s => {
+  }
+  if (raw.includes('|')) {
+    return raw.split('||').map(s => {
       const p = s.trim().split('|').map(x => x.trim());
       return {title:p[0]||'', desc:p[1]||'', img:p[2]||''};
     }).filter(s => s.title || s.desc);
   }
-  specs.forEach(s => addSpecRow(s.title||'', s.desc||'', s.img||''));
+  return [];
+}
+
+function loadSpecs(rawTr, rawEn, rawZh) {
+  const specs   = _parseSpecsRaw(rawTr);
+  const specsEn = _parseSpecsRaw(rawEn);
+  const specsZh = _parseSpecsRaw(rawZh);
+  specs.forEach((s, i) => {
+    addSpecRow(
+      s.title || '',
+      s.desc  || '',
+      s.img   || '',
+      (specsEn[i] || {}).desc || '',
+      (specsZh[i] || {}).desc || ''
+    );
+  });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  loadSpecs({{ (model.specs or '')|tojson }});
+  loadSpecs(
+    {{ (model.specs    or '')|tojson }},
+    {{ (model.specs_en or '')|tojson }},
+    {{ (model.specs_zh or '')|tojson }}
+  );
   if (document.getElementById('isLineCb')?.checked) renderLineImageInputs();
 });
 
@@ -400,10 +430,23 @@ async function importFromExcel(input) {
     }
   }
 
-  // Teknik özellikler
+  // Teknik özellikler (TR + EN + ZH)
   if (data.specs && data.specs.length > 0) {
     document.getElementById('specsRows').innerHTML = '';
-    data.specs.forEach(s => addSpecRow(s.title || '', s.desc || '', s.img || ''));
+    data.specs.forEach((s, i) => {
+      const en = (data.specs_en || [])[i] || {};
+      const zh = (data.specs_zh || [])[i] || {};
+      addSpecRow(s.title || '', s.desc || '', '', en.desc || '', zh.desc || '');
+    });
+  }
+
+  // Uyumlu opsiyonlar
+  if (data.compatible_option_ids && data.compatible_option_ids.length > 0) {
+    document.querySelectorAll('[name="compatible_options"]').forEach(cb => cb.checked = false);
+    data.compatible_option_ids.forEach(id => {
+      const cb = document.querySelector(`[name="compatible_options"][value="${id}"]`);
+      if (cb) cb.checked = true;
+    });
   }
 
   // Başarı bildirimi

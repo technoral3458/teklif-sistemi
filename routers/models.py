@@ -249,69 +249,96 @@ async def excel_template_download(request: Request):
         return Response("openpyxl kurulu değil. pip install openpyxl", status_code=500, media_type="text/plain")
 
     wb = openpyxl.Workbook()
+    hdr_font  = Font(bold=True, color="FFFFFF")
+    hdr_align_c = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    def _hdr(ws, col, value, fill_color, width, wrap=True):
+        cell = ws.cell(row=1, column=col, value=value)
+        cell.font      = hdr_font
+        cell.fill      = PatternFill("solid", fgColor=fill_color)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=wrap)
+        col_letter = ws.cell(row=1, column=col).column_letter
+        ws.column_dimensions[col_letter].width = width
+        return cell
 
     # ── Sheet 1: Model temel bilgileri ────────────────────────────────────────
     ws1 = wb.active
     ws1.title = "Model Bilgileri"
+    ws1.row_dimensions[1].height = 36
 
-    hdr_font  = Font(bold=True, color="FFFFFF")
-    hdr_fill  = PatternFill("solid", fgColor="2563EB")
-    hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    headers1 = [
-        "Makine Adı (TR) *",
-        "Makine Adı (EN)",
-        "Makine Adı (ZH)",
-        "Açıklama (TR)",
-        "Açıklama (EN)",
-        "Açıklama (ZH)",
-        "Satış Fiyatı",
-        "Para Birimi\n(USD/EUR/TRY)",
-        "Kategori Adı",
+    info = [
+        ("Makine Adı (TR) *", "2563EB", 28),
+        ("Makine Adı (EN)",   "2563EB", 28),
+        ("Makine Adı (ZH)",   "2563EB", 28),
+        ("Açıklama (TR)",     "2563EB", 35),
+        ("Açıklama (EN)",     "2563EB", 35),
+        ("Açıklama (ZH)",     "2563EB", 35),
+        ("Satış Fiyatı",      "2563EB", 14),
+        ("Para Birimi\n(USD/EUR/TRY)", "2563EB", 16),
+        ("Kategori Adı",      "2563EB", 22),
     ]
-    col_widths1 = [28, 28, 28, 35, 35, 35, 14, 16, 20]
+    for col, (title, color, width) in enumerate(info, 1):
+        _hdr(ws1, col, title, color, width)
 
-    for col, (h, w) in enumerate(zip(headers1, col_widths1), 1):
-        cell = ws1.cell(row=1, column=col, value=h)
-        cell.font  = hdr_font
-        cell.fill  = hdr_fill
-        cell.alignment = hdr_align
-        ws1.column_dimensions[chr(64 + col)].width = w
+    # Not satırı
+    note_cell = ws1.cell(row=2, column=1, value="⚠ Resimler Excel'e eklenemez — formdaki resim alanından yüklenir.")
+    note_cell.font = Font(italic=True, color="B45309")
+    ws1.merge_cells(start_row=2, start_column=1, end_row=2, end_column=9)
 
-    # Örnek satır
-    example = ["Örnek Makine Model A", "Example Machine A", "", "Türkçe açıklama...", "", "", 15000.00, "USD", "Kategori Adı"]
+    # Örnek veri satırı
+    example = ["Örnek Makine A", "Example Machine A", "", "Türkçe açıklama...", "English description...", "", 15000.00, "USD", "Kategori Adı"]
     for col, v in enumerate(example, 1):
-        ws1.cell(row=2, column=col, value=v)
-
-    ws1.row_dimensions[1].height = 35
+        ws1.cell(row=3, column=col, value=v)
 
     # ── Sheet 2: Teknik özellikler ─────────────────────────────────────────────
     ws2 = wb.create_sheet("Teknik Özellikler")
-    hdr_fill2 = PatternFill("solid", fgColor="059669")
-
-    headers2 = ["Başlık", "Açıklama"]
-    col_widths2 = [30, 60]
-
-    for col, (h, w) in enumerate(zip(headers2, col_widths2), 1):
-        cell = ws2.cell(row=1, column=col, value=h)
-        cell.font  = hdr_font
-        cell.fill  = hdr_fill2
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        ws2.column_dimensions[chr(64 + col)].width = w
-
-    # Örnek satırlar
-    examples2 = [
-        ("Motor Gücü", "3.5 kW / 4.8 HP"),
-        ("Kesim Genişliği", "1600 mm"),
-        ("Tabla Boyutu", "1600 x 1250 mm"),
-        ("Max. Kesim Hızı", "60 m/min"),
-        ("Ağırlık", "850 kg"),
-    ]
-    for row_idx, (t, d) in enumerate(examples2, 2):
-        ws2.cell(row=row_idx, column=1, value=t)
-        ws2.cell(row=row_idx, column=2, value=d)
-
     ws2.row_dimensions[1].height = 28
+
+    spec_info = [
+        ("Başlık",          "059669", 30),
+        ("Açıklama (TR)",   "059669", 45),
+        ("Açıklama (EN)",   "059669", 45),
+        ("Açıklama (ZH)",   "059669", 45),
+    ]
+    for col, (title, color, width) in enumerate(spec_info, 1):
+        _hdr(ws2, col, title, color, width)
+
+    examples2 = [
+        ("Motor Gücü",      "3.5 kW / 4.8 HP",    "Motor Power: 3.5 kW / 4.8 HP", ""),
+        ("Kesim Genişliği", "1600 mm",             "Cutting Width: 1600 mm",        ""),
+        ("Tabla Boyutu",    "1600 x 1250 mm",      "Table Size: 1600 x 1250 mm",    ""),
+        ("Max. Kesim Hızı", "60 m/min",            "Max. Cutting Speed: 60 m/min",  ""),
+        ("Ağırlık",         "850 kg",              "Weight: 850 kg",                ""),
+    ]
+    for row_idx, row_data in enumerate(examples2, 2):
+        for col, v in enumerate(row_data, 1):
+            ws2.cell(row=row_idx, column=col, value=v)
+
+    # ── Sheet 3: Opsiyonlar ────────────────────────────────────────────────────
+    ws3 = wb.create_sheet("Opsiyonlar")
+    ws3.row_dimensions[1].height = 28
+
+    opt_info = [
+        ("ID",              "7C3AED", 8),
+        ("Opsiyon Adı",     "7C3AED", 35),
+        ("Fiyat",           "7C3AED", 12),
+        ("Para Birimi",     "7C3AED", 12),
+        ("Miktar Tipi",     "7C3AED", 16),
+        ("Uyumlu? (E/H)",   "7C3AED", 16),
+    ]
+    for col, (title, color, width) in enumerate(opt_info, 1):
+        _hdr(ws3, col, title, color, width)
+
+    # Sistemdeki tüm opsiyonları listele
+    options = fdb.get_options()
+    qty_labels = {"MANUAL": "Elle Giriş", "FIXED_1": "Sabit 1", "PER_MACHINE": "Makine Adeti"}
+    for row_idx, opt in enumerate(options, 2):
+        ws3.cell(row=row_idx, column=1, value=opt["id"])
+        ws3.cell(row=row_idx, column=2, value=opt.get("name", ""))
+        ws3.cell(row=row_idx, column=3, value=opt.get("price", 0))
+        ws3.cell(row=row_idx, column=4, value=opt.get("currency", ""))
+        ws3.cell(row=row_idx, column=5, value=qty_labels.get(opt.get("qty_type", "MANUAL"), opt.get("qty_type", "")))
+        ws3.cell(row=row_idx, column=6, value="H")  # default: uyumsuz
 
     buf = BytesIO()
     wb.save(buf)
@@ -339,13 +366,14 @@ async def excel_import(request: Request, excel_file: UploadFile = File(...)):
 
     result = {}
 
-    # ── Sheet 1 ───────────────────────────────────────────────────────────────
-    ws1_name = next((s for s in wb.sheetnames if "Model" in s or "Bilgi" in s), wb.sheetnames[0])
-    ws1 = wb[ws1_name]
+    # ── Sheet 1: Model bilgileri ──────────────────────────────────────────────
+    ws1 = wb[wb.sheetnames[0]]
+    # Row 2 = note/merge, row 3 = actual data
+    data_row_idx = 3 if ws1.max_row >= 3 else 2
     keys1 = ["name", "name_en", "name_zh", "description", "description_en", "description_zh",
              "base_price", "currency", "category_name"]
-    row2 = [cell.value for cell in ws1[2]]
-    for k, v in zip(keys1, row2):
+    row_vals = [cell.value for cell in ws1[data_row_idx]]
+    for k, v in zip(keys1, row_vals):
         if v is None:
             continue
         if k == "base_price":
@@ -354,17 +382,49 @@ async def excel_import(request: Request, excel_file: UploadFile = File(...)):
             except Exception:
                 result[k] = 0.0
         else:
-            result[k] = str(v).strip()
+            s = str(v).strip()
+            if s:
+                result[k] = s
 
-    # ── Sheet 2 ───────────────────────────────────────────────────────────────
-    specs = []
+    # ── Sheet 2: Teknik özellikler (Başlık | TR | EN | ZH) ────────────────────
+    def _sv(v):
+        return str(v).strip() if v is not None else ""
+
+    specs, specs_en, specs_zh = [], [], []
     if len(wb.sheetnames) > 1:
         ws2 = wb[wb.sheetnames[1]]
         for row in ws2.iter_rows(min_row=2, values_only=True):
-            title = str(row[0] or "").strip() if row[0] is not None else ""
-            desc  = str(row[1] or "").strip() if len(row) > 1 and row[1] is not None else ""
-            if title:
-                specs.append({"title": title, "desc": desc, "img": ""})
-    result["specs"] = specs
+            if not row or row[0] is None:
+                continue
+            title = _sv(row[0])
+            if not title:
+                continue
+            desc    = _sv(row[1]) if len(row) > 1 else ""
+            desc_en = _sv(row[2]) if len(row) > 2 else ""
+            desc_zh = _sv(row[3]) if len(row) > 3 else ""
+            specs.append(   {"title": title, "desc": desc,    "img": ""})
+            specs_en.append({"title": title, "desc": desc_en, "img": ""})
+            specs_zh.append({"title": title, "desc": desc_zh, "img": ""})
+
+    result["specs"]    = specs
+    result["specs_en"] = specs_en
+    result["specs_zh"] = specs_zh
+
+    # ── Sheet 3: Opsiyonlar ────────────────────────────────────────────────────
+    compatible_ids = []
+    if len(wb.sheetnames) > 2:
+        ws3 = wb[wb.sheetnames[2]]
+        for row in ws3.iter_rows(min_row=2, values_only=True):
+            if not row or row[0] is None:
+                continue
+            opt_id = row[0]
+            uyumlu = _sv(row[5]) if len(row) > 5 else "H"
+            if uyumlu.upper() in ("E", "EVET", "YES", "1", "TRUE"):
+                try:
+                    compatible_ids.append(int(opt_id))
+                except Exception:
+                    pass
+
+    result["compatible_option_ids"] = compatible_ids
 
     return JSONResponse(result)
