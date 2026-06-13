@@ -114,7 +114,7 @@
             {% if offer.termin_date %}<div style="font-size:12px;color:var(--text-muted);">Termin: <strong>{{ offer.termin_date }}</strong></div>{% endif %}
             {% if offer.mfr_notes %}<div style="font-size:12px;color:var(--text-muted);">Not: {{ offer.mfr_notes }}</div>{% endif %}
 
-            {% if user.role == 'manufacturer' and admin_done and not mfr_confirmed %}
+            {% if user.role == 'manufacturer' and admin_done and not mfr_confirmed and can_confirm %}
             <form method="post" action="/orders/{{ offer.id }}/confirm" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
               <input type="date" name="termin_date" class="form-control" style="max-width:160px;font-size:13px;" required />
               <input type="text" name="mfr_notes" class="form-control" placeholder="Not (opsiyonel)" style="max-width:200px;font-size:13px;" />
@@ -136,7 +136,7 @@
           </div>
           <div style="flex:1;">
             <div style="font-weight:600;font-size:13px;">Üretim — {{ MFR_STATUS_TR.get(offer.mfr_status or '', 'Bekleniyor') }}</div>
-            {% if (user.role == 'manufacturer' and offer.manufacturer_id == effective_mfr_id) or user.role == 'admin' %}
+            {% if ((user.role == 'manufacturer' and offer.manufacturer_id == effective_mfr_id and can_status) or user.role == 'admin') %}
             {% if mfr_confirmed %}
             <div style="margin-top:8px;">
               <form method="post" action="/orders/{{ offer.id }}/status" style="display:flex;gap:8px;">
@@ -161,10 +161,8 @@
   <div class="card">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
       <h3 class="card-title">Üretim Aşamaları</h3>
-      {% if (user.role == 'manufacturer') or user.role == 'admin' %}
-      {% if mfr_confirmed %}
+      {% if ((user.role == 'manufacturer' and can_stage) or user.role == 'admin') and mfr_confirmed %}
       <button class="btn btn-outline btn-sm" onclick="openModal('stageModal')">+ Aşama Ekle</button>
-      {% endif %}
       {% endif %}
     </div>
     <div class="card-body" style="padding:0;">

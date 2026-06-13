@@ -384,6 +384,12 @@ TRANSLATIONS = {
         'admin_parent_account': 'Bağlı Üretici (Alt Hesap)',
         'admin_no_parent': '— Bağımsız Hesap —',
         'admin_parent_hint': 'Bu kullanıcıyı bir üreticiye bağlarsan aynı siparişlere erişebilir.',
+        # Manufacturer action permissions
+        'admin_action_perms': 'Üretici İşlem Yetkileri',
+        'admin_action_hint': 'Alt hesap için boş bırakılırsa hiçbir işlem yapamaz (sadece görüntüler).',
+        'action_order_confirm': 'Sipariş Onayla + Termin Belirle',
+        'action_order_status': 'Üretim Durumu Güncelle',
+        'action_order_stage': 'Üretim Aşaması Ekle',
     },
     'en': {
         'nav_dashboard': 'Dashboard',
@@ -758,6 +764,12 @@ TRANSLATIONS = {
         'admin_parent_account': 'Linked Manufacturer (Sub-account)',
         'admin_no_parent': '— Independent Account —',
         'admin_parent_hint': 'Linking this user to a manufacturer lets them share order access.',
+        # Manufacturer action permissions
+        'admin_action_perms': 'Manufacturer Action Permissions',
+        'admin_action_hint': 'For sub-accounts, empty means view-only (no actions allowed).',
+        'action_order_confirm': 'Confirm Order + Set Deadline',
+        'action_order_status': 'Update Production Status',
+        'action_order_stage': 'Add Production Stage',
     },
     'zh': {
         'nav_dashboard': '仪表板',
@@ -1132,6 +1144,12 @@ TRANSLATIONS = {
         'admin_parent_account': '关联制造商（子账户）',
         'admin_no_parent': '— 独立账户 —',
         'admin_parent_hint': '将此用户关联到制造商，他们可以共享订单访问权限。',
+        # Manufacturer action permissions
+        'admin_action_perms': '制造商操作权限',
+        'admin_action_hint': '子账户为空时仅可查看，不可进行任何操作。',
+        'action_order_confirm': '确认订单 + 设定期限',
+        'action_order_status': '更新生产状态',
+        'action_order_stage': '添加生产阶段',
     },
 }
 

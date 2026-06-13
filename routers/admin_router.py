@@ -75,6 +75,7 @@ async def update_user(request: Request,
     form = await request.form()
     allowed_menus = ",".join(form.getlist("allowed_menus"))
     allowed_categories = ",".join(form.getlist("allowed_categories"))
+    allowed_actions = ",".join(form.getlist("allowed_actions"))
     udb.update_admin(uid,
         role=role,
         is_approved=is_approved,
@@ -83,6 +84,7 @@ async def update_user(request: Request,
         allowed_menus=allowed_menus,
         allowed_categories=allowed_categories,
         parent_id=parent_id if parent_id else None,
+        allowed_actions=allowed_actions,
     )
     return RedirectResponse("/admin?tab=users", 303)
 

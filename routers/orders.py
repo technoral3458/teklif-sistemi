@@ -1,4 +1,5 @@
 import datetime
+import threading
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse
 
@@ -9,6 +10,17 @@ from config import CURRENCIES, PAYMENT_METHODS
 
 router = APIRouter(prefix="/orders")
 from tmpl import templates
+
+
+def _notify(event_label: str, details: dict):
+    """Fire-and-forget admin email notification."""
+    def _send():
+        try:
+            from email_utils import send_admin_notification
+            send_admin_notification(event_label, details)
+        except Exception:
+            pass
+    threading.Thread(target=_send, daemon=True).start()
 
 
 def _enrich(orders):
@@ -34,7 +46,6 @@ async def orders_list(request: Request):
     role = user["role"]
     if role == "admin":
         orders = fdb.get_offers(status="Sipariş Verildi")
-        # also include Admin Onaylı, Üretimde, Tamamlandı, Teslim Edildi
         for s in ["Admin Onaylı", "Üretimde", "Tamamlandı", "Teslim Edildi"]:
             orders += fdb.get_offers(status=s)
     elif role == "manufacturer":
@@ -91,6 +102,9 @@ async def order_detail(request: Request, oid: int):
         "payment_methods": PAYMENT_METHODS,
         "active_page": "orders",
         "effective_mfr_id": mfr_id,
+        "can_confirm": udb.has_action(user, "order_confirm"),
+        "can_status":  udb.has_action(user, "order_status"),
+        "can_stage":   udb.has_action(user, "order_stage"),
     })
 
 
@@ -100,6 +114,12 @@ async def approve_order(request: Request, oid: int,
                         admin_notes: str = Form("")):
     auth.require_admin(request)
     fdb.approve_order(oid, manufacturer_id, admin_notes)
+    offer = fdb.get_offer(oid)
+    _notify("Admin Siparişi Onayladı", {
+        "Sipariş No": f"#{oid}",
+        "Müşteri": (offer or {}).get("customer_name", "-"),
+        "Notlar": admin_notes or "-",
+    })
     return RedirectResponse(f"/orders/{oid}", 303)
 
 
@@ -116,10 +136,18 @@ async def confirm_order(request: Request, oid: int,
                         termin_date: str = Form(""),
                         mfr_notes: str = Form("")):
     user = auth.require_user(request)
+    if not udb.has_action(user, "order_confirm"):
+        return RedirectResponse(f"/orders/{oid}", 303)
     offer = fdb.get_offer(oid)
     mfr_id = udb.effective_mfr_id(user)
     if offer and offer.get("manufacturer_id") == mfr_id:
         fdb.mfr_confirm_order(oid, termin_date, mfr_notes)
+        _notify("Üretici Siparişi Onayladı", {
+            "Sipariş No": f"#{oid}",
+            "Üretici": user.get("company_name", "-"),
+            "Termin": termin_date or "-",
+            "Not": mfr_notes or "-",
+        })
     return RedirectResponse(f"/orders/{oid}", 303)
 
 
@@ -127,10 +155,22 @@ async def confirm_order(request: Request, oid: int,
 async def update_status(request: Request, oid: int,
                         mfr_status: str = Form(...)):
     user = auth.require_user(request)
+    if not udb.has_action(user, "order_status") and user["role"] != "admin":
+        return RedirectResponse(f"/orders/{oid}", 303)
     offer = fdb.get_offer(oid)
     mfr_id = udb.effective_mfr_id(user)
     if offer and (offer.get("manufacturer_id") == mfr_id or user["role"] == "admin"):
         fdb.update_mfr_status(oid, mfr_status)
+        status_labels = {
+            "in_production": "Üretimde",
+            "completed": "Tamamlandı",
+            "delivered": "Teslim Edildi",
+        }
+        _notify("Sipariş Durumu Güncellendi", {
+            "Sipariş No": f"#{oid}",
+            "Üretici": user.get("company_name", "-"),
+            "Yeni Durum": status_labels.get(mfr_status, mfr_status),
+        })
     return RedirectResponse(f"/orders/{oid}", 303)
 
 
@@ -140,12 +180,21 @@ async def add_stage(request: Request, oid: int,
                     notes: str = Form(""),
                     stage_date: str = Form("")):
     user = auth.require_user(request)
+    if not udb.has_action(user, "order_stage") and user["role"] != "admin":
+        return RedirectResponse(f"/orders/{oid}", 303)
     offer = fdb.get_offer(oid)
     mfr_id = udb.effective_mfr_id(user)
     if offer and (offer.get("manufacturer_id") == mfr_id or user["role"] == "admin"):
         if not stage_date:
             stage_date = datetime.date.today().isoformat()
         fdb.add_order_stage(oid, stage_name, notes, stage_date)
+        _notify("Üretim Aşaması Eklendi", {
+            "Sipariş No": f"#{oid}",
+            "Üretici": user.get("company_name", "-"),
+            "Aşama": stage_name,
+            "Tarih": stage_date,
+            "Not": notes or "-",
+        })
     return RedirectResponse(f"/orders/{oid}", 303)
 
 

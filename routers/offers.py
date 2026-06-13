@@ -412,8 +412,23 @@ async def offer_pdf(request: Request, offer_id: int, dl: int = 0):
 async def update_status(request: Request,
                         offer_id: int,
                         status: str = Form(...)):
-    auth.require_user(request)
+    user = auth.require_user(request)
     fdb.upd_offer_status(offer_id, status)
+    if status == "Sipariş Verildi":
+        import threading
+        offer = fdb.get_offer(offer_id)
+        def _send():
+            try:
+                from email_utils import send_admin_notification
+                send_admin_notification("Yeni Sipariş Verildi", {
+                    "Teklif No": f"#{offer_id}",
+                    "Bayi": user.get("company_name", "-"),
+                    "Müşteri": (offer or {}).get("customer_name", "-"),
+                    "Model": (offer or {}).get("model_name", "-"),
+                })
+            except Exception:
+                pass
+        threading.Thread(target=_send, daemon=True).start()
     return RedirectResponse(f"/offers/{offer_id}", 303)
 
 
