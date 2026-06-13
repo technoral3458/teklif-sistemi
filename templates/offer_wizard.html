@@ -109,7 +109,7 @@
              data-is-line="{{ m.is_line or 0 }}"
              data-line-configs="{{ m.line_configs or '2,3,4' }}"
              data-line-images='{{ m.line_images_map|tojson }}'
-             onclick="wizardSelectModel({{ m.id }}, {{ (m.get('name_'+user.lang) or m.name if user.lang != 'tr' else m.name)|tojson }}, {{ m.base_price|default(0) }}, {{ m.currency|tojson }})"
+             onclick='wizardSelectModel({{ m.id }}, {{ (m.get("name_"+user.lang) or m.name if user.lang != "tr" else m.name)|tojson }}, {{ m.base_price|default(0) }}, {{ m.currency|tojson }})'
              style="cursor:pointer;display:flex;flex-direction:column;border-radius:12px;border:2px solid var(--border);overflow:hidden;transition:border-color .15s,box-shadow .15s;background:var(--surface);">
           <div style="position:relative;height:150px;background:var(--surface-2);flex-shrink:0;">
             {% if m.image_path %}
