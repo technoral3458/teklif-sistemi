@@ -14,6 +14,22 @@
 </head>
 <body>
 
+  <!-- Impersonation banner -->
+  {% set _imp = _get_impersonator(request) %}
+  {% if _imp %}
+  <div id="impersonateBanner" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#f59e0b;color:#1a1a1a;padding:7px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.3);">
+    <span>👁️ Kullanıcı görünümü: <strong>{{ user.company_name if user else '?' }}</strong> — {{ user.role if user else '' }}</span>
+    <form method="post" action="/admin/impersonate/exit" style="margin:0;">
+      <button type="submit" style="background:#1a1a1a;color:#f59e0b;border:none;padding:4px 14px;border-radius:5px;cursor:pointer;font-weight:700;font-size:12px;white-space:nowrap;">← Admin'e Dön</button>
+    </form>
+  </div>
+  <style>
+    .sidebar  { top: 34px !important; }
+    .topbar   { top: 34px !important; }
+    .main-content { margin-top: calc(var(--topbar-h) + 34px) !important; }
+  </style>
+  {% endif %}
+
   <!-- Mobile overlay -->
   <div class="overlay"></div>
 

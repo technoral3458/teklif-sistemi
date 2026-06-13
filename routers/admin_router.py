@@ -89,6 +89,30 @@ async def update_user(request: Request,
     return RedirectResponse("/admin?tab=users", 303)
 
 
+@router.post("/impersonate/exit")
+async def exit_impersonation(request: Request):
+    admin_token = request.cookies.get("admin_session")
+    if not admin_token:
+        return RedirectResponse("/", 303)
+    resp = RedirectResponse("/admin?tab=users", 303)
+    resp.set_cookie("session", admin_token, max_age=86400 * 30, httponly=True, samesite="lax")
+    resp.delete_cookie("admin_session")
+    return resp
+
+
+@router.post("/impersonate/{uid}")
+async def impersonate_user(request: Request, uid: int):
+    auth.require_admin(request)
+    target = udb.by_id(uid)
+    if not target or target["role"] == "admin":
+        return RedirectResponse("/admin?tab=users", 303)
+    current_token = request.cookies.get("session")
+    resp = RedirectResponse("/", 303)
+    resp.set_cookie("admin_session", current_token, max_age=3600, httponly=True, samesite="lax")
+    resp.set_cookie("session", auth.make_session(uid), max_age=3600, httponly=True, samesite="lax")
+    return resp
+
+
 @router.get("/backup/download")
 async def backup_download(request: Request):
     auth.require_admin(request)

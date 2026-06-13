@@ -37,3 +37,15 @@ def require_admin(request: Request):
     if u["role"] != "admin":
         raise HTTPException(status_code=403, detail="Yetkisiz erişim")
     return u
+
+def get_impersonator(request: Request):
+    """Returns the admin user if currently impersonating someone, else None."""
+    token = request.cookies.get("admin_session")
+    if not token:
+        return None
+    uid = read_session(token)
+    if not uid:
+        return None
+    u = udb.by_id(uid)
+    return u if (u and u["role"] == "admin") else None
+

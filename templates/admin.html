@@ -127,6 +127,9 @@
                   '{{ u.allowed_actions or '' }}')">
                 ✏️ {{ T.btn_edit }}
               </button>
+              <form method="post" action="/admin/impersonate/{{ u.id }}" style="margin:0;">
+                <button type="submit" class="btn btn-ghost btn-sm" title="Bu kullanıcı olarak görüntüle">👁️</button>
+              </form>
               <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)" style="margin:0;">
                 <input type="hidden" name="id" value="{{ u.id }}" />
                 <button class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
