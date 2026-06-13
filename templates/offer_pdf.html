@@ -116,7 +116,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
   </div>
   {% endif %}
 
-  <div class="cover-model">MODEL: {{ model.name if model else '' }}</div>
+  <div class="cover-model">MODEL: {{ ((model.get('name_'+lang) or model.name) if lang != 'tr' else model.name) if model else '' }}</div>
 
   <table class="info-tbl">
     <tr><td>Sayın Yetkili:</td><td><strong>{{ customer.name if customer else '-' }}</strong></td></tr>

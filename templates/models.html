@@ -3,6 +3,8 @@
 
 {% block content %}
 {% set T = _T(user.lang if user else 'tr') %}
+{% set _lang = user.lang if user else 'tr' %}
+{% macro mname(m) %}{{ (m.get('name_'+_lang) or m.name) if _lang != 'tr' else m.name }}{% endmacro %}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
   <form method="get" style="display:flex;gap:8px;align-items:center;">
     <select name="category_id" class="form-control" style="max-width:200px;" onchange="this.form.submit()">
@@ -37,21 +39,21 @@
         <tr>
           <td>
             {% if m.image_path %}
-            <img src="/static/{{ m.image_path }}" alt="{{ m.name }}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;" />
+            <img src="/static/{{ m.image_path }}" alt="{{ mname(m) }}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;" />
             {% else %}
             <div style="width:48px;height:48px;background:var(--surface-2);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
             </div>
             {% endif %}
           </td>
-          <td><strong>{{ m.name }}</strong></td>
+          <td><strong>{{ mname(m) }}</strong></td>
           <td>{{ m.category_name or '-' }}</td>
           <td>{{ "%.2f"|format(m.base_price|default(0)|float) }}</td>
           <td>{{ m.currency or 'USD' }}</td>
           <td>
             <div style="display:flex;gap:6px;">
               <a href="/models/{{ m.id }}/edit" class="btn btn-ghost btn-sm">{{ T.btn_edit }}</a>
-              <form method="post" action="/models/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ m.name }}' modelini silmek istiyor musunuz?">
+              <form method="post" action="/models/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ mname(m) }}' modelini silmek istiyor musunuz?">
                 <input type="hidden" name="id" value="{{ m.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
               </form>

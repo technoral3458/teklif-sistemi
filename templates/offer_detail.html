@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% set T = _T(user.lang if user else 'tr') %}
+{% set _lang = user.lang if user else 'tr' %}
+{% macro mname(obj) %}{{ (obj.get('name_'+_lang) or obj.name) if _lang != 'tr' else obj.name }}{% endmacro %}
 {% block page_title %}{{ T.offer_no }} {{ offer.offer_no }}{% endblock %}
 
 {% block content %}
@@ -33,7 +35,7 @@
           </div>
           <div>
             <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">{{ T.offer_model | upper }}</div>
-            <div style="font-weight:600;">{{ model.name if model else '-' }}</div>
+            <div style="font-weight:600;">{{ mname(model) if model else '-' }}</div>
             <div style="font-size:13px;color:var(--text-muted);">{{ T.offer_count }}: {{ offer.machine_count }}</div>
             <div style="font-size:13px;color:var(--text-muted);">{{ T.offer_currency }}: {{ offer.currency }}</div>
             {% if offer.validity_date %}<div style="font-size:13px;color:var(--text-muted);">{{ T.offer_validity }}: {{ offer.validity_date }}</div>{% endif %}
@@ -56,7 +58,7 @@
                 <div style="width:44px;height:44px;background:var(--surface-2);border-radius:6px;border:1px dashed var(--border);"></div>
                 {% endif %}
               </td>
-              <td><strong>{{ model.name if model else 'Model' }}</strong></td>
+              <td><strong>{{ mname(model) if model else 'Model' }}</strong></td>
               <td style="text-align:center">{{ offer.machine_count }}</td>
               <td style="text-align:right">{{ "%.2f"|format(offer.base_price|default(0)|float) }} {{ offer.currency }}</td>
               <td style="text-align:right">{{ "%.2f"|format((offer.base_price|default(0)|float) * (offer.machine_count|default(1)|int)) }} {{ offer.currency }}</td>

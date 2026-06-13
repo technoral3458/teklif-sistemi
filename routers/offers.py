@@ -29,6 +29,37 @@ def _filter_specs(specs, items, opts):
     return [s for s in specs if s.get("title", "").lower().strip() not in hidden]
 
 
+def _resolve_opt_fields(item, opt, lang):
+    """Set language-aware fields on an offer item from its option."""
+    item["option_name"] = (opt.get(f"name_{lang}") or opt.get("name", "-")) if lang != "tr" else opt.get("name", "-")
+    item["description"] = (opt.get(f"description_{lang}") or opt.get("description", "")) if lang != "tr" else (opt.get("description", "") or "")
+    item["image_path"]  = opt.get("image_path", "") or ""
+    item["video_url"]   = opt.get("video_url", "") or ""
+
+
+def _parse_specs(model, lang):
+    """Return parsed specs list for the given language."""
+    if not model:
+        return []
+    if lang != "tr":
+        raw = (model.get(f"specs_{lang}", "") or model.get("specs", "")) or ""
+    else:
+        raw = (model.get("specs", "") or "")
+    raw = raw.strip()
+    if raw.startswith("["):
+        try:
+            return json.loads(raw)
+        except Exception:
+            pass
+    elif raw.startswith("{"):
+        try:
+            obj = json.loads(raw)
+            return [{"title": k, "desc": str(v), "img": ""} for k, v in obj.items()]
+        except Exception:
+            pass
+    return []
+
+
 @router.get("")
 async def offers_list(request: Request, status: str = "", q: str = ""):
     user = auth.require_user(request)
@@ -268,10 +299,7 @@ async def offer_detail(request: Request, offer_id: int):
     lang = user.get("lang", "tr")
     for item in items:
         opt = opts.get(item.get("option_id"), {})
-        item["option_name"] = (opt.get(f"name_{lang}") or opt.get("name", "-")) if lang != "tr" else opt.get("name", "-")
-        item["image_path"]  = opt.get("image_path", "") or ""
-        item["description"] = opt.get("description", "") or ""
-        item["video_url"]   = opt.get("video_url", "") or ""
+        _resolve_opt_fields(item, opt, lang)
         var_img = opt.get("variation_image_path", "")
         prio = opt.get("image_priority") or 0
         if var_img and prio > best_prio:
@@ -303,38 +331,23 @@ async def offer_print(request: Request, offer_id: int):
     lang = user.get("lang", "tr")
     for item in items:
         opt = opts.get(item.get("option_id"), {})
-        item["option_name"] = (opt.get(f"name_{lang}") or opt.get("name", "-")) if lang != "tr" else opt.get("name", "-")
-        item["description"] = opt.get("description", "") or ""
-        item["image_path"] = opt.get("image_path", "") or ""
-        item["video_url"]  = opt.get("video_url", "") or ""
+        _resolve_opt_fields(item, opt, lang)
         var_img = opt.get("variation_image_path", "")
         prio = opt.get("image_priority") or 0
         if var_img and prio > best_prio:
             display_image, best_prio = var_img, prio
 
-    specs = []
-    raw = (model.get("specs", "") or "") if model else ""
-    if raw.strip().startswith("["):
-        try:
-            specs = json.loads(raw)
-        except Exception:
-            pass
-    elif raw.strip().startswith("{"):
-        try:
-            obj = json.loads(raw)
-            specs = [{"title": k, "desc": str(v), "img": ""} for k, v in obj.items()]
-        except Exception:
-            pass
-
-    specs = _filter_specs(specs, items, opts)
+    specs = _filter_specs(_parse_specs(model, lang), items, opts)
 
     return templates.TemplateResponse(request, "offer_print.html", {
+        "user": user,
         "offer": offer,
         "customer": customer or {},
         "model": model or {},
         "items": items,
         "specs": specs,
         "display_image": display_image,
+        "lang": lang,
     })
 
 
@@ -367,30 +380,13 @@ async def offer_pdf(request: Request, offer_id: int, dl: int = 0):
     lang = user.get("lang", "tr")
     for item in items:
         opt = opts.get(item.get("option_id"), {})
-        item["option_name"] = (opt.get(f"name_{lang}") or opt.get("name", "-")) if lang != "tr" else opt.get("name", "-")
-        item["description"] = opt.get("description", "") or ""
-        item["image_path"] = opt.get("image_path", "") or ""
-        item["video_url"]  = opt.get("video_url", "") or ""
+        _resolve_opt_fields(item, opt, lang)
         var_img = opt.get("variation_image_path", "")
         prio = opt.get("image_priority") or 0
         if var_img and prio > best_prio:
             display_image, best_prio = var_img, prio
 
-    specs = []
-    raw = (model.get("specs", "") or "") if model else ""
-    if raw.strip().startswith("["):
-        try:
-            specs = json.loads(raw)
-        except Exception:
-            pass
-    elif raw.strip().startswith("{"):
-        try:
-            obj = json.loads(raw)
-            specs = [{"title": k, "desc": str(v), "img": ""} for k, v in obj.items()]
-        except Exception:
-            pass
-
-    specs = _filter_specs(specs, items, opts)
+    specs = _filter_specs(_parse_specs(model, lang), items, opts)
 
     company = fdb.get_company() or {}
     html_str = templates.get_template("offer_pdf.html").render(
@@ -400,6 +396,7 @@ async def offer_pdf(request: Request, offer_id: int, dl: int = 0):
         items=items,
         specs=specs,
         display_image=display_image,
+        lang=lang,
         admin_logo=company.get("logo_path", "") or "",
         admin_company=company.get("company_name", "") or "",
     )
