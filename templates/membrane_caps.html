@@ -215,7 +215,8 @@
             <button class="btn btn-ghost btn-sm" onclick="simReset()">↺ Sıfırla</button>
             <div style="flex:1;display:flex;align-items:center;gap:6px;">
               <span style="font-size:11px;color:var(--text-muted);">Hız:</span>
-              <input type="range" id="simSpeed" min="1" max="10" value="5" style="flex:1;" />
+              <input type="range" id="simSpeed" min="0" max="10" value="3" style="flex:1;" oninput="updateSpeedLabel()" />
+              <span id="simSpeedLabel" style="font-size:11px;color:var(--text-muted);min-width:28px;">x1</span>
             </div>
             <div id="simInfo" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">—</div>
           </div>
@@ -855,8 +856,10 @@ function simPlay() {
   if (_animRunning) { simPause(); return; }
   if (simState.wpIdx >= simState.waypoints.length - 1) simReset();
   _animRunning = true;
+  _lastStepTime = 0;
   document.getElementById('simPlayBtn').textContent = '⏸ Durdur';
-  _animStep();
+  updateSpeedLabel();
+  requestAnimationFrame(_animStep);
 }
 
 function simPause() {
@@ -874,32 +877,49 @@ function simReset() {
   document.getElementById('simInfo').textContent = `${simState.waypoints.length} hareket noktası`;
 }
 
-let _lastTime = 0;
+let _lastStepTime = 0;
+
+// ms to wait between each waypoint advance
+// speed 0 → 1500ms, speed 1 → 750ms, speed 3 → 188ms, speed 5 → 47ms, speed 10 → 1.5ms
+function _msPerStep(speed) {
+  return Math.max(1, Math.pow(10, 3.17 - speed * 0.3));
+}
+
+function updateSpeedLabel() {
+  const s = parseInt(document.getElementById('simSpeed').value) || 0;
+  const labels = ['⏸', '×¼', '×½', '×1', '×2', '×4', '×8', '×16', '×32', '×64', '×MAX'];
+  const el = document.getElementById('simSpeedLabel');
+  if (el) el.textContent = labels[s] || s;
+}
+
 function _animStep(ts = 0) {
   if (!_animRunning) return;
-  const speed = parseInt(document.getElementById('simSpeed').value) || 5;
-  const dt = ts - _lastTime;
-  // Steps per frame based on speed (1=slow, 10=fast)
-  const stepsPerFrame = Math.max(1, Math.floor(speed * speed / 5));
-  _lastTime = ts;
-
+  const speed = parseInt(document.getElementById('simSpeed').value) || 0;
+  const delay = _msPerStep(speed);
   const {waypoints, W, H} = simState;
   const {cw, ch} = simCtx();
 
-  for (let s = 0; s < stepsPerFrame && simState.wpIdx < waypoints.length - 1; s++) {
-    const i = simState.wpIdx;
-    const from = waypoints[i], to = waypoints[i+1];
-    const {tx:ax, ty:ay} = simTransform(from.x, from.y, W, H, cw, ch);
-    const {tx:bx, ty:by} = simTransform(to.x, to.y, W, H, cw, ch);
-    simState.drawn.push({ ax, ay, bx, by, color: to.color, isRapid: to.type === 'RAPID' });
-    simState.wpIdx++;
+  const elapsed = ts - _lastStepTime;
+  // Only advance if enough time has passed for the current speed
+  if (elapsed >= delay) {
+    // At very high speeds, process multiple waypoints per frame to stay smooth
+    const stepsToAdvance = delay < 5 ? Math.max(1, Math.floor(elapsed / delay)) : 1;
+    for (let s = 0; s < stepsToAdvance && simState.wpIdx < waypoints.length - 1; s++) {
+      const i = simState.wpIdx;
+      const from = waypoints[i], to = waypoints[i + 1];
+      const {tx:ax, ty:ay} = simTransform(from.x, from.y, W, H, cw, ch);
+      const {tx:bx, ty:by} = simTransform(to.x, to.y, W, H, cw, ch);
+      simState.drawn.push({ ax, ay, bx, by, color: to.color, isRapid: to.type === 'RAPID' });
+      simState.wpIdx++;
+    }
+    _lastStepTime = ts;
   }
 
   simDrawFrame();
 
-  const pct = Math.round(simState.wpIdx / (waypoints.length-1) * 100);
-  document.getElementById('simInfo').textContent =
-    `${simState.wpIdx}/${waypoints.length-1} nokta (%${pct})`;
+  const total = waypoints.length - 1;
+  const pct = total > 0 ? Math.round(simState.wpIdx / total * 100) : 100;
+  document.getElementById('simInfo').textContent = `${simState.wpIdx}/${total} nokta (%${pct})`;
 
   if (simState.wpIdx >= waypoints.length - 1) {
     _animRunning = false;
