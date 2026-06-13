@@ -200,7 +200,7 @@ def _nest(items, sheet_w, sheet_h, margin=5.0):
     return placements, n_sheets, util
 
 
-def _eval_paths(model, paths, variables):
+def _eval_paths(model, paths, variables, x_off=0.0, y_off=0.0):
     """Return evaluated path coordinates for frontend simulation."""
     ev = lambda expr: _eval_expr(expr, variables)
     safe_z = float(model.get("safe_z") or 5.0)
@@ -210,22 +210,22 @@ def _eval_paths(model, paths, variables):
             ep = {
                 "label": p.get("label") or "",
                 "type": p.get("path_type", "LINE"),
-                "x1": round(ev(p["x1"]), 4),
-                "y1": round(ev(p["y1"]), 4),
-                "x2": round(ev(p["x2"]), 4),
-                "y2": round(ev(p["y2"]), 4),
+                "x1": round(ev(p["x1"]) + x_off, 4),
+                "y1": round(ev(p["y1"]) + y_off, 4),
+                "x2": round(ev(p["x2"]) + x_off, 4),
+                "y2": round(ev(p["y2"]) + y_off, 4),
                 "z2": round(ev(p["z2"]), 4),
             }
             if ep["type"] in ("ARC_CW", "ARC_CCW"):
-                ep["cx"] = round(ev(p.get("ix") or "0"), 4)
-                ep["cy"] = round(ev(p.get("jy") or "0"), 4)
+                ep["cx"] = round(ev(p.get("ix") or "0") + x_off, 4)
+                ep["cy"] = round(ev(p.get("jy") or "0") + y_off, 4)
             if ep["type"] == "POCKET":
                 ep["tool_dia"] = float(p.get("tool_dia") or 8.0)
                 ep["step_over"] = float(p.get("step_over") or 0.5)
             result.append(ep)
         except Exception as exc:
             result.append({"type": "ERROR", "label": str(exc),
-                           "x1": 0, "y1": 0, "x2": 0, "y2": 0, "z2": 0})
+                           "x1": x_off, "y1": y_off, "x2": x_off, "y2": y_off, "z2": 0})
     return {"paths": result, "safe_z": safe_z}
 
 router = APIRouter(prefix="/membrane")
@@ -800,6 +800,59 @@ async def job_nest(request: Request, jid: int,
         return JSONResponse({"error": "İş listesinde kalem yok"}, status_code=400)
     placements, n_sheets, util = _nest(items, sheet_w, sheet_h, margin)
     return JSONResponse({
+        "placements": placements,
+        "sheet_count": n_sheets,
+        "util_pct": util,
+        "sheet_w": sheet_w,
+        "sheet_h": sheet_h,
+        "total_pieces": len(placements),
+    })
+
+
+@router.post("/jobs/{jid}/nest_nc")
+async def job_nest_nc(request: Request, jid: int,
+                      sheet_w: float = Form(2800), sheet_h: float = Form(1100),
+                      margin: float = Form(5), T: float = Form(18)):
+    """Generate NC code + simulation data for all nested pieces."""
+    auth.require_user(request)
+    job = fdb.get_cap_job(jid)
+    if not job:
+        return JSONResponse({"error": "İş listesi bulunamadı"}, status_code=404)
+    items = fdb.get_cap_job_items(jid)
+    if not items:
+        return JSONResponse({"error": "İş listesinde kalem yok"}, status_code=400)
+
+    placements, n_sheets, util = _nest(items, sheet_w, sheet_h, margin)
+    nc_parts, sim_paths = [], []
+    safe_z = 5.0
+    prog_no = 1
+
+    for pl in placements:
+        mid = pl.get('model_id')
+        if not mid:
+            continue
+        model = fdb.get_cap_model(mid)
+        if not model:
+            continue
+        safe_z = float(model.get("safe_z") or 5.0)
+        paths = fdb.get_cap_paths(mid)
+        W, H = pl['cap_w'], pl['cap_h']
+        variables = {"W": W, "H": H, "T": T}
+        variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
+        if pl.get('rotated'):
+            variables["W"], variables["H"] = H, W
+        x_off, y_off = pl['x'], pl['y']
+        nc_parts.append(_generate_nc(model, paths, variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
+        evp = _eval_paths(model, paths, variables, x_off=x_off, y_off=y_off)
+        for p in evp['paths']:
+            p['sheet'] = pl['sheet']
+            p['piece_color'] = pl['color']
+        sim_paths.extend(evp['paths'])
+        prog_no += 1
+
+    return JSONResponse({
+        "nc": "\n\n".join(nc_parts),
+        "sim": {"paths": sim_paths, "safe_z": safe_z},
         "placements": placements,
         "sheet_count": n_sheets,
         "util_pct": util,

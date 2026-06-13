@@ -25,43 +25,38 @@
   {# Left: job info + item list #}
   <div style="display:flex;flex-direction:column;gap:16px;min-width:0;">
 
-    {# Job header card #}
     <div class="card">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
         <h3 class="card-title" style="margin:0;">📋 {{ edit_job.name }}</h3>
         <button class="btn btn-outline btn-sm" onclick="openModal('editJobModal')">✏️ Düzenle</button>
       </div>
       <div class="card-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">
-        {% for label, val in [
-          ('Levha En', (edit_job.sheet_w|int) ~ ' mm'),
-          ('Levha Boy', (edit_job.sheet_h|int) ~ ' mm'),
-          ('Boşluk', (edit_job.margin|int) ~ ' mm'),
-        ] %}
+        {% for lbl, val in [('Levha En', (edit_job.sheet_w|int)~' mm'),
+                             ('Levha Boy', (edit_job.sheet_h|int)~' mm'),
+                             ('Boşluk', (edit_job.margin|int)~' mm')] %}
         <div style="padding:7px 10px;background:var(--surface-2);border-radius:6px;">
-          <div style="color:var(--text-muted);font-size:10px;">{{ label }}</div>
+          <div style="color:var(--text-muted);font-size:10px;">{{ lbl }}</div>
           <div style="font-weight:700;margin-top:2px;">{{ val }}</div>
         </div>
         {% endfor %}
       </div>
-      {% if edit_job.notes %}
-      <div style="padding:4px 16px 12px;font-size:12px;color:var(--text-muted);">{{ edit_job.notes }}</div>
-      {% endif %}
+      {% if edit_job.notes %}<div style="padding:4px 16px 12px;font-size:12px;color:var(--text-muted);">{{ edit_job.notes }}</div>{% endif %}
     </div>
 
-    {# Items table #}
     <div class="card">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 class="card-title" style="margin:0;">🗂️ Kalemler <span style="font-size:12px;color:var(--text-muted);font-weight:400;">({{ items|length }} satır)</span></h3>
+        <h3 class="card-title" style="margin:0;">🗂️ Kalemler
+          <span style="font-size:12px;color:var(--text-muted);font-weight:400;">({{ items|length }} satır)</span>
+        </h3>
         <button class="btn btn-primary btn-sm" onclick="openModal('addItemModal')">+ Kalem Ekle</button>
       </div>
       {% if items %}
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>#</th>
-            <th>Model</th>
-            <th style="text-align:right">En (W)</th>
-            <th style="text-align:right">Boy (H)</th>
+            <th>#</th><th>Model</th>
+            <th style="text-align:right">En W</th>
+            <th style="text-align:right">Boy H</th>
             <th style="text-align:center">Adet</th>
             <th>Not</th>
             <th style="text-align:center">İşlem</th>
@@ -70,16 +65,13 @@
             {% for it in items %}
             <tr>
               <td style="color:var(--text-muted)">{{ loop.index }}</td>
-              <td>
-                {% if it.model_name %}<strong>{{ it.model_name }}</strong>{% else %}<span style="color:var(--text-muted)">—</span>{% endif %}
-              </td>
+              <td>{% if it.model_name %}<strong>{{ it.model_name }}</strong>{% else %}<span style="color:var(--text-muted)">—</span>{% endif %}</td>
               <td style="text-align:right;font-family:monospace;">{{ it.cap_w|int }}</td>
               <td style="text-align:right;font-family:monospace;">{{ it.cap_h|int }}</td>
               <td style="text-align:center;font-weight:700;color:var(--accent);">{{ it.qty }}</td>
               <td style="font-size:12px;color:var(--text-muted);">{{ it.notes or '—' }}</td>
               <td style="text-align:center;">
-                <button class="btn btn-ghost btn-sm"
-                  onclick='editItem({{ it|tojson }})'>✏️</button>
+                <button class="btn btn-ghost btn-sm" onclick='editItem({{ it|tojson }})'>✏️</button>
                 <form method="post" action="/membrane/jobs/{{ edit_job.id }}/item/delete"
                       onsubmit="return confirm('Kalemi sil?')" style="display:inline;">
                   <input type="hidden" name="item_id" value="{{ it.id }}" />
@@ -89,7 +81,7 @@
             </tr>
             {% endfor %}
             <tr style="background:var(--surface-2);">
-              <td colspan="4" style="text-align:right;font-weight:600;font-size:12px;">TOPLAM ADET:</td>
+              <td colspan="4" style="text-align:right;font-weight:600;font-size:12px;">TOPLAM:</td>
               <td style="text-align:center;font-weight:800;color:var(--accent);">{{ items|sum(attribute='qty') }}</td>
               <td colspan="2"></td>
             </tr>
@@ -104,72 +96,134 @@
       {% endif %}
     </div>
 
-    {# Delete job #}
     <form method="post" action="/membrane/jobs/delete"
-          onsubmit="return confirm('Bu iş listesini sil?')"
-          style="text-align:right;">
+          onsubmit="return confirm('Bu iş listesini sil?')" style="text-align:right;">
       <input type="hidden" name="id" value="{{ edit_job.id }}" />
       <button type="submit" class="btn btn-danger btn-sm">🗑 İş Listesini Sil</button>
     </form>
-
   </div>
 
-  {# Right: Nesting panel #}
+  {# Right: Nesting + NC + Simulation #}
   <div>
     <div class="card" style="position:sticky;top:16px;">
-      <div class="card-header"><h3 class="card-title" style="margin:0;">🧩 Levha Yerleşimi (Nesting)</h3></div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div class="card-header"><h3 class="card-title" style="margin:0;">🧩 Yerleşim · NC · Simülasyon</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
 
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        {# Step 1: parameters #}
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;">
           <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">Levha Eni (mm)</label>
+            <label class="form-label" style="font-size:10px;">Levha En</label>
             <input type="number" id="nestW" class="form-control" value="{{ edit_job.sheet_w|int }}" step="1" />
           </div>
           <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">Levha Boyu (mm)</label>
+            <label class="form-label" style="font-size:10px;">Levha Boy</label>
             <input type="number" id="nestH" class="form-control" value="{{ edit_job.sheet_h|int }}" step="1" />
           </div>
           <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">Boşluk (mm)</label>
+            <label class="form-label" style="font-size:10px;">Boşluk mm</label>
             <input type="number" id="nestMargin" class="form-control" value="{{ edit_job.margin|int }}" step="1" min="0" />
           </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">Malzeme Kalınlığı T (mm)</label>
+            <label class="form-label" style="font-size:10px;">Kalınlık T</label>
             <input type="number" id="nestT" class="form-control" value="18" step="0.5" />
           </div>
-          <div style="display:flex;align-items:flex-end;">
-            <button class="btn btn-primary" style="width:100%;" onclick="runNest()">▶ Yerleştir</button>
-          </div>
         </div>
 
+        {# Step buttons #}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="runNest()" style="flex:1;">
+            <span>▶</span> <span>Yerleştir</span>
+          </button>
+          <button id="btnGenNC" class="btn btn-outline btn-sm" onclick="genNC()" disabled style="flex:1;">
+            <span>🔧</span> <span>NC Üret</span>
+          </button>
+          <button id="btnDlNC" class="btn btn-ghost btn-sm" onclick="downloadNC()" disabled style="flex:1;">
+            <span>⬇</span> <span>NC İndir</span>
+          </button>
+        </div>
+
+        {# Status line #}
         <div id="nestStatus" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;background:var(--surface-2);"></div>
 
-        {# Sheet selector #}
-        <div id="sheetNav" style="display:none;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-          <span style="font-size:12px;color:var(--text-muted);">Levha:</span>
-          <div id="sheetBtns" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
-          <button class="btn btn-outline btn-sm" onclick="downloadNC()">⬇ NC İndir</button>
-        </div>
-
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-          <canvas id="nestCanvas" width="480" height="340"
-            style="width:100%;display:block;background:#0f172a;"></canvas>
-        </div>
-
-        <div id="nestStats" style="display:none;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">
-          <div style="padding:8px;background:var(--surface-2);border-radius:6px;text-align:center;">
-            <div style="color:var(--text-muted);font-size:10px;">LEVHA SAYISI</div>
-            <div id="statSheets" style="font-size:20px;font-weight:800;color:var(--accent);">—</div>
+        {# Stats #}
+        <div id="nestStats" style="display:none;grid-template-columns:repeat(3,1fr);gap:6px;">
+          <div style="padding:6px;background:var(--surface-2);border-radius:6px;text-align:center;">
+            <div style="color:var(--text-muted);font-size:10px;">LEVHA</div>
+            <div id="statSheets" style="font-size:18px;font-weight:800;color:var(--accent);">—</div>
           </div>
-          <div style="padding:8px;background:var(--surface-2);border-radius:6px;text-align:center;">
-            <div style="color:var(--text-muted);font-size:10px;">PARÇA SAYISI</div>
-            <div id="statPieces" style="font-size:20px;font-weight:800;color:var(--accent);">—</div>
+          <div style="padding:6px;background:var(--surface-2);border-radius:6px;text-align:center;">
+            <div style="color:var(--text-muted);font-size:10px;">PARÇA</div>
+            <div id="statPieces" style="font-size:18px;font-weight:800;color:var(--accent);">—</div>
           </div>
-          <div style="padding:8px;background:var(--surface-2);border-radius:6px;text-align:center;">
+          <div style="padding:6px;background:var(--surface-2);border-radius:6px;text-align:center;">
             <div style="color:var(--text-muted);font-size:10px;">VERİM</div>
-            <div id="statUtil" style="font-size:20px;font-weight:800;color:var(--accent);">—</div>
+            <div id="statUtil" style="font-size:18px;font-weight:800;color:var(--accent);">—</div>
+          </div>
+        </div>
+
+        {# Tab bar #}
+        <div style="display:flex;border-bottom:1px solid var(--border);">
+          <button id="tabLayout" onclick="switchTab('layout')"
+            style="padding:5px 12px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);">
+            📐 Yerleşim
+          </button>
+          <button id="tabGcode" onclick="switchTab('gcode')"
+            style="padding:5px 12px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);">
+            G-Code
+          </button>
+          <button id="tabSim" onclick="switchTab('sim')"
+            style="padding:5px 12px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);">
+            🎬 Simülasyon
+          </button>
+        </div>
+
+        {# Layout panel #}
+        <div id="panelLayout">
+          <div id="sheetNav" style="display:none;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:4px;">
+            <span style="font-size:11px;color:var(--text-muted);">Levha:</span>
+            <div id="sheetBtns" style="display:flex;gap:3px;flex-wrap:wrap;"></div>
+          </div>
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <canvas id="nestCanvas" width="480" height="300" style="width:100%;display:block;background:#0f172a;"></canvas>
+          </div>
+        </div>
+
+        {# G-Code panel #}
+        <div id="panelGcode" style="display:none;position:relative;">
+          <textarea id="ncOutput" readonly
+            style="width:100%;height:320px;font-family:monospace;font-size:10px;line-height:1.4;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text-primary);resize:vertical;box-sizing:border-box;"
+            placeholder="1. Yerleştir → 2. NC Üret adımlarını izleyin."></textarea>
+          <button onclick="copyNC()"
+            style="position:absolute;top:8px;right:8px;padding:3px 9px;font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-muted);">
+            📋 Kopyala
+          </button>
+        </div>
+
+        {# Simulation panel #}
+        <div id="panelSim" style="display:none;">
+          <div id="sheetNavSim" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:4px;">
+            <span style="font-size:11px;color:var(--text-muted);">Levha:</span>
+            <div id="sheetBtnsSim" style="display:flex;gap:3px;flex-wrap:wrap;"></div>
+          </div>
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <canvas id="simCanvas" width="480" height="300" style="width:100%;display:block;background:#0f172a;"></canvas>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+            <button id="simPlayBtn" class="btn btn-primary btn-sm" onclick="simPlay()" disabled>▶ Oynat</button>
+            <button class="btn btn-ghost btn-sm" onclick="simReset()">↺ Sıfırla</button>
+            <div style="flex:1;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:11px;color:var(--text-muted);">Hız:</span>
+              <input type="range" id="simSpeed" min="0" max="10" value="3" style="flex:1;" oninput="updateSpeedLabel()" />
+              <span id="simSpeedLabel" style="font-size:11px;color:var(--text-muted);min-width:28px;">×1</span>
+            </div>
+            <div id="simInfo" style="font-size:11px;color:var(--text-muted);">—</div>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;flex-wrap:wrap;">
+            <span style="color:#94a3b8;">⋯ Hızlı hareket</span>
+            <span style="color:#3b82f6;">━ Düz kesim</span>
+            <span style="color:#a855f7;">━ Yay kesim</span>
+            <span style="color:#22c55e;">━ Cep kesim</span>
+            <span style="color:#ef4444;">● Takım</span>
           </div>
         </div>
 
@@ -189,21 +243,17 @@
     <form method="post" action="/membrane/jobs/save">
       <input type="hidden" name="id" value="{{ edit_job.id }}" />
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-        <div class="form-group" style="margin:0;">
-          <label class="form-label">İş Listesi Adı *</label>
-          <input type="text" name="name" class="form-control" required value="{{ edit_job.name }}" />
-        </div>
-        <div class="form-group" style="margin:0;">
-          <label class="form-label">Notlar</label>
-          <input type="text" name="notes" class="form-control" value="{{ edit_job.notes }}" />
-        </div>
+        <div class="form-group" style="margin:0;"><label class="form-label">İş Listesi Adı *</label>
+          <input type="text" name="name" class="form-control" required value="{{ edit_job.name }}" /></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">Notlar</label>
+          <input type="text" name="notes" class="form-control" value="{{ edit_job.notes }}" /></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
           <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Levha Eni</label>
             <input type="number" name="sheet_w" class="form-control" value="{{ edit_job.sheet_w|int }}" /></div>
           <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Levha Boyu</label>
             <input type="number" name="sheet_h" class="form-control" value="{{ edit_job.sheet_h|int }}" /></div>
           <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Boşluk mm</label>
-            <input type="number" name="margin" class="form-control" value="{{ edit_job.margin|int }}" step="1" min="0" /></div>
+            <input type="number" name="margin" class="form-control" value="{{ edit_job.margin|int }}" min="0" /></div>
         </div>
       </div>
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
@@ -221,10 +271,9 @@
       <h3 class="modal-title" id="itemModalTitle">Kalem Ekle</h3>
       <button class="modal-close" onclick="closeModal('addItemModal')">&times;</button>
     </div>
-    <form method="post" action="/membrane/jobs/{{ edit_job.id }}/item/save" id="itemForm">
+    <form method="post" action="/membrane/jobs/{{ edit_job.id }}/item/save">
       <input type="hidden" name="id" id="item_id" value="0" />
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-
         <div class="form-group" style="margin:0;">
           <label class="form-label">Kapak Modeli</label>
           <select name="model_id" id="item_model" class="form-control" onchange="onModelChange()">
@@ -234,36 +283,21 @@
             {% endfor %}
           </select>
         </div>
-
         <div class="form-group" style="margin:0;">
           <label class="form-label">Model Adı <span style="color:var(--text-muted);font-size:11px;">(model seçilmezse yazın)</span></label>
           <input type="text" name="model_name" id="item_model_name" class="form-control"
                  placeholder="örn: Standart Membran, Özel Model A..." />
         </div>
-
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-          <div class="form-group" style="margin:0;">
-            <label class="form-label">En — W (mm) *</label>
-            <input type="number" name="cap_w" id="item_w" class="form-control"
-                   step="1" min="1" required placeholder="örn: 400" />
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label class="form-label">Boy — H (mm) *</label>
-            <input type="number" name="cap_h" id="item_h" class="form-control"
-                   step="1" min="1" required placeholder="örn: 600" />
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label class="form-label">Adet *</label>
-            <input type="number" name="qty" id="item_qty" class="form-control"
-                   step="1" min="1" value="1" required />
-          </div>
+          <div class="form-group" style="margin:0;"><label class="form-label">En — W (mm) *</label>
+            <input type="number" name="cap_w" id="item_w" class="form-control" step="1" min="1" required placeholder="400" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Boy — H (mm) *</label>
+            <input type="number" name="cap_h" id="item_h" class="form-control" step="1" min="1" required placeholder="600" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Adet *</label>
+            <input type="number" name="qty" id="item_qty" class="form-control" step="1" min="1" value="1" required /></div>
         </div>
-
-        <div class="form-group" style="margin:0;">
-          <label class="form-label">Not</label>
-          <input type="text" name="notes" id="item_notes" class="form-control"
-                 placeholder="örn: Renk: STN Mercan" />
-        </div>
+        <div class="form-group" style="margin:0;"><label class="form-label">Not</label>
+          <input type="text" name="notes" id="item_notes" class="form-control" placeholder="örn: Renk: STN Mercan" /></div>
       </div>
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
         <button type="button" class="btn btn-ghost" onclick="closeModal('addItemModal')">İptal</button>
@@ -280,16 +314,14 @@
     {% if jobs %}
     <div class="table-wrap">
       <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr>
-            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">İş Listesi Adı</th>
-            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">Levha</th>
-            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);text-align:center;">Kalem</th>
-            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);text-align:center;">Top. Adet</th>
-            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">Tarih</th>
-            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">İşlem</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">İş Listesi Adı</th>
+          <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">Levha</th>
+          <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);text-align:center;">Kalem</th>
+          <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);text-align:center;">Top. Adet</th>
+          <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">Tarih</th>
+          <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">İşlem</th>
+        </tr></thead>
         <tbody>
           {% for job in jobs %}
           <tr style="border-top:1px solid var(--border);">
@@ -337,15 +369,11 @@
     <form method="post" action="/membrane/jobs/save">
       <input type="hidden" name="id" value="0" />
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-        <div class="form-group" style="margin:0;">
-          <label class="form-label">İş Listesi Adı *</label>
+        <div class="form-group" style="margin:0;"><label class="form-label">İş Listesi Adı *</label>
           <input type="text" name="name" class="form-control" required autofocus
-                 placeholder="örn: Ahmet Bey Mutfak, Proje A..." />
-        </div>
-        <div class="form-group" style="margin:0;">
-          <label class="form-label">Notlar</label>
-          <input type="text" name="notes" class="form-control" placeholder="Opsiyonel" />
-        </div>
+                 placeholder="örn: Ahmet Bey Mutfak, Proje A..." /></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">Notlar</label>
+          <input type="text" name="notes" class="form-control" placeholder="Opsiyonel" /></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
           <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Levha Eni (mm)</label>
             <input type="number" name="sheet_w" class="form-control" value="2800" /></div>
@@ -367,152 +395,404 @@
 
 {% block scripts %}
 <script>
-const JOB_ID = {{ edit_job.id if edit_job else 0 }};
-const MODELS = {{ models|tojson }};
+const JOB_ID  = {{ edit_job.id if edit_job else 0 }};
+const MODELS  = {{ models|tojson }};
 
-// ── Model select auto-fill ─────────────────────────────────────────────────
+// ── Model auto-fill ────────────────────────────────────────────────────────
 function onModelChange() {
-  const sel = document.getElementById('item_model');
-  const nameEl = document.getElementById('item_model_name');
-  const mid = parseInt(sel.value) || 0;
+  const mid = parseInt(document.getElementById('item_model')?.value) || 0;
   if (mid) {
     const m = MODELS.find(x => x.id === mid);
-    if (m && nameEl) nameEl.value = m.name;
+    const el = document.getElementById('item_model_name');
+    if (m && el) el.value = m.name;
   }
 }
 
 function editItem(it) {
   document.getElementById('itemModalTitle').textContent = 'Kalem Düzenle';
-  document.getElementById('item_id').value = it.id;
-  document.getElementById('item_model').value = it.model_id || 0;
+  document.getElementById('item_id').value         = it.id;
+  document.getElementById('item_model').value      = it.model_id || 0;
   document.getElementById('item_model_name').value = it.model_name || '';
-  document.getElementById('item_w').value = it.cap_w;
-  document.getElementById('item_h').value = it.cap_h;
-  document.getElementById('item_qty').value = it.qty;
-  document.getElementById('item_notes').value = it.notes || '';
+  document.getElementById('item_w').value          = it.cap_w;
+  document.getElementById('item_h').value          = it.cap_h;
+  document.getElementById('item_qty').value        = it.qty;
+  document.getElementById('item_notes').value      = it.notes || '';
   openModal('addItemModal');
+}
+
+// ── Tab switcher ───────────────────────────────────────────────────────────
+let _activeTab = 'layout';
+function switchTab(t) {
+  _activeTab = t;
+  const tabs = {layout:'panelLayout', gcode:'panelGcode', sim:'panelSim'};
+  const ids  = {layout:'tabLayout',  gcode:'tabGcode',  sim:'tabSim'};
+  for (const [key, panelId] of Object.entries(tabs)) {
+    document.getElementById(panelId).style.display = key === t ? '' : 'none';
+    const btn = document.getElementById(ids[key]);
+    btn.style.borderBottomColor = key === t ? 'var(--accent)' : 'transparent';
+    btn.style.color = key === t ? 'var(--accent)' : 'var(--text-muted)';
+  }
+  if (t === 'sim' && _nestData) {
+    _drawNest(_curSheet);          // static preview on sim canvas if NC not ready
+    if (_ncData) _nestSimBuild(_simSheet);
+  }
 }
 
 // ── Nesting ────────────────────────────────────────────────────────────────
 let _nestData = null;
+let _ncData   = null;
 let _curSheet = 0;
+let _simSheet = 0;
+
+function _getParams() {
+  return {
+    sheet_w: parseFloat(document.getElementById('nestW')?.value)      || 2800,
+    sheet_h: parseFloat(document.getElementById('nestH')?.value)      || 1100,
+    margin:  parseFloat(document.getElementById('nestMargin')?.value)  || 5,
+    T:       parseFloat(document.getElementById('nestT')?.value)       || 18,
+  };
+}
 
 async function runNest() {
   if (!JOB_ID) return;
-  const sheet_w = parseFloat(document.getElementById('nestW').value) || 2800;
-  const sheet_h = parseFloat(document.getElementById('nestH').value) || 1100;
-  const margin  = parseFloat(document.getElementById('nestMargin').value) || 5;
-  const statusEl = document.getElementById('nestStatus');
-  statusEl.style.display = 'block';
-  statusEl.style.color = 'var(--text-muted)';
-  statusEl.textContent = '⏳ Yerleştiriliyor...';
-
+  const {sheet_w, sheet_h, margin} = _getParams();
+  _setStatus('⏳ Yerleştiriliyor...', 'muted');
   try {
     const fd = new FormData();
     fd.append('sheet_w', sheet_w); fd.append('sheet_h', sheet_h); fd.append('margin', margin);
-    const res = await fetch('/membrane/jobs/' + JOB_ID + '/nest', {method:'POST', body:fd});
+    const res  = await fetch('/membrane/jobs/' + JOB_ID + '/nest', {method:'POST', body:fd});
+    const data = await res.json();
+    if (data.error) { _setStatus('⚠️ ' + data.error, 'danger'); return; }
+    _nestData = data; _curSheet = 0; _ncData = null;
+    _setStatus(`✅ ${data.total_pieces} parça → ${data.sheet_count} levha  |  Verim %${data.util_pct}`, 'success');
+    _showStats(data.sheet_count, data.total_pieces, data.util_pct);
+    _buildSheetBtns('sheetBtns', data.sheet_count, i => { _curSheet = i; _drawNest(i); });
+    document.getElementById('sheetNav').style.display = 'flex';
+    document.getElementById('btnGenNC').disabled = false;
+    document.getElementById('btnDlNC').disabled  = true;
+    _drawNest(0);
+    switchTab('layout');
+  } catch(e) { _setStatus('⚠️ ' + e.message, 'danger'); }
+}
+
+async function genNC() {
+  if (!JOB_ID) return;
+  const {sheet_w, sheet_h, margin, T} = _getParams();
+  _setStatus('⏳ NC kodu oluşturuluyor...', 'muted');
+  document.getElementById('btnGenNC').disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('sheet_w', sheet_w); fd.append('sheet_h', sheet_h);
+    fd.append('margin', margin); fd.append('T', T);
+    const res  = await fetch('/membrane/jobs/' + JOB_ID + '/nest_nc', {method:'POST', body:fd});
     const data = await res.json();
     if (data.error) {
-      statusEl.style.color = 'var(--danger)';
-      statusEl.textContent = '⚠️ ' + data.error; return;
+      _setStatus('⚠️ ' + data.error, 'danger');
+      document.getElementById('btnGenNC').disabled = false;
+      return;
     }
+    _ncData = data;
+    // Update nest data with NC placements
     _nestData = data;
-    _curSheet = 0;
-    statusEl.style.color = 'var(--success, #22c55e)';
-    statusEl.textContent = `✅ ${data.total_pieces} parça → ${data.sheet_count} levha — Verim: %${data.util_pct}`;
-    document.getElementById('statSheets').textContent = data.sheet_count;
-    document.getElementById('statPieces').textContent = data.total_pieces;
-    document.getElementById('statUtil').textContent = '%' + data.util_pct;
-    document.getElementById('nestStats').style.display = 'grid';
-    _buildSheetBtns(data.sheet_count);
-    document.getElementById('sheetNav').style.display = 'flex';
-    _drawNest(0);
+    document.getElementById('ncOutput').value = data.nc;
+    const lines = data.nc.split('\n').length;
+    _setStatus(`✅ ${lines} satır G-code  |  ${data.sheet_count} levha  |  Verim %${data.util_pct}`, 'success');
+    _showStats(data.sheet_count, data.total_pieces, data.util_pct);
+    document.getElementById('btnGenNC').disabled = false;
+    document.getElementById('btnDlNC').disabled  = false;
+    document.getElementById('simPlayBtn').disabled = false;
+    _buildSheetBtns('sheetBtnsSim', data.sheet_count, i => {
+      _simSheet = i; simReset(); _nestSimBuild(i);
+    });
+    document.getElementById('sheetNavSim').style.display = 'flex';
+    _nestSimBuild(0);
+    switchTab('gcode');
   } catch(e) {
-    statusEl.style.color = 'var(--danger)';
-    statusEl.textContent = '⚠️ Hata: ' + e.message;
+    _setStatus('⚠️ ' + e.message, 'danger');
+    document.getElementById('btnGenNC').disabled = false;
   }
 }
 
-function _buildSheetBtns(n) {
-  const el = document.getElementById('sheetBtns');
+function downloadNC() {
+  if (!JOB_ID) return;
+  const {sheet_w, sheet_h, margin, T} = _getParams();
+  window.location.href = `/membrane/jobs/${JOB_ID}/nc?sheet_w=${sheet_w}&sheet_h=${sheet_h}&margin=${margin}&T=${T}`;
+}
+
+function copyNC() {
+  const val = document.getElementById('ncOutput')?.value;
+  if (val) navigator.clipboard.writeText(val).then(() => {
+    if (typeof showToast === 'function') showToast('Kopyalandı', 'success');
+  });
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function _setStatus(msg, type) {
+  const el = document.getElementById('nestStatus');
+  el.style.display = 'block';
+  el.style.color = type === 'danger' ? 'var(--danger)' : type === 'success' ? 'var(--success,#22c55e)' : 'var(--text-muted)';
+  el.textContent = msg;
+}
+function _showStats(sheets, pieces, util) {
+  document.getElementById('nestStats').style.display = 'grid';
+  document.getElementById('statSheets').textContent = sheets;
+  document.getElementById('statPieces').textContent = pieces;
+  document.getElementById('statUtil').textContent   = '%' + util;
+}
+function _buildSheetBtns(containerId, n, onClick) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
   el.innerHTML = '';
   for (let i = 0; i < n; i++) {
     const b = document.createElement('button');
     b.className = 'btn btn-sm ' + (i === 0 ? 'btn-primary' : 'btn-ghost');
+    b.style.padding = '2px 8px'; b.style.fontSize = '11px';
     b.textContent = 'L' + (i+1);
-    b.onclick = () => { _curSheet = i; _drawNest(i);
+    const idx = i;
+    b.onclick = () => {
       el.querySelectorAll('button').forEach((x,j) => {
-        x.className = 'btn btn-sm ' + (j===i ? 'btn-primary' : 'btn-ghost');
-      }); };
+        x.className = 'btn btn-sm ' + (j===idx ? 'btn-primary':'btn-ghost');
+        x.style.padding='2px 8px'; x.style.fontSize='11px';
+      });
+      onClick(idx);
+    };
     el.appendChild(b);
   }
+}
+
+// ── Nesting Canvas (layout) ───────────────────────────────────────────────
+function _nestTransform(x, y, sw, sh, cw, ch) {
+  const mg = 28, scale = Math.min((cw-2*mg)/(sw||1), (ch-2*mg)/(sh||1));
+  return { tx: mg + x*scale, ty: ch - mg - y*scale, scale };
+}
+
+function _drawSheet(ctx, cw, ch, sw, sh, label) {
+  const mg = 28, scale = Math.min((cw-2*mg)/(sw||1), (ch-2*mg)/(sh||1));
+  const pw = sw*scale, ph = sh*scale, ox = mg, oy = ch-mg-ph;
+  ctx.fillStyle='#1e293b'; ctx.fillRect(ox,oy,pw,ph);
+  ctx.strokeStyle='rgba(100,116,139,0.2)'; ctx.lineWidth=1;
+  const gs = scale*(sw>=500?100:50);
+  for(let gx=ox;gx<=ox+pw;gx+=gs){ctx.beginPath();ctx.moveTo(gx,oy);ctx.lineTo(gx,oy+ph);ctx.stroke();}
+  for(let gy=oy;gy<=oy+ph;gy+=gs){ctx.beginPath();ctx.moveTo(ox,gy);ctx.lineTo(ox+pw,gy);ctx.stroke();}
+  ctx.strokeStyle='#475569'; ctx.lineWidth=2; ctx.strokeRect(ox,oy,pw,ph);
+  ctx.fillStyle='#64748b'; ctx.font='11px monospace'; ctx.textAlign='center';
+  ctx.fillText(`${sw}mm`, ox+pw/2, oy-6);
+  ctx.save(); ctx.translate(ox-10,oy+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(`${sh}mm`,0,0); ctx.restore();
+  if (label) {
+    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(ox+2,oy+2,120,16);
+    ctx.fillStyle='#94a3b8'; ctx.font='10px monospace'; ctx.textAlign='left';
+    ctx.fillText(label, ox+5, oy+13);
+  }
+}
+
+function _drawPieces(ctx, cw, ch, sw, sh, pieces, alpha=0.75) {
+  const mg = 28, scale = Math.min((cw-2*mg)/(sw||1), (ch-2*mg)/(sh||1));
+  for (const p of pieces) {
+    const px = mg+p.x*scale, py = ch-mg-(p.y+p.h)*scale, pw=p.w*scale, ph=p.h*scale;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color; ctx.fillRect(px,py,pw,ph);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.strokeRect(px,py,pw,ph);
+    ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font='bold 9px sans-serif';
+    const lines = p.label.split('\n'), ly = py+ph/2-(lines.length-1)*6;
+    lines.forEach((l,i) => ctx.fillText(l, px+pw/2, ly+i*11, pw-4));
+    if (p.rotated) { ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='8px sans-serif'; ctx.fillText('↻',px+pw-7,py+10); }
+  }
+  ctx.globalAlpha=1;
 }
 
 function _drawNest(sheetIdx) {
   if (!_nestData) return;
   const canvas = document.getElementById('nestCanvas');
-  const ctx = canvas.getContext('2d');
-  const cw = canvas.width, ch = canvas.height;
-  const {placements, sheet_w, sheet_h} = _nestData;
-  const mg = 28;
-  const scale = Math.min((cw-2*mg)/sheet_w, (ch-2*mg)/sheet_h);
-  const ox = mg, oy = ch - mg - sheet_h*scale;
-
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d'), cw=canvas.width, ch=canvas.height;
+  const {sheet_w:sw, sheet_h:sh, placements} = _nestData;
   ctx.clearRect(0,0,cw,ch);
-  // Sheet background
-  ctx.fillStyle = '#1e293b';
-  ctx.fillRect(ox, oy, sheet_w*scale, sheet_h*scale);
-  // Grid
-  ctx.strokeStyle = 'rgba(100,116,139,0.2)'; ctx.lineWidth=1;
-  for (let x=ox; x<=ox+sheet_w*scale; x+=scale*100)
-    { ctx.beginPath(); ctx.moveTo(x,oy); ctx.lineTo(x,oy+sheet_h*scale); ctx.stroke(); }
-  for (let y=oy; y<=oy+sheet_h*scale; y+=scale*100)
-    { ctx.beginPath(); ctx.moveTo(ox,y); ctx.lineTo(ox+sheet_w*scale,y); ctx.stroke(); }
-  ctx.strokeStyle='#475569'; ctx.lineWidth=2;
-  ctx.strokeRect(ox, oy, sheet_w*scale, sheet_h*scale);
-  // Labels
-  ctx.fillStyle='#64748b'; ctx.font='11px monospace'; ctx.textAlign='center';
-  ctx.fillText(`${sheet_w}mm`, ox+sheet_w*scale/2, oy-8);
-  ctx.save(); ctx.translate(ox-12, oy+sheet_h*scale/2); ctx.rotate(-Math.PI/2);
-  ctx.fillText(`${sheet_h}mm`,0,0); ctx.restore();
-
-  // Pieces
-  const sheetPieces = placements.filter(p => p.sheet === sheetIdx);
-  for (const p of sheetPieces) {
-    const px = ox + p.x*scale, py = oy + (sheet_h - p.y - p.h)*scale;
-    const pw = p.w*scale, ph = p.h*scale;
-    // Fill
-    ctx.globalAlpha = 0.75;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(px, py, pw, ph);
-    ctx.globalAlpha = 1;
-    // Border
-    ctx.strokeStyle = '#fff'; ctx.lineWidth=1;
-    ctx.strokeRect(px, py, pw, ph);
-    // Label
-    ctx.fillStyle = '#fff'; ctx.textAlign='center'; ctx.font='bold 10px sans-serif';
-    const lines = p.label.split('\n');
-    const ly = py + ph/2 - (lines.length-1)*6;
-    lines.forEach((l,i) => ctx.fillText(l, px+pw/2, ly+i*12, pw-4));
-    if (p.rotated) {
-      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='9px sans-serif';
-      ctx.fillText('↻', px+pw-8, py+12);
-    }
-  }
-  // Piece count badge
-  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(ox+2, oy+2, 100, 18);
-  ctx.fillStyle='#94a3b8'; ctx.font='10px monospace'; ctx.textAlign='left';
-  ctx.fillText(`Levha ${sheetIdx+1}/${_nestData.sheet_count} — ${sheetPieces.length} parça`, ox+5, oy+14);
+  _drawSheet(ctx,cw,ch,sw,sh,`Levha ${sheetIdx+1}/${_nestData.sheet_count} — ${(placements||[]).filter(p=>p.sheet===sheetIdx).length} parça`);
+  _drawPieces(ctx,cw,ch,sw,sh,(placements||[]).filter(p=>p.sheet===sheetIdx));
 }
 
-function downloadNC() {
-  if (!JOB_ID) return;
-  const sheet_w = document.getElementById('nestW').value;
-  const sheet_h = document.getElementById('nestH').value;
-  const margin  = document.getElementById('nestMargin').value;
-  const T       = document.getElementById('nestT').value;
-  const p = new URLSearchParams({sheet_w, sheet_h, margin, T});
-  window.location.href = '/membrane/jobs/' + JOB_ID + '/nc?' + p;
+// ── Simulation Engine (adapted from caps page, uses simCanvas) ─────────────
+const SIM_COLORS = { RAPID:'#94a3b8', LINE:'#3b82f6', ARC_CW:'#a855f7', ARC_CCW:'#a855f7', POCKET:'#22c55e' };
+
+const simState = {
+  segments: [], totalLen: 0, currentDist: 0, animId: null,
+  sheetW: 0, sheetH: 0,
+};
+
+function _simCtx() {
+  const c = document.getElementById('simCanvas');
+  return { ctx: c.getContext('2d'), cw: c.width, ch: c.height };
+}
+function _simTransform(x,y,sw,sh,cw,ch) {
+  const mg=28, scale=Math.min((cw-2*mg)/(sw||1),(ch-2*mg)/(sh||1));
+  return { tx: mg+x*scale, ty: ch-mg-y*scale };
+}
+
+function _nestSimBuild(sheetIdx) {
+  if (!_ncData) return;
+  const {sim, placements, sheet_w:sw, sheet_h:sh} = _ncData;
+  simState.sheetW = sw; simState.sheetH = sh;
+  const paths = (sim.paths||[]).filter(p => p.sheet === sheetIdx);
+  const {cw,ch} = _simCtx();
+
+  // Build waypoints
+  const wps = [];
+  const rapid = (x,y) => wps.push({type:'RAPID',x,y,color:SIM_COLORS.RAPID});
+  const cut   = (x,y,color) => wps.push({type:'CUT',x,y,color});
+
+  rapid(0,0);
+  for (const p of paths) {
+    const col = SIM_COLORS[p.type] || SIM_COLORS.LINE;
+    rapid(p.x1,p.y1);
+    cut(p.x1,p.y1,col);
+    if (p.type==='LINE') {
+      cut(p.x2,p.y2,col);
+    } else if (p.type==='ARC_CW'||p.type==='ARC_CCW') {
+      const cx=p.cx, cy=p.cy, r=Math.hypot(cx-p.x1,cy-p.y1);
+      let sa=Math.atan2(p.y1-cy,p.x1-cx), ea=Math.atan2(p.y2-cy,p.x2-cx);
+      const steps=48;
+      if(p.type==='ARC_CW'){if(ea>sa)sa+=Math.PI*2;}else{if(ea<sa)ea+=Math.PI*2;}
+      for(let i=1;i<=steps;i++){const a=sa+(ea-sa)*(i/steps);cut(cx+r*Math.cos(a),cy+r*Math.sin(a),col);}
+    } else if (p.type==='POCKET') {
+      const td=p.tool_dia||8,so=p.step_over||0.5,step=td*so,r2=td/2;
+      const lx=Math.min(p.x1,p.x2)+r2,rx=Math.max(p.x1,p.x2)-r2;
+      const by=Math.min(p.y1,p.y2)+r2,ty2=Math.max(p.y1,p.y2)-r2;
+      let dir=1;
+      for(let y=by;y<=ty2+0.001;y+=step){
+        rapid(dir===1?lx:rx,y); cut(dir===1?lx:rx,y,col); cut(dir===1?rx:lx,y,col); dir*=-1;
+      }
+      rapid(lx,by);cut(lx,by,col);cut(rx,by,col);cut(rx,ty2,col);cut(lx,ty2,col);cut(lx,by,col);
+    }
+    rapid(p.x2,p.y2);
+  }
+
+  // Convert to pixel segments
+  const segs = [];
+  let total = 0;
+  for (let i=0;i<wps.length-1;i++) {
+    const f=wps[i],t=wps[i+1];
+    const {tx:ax,ty:ay}=_simTransform(f.x,f.y,sw,sh,cw,ch);
+    const {tx:bx,ty:by}=_simTransform(t.x,t.y,sw,sh,cw,ch);
+    const len=Math.hypot(bx-ax,by-ay)||0;
+    segs.push({ax,ay,bx,by,len,color:t.color,isRapid:t.type==='RAPID'});
+    total+=len;
+  }
+  simState.segments=segs; simState.totalLen=total; simState.currentDist=0;
+  _simDrawStatic(sheetIdx);
+  document.getElementById('simPlayBtn').disabled=false;
+  document.getElementById('simInfo').textContent=`${segs.length} segment  ▶ başlatın`;
+}
+
+function _simDrawBg(ctx,cw,ch,sheetIdx) {
+  const {sheetW:sw,sheetH:sh}=simState;
+  const n=_ncData?_ncData.sheet_count:1;
+  _drawSheet(ctx,cw,ch,sw,sh,`Levha ${sheetIdx+1}/${n}`);
+  if(_ncData?.placements) {
+    _drawPieces(ctx,cw,ch,sw,sh,_ncData.placements.filter(p=>p.sheet===sheetIdx),0.12);
+  }
+}
+
+function _simDrawStatic(sheetIdx=_simSheet) {
+  const {ctx,cw,ch}=_simCtx();
+  ctx.clearRect(0,0,cw,ch);
+  _simDrawBg(ctx,cw,ch,sheetIdx);
+  for (const seg of simState.segments) {
+    if(seg.len<0.5) continue;
+    ctx.beginPath(); ctx.moveTo(seg.ax,seg.ay); ctx.lineTo(seg.bx,seg.by);
+    if(seg.isRapid){ctx.strokeStyle='rgba(148,163,184,0.2)';ctx.setLineDash([3,3]);ctx.lineWidth=1;}
+    else            {ctx.strokeStyle=seg.color+'40';         ctx.setLineDash([]);    ctx.lineWidth=2;}
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  const {tx,ty}=_simTransform(0,0,simState.sheetW,simState.sheetH,cw,ch);
+  _drawTool(ctx,tx,ty);
+}
+
+function _simDrawFrame() {
+  const {ctx,cw,ch}=_simCtx();
+  const {segments,currentDist}=simState;
+  ctx.clearRect(0,0,cw,ch);
+  _simDrawBg(ctx,cw,ch,_simSheet);
+
+  let rem=currentDist, toolX=segments[0]?.ax??0, toolY=segments[0]?.ay??0;
+  let curColor=SIM_COLORS.LINE, isRapid=true;
+
+  for (const seg of segments) {
+    if(seg.len<0.5){rem-=seg.len;continue;}
+    const draw=rem>0, partial=draw&&rem<seg.len;
+    let ex=seg.bx,ey=seg.by;
+    if(partial){const t=rem/seg.len;ex=seg.ax+(seg.bx-seg.ax)*t;ey=seg.ay+(seg.by-seg.ay)*t;}
+    if(draw){
+      ctx.beginPath();ctx.moveTo(seg.ax,seg.ay);ctx.lineTo(ex,ey);
+      if(seg.isRapid){ctx.strokeStyle='rgba(148,163,184,0.45)';ctx.setLineDash([5,4]);ctx.lineWidth=1.5;}
+      else            {ctx.strokeStyle=seg.color;ctx.setLineDash([]);ctx.lineWidth=2.5;}
+      ctx.stroke();ctx.setLineDash([]);
+      toolX=ex;toolY=ey;curColor=seg.color;isRapid=seg.isRapid;
+      if(partial)break;
+    }
+    rem-=seg.len;
+  }
+  _drawTool(ctx,toolX,toolY,isRapid?'#94a3b8':curColor);
+}
+
+function _drawTool(ctx,x,y,color='#ef4444') {
+  const g=ctx.createRadialGradient(x,y,0,x,y,14);
+  g.addColorStop(0,color+'55');g.addColorStop(1,'transparent');
+  ctx.beginPath();ctx.arc(x,y,14,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+  ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+  ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.strokeStyle=color+'99';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x-13,y);ctx.lineTo(x+13,y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x,y-13);ctx.lineTo(x,y+13);ctx.stroke();
+}
+
+function _pxPerSec(s){return 40*Math.pow(10,s*0.2);}
+
+function updateSpeedLabel(){
+  const s=parseInt(document.getElementById('simSpeed')?.value)||0;
+  const labels=['🐢','×¼','×½','×1','×2','×4','×8','×16','×32','×64','⚡'];
+  const el=document.getElementById('simSpeedLabel');
+  if(el)el.textContent=labels[s]??s;
+}
+
+let _animRunning=false, _lastRafTime=0;
+
+function simPlay(){
+  if(_animRunning){simPause();return;}
+  if(simState.currentDist>=simState.totalLen)simState.currentDist=0;
+  _animRunning=true;_lastRafTime=0;
+  document.getElementById('simPlayBtn').textContent='⏸ Durdur';
+  updateSpeedLabel();
+  requestAnimationFrame(_animStep);
+}
+function simPause(){
+  _animRunning=false;
+  if(simState.animId)cancelAnimationFrame(simState.animId);
+  document.getElementById('simPlayBtn').textContent='▶ Devam';
+}
+function simReset(){
+  simPause();simState.currentDist=0;
+  if(simState.segments.length)_simDrawStatic(_simSheet);
+  document.getElementById('simPlayBtn').textContent='▶ Oynat';
+  document.getElementById('simInfo').textContent=`${simState.segments.length} segment  ▶ başlatın`;
+}
+function _animStep(ts){
+  if(!_animRunning)return;
+  if(_lastRafTime===0)_lastRafTime=ts;
+  const dt=Math.min((ts-_lastRafTime)/1000,0.1);
+  _lastRafTime=ts;
+  const speed=parseInt(document.getElementById('simSpeed')?.value)??3;
+  simState.currentDist=Math.min(simState.currentDist+_pxPerSec(speed)*dt,simState.totalLen);
+  _simDrawFrame();
+  const pct=simState.totalLen>0?Math.round(simState.currentDist/simState.totalLen*100):100;
+  document.getElementById('simInfo').textContent=`%${pct} tamamlandı`;
+  if(simState.currentDist>=simState.totalLen){
+    _animRunning=false;
+    document.getElementById('simPlayBtn').textContent='↺ Tekrar';
+    return;
+  }
+  simState.animId=requestAnimationFrame(_animStep);
 }
 </script>
 {% endblock %}
