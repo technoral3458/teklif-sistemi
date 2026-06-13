@@ -3,8 +3,7 @@
 
 {% block content %}
 {% set T = _T(user.lang if user else 'tr') %}
-{% set _lang = user.lang if user else 'tr' %}
-{% macro mname(m) %}{{ (m.get('name_'+_lang) or m.name) if _lang != 'tr' else m.name }}{% endmacro %}
+{% macro mname(m) %}{{ (m.get('name_'+user.lang) or m.name) if user.lang and user.lang != 'tr' else m.name }}{% endmacro %}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
   <form method="get" style="display:flex;gap:8px;align-items:center;">
     <select name="category_id" class="form-control" style="max-width:200px;" onchange="this.form.submit()">
