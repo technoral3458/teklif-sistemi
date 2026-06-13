@@ -3,7 +3,7 @@
 {% block page_title %}{{ T.options_title }}{% endblock %}
 
 {% block content %}
-{% set qty_labels = {'MANUAL':'Elle Giriş','FIXED_1':'Sabit 1 Adet','PER_MACHINE':'Makine Adeti Kadar'} %}
+{% set qty_labels = {'MANUAL': T.qty_manual, 'FIXED_1': T.qty_fixed1, 'PER_MACHINE': T.qty_per_machine} %}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
   <input type="text" id="tableSearch" class="search-box" placeholder="{{ T.btn_search }}..." style="max-width:280px;" />
   <button class="btn btn-primary" onclick="newOpt()">
@@ -34,7 +34,7 @@
           <th style="width:56px;"></th>
           <th>{{ T.option_name }}</th>
           <th>{{ T.model_category }}</th>
-          <th>Adet Tipi</th>
+          <th>{{ T.opt_qty_type }}</th>
           <th>{{ T.option_price }}</th>
           <th style="width:60px;text-align:center;"></th>
           <th></th>
@@ -167,7 +167,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Adet Tipi</label>
+            <label class="form-label">{{ T.opt_qty_type }}</label>
             <select name="qty_type" id="oqty_type" class="form-control">
               {% for qt in qty_types %}
               <option value="{{ qt }}">{{ qty_labels.get(qt, qt) }}</option>
