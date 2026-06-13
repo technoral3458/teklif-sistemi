@@ -1076,6 +1076,28 @@ def _init_membrane(c):
     # Add tool_no to paths (0 = inherit from model)
     _acol(c, "membrane_cap_paths", "tool_no", "INTEGER DEFAULT 0")
 
+    # Structured ops/moves tables (new path editor)
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_ops(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        model_id INTEGER NOT NULL REFERENCES membrane_cap_models(id) ON DELETE CASCADE,
+        name TEXT DEFAULT '',
+        tool_no INTEGER DEFAULT 1,
+        depth TEXT DEFAULT '-T',
+        feed TEXT DEFAULT '',
+        ref_corner TEXT DEFAULT 'BL',
+        seq INTEGER DEFAULT 0
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_moves(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        op_id INTEGER NOT NULL REFERENCES membrane_cap_ops(id) ON DELETE CASCADE,
+        move_type TEXT DEFAULT 'line',
+        x TEXT DEFAULT '0',
+        y TEXT DEFAULT '0',
+        cx TEXT DEFAULT '0',
+        cy TEXT DEFAULT '0',
+        seq INTEGER DEFAULT 0
+    )""")
+
     # Job list tables
     c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_jobs(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1351,3 +1373,60 @@ def save_cap_job_item(id=0, **kw):
 def del_cap_job_item(item_id):
     with _c() as c:
         c.execute("DELETE FROM membrane_cap_job_items WHERE id=?", (item_id,))
+
+
+# ── Cap Ops (structured path editor) ─────────────────────────────────────────
+
+_CO_KEYS = ["id","model_id","name","tool_no","depth","feed","ref_corner","seq"]
+_CM_KEYS = ["id","op_id","move_type","x","y","cx","cy","seq"]
+
+def get_cap_moves(op_id):
+    with _c() as c:
+        rows = c.execute(
+            "SELECT id,op_id,move_type,x,y,cx,cy,seq FROM membrane_cap_moves WHERE op_id=? ORDER BY seq",
+            (op_id,)
+        ).fetchall()
+    return [dict(zip(_CM_KEYS, r)) for r in rows]
+
+def get_cap_ops(model_id):
+    with _c() as c:
+        rows = c.execute(
+            "SELECT id,model_id,name,tool_no,depth,feed,ref_corner,seq FROM membrane_cap_ops WHERE model_id=? ORDER BY seq",
+            (model_id,)
+        ).fetchall()
+    ops = [dict(zip(_CO_KEYS, r)) for r in rows]
+    for op in ops:
+        op['moves'] = get_cap_moves(op['id'])
+    return ops
+
+def save_cap_op(id=0, **kw):
+    allowed = ["model_id","name","tool_no","depth","feed","ref_corner","seq"]
+    f = {k: v for k, v in kw.items() if k in allowed}
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{k}=?" for k in f)
+            c.execute(f"UPDATE membrane_cap_ops SET {sets} WHERE id=?", list(f.values()) + [id])
+            return id
+        cols = ",".join(f.keys()); ph = ",".join("?" * len(f))
+        cur = c.execute(f"INSERT INTO membrane_cap_ops({cols}) VALUES({ph})", list(f.values()))
+        return cur.lastrowid
+
+def del_cap_op(op_id):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_cap_ops WHERE id=?", (op_id,))
+
+def save_cap_move(id=0, **kw):
+    allowed = ["op_id","move_type","x","y","cx","cy","seq"]
+    f = {k: v for k, v in kw.items() if k in allowed}
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{k}=?" for k in f)
+            c.execute(f"UPDATE membrane_cap_moves SET {sets} WHERE id=?", list(f.values()) + [id])
+            return id
+        cols = ",".join(f.keys()); ph = ",".join("?" * len(f))
+        cur = c.execute(f"INSERT INTO membrane_cap_moves({cols}) VALUES({ph})", list(f.values()))
+        return cur.lastrowid
+
+def del_cap_move(move_id):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_cap_moves WHERE id=?", (move_id,))

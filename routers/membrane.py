@@ -115,6 +115,124 @@ def _generate_nc(model, paths, variables, x_off=0.0, y_off=0.0, prog_no=1):
     return "\n".join(lines)
 
 
+# ── Ops/Moves NC generator ────────────────────────────────────────────────────
+
+_CORNER_LABELS = {'BL':'Sol-Alt','TL':'Sol-Ust','BR':'Sag-Alt','TR':'Sag-Ust'}
+
+def _apply_corner(x, y, ref, W, H):
+    if ref == 'TL':   return x, H - y
+    elif ref == 'BR': return W - x, y
+    elif ref == 'TR': return W - x, H - y
+    return x, y  # BL default
+
+
+def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
+    ev = lambda expr: _eval_expr(expr, variables)
+    W = float(variables.get('W', 0)); H = float(variables.get('H', 0))
+    name_upper = model["name"].upper().replace("(", "").replace(")", "")
+    var_comment = " ".join(f"{k}={v}" for k, v in sorted(variables.items()))
+    safe_z = float(model.get("safe_z") or 5.0)
+    feed_xy = int(model.get("feed_xy") or 3000)
+    feed_z = int(model.get("feed_z") or 1000)
+    spindle = int(model.get("spindle_speed") or 18000)
+    off_comment = f" OFS X{x_off:.1f} Y{y_off:.1f}" if (x_off or y_off) else ""
+
+    lines = [
+        "%", f"O{prog_no:04d} ({name_upper}{off_comment})",
+        f"({var_comment})",
+        f"(GENERATED {datetime.now().strftime('%Y-%m-%d %H:%M')})",
+        "G17 G21 G40 G49 G80 G90",
+    ]
+    if not ops:
+        lines += ["(NO OPERATIONS)", "M30", "%"]
+        return "\n".join(lines)
+
+    cur_tool = None
+    for op in ops:
+        ref = op.get('ref_corner') or 'BL'
+        op_tool = int(op.get('tool_no') or 1)
+        try:    op_depth = ev(op.get('depth') or '-T')
+        except: op_depth = -5.0
+        feed_str = str(op.get('feed') or '').strip()
+        try:    op_feed = int(ev(feed_str)) if feed_str else feed_xy
+        except: op_feed = feed_xy
+
+        if cur_tool is None:
+            lines += [f"T{op_tool} M6", f"S{spindle} M3", f"G0 G90 Z{safe_z:.3f}"]
+        elif op_tool != cur_tool:
+            lines += [f"G0 Z{safe_z:.3f}", "M5",
+                      f"T{op_tool} M6", f"S{spindle} M3", f"G0 G90 Z{safe_z:.3f}"]
+        cur_tool = op_tool
+
+        op_name = (op.get('name') or '').strip() or f"OP{op.get('seq',0)}"
+        lines.append(f"({op_name} T{op_tool} F{op_feed} Z{op_depth:.3f} REF:{_CORNER_LABELS.get(ref,ref)})")
+
+        cur_x = cur_y = 0.0; plunged = False
+        for mv in op.get('moves', []):
+            mt = mv.get('move_type', 'line')
+            try:
+                mx = ev(mv.get('x') or '0'); my = ev(mv.get('y') or '0')
+                ax, ay = _apply_corner(mx, my, ref, W, H)
+                ax += x_off; ay += y_off
+                if mt == 'start':
+                    if plunged: lines.append(f"G0 Z{safe_z:.3f}")
+                    lines += [f"G0 X{ax:.3f} Y{ay:.3f}", f"G1 Z{op_depth:.3f} F{feed_z}"]
+                    cur_x = ax; cur_y = ay; plunged = True
+                elif mt == 'line' and plunged:
+                    lines.append(f"G1 X{ax:.3f} Y{ay:.3f} F{op_feed}")
+                    cur_x = ax; cur_y = ay
+                elif mt in ('arc_cw','arc_ccw') and plunged:
+                    mcx = ev(mv.get('cx') or '0'); mcy = ev(mv.get('cy') or '0')
+                    acx, acy = _apply_corner(mcx, mcy, ref, W, H)
+                    acx += x_off; acy += y_off
+                    I = round(acx - cur_x, 3); J = round(acy - cur_y, 3)
+                    cmd = 'G2' if mt == 'arc_cw' else 'G3'
+                    lines.append(f"{cmd} X{ax:.3f} Y{ay:.3f} I{I:.3f} J{J:.3f} F{op_feed}")
+                    cur_x = ax; cur_y = ay
+            except Exception as exc:
+                lines.append(f"(ERROR: {exc})")
+        if plunged: lines.append(f"G0 Z{safe_z:.3f}")
+
+    lines += ["M5", "G28 G91 Z0.", "M30", "%"]
+    return "\n".join(lines)
+
+
+def _eval_ops(model, ops, variables, x_off=0.0, y_off=0.0):
+    ev = lambda expr: _eval_expr(expr, variables)
+    W = float(variables.get('W', 0)); H = float(variables.get('H', 0))
+    safe_z = float(model.get('safe_z') or 5.0)
+    result = []
+    for op in ops:
+        ref = op.get('ref_corner') or 'BL'
+        try:    depth = ev(op.get('depth') or '-T')
+        except: depth = -5.0
+        cur_x = cur_y = 0.0; plunged = False
+        for mv in op.get('moves', []):
+            mt = mv.get('move_type', 'line')
+            try:
+                mx = ev(mv.get('x') or '0'); my = ev(mv.get('y') or '0')
+                ax, ay = _apply_corner(mx, my, ref, W, H)
+                ax += x_off; ay += y_off
+                if mt == 'start':
+                    # zero-length entry: simulation shows rapid to this point
+                    result.append({'type':'LINE','x1':ax,'y1':ay,'x2':ax,'y2':ay,'z2':depth,'label':'START'})
+                    cur_x = ax; cur_y = ay; plunged = True
+                elif mt == 'line' and plunged:
+                    result.append({'type':'LINE','x1':cur_x,'y1':cur_y,'x2':ax,'y2':ay,'z2':depth})
+                    cur_x = ax; cur_y = ay
+                elif mt in ('arc_cw','arc_ccw') and plunged:
+                    mcx = ev(mv.get('cx') or '0'); mcy = ev(mv.get('cy') or '0')
+                    acx, acy = _apply_corner(mcx, mcy, ref, W, H)
+                    acx += x_off; acy += y_off
+                    result.append({'type':'ARC_CW' if mt=='arc_cw' else 'ARC_CCW',
+                                   'x1':cur_x,'y1':cur_y,'x2':ax,'y2':ay,
+                                   'cx':acx,'cy':acy,'z2':depth})
+                    cur_x = ax; cur_y = ay
+            except Exception as exc:
+                result.append({'type':'ERROR','label':str(exc),'x1':x_off,'y1':y_off,'x2':x_off,'y2':y_off,'z2':0})
+    return {'paths': result, 'safe_z': safe_z}
+
+
 # ── Nesting algorithm (shelf / strip packing with rotation) ───────────────────
 
 _NEST_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6',
@@ -677,8 +795,14 @@ async def cap_generate(request: Request, mid: int,
         pass
     constants = model.get("constants") or {}
     variables.update({k: float(v) for k, v in constants.items()})
-    nc = _generate_nc(model, paths, variables)
-    sim = _eval_paths(model, paths, variables)
+    ops = fdb.get_cap_ops(mid)
+    if ops:
+        nc = _generate_nc_ops(model, ops, variables)
+        sim = _eval_ops(model, ops, variables)
+    else:
+        paths = fdb.get_cap_paths(mid)
+        nc = _generate_nc(model, paths, variables)
+        sim = _eval_paths(model, paths, variables)
     return JSONResponse({"nc": nc, "sim": sim, "W": W, "H": H, "T": T})
 
 
@@ -690,14 +814,17 @@ async def cap_download(request: Request, mid: int,
     model = fdb.get_cap_model(mid)
     if not model:
         return RedirectResponse("/membrane/caps", 303)
-    paths = fdb.get_cap_paths(mid)
     variables = {"W": W, "H": H, "T": T}
     try:
         variables.update({k: float(v) for k, v in json.loads(extra).items()})
     except Exception:
         pass
     variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
-    nc = _generate_nc(model, paths, variables)
+    ops = fdb.get_cap_ops(mid)
+    if ops:
+        nc = _generate_nc_ops(model, ops, variables)
+    else:
+        nc = _generate_nc(model, fdb.get_cap_paths(mid), variables)
     safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in model["name"])
     filename = f"{safe_name}_W{int(W)}xH{int(H)}.nc"
     return Response(
@@ -705,6 +832,53 @@ async def cap_download(request: Request, mid: int,
         media_type="text/plain",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ── Cap Ops/Moves API ─────────────────────────────────────────────────────────
+
+@router.get("/caps/{mid}/ops")
+async def cap_ops_list(request: Request, mid: int):
+    auth.require_user(request)
+    return JSONResponse(fdb.get_cap_ops(mid))
+
+
+@router.post("/caps/{mid}/op/save")
+async def cap_op_save(request: Request, mid: int,
+                      id: int = Form(0), name: str = Form(""),
+                      tool_no: int = Form(1), depth: str = Form("-T"),
+                      feed: str = Form(""), ref_corner: str = Form("BL"),
+                      seq: int = Form(0)):
+    auth.require_user(request)
+    op_id = fdb.save_cap_op(id=id or 0, model_id=mid, name=name,
+                             tool_no=tool_no, depth=depth, feed=feed,
+                             ref_corner=ref_corner, seq=seq)
+    return JSONResponse({"id": op_id})
+
+
+@router.post("/caps/op/{oid}/delete")
+async def cap_op_delete(request: Request, oid: int):
+    auth.require_user(request)
+    fdb.del_cap_op(oid)
+    return JSONResponse({"ok": True})
+
+
+@router.post("/caps/op/{oid}/move/save")
+async def cap_move_save(request: Request, oid: int,
+                        id: int = Form(0), move_type: str = Form("line"),
+                        x: str = Form("0"), y: str = Form("0"),
+                        cx: str = Form("0"), cy: str = Form("0"),
+                        seq: int = Form(0)):
+    auth.require_user(request)
+    mv_id = fdb.save_cap_move(id=id or 0, op_id=oid, move_type=move_type,
+                               x=x, y=y, cx=cx, cy=cy, seq=seq)
+    return JSONResponse({"id": mv_id})
+
+
+@router.post("/caps/move/{mvid}/delete")
+async def cap_move_delete(request: Request, mvid: int):
+    auth.require_user(request)
+    fdb.del_cap_move(mvid)
+    return JSONResponse({"ok": True})
 
 
 # ── Job List ──────────────────────────────────────────────────────────────────
@@ -835,15 +1009,20 @@ async def job_nest_nc(request: Request, jid: int,
         if not model:
             continue
         safe_z = float(model.get("safe_z") or 5.0)
-        paths = fdb.get_cap_paths(mid)
         W, H = pl['cap_w'], pl['cap_h']
         variables = {"W": W, "H": H, "T": T}
         variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
         if pl.get('rotated'):
             variables["W"], variables["H"] = H, W
         x_off, y_off = pl['x'], pl['y']
-        nc_parts.append(_generate_nc(model, paths, variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
-        evp = _eval_paths(model, paths, variables, x_off=x_off, y_off=y_off)
+        ops = fdb.get_cap_ops(mid)
+        if ops:
+            nc_parts.append(_generate_nc_ops(model, ops, variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
+            evp = _eval_ops(model, ops, variables, x_off=x_off, y_off=y_off)
+        else:
+            paths = fdb.get_cap_paths(mid)
+            nc_parts.append(_generate_nc(model, paths, variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
+            evp = _eval_paths(model, paths, variables, x_off=x_off, y_off=y_off)
         for p in evp['paths']:
             p['sheet'] = pl['sheet']
             p['piece_color'] = pl['color']
