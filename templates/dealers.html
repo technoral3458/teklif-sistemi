@@ -3,7 +3,15 @@
 
 {% block content %}
 {% set T = _T(user.lang if user else 'tr') %}
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+{% set role_labels = {'admin': T.role_admin, 'manufacturer': T.role_manufacturer, 'dealer': T.role_dealer} %}
+{% set ALL_MENUS = [
+  ('dashboard', T.menu_dashboard), ('customers', T.menu_customers), ('models', T.menu_models),
+  ('options', T.menu_options), ('categories', T.menu_categories), ('offers', T.menu_offers),
+  ('orders', T.menu_orders), ('costs', T.menu_costs),
+  ('membrane', T.menu_membrane), ('loan', T.menu_loan)
+] %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
   <div class="tabs" style="margin-bottom:0;">
     <button class="tab-btn" data-tab="tab-pending" onclick="switchTab('tab-pending')">
       {{ T.dealer_pending }}
@@ -18,21 +26,29 @@
 
 {% macro dealer_table(dealer_list) %}
 <div class="table-wrap">
-  <table>
+  <table class="dealers-table">
     <thead>
       <tr>
         <th>{{ T.dealer_company }}</th>
-        <th>{{ T.dealer_email }}</th>
+        <th class="col-hide-sm">{{ T.dealer_email }}</th>
         <th>{{ T.dealer_status }}</th>
-        <th>{{ T.dealer_reg_date }}</th>
+        <th class="col-hide-sm">{{ T.dealer_reg_date }}</th>
         <th>{{ T.dealer_actions }}</th>
       </tr>
     </thead>
     <tbody>
       {% for d in dealer_list %}
       <tr>
-        <td><strong>{{ d.company_name or d.email }}</strong></td>
-        <td>{{ d.email }}</td>
+        <td>
+          <strong>{{ d.company_name or d.email }}</strong>
+          <div class="col-show-sm" style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ d.email }}</div>
+          {% if d.parent_id %}
+          <div style="font-size:11px;color:var(--text-muted);">
+            ↳ {% for mfr in manufacturers if mfr.id == d.parent_id %}{{ mfr.company_name }}{% endfor %}
+          </div>
+          {% endif %}
+        </td>
+        <td class="col-hide-sm">{{ d.email }}</td>
         <td>
           {% if d.is_approved and d.is_active %}
             <span class="badge badge-green">{{ T.status_active }}</span>
@@ -42,9 +58,16 @@
             <span class="badge badge-red">{{ T.status_inactive }}</span>
           {% endif %}
         </td>
-        <td>{{ d.created_at[:10] if d.created_at else '-' }}</td>
+        <td class="col-hide-sm">{{ d.created_at[:10] if d.created_at else '-' }}</td>
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm"
+              onclick="editDealer({{ d.id }}, '{{ d.email|e }}', '{{ d.company_name|e }}', '{{ d.role }}',
+                {{ d.is_approved }}, {{ d.is_active }}, {{ d.can_view_costs or 0 }},
+                '{{ d.allowed_menus or '' }}', '{{ d.allowed_categories or '' }}',
+                {{ d.parent_id or 0 }}, '{{ d.allowed_actions or '' }}')">
+              ✏️ {{ T.btn_edit }}
+            </button>
             {% if not d.is_approved %}
             <form method="post" action="/dealers/approve" style="display:inline;">
               <input type="hidden" name="id" value="{{ d.id }}" />
@@ -56,12 +79,8 @@
               <button type="submit" class="btn btn-outline btn-sm">{{ T.dealer_deactivate }}</button>
             </form>
             {% endif %}
-            <a href="/ledger/dealers/{{ d.id }}" class="btn btn-ghost btn-sm">📒 {{ T.ledger_title }}</a>
-            <button class="btn btn-ghost btn-sm"
-              onclick="editDealer({{ d.id }}, '{{ d.company_name|e }}', {{ d.can_view_costs or 0 }}, '{{ d.role }}', '{{ d.allowed_categories|e }}')">
-              ✏️ {{ T.btn_edit }}
-            </button>
-            <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)" data-confirm="Bu bayiyi silmek istiyor musunuz?">
+            <a href="/ledger/dealers/{{ d.id }}" class="btn btn-ghost btn-sm">📒</a>
+            <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ d.company_name or d.email }}'?">
               <input type="hidden" name="id" value="{{ d.id }}" />
               <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
             </form>
@@ -86,7 +105,7 @@
   {{ dealer_table(dealers) }}
 </div>
 
-<!-- Bayi Ekle Modalı -->
+<!-- Add Dealer Modal -->
 <div id="addDealerModal" class="modal-overlay">
   <div class="modal-box" style="max-width:440px;">
     <div class="modal-header">
@@ -109,7 +128,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">{{ T.dealer_phone }}</label>
-          <input type="tel" name="phone" class="form-control" placeholder="Telefon numarası" />
+          <input type="tel" name="phone" class="form-control" />
         </div>
       </div>
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
@@ -120,35 +139,120 @@
   </div>
 </div>
 
-<!-- Düzenle Modalı -->
+<!-- Full Edit Modal -->
 <div id="dealerEditModal" class="modal-overlay">
-  <div class="modal-box" style="max-width:480px;">
+  <div class="modal-box" style="max-width:600px;">
     <div class="modal-header">
-      <h3 class="modal-title">{{ T.dealer_edit_modal }}</h3>
+      <div>
+        <h3 class="modal-title">{{ T.dealer_edit_modal }}</h3>
+        <div id="deModalEmail" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+      </div>
       <button class="modal-close" onclick="closeModal('dealerEditModal')">&times;</button>
     </div>
-    <form method="post" action="/dealers/save">
-      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-        <input type="hidden" name="id" id="deid" value="" />
-        <div class="form-group">
-          <label class="form-label">{{ T.dealer_company }}</label>
-          <input type="text" name="company_name" id="decompany" class="form-control" />
+    <form method="post" action="/dealers/save" id="dealerEditForm">
+      <input type="hidden" name="id" id="deid" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Basic info -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">{{ T.dealer_company }}</label>
+            <input type="text" name="company_name" id="decompany" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.admin_role }}</label>
+            <select name="role" id="derole" class="form-control">
+              <option value="dealer">{{ T.role_dealer }}</option>
+              <option value="manufacturer">{{ T.role_manufacturer }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.admin_status }}</label>
+            <select name="is_approved" id="deapproved" class="form-control">
+              <option value="1">{{ T.admin_approved_opt }}</option>
+              <option value="0">{{ T.admin_waiting_opt }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.admin_active_status }}</label>
+            <select name="is_active" id="deactive" class="form-control">
+              <option value="1">{{ T.status_active }}</option>
+              <option value="0">{{ T.status_inactive }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.admin_parent_account }}</label>
+            <select name="parent_id" id="deParent" class="form-control">
+              <option value="0">{{ T.admin_no_parent }}</option>
+              {% for mfr in manufacturers %}
+              <option value="{{ mfr.id }}">{{ mfr.company_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">{{ T.dealer_role }}</label>
-          <select name="role" id="derole" class="form-control">
-            <option value="dealer">Bayi</option>
-            <option value="manufacturer">Üretici olarak taşı →</option>
-          </select>
+
+        <!-- Permissions -->
+        <div>
+          <label class="form-label" style="margin-bottom:8px;display:block;">{{ T.admin_permissions }}</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" id="decosts" onchange="document.getElementById('decostsHidden').value=this.checked?1:0" />
+              <span style="font-size:13px;">💰 {{ T.costs_title }}</span>
+            </label>
+            <input type="hidden" name="can_view_costs" id="decostsHidden" value="0" />
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">{{ T.dealer_allowed_cats }} <small style="color:var(--text-muted)">(virgülle, boş=tümü)</small></label>
-          <input type="text" name="allowed_categories" id="decat" class="form-control" />
+
+        <!-- Menu Permissions -->
+        <div>
+          <label class="form-label" style="margin-bottom:4px;display:block;">{{ T.admin_menu_perms }}</label>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">{{ T.admin_menu_hint }}</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            {% for key, label in ALL_MENUS %}
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="allowed_menus" value="{{ key }}" class="de-menu-chk" />
+              <span style="font-size:13px;">{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="checkAll('.de-menu-chk',true)">{{ T.admin_select_all }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="checkAll('.de-menu-chk',false)">{{ T.admin_clear }}</button>
+          </div>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" name="can_view_costs" id="decosts" value="1" />
-          <span style="font-size:13px;">💰 {{ T.dealer_can_costs }}</span>
-        </label>
+
+        <!-- Manufacturer Action Permissions (sub-account) -->
+        <div id="deActionSection" style="display:none;">
+          <label class="form-label" style="margin-bottom:4px;display:block;">{{ T.admin_action_perms }}</label>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">{{ T.admin_action_hint }}</p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            {% for action_key, action_label in [
+              ('order_confirm', T.action_order_confirm),
+              ('order_status',  T.action_order_status),
+              ('order_stage',   T.action_order_stage)
+            ] %}
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="allowed_actions" value="{{ action_key }}" class="de-action-chk" />
+              <span style="font-size:13px;">{{ action_label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Category Permissions -->
+        <div>
+          <label class="form-label" style="margin-bottom:4px;display:block;">{{ T.admin_cat_perms }}</label>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">{{ T.admin_cat_hint }}</p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            {% for cat in categories %}
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="allowed_categories" value="{{ cat.name }}" class="de-cat-chk" />
+              <span style="font-size:13px;">{{ cat.name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
       </div>
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
         <button type="button" class="btn btn-ghost" onclick="closeModal('dealerEditModal')">{{ T.btn_cancel }}</button>
@@ -161,13 +265,52 @@
 
 {% block scripts %}
 <script>
-function editDealer(id, company, canCosts, role, cats) {
+function editDealer(id, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions) {
   document.getElementById('deid').value = id;
+  document.getElementById('deModalEmail').textContent = email + (company ? ' — ' + company : '');
   document.getElementById('decompany').value = company;
-  document.getElementById('decosts').checked = !!canCosts;
   document.getElementById('derole').value = role;
-  document.getElementById('decat').value = cats;
+  document.getElementById('deapproved').value = approved ? '1' : '0';
+  document.getElementById('deactive').value = active ? '1' : '0';
+  document.getElementById('deParent').value = parentId || 0;
+
+  const costsChk = document.getElementById('decosts');
+  costsChk.checked = !!costs;
+  document.getElementById('decostsHidden').value = costs ? 1 : 0;
+  costsChk.onchange = () => document.getElementById('decostsHidden').value = costsChk.checked ? 1 : 0;
+
+  // Menus
+  const menuList = allowedMenus ? allowedMenus.split(',') : [];
+  document.querySelectorAll('.de-menu-chk').forEach(cb => {
+    cb.checked = menuList.length === 0 || menuList.includes(cb.value);
+  });
+
+  // Categories
+  const catList = allowedCats ? allowedCats.split(',') : [];
+  document.querySelectorAll('.de-cat-chk').forEach(cb => {
+    cb.checked = catList.length === 0 || catList.includes(cb.value);
+  });
+
+  // Action permissions
+  const actionList = allowedActions ? allowedActions.split(',') : [];
+  document.querySelectorAll('.de-action-chk').forEach(cb => {
+    cb.checked = actionList.includes(cb.value);
+  });
+  document.getElementById('deActionSection').style.display = parentId ? '' : 'none';
+
   openModal('dealerEditModal');
 }
+
+function checkAll(sel, state) {
+  document.querySelectorAll(sel).forEach(cb => cb.checked = state);
+}
+
+// Show/hide action section on parent change
+document.addEventListener('DOMContentLoaded', function() {
+  const p = document.getElementById('deParent');
+  if (p) p.addEventListener('change', function() {
+    document.getElementById('deActionSection').style.display = (this.value && this.value !== '0') ? '' : 'none';
+  });
+});
 </script>
 {% endblock %}
