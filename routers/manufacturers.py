@@ -56,13 +56,25 @@ async def save_mfr(request: Request,
                    company_name: str = Form(""),
                    can_view_costs: int = Form(0),
                    role: str = Form("manufacturer"),
-                   allowed_categories: str = Form("")):
+                   is_approved: int = Form(0),
+                   is_active: int = Form(0),
+                   parent_id: int = Form(0)):
     auth.require_admin(request)
-    udb.update_admin(id,
+    form = await request.form()
+    allowed_menus = ",".join(form.getlist("allowed_menus"))
+    allowed_categories = ",".join(form.getlist("allowed_categories"))
+    allowed_actions = ",".join(form.getlist("allowed_actions"))
+    udb.update_admin(
+        id,
         company_name=company_name,
         can_view_costs=can_view_costs,
         role=role,
+        is_approved=is_approved,
+        is_active=is_active,
+        allowed_menus=allowed_menus,
         allowed_categories=allowed_categories,
+        parent_id=parent_id if parent_id else None,
+        allowed_actions=allowed_actions,
     )
     if role == "dealer":
         return RedirectResponse("/dealers?msg=Kullanıcı+bayi+olarak+taşındı&msg_type=info", 303)
