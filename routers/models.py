@@ -314,32 +314,6 @@ async def excel_template_download(request: Request):
         for col, v in enumerate(row_data, 1):
             ws2.cell(row=row_idx, column=col, value=v)
 
-    # ── Sheet 3: Opsiyonlar ────────────────────────────────────────────────────
-    ws3 = wb.create_sheet("Opsiyonlar")
-    ws3.row_dimensions[1].height = 28
-
-    opt_info = [
-        ("ID",              "7C3AED", 8),
-        ("Opsiyon Adı",     "7C3AED", 35),
-        ("Fiyat",           "7C3AED", 12),
-        ("Para Birimi",     "7C3AED", 12),
-        ("Miktar Tipi",     "7C3AED", 16),
-        ("Uyumlu? (E/H)",   "7C3AED", 16),
-    ]
-    for col, (title, color, width) in enumerate(opt_info, 1):
-        _hdr(ws3, col, title, color, width)
-
-    # Sistemdeki tüm opsiyonları listele
-    options = fdb.get_options()
-    qty_labels = {"MANUAL": "Elle Giriş", "FIXED_1": "Sabit 1", "PER_MACHINE": "Makine Adeti"}
-    for row_idx, opt in enumerate(options, 2):
-        ws3.cell(row=row_idx, column=1, value=opt["id"])
-        ws3.cell(row=row_idx, column=2, value=opt.get("name", ""))
-        ws3.cell(row=row_idx, column=3, value=opt.get("price", 0))
-        ws3.cell(row=row_idx, column=4, value=opt.get("currency", ""))
-        ws3.cell(row=row_idx, column=5, value=qty_labels.get(opt.get("qty_type", "MANUAL"), opt.get("qty_type", "")))
-        ws3.cell(row=row_idx, column=6, value="H")  # default: uyumsuz
-
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -409,22 +383,5 @@ async def excel_import(request: Request, excel_file: UploadFile = File(...)):
     result["specs"]    = specs
     result["specs_en"] = specs_en
     result["specs_zh"] = specs_zh
-
-    # ── Sheet 3: Opsiyonlar ────────────────────────────────────────────────────
-    compatible_ids = []
-    if len(wb.sheetnames) > 2:
-        ws3 = wb[wb.sheetnames[2]]
-        for row in ws3.iter_rows(min_row=2, values_only=True):
-            if not row or row[0] is None:
-                continue
-            opt_id = row[0]
-            uyumlu = _sv(row[5]) if len(row) > 5 else "H"
-            if uyumlu.upper() in ("E", "EVET", "YES", "1", "TRUE"):
-                try:
-                    compatible_ids.append(int(opt_id))
-                except Exception:
-                    pass
-
-    result["compatible_option_ids"] = compatible_ids
 
     return JSONResponse(result)
