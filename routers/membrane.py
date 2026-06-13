@@ -2,14 +2,127 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import base64
 import json
+import math as _math
 import os
+from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Request, Form, UploadFile, File
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, Response
 
 import db.factory as fdb
 import auth
 from tmpl import templates
+
+
+# ── NC Code Generator ─────────────────────────────────────────────────────────
+
+def _eval_expr(expr, variables):
+    """Safely evaluate a parametric expression using the given variables."""
+    env = {k: float(v) for k, v in variables.items()}
+    env.update({k: getattr(_math, k) for k in dir(_math) if not k.startswith("_")})
+    env["__builtins__"] = None
+    return float(eval(str(expr).strip(), env))
+
+
+def _generate_nc(model, paths, variables):
+    """Generate Fanuc-compatible G-code from a cap model and plate variables."""
+    ev = lambda expr: _eval_expr(expr, variables)
+    lines = []
+    name_upper = model["name"].upper().replace("(", "").replace(")", "")
+    var_comment = " ".join(f"{k}={v}" for k, v in sorted(variables.items()))
+    safe_z = float(model.get("safe_z") or 5.0)
+    feed_xy = int(model.get("feed_xy") or 3000)
+    feed_z = int(model.get("feed_z") or 1000)
+    spindle = int(model.get("spindle_speed") or 18000)
+    tool_no = int(model.get("tool_no") or 1)
+
+    lines += [
+        "%",
+        f"O0001 ({name_upper})",
+        f"({var_comment})",
+        f"(GENERATED {datetime.now().strftime('%Y-%m-%d %H:%M')})",
+        "G17 G21 G40 G49 G80 G90",
+        f"T{tool_no} M6",
+        f"S{spindle} M3",
+        f"G0 G90 Z{safe_z:.3f}",
+    ]
+
+    for p in paths:
+        label = (p.get("label") or "").strip()
+        ptype = p.get("path_type", "LINE")
+        if label:
+            lines.append(f"({label})")
+
+        try:
+            x1, y1 = ev(p["x1"]), ev(p["y1"])
+            x2, y2 = ev(p["x2"]), ev(p["y2"])
+            z2 = ev(p["z2"])
+            feed = int(ev(p["feed_override"])) if str(p.get("feed_override", "")).strip() else feed_xy
+
+            if ptype == "LINE":
+                lines += [
+                    f"G0 Z{safe_z:.3f}",
+                    f"G0 X{x1:.3f} Y{y1:.3f}",
+                    f"G1 Z{z2:.3f} F{feed_z}",
+                    f"G1 X{x2:.3f} Y{y2:.3f} F{feed}",
+                ]
+
+            elif ptype in ("ARC_CW", "ARC_CCW"):
+                cx, cy = ev(p.get("ix") or "0"), ev(p.get("jy") or "0")
+                I = round(cx - x1, 3)
+                J = round(cy - y1, 3)
+                cmd = "G2" if ptype == "ARC_CW" else "G3"
+                lines += [
+                    f"G0 Z{safe_z:.3f}",
+                    f"G0 X{x1:.3f} Y{y1:.3f}",
+                    f"G1 Z{z2:.3f} F{feed_z}",
+                    f"{cmd} X{x2:.3f} Y{y2:.3f} I{I:.3f} J{J:.3f} F{feed}",
+                ]
+
+            elif ptype == "POCKET":
+                tool_dia = float(p.get("tool_dia") or 8.0)
+                step_over = float(p.get("step_over") or 0.5)
+                step = max(0.1, tool_dia * step_over)
+                r = tool_dia / 2.0
+                # Ensure x1<x2, y1<y2
+                lx, rx = (min(x1,x2)+r, max(x1,x2)-r)
+                by, ty = (min(y1,y2)+r, max(y1,y2)-r)
+                lines.append(f"G0 Z{safe_z:.3f}")
+                direction = 1
+                y = by
+                while y <= ty + 0.001:
+                    sx, ex = (lx, rx) if direction == 1 else (rx, lx)
+                    lines += [
+                        f"G0 X{sx:.3f} Y{y:.3f}",
+                        f"G1 Z{z2:.3f} F{feed_z}",
+                        f"G1 X{ex:.3f} F{feed}",
+                        f"G0 Z{safe_z:.3f}",
+                    ]
+                    y = round(y + step, 4)
+                    direction *= -1
+                # Contour finish pass
+                lines += [
+                    f"G0 X{lx:.3f} Y{by:.3f}",
+                    f"G1 Z{z2:.3f} F{feed_z}",
+                    f"G1 X{rx:.3f} F{feed}",
+                    f"G1 Y{ty:.3f}",
+                    f"G1 X{lx:.3f}",
+                    f"G1 Y{by:.3f}",
+                    f"G0 Z{safe_z:.3f}",
+                ]
+
+        except Exception as exc:
+            lines.append(f"(ERROR IN PATH '{label or ptype}': {exc})")
+
+    lines += [
+        f"G0 Z{safe_z:.3f}",
+        "M5",
+        "G28 G91 Z0.",
+        "M30",
+        "%",
+    ]
+    return "\n".join(lines)
 
 router = APIRouter(prefix="/membrane")
 
@@ -349,3 +462,139 @@ async def delete_door_old(request: Request, id: int = Form(...)):
     auth.require_user(request)
     fdb.del_membrane_door(id)
     return RedirectResponse("/membrane", 303)
+
+
+# ── Parametric Cap Models ─────────────────────────────────────────────────────
+
+@router.get("/caps")
+async def caps_list(request: Request):
+    user = auth.require_user(request)
+    models = fdb.get_cap_models()
+    return templates.TemplateResponse(request, "membrane_caps.html", {
+        "user": user, "models": models, "active_page": "membrane",
+        "edit_model": None, "paths": [],
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
+    })
+
+
+@router.get("/caps/{mid}")
+async def caps_edit(request: Request, mid: int):
+    user = auth.require_user(request)
+    model = fdb.get_cap_model(mid)
+    if not model:
+        return RedirectResponse("/membrane/caps", 303)
+    paths = fdb.get_cap_paths(mid)
+    models = fdb.get_cap_models()
+    return templates.TemplateResponse(request, "membrane_caps.html", {
+        "user": user, "models": models, "edit_model": model, "paths": paths,
+        "active_page": "membrane",
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
+    })
+
+
+@router.post("/caps/save")
+async def caps_save(request: Request,
+                    id: int = Form(0),
+                    name: str = Form(...),
+                    description: str = Form(""),
+                    tool_no: int = Form(1),
+                    spindle_speed: int = Form(18000),
+                    feed_xy: int = Form(3000),
+                    feed_z: int = Form(1000),
+                    safe_z: float = Form(5.0),
+                    constants_json: str = Form("{}")):
+    auth.require_user(request)
+    try:
+        json.loads(constants_json or "{}")
+    except Exception:
+        constants_json = "{}"
+    mid = fdb.save_cap_model(
+        id=id or 0, name=name, description=description,
+        tool_no=tool_no, spindle_speed=spindle_speed,
+        feed_xy=feed_xy, feed_z=feed_z, safe_z=safe_z,
+        constants_json=constants_json,
+    )
+    return RedirectResponse(f"/membrane/caps/{mid}?msg=Model+kaydedildi&msg_type=success", 303)
+
+
+@router.post("/caps/delete")
+async def caps_delete(request: Request, id: int = Form(...)):
+    auth.require_user(request)
+    fdb.del_cap_model(id)
+    return RedirectResponse("/membrane/caps?msg=Model+silindi&msg_type=success", 303)
+
+
+@router.post("/caps/{mid}/path/save")
+async def cap_path_save(request: Request, mid: int,
+                        id: int = Form(0),
+                        seq: int = Form(0),
+                        label: str = Form(""),
+                        path_type: str = Form("LINE"),
+                        x1: str = Form("0"), y1: str = Form("0"), z1: str = Form("0"),
+                        x2: str = Form("W"), y2: str = Form("H"), z2: str = Form("-T"),
+                        ix: str = Form("0"), jy: str = Form("0"),
+                        tool_dia: float = Form(8.0),
+                        step_over: float = Form(0.5),
+                        feed_override: str = Form("")):
+    auth.require_user(request)
+    fdb.save_cap_path(
+        id=id or 0, model_id=mid, seq=seq, label=label, path_type=path_type,
+        x1=x1, y1=y1, z1=z1, x2=x2, y2=y2, z2=z2,
+        ix=ix, jy=jy, tool_dia=tool_dia, step_over=step_over, feed_override=feed_override,
+    )
+    return RedirectResponse(f"/membrane/caps/{mid}?msg=Yol+kaydedildi&msg_type=success", 303)
+
+
+@router.post("/caps/{mid}/path/delete")
+async def cap_path_delete(request: Request, mid: int, path_id: int = Form(...)):
+    auth.require_user(request)
+    fdb.del_cap_path(path_id)
+    return RedirectResponse(f"/membrane/caps/{mid}?msg=Yol+silindi&msg_type=success", 303)
+
+
+@router.post("/caps/{mid}/generate")
+async def cap_generate(request: Request, mid: int,
+                       W: float = Form(0), H: float = Form(0), T: float = Form(18.0),
+                       extra_json: str = Form("{}")):
+    auth.require_user(request)
+    model = fdb.get_cap_model(mid)
+    if not model:
+        return JSONResponse({"error": "Model bulunamadı"}, status_code=404)
+    paths = fdb.get_cap_paths(mid)
+    variables = {"W": W, "H": H, "T": T}
+    try:
+        extra = json.loads(extra_json or "{}")
+        variables.update({k: float(v) for k, v in extra.items()})
+    except Exception:
+        pass
+    constants = model.get("constants") or {}
+    variables.update({k: float(v) for k, v in constants.items()})
+    nc = _generate_nc(model, paths, variables)
+    return JSONResponse({"nc": nc})
+
+
+@router.get("/caps/{mid}/download")
+async def cap_download(request: Request, mid: int,
+                       W: float = 0, H: float = 0, T: float = 18.0,
+                       extra: str = "{}"):
+    auth.require_user(request)
+    model = fdb.get_cap_model(mid)
+    if not model:
+        return RedirectResponse("/membrane/caps", 303)
+    paths = fdb.get_cap_paths(mid)
+    variables = {"W": W, "H": H, "T": T}
+    try:
+        variables.update({k: float(v) for k, v in json.loads(extra).items()})
+    except Exception:
+        pass
+    variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
+    nc = _generate_nc(model, paths, variables)
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in model["name"])
+    filename = f"{safe_name}_W{int(W)}xH{int(H)}.nc"
+    return Response(
+        content=nc,
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

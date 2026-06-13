@@ -1047,6 +1047,34 @@ def _init_membrane(c):
     )""")
     _acol(c, "membrane_doors", "list_id", "INTEGER DEFAULT NULL")
 
+    # Parametric cap macro tables
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_models(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        tool_no INTEGER DEFAULT 1,
+        spindle_speed INTEGER DEFAULT 18000,
+        feed_xy INTEGER DEFAULT 3000,
+        feed_z INTEGER DEFAULT 1000,
+        safe_z REAL DEFAULT 5.0,
+        constants_json TEXT DEFAULT '{}',
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_paths(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        model_id INTEGER NOT NULL REFERENCES membrane_cap_models(id) ON DELETE CASCADE,
+        seq INTEGER DEFAULT 0,
+        label TEXT DEFAULT '',
+        path_type TEXT DEFAULT 'LINE',
+        x1 TEXT DEFAULT '0', y1 TEXT DEFAULT '0', z1 TEXT DEFAULT '0',
+        x2 TEXT DEFAULT 'W', y2 TEXT DEFAULT 'H', z2 TEXT DEFAULT '-T',
+        ix TEXT DEFAULT '0', jy TEXT DEFAULT '0',
+        tool_dia REAL DEFAULT 8.0,
+        step_over REAL DEFAULT 0.5,
+        feed_override TEXT DEFAULT ''
+    )""")
+
+
 def get_membrane_materials():
     with _c() as c:
         rows = c.execute("SELECT id,name,material_type,price,currency,unit,sheet_width,sheet_height,usage_per_m2,notes FROM membrane_materials ORDER BY material_type,name").fetchall()
@@ -1156,3 +1184,74 @@ def get_membrane_rates():
 def set_membrane_rate(currency, rate):
     with _c() as c:
         c.execute("INSERT OR REPLACE INTO membrane_rates(currency,rate_to_try,updated_at) VALUES(?,?,datetime('now'))", (currency, rate))
+
+
+# ── Parametric Cap Models ─────────────────────────────────────────────────────
+
+_CM_KEYS = ["id","name","description","tool_no","spindle_speed","feed_xy","feed_z","safe_z","constants_json","created_at"]
+_CM_COLS = ",".join(_CM_KEYS)
+_CP_KEYS = ["id","model_id","seq","label","path_type","x1","y1","z1","x2","y2","z2","ix","jy","tool_dia","step_over","feed_override"]
+_CP_COLS = ",".join(_CP_KEYS)
+
+
+def get_cap_models():
+    with _c() as c:
+        rows = c.execute(f"SELECT {_CM_COLS} FROM membrane_cap_models ORDER BY name").fetchall()
+    return [dict(zip(_CM_KEYS, r)) for r in rows]
+
+
+def get_cap_model(mid):
+    with _c() as c:
+        r = c.execute(f"SELECT {_CM_COLS} FROM membrane_cap_models WHERE id=?", (mid,)).fetchone()
+    if not r:
+        return None
+    m = dict(zip(_CM_KEYS, r))
+    try:
+        m["constants"] = json.loads(m["constants_json"] or "{}")
+    except Exception:
+        m["constants"] = {}
+    return m
+
+
+def save_cap_model(id=0, **kw):
+    allowed = ["name","description","tool_no","spindle_speed","feed_xy","feed_z","safe_z","constants_json"]
+    f = {k: v for k, v in kw.items() if k in allowed}
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{k}=?" for k in f)
+            c.execute(f"UPDATE membrane_cap_models SET {sets} WHERE id=?", list(f.values()) + [id])
+            return id
+        cols = ",".join(f.keys())
+        ph = ",".join("?" * len(f))
+        cur = c.execute(f"INSERT INTO membrane_cap_models({cols}) VALUES({ph})", list(f.values()))
+        return cur.lastrowid
+
+
+def del_cap_model(mid):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_cap_models WHERE id=?", (mid,))
+
+
+def get_cap_paths(model_id):
+    with _c() as c:
+        rows = c.execute(f"SELECT {_CP_COLS} FROM membrane_cap_paths WHERE model_id=? ORDER BY seq,id", (model_id,)).fetchall()
+    return [dict(zip(_CP_KEYS, r)) for r in rows]
+
+
+def save_cap_path(id=0, **kw):
+    allowed = ["model_id","seq","label","path_type","x1","y1","z1","x2","y2","z2","ix","jy","tool_dia","step_over","feed_override"]
+    f = {k: v for k, v in kw.items() if k in allowed}
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{k}=?" for k in f)
+            c.execute(f"UPDATE membrane_cap_paths SET {sets} WHERE id=?", list(f.values()) + [id])
+            return id
+        cols = ",".join(f.keys())
+        ph = ",".join("?" * len(f))
+        cur = c.execute(f"INSERT INTO membrane_cap_paths({cols}) VALUES({ph})", list(f.values()))
+        return cur.lastrowid
+
+
+def del_cap_path(pid):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_cap_paths WHERE id=?", (pid,))

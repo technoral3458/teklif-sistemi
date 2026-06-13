@@ -1,0 +1,607 @@
+{% extends "base.html" %}
+{% block page_title %}Kapak Makroları{% endblock %}
+
+{% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
+
+<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+  <a href="/membrane" class="btn btn-ghost btn-sm">← Membran</a>
+  <h2 style="margin:0;font-size:18px;font-weight:700;flex:1;">🔧 Parametrik Kapak Makroları</h2>
+  {% if not edit_model %}
+  <button class="btn btn-primary btn-sm" onclick="openModal('newModelModal')">+ Yeni Model</button>
+  {% else %}
+  <a href="/membrane/caps" class="btn btn-ghost btn-sm">← Modeller</a>
+  {% endif %}
+</div>
+
+{% if msg %}
+<div class="alert alert-{{ msg_type }}" style="margin-bottom:12px;">{{ msg }}</div>
+{% endif %}
+
+{% if edit_model %}
+{# ═══════════ EDIT VIEW ═══════════ #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+  {# Left panel: model info + paths #}
+  <div style="display:flex;flex-direction:column;gap:16px;min-width:0;">
+
+    {# Model info card #}
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 class="card-title" style="margin:0;">⚙️ {{ edit_model.name }}</h3>
+        <button class="btn btn-outline btn-sm" onclick="openModal('editModelModal')">✏️ Düzenle</button>
+      </div>
+      <div class="card-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">
+        {% for label, val in [
+          ('Takım', 'T' ~ edit_model.tool_no),
+          ('Devir (S)', edit_model.spindle_speed),
+          ('Besleme XY', edit_model.feed_xy ~ ' mm/dk'),
+          ('Besleme Z', edit_model.feed_z ~ ' mm/dk'),
+          ('Güvenli Z', edit_model.safe_z ~ ' mm'),
+        ] %}
+        <div style="padding:7px 10px;background:var(--surface-2);border-radius:6px;">
+          <div style="color:var(--text-muted);font-size:10px;">{{ label }}</div>
+          <div style="font-weight:700;margin-top:2px;">{{ val }}</div>
+        </div>
+        {% endfor %}
+        <div style="padding:7px 10px;background:var(--surface-2);border-radius:6px;">
+          <div style="color:var(--text-muted);font-size:10px;">Sabitler</div>
+          <div style="font-weight:700;margin-top:2px;font-size:11px;font-family:monospace;">
+            {% for k,v in edit_model.constants.items() %}{{ k }}={{ v }} {% else %}—{% endfor %}
+          </div>
+        </div>
+      </div>
+      {% if edit_model.description %}
+      <div style="padding:4px 16px 12px;font-size:12px;color:var(--text-muted);">{{ edit_model.description }}</div>
+      {% endif %}
+    </div>
+
+    {# Paths card #}
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 class="card-title" style="margin:0;">🛤️ Bıçak Yolları
+          <span style="font-size:12px;color:var(--text-muted);font-weight:400;">({{ paths|length }})</span>
+        </h3>
+        <button class="btn btn-primary btn-sm" onclick="openPathModal(0)">+ Yol Ekle</button>
+      </div>
+      <div style="padding:0;">
+        {% if paths %}
+        {% for p in paths %}
+        <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px;">{{ loop.index }}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+              {% if p.path_type == 'LINE' %}
+              <span class="badge" style="background:rgba(59,130,246,.18);color:#60a5fa;font-size:10px;">LINE</span>
+              {% elif p.path_type == 'ARC_CW' %}
+              <span class="badge" style="background:rgba(168,85,247,.18);color:#c084fc;font-size:10px;">YAY CW</span>
+              {% elif p.path_type == 'ARC_CCW' %}
+              <span class="badge" style="background:rgba(168,85,247,.18);color:#c084fc;font-size:10px;">YAY CCW</span>
+              {% elif p.path_type == 'POCKET' %}
+              <span class="badge" style="background:rgba(34,197,94,.18);color:#4ade80;font-size:10px;">CEP</span>
+              {% endif %}
+              <strong style="font-size:13px;">{{ p.label or ('Yol ' ~ loop.index) }}</strong>
+              <span style="font-size:10px;color:var(--text-muted);">sıra:{{ p.seq }}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);font-family:monospace;">
+              {% if p.path_type == 'LINE' %}
+              ({{ p.x1 }}, {{ p.y1 }}) → ({{ p.x2 }}, {{ p.y2 }})&nbsp; Z={{ p.z2 }}
+              {% elif p.path_type in ('ARC_CW','ARC_CCW') %}
+              ({{ p.x1 }}, {{ p.y1 }}) → ({{ p.x2 }}, {{ p.y2 }})&nbsp; Merkez({{ p.ix }},{{ p.jy }}) Z={{ p.z2 }}
+              {% elif p.path_type == 'POCKET' %}
+              ({{ p.x1 }},{{ p.y1 }})→({{ p.x2 }},{{ p.y2 }}) Z={{ p.z2 }} Ø{{ p.tool_dia }}mm step={{ p.step_over }}
+              {% endif %}
+              {% if p.feed_override %}&nbsp; F={{ p.feed_override }}{% endif %}
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0;">
+            <button class="btn btn-ghost btn-sm" onclick='openPathModal(
+              {{ p.id }}, {{ p.seq }},
+              {{ p.label|tojson }}, {{ p.path_type|tojson }},
+              {{ p.x1|tojson }}, {{ p.y1|tojson }}, {{ p.z1|tojson }},
+              {{ p.x2|tojson }}, {{ p.y2|tojson }}, {{ p.z2|tojson }},
+              {{ p.ix|tojson }}, {{ p.jy|tojson }},
+              {{ p.tool_dia }}, {{ p.step_over }}, {{ p.feed_override|tojson }}
+            )'>✏️</button>
+            <form method="post" action="/membrane/caps/{{ edit_model.id }}/path/delete"
+                  onsubmit="return confirm('Bu yolu sil?')" style="display:inline;">
+              <input type="hidden" name="path_id" value="{{ p.id }}" />
+              <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="padding:32px;text-align:center;color:var(--text-muted);">
+          Henüz yol tanımlanmadı.<br>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="openPathModal(0)">+ İlk Yolu Ekle</button>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Delete model #}
+    <form method="post" action="/membrane/caps/delete"
+          onsubmit="return confirm('\"{{ edit_model.name }}\" modelini ve tüm yollarını sil?')"
+          style="text-align:right;">
+      <input type="hidden" name="id" value="{{ edit_model.id }}" />
+      <button type="submit" class="btn btn-danger btn-sm">🗑 Modeli Sil</button>
+    </form>
+
+  </div>
+
+  {# Right panel: NC generator #}
+  <div>
+    <div class="card" style="position:sticky;top:16px;">
+      <div class="card-header"><h3 class="card-title" style="margin:0;">🖥️ NC Kodu Üret</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+
+        <div style="padding:9px 12px;background:var(--surface-2);border-radius:8px;font-size:12px;">
+          <strong style="color:var(--accent);">Değişkenler:</strong>
+          <code>W</code>=Genişlik, <code>H</code>=Yükseklik, <code>T</code>=Kalınlık
+          {% if edit_model.constants %}
+          &nbsp;|&nbsp;
+          {% for k,v in edit_model.constants.items() %}
+          <code>{{ k }}</code>=<em>{{ v }}</em>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+          {% endif %}
+          <br><span style="color:var(--text-muted);font-size:11px;">Formül örn: <code>W-50</code>, <code>H/2</code>, <code>-T*0.8</code></span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">W — Genişlik</label>
+            <input type="number" id="ncW" class="form-control" value="600" step="1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">H — Yükseklik</label>
+            <input type="number" id="ncH" class="form-control" value="900" step="1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">T — Kalınlık</label>
+            <input type="number" id="ncT" class="form-control" value="18" step="0.5" />
+          </div>
+        </div>
+
+        {% if edit_model.constants %}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;">
+          {% for k,v in edit_model.constants.items() %}
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">{{ k }}</label>
+            <input type="number" id="ncConst_{{ k }}" class="form-control" value="{{ v }}" step="any" />
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" style="flex:1;" onclick="generateNC()">▶ Ön İzleme</button>
+          <button class="btn btn-outline" style="flex:1;" onclick="downloadNC()">⬇ .nc İndir</button>
+        </div>
+
+        <div id="ncStatus" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;background:var(--surface-2);"></div>
+
+        <div style="position:relative;">
+          <textarea id="ncOutput" readonly
+            style="width:100%;height:340px;font-family:monospace;font-size:11px;line-height:1.5;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text-primary);resize:vertical;box-sizing:border-box;"
+            placeholder="Parametreleri girin → Ön İzleme..."></textarea>
+          <button onclick="copyNC()"
+            style="position:absolute;top:8px;right:8px;padding:3px 9px;font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-muted);">
+            📋 Kopyala
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# Edit Model Modal #}
+<div id="editModelModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Model Düzenle</h3>
+      <button class="modal-close" onclick="closeModal('editModelModal')">&times;</button>
+    </div>
+    <form method="post" action="/membrane/caps/save">
+      <input type="hidden" name="id" value="{{ edit_model.id }}" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Model Adı *</label>
+          <input type="text" name="name" class="form-control" required value="{{ edit_model.name }}" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Açıklama</label>
+          <input type="text" name="description" class="form-control" value="{{ edit_model.description }}" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Takım No</label>
+            <input type="number" name="tool_no" class="form-control" value="{{ edit_model.tool_no }}" min="1" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Devir (S)</label>
+            <input type="number" name="spindle_speed" class="form-control" value="{{ edit_model.spindle_speed }}" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Güvenli Z</label>
+            <input type="number" name="safe_z" class="form-control" value="{{ edit_model.safe_z }}" step="0.5" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Besleme XY</label>
+            <input type="number" name="feed_xy" class="form-control" value="{{ edit_model.feed_xy }}" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Besleme Z</label>
+            <input type="number" name="feed_z" class="form-control" value="{{ edit_model.feed_z }}" /></div>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Özel Sabitler (JSON) <span style="color:var(--text-muted);">örn: {"A":50,"B":25}</span></label>
+          <input type="text" name="constants_json" id="editConstJson" class="form-control" style="font-family:monospace;"
+                 value="{{ edit_model.constants_json }}" />
+        </div>
+        <div style="padding:10px;background:var(--surface-2);border-radius:8px;">
+          <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:var(--text-muted);">Sabit Ekle / Çıkar</div>
+          <div id="editConstBuilder" style="display:flex;flex-direction:column;gap:6px;"></div>
+          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px;"
+                  onclick="addConstRow('editConstBuilder','editConstJson')">+ Sabit Ekle</button>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editModelModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Path Add/Edit Modal #}
+<div id="pathModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:540px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="pathModalTitle">Yol Ekle</h3>
+      <button class="modal-close" onclick="closeModal('pathModal')">&times;</button>
+    </div>
+    <form method="post" action="/membrane/caps/{{ edit_model.id }}/path/save">
+      <input type="hidden" name="id" id="pid" value="0" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Etiket</label>
+            <input type="text" name="label" id="plabel" class="form-control" placeholder="örn: Üst profil" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Sıra</label>
+            <input type="number" name="seq" id="pseq" class="form-control" value="{{ (paths|length + 1) * 10 }}" />
+          </div>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Yol Tipi</label>
+          <select name="path_type" id="ptype" class="form-control" onchange="updatePathFields()">
+            <option value="LINE">📏 Düz Çizgi (G1)</option>
+            <option value="ARC_CW">↻ Yay – Saat Yönü (G2)</option>
+            <option value="ARC_CCW">↺ Yay – Saat Aksi (G3)</option>
+            <option value="POCKET">◻ Cep Frezeleme</option>
+          </select>
+        </div>
+
+        <div style="padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:11px;color:var(--text-muted);">
+          <strong>Formül değişkenleri:</strong>
+          <code>W</code> <code>H</code> <code>T</code>
+          {% for k in edit_model.constants.keys() %}<code>{{ k }}</code>{% endfor %}
+          — Örn: <code>W/2-10</code>, <code>H-50</code>, <code>-T*0.8</code>
+        </div>
+
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+          <legend style="font-size:11px;font-weight:600;padding:0 6px;color:var(--text-muted);">Başlangıç Noktası</legend>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">X Başlangıç</label>
+              <input type="text" name="x1" id="px1" class="form-control" value="0" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Y Başlangıç</label>
+              <input type="text" name="y1" id="py1" class="form-control" value="0" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Z Başlangıç</label>
+              <input type="text" name="z1" id="pz1" class="form-control" value="0" /></div>
+          </div>
+        </fieldset>
+
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+          <legend style="font-size:11px;font-weight:600;padding:0 6px;color:var(--text-muted);">Bitiş Noktası</legend>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">X Bitiş</label>
+              <input type="text" name="x2" id="px2" class="form-control" value="W" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Y Bitiş</label>
+              <input type="text" name="y2" id="py2" class="form-control" value="H" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Z Kesim Derinliği</label>
+              <input type="text" name="z2" id="pz2" class="form-control" value="-T" /></div>
+          </div>
+        </fieldset>
+
+        <fieldset id="arcFields" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:none;">
+          <legend style="font-size:11px;font-weight:600;padding:0 6px;color:var(--text-muted);">Yay Merkezi</legend>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Merkez X</label>
+              <input type="text" name="ix" id="pix" class="form-control" value="0" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Merkez Y</label>
+              <input type="text" name="jy" id="pjy" class="form-control" value="0" /></div>
+          </div>
+        </fieldset>
+
+        <fieldset id="pocketFields" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:none;">
+          <legend style="font-size:11px;font-weight:600;padding:0 6px;color:var(--text-muted);">Cep Ayarları</legend>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Takım Çapı (mm)</label>
+              <input type="number" name="tool_dia" id="ptooldia" class="form-control" value="8" step="0.1" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Step Over (0.1–1.0)</label>
+              <input type="number" name="step_over" id="pstepover" class="form-control" value="0.5" step="0.05" min="0.1" max="1.0" /></div>
+          </div>
+        </fieldset>
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Besleme Override <span style="color:var(--text-muted);">(boş = model varsayılanı)</span></label>
+          <input type="text" name="feed_override" id="pfeed" class="form-control" placeholder="örn: 1500" />
+        </div>
+
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('pathModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% else %}
+{# ═══════════ LIST VIEW ═══════════ #}
+<div class="card">
+  <div style="padding:0;">
+    {% if models %}
+    <div class="table-wrap">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;text-align:left;">Model Adı</th>
+            <th class="col-hide-sm" style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;">Açıklama</th>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;text-align:center;">Takım</th>
+            <th class="col-hide-sm" style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;">S / F-XY</th>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;">İşlemler</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in models %}
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:12px 16px;font-weight:700;">{{ m.name }}</td>
+            <td class="col-hide-sm" style="padding:12px 16px;font-size:12px;color:var(--text-muted);">{{ m.description or '—' }}</td>
+            <td style="padding:12px 16px;text-align:center;font-family:monospace;">T{{ m.tool_no }}</td>
+            <td class="col-hide-sm" style="padding:12px 16px;font-family:monospace;font-size:12px;">{{ m.spindle_speed }} / {{ m.feed_xy }}</td>
+            <td style="padding:12px 16px;">
+              <div style="display:flex;gap:4px;">
+                <a href="/membrane/caps/{{ m.id }}" class="btn btn-outline btn-sm">✏️ <span class="btn-text">Düzenle</span></a>
+                <form method="post" action="/membrane/caps/delete"
+                      onsubmit="return confirm('Bu modeli sil?')" style="display:inline;">
+                  <input type="hidden" name="id" value="{{ m.id }}" />
+                  <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:48px;text-align:center;color:var(--text-muted);">
+      <div style="font-size:36px;margin-bottom:8px;">🔧</div>
+      <div style="margin-bottom:16px;">Henüz kapak makro modeli yok.</div>
+      <button class="btn btn-primary" onclick="openModal('newModelModal')">+ İlk Modeli Oluştur</button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# New Model Modal (list view) #}
+<div id="newModelModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Yeni Kapak Modeli</h3>
+      <button class="modal-close" onclick="closeModal('newModelModal')">&times;</button>
+    </div>
+    <form method="post" action="/membrane/caps/save">
+      <input type="hidden" name="id" value="0" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Model Adı *</label>
+          <input type="text" name="name" class="form-control" required placeholder="örn: Standart Membran Kapak" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Açıklama</label>
+          <input type="text" name="description" class="form-control" placeholder="Opsiyonel" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Takım No</label>
+            <input type="number" name="tool_no" class="form-control" value="1" min="1" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Devir (S)</label>
+            <input type="number" name="spindle_speed" class="form-control" value="18000" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Güvenli Z</label>
+            <input type="number" name="safe_z" class="form-control" value="5" step="0.5" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Besleme XY</label>
+            <input type="number" name="feed_xy" class="form-control" value="3000" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Besleme Z</label>
+            <input type="number" name="feed_z" class="form-control" value="1000" /></div>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Özel Sabitler (JSON) <span style="color:var(--text-muted);">örn: {"A":50,"B":25}</span></label>
+          <input type="text" name="constants_json" id="newConstJson" class="form-control" style="font-family:monospace;" value="{}" />
+        </div>
+        <div style="padding:10px;background:var(--surface-2);border-radius:8px;">
+          <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:var(--text-muted);">Sabit Ekle / Çıkar</div>
+          <div id="newConstBuilder" style="display:flex;flex-direction:column;gap:6px;"></div>
+          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px;"
+                  onclick="addConstRow('newConstBuilder','newConstJson')">+ Sabit Ekle</button>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('newModelModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Oluştur</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MODEL_ID = {{ edit_model.id if edit_model else 0 }};
+{% if edit_model and edit_model.constants %}
+const MODEL_CONSTS = {{ edit_model.constants|tojson }};
+{% else %}
+const MODEL_CONSTS = {};
+{% endif %}
+
+// ── Path modal ────────────────────────────────────────────────────────────
+function openPathModal(id, seq, label, ptype, x1,y1,z1,x2,y2,z2,ix,jy,tooldia,stepover,feed) {
+  document.getElementById('pid').value = id || 0;
+  document.getElementById('pathModalTitle').textContent = id ? 'Yol Düzenle' : 'Yol Ekle';
+  document.getElementById('plabel').value = label != null ? label : '';
+  document.getElementById('pseq').value   = seq != null ? seq : {{ (paths|length + 1) * 10 if paths is defined else 10 }};
+  document.getElementById('ptype').value  = ptype || 'LINE';
+  document.getElementById('px1').value = x1 != null ? x1 : '0';
+  document.getElementById('py1').value = y1 != null ? y1 : '0';
+  document.getElementById('pz1').value = z1 != null ? z1 : '0';
+  document.getElementById('px2').value = x2 != null ? x2 : 'W';
+  document.getElementById('py2').value = y2 != null ? y2 : 'H';
+  document.getElementById('pz2').value = z2 != null ? z2 : '-T';
+  document.getElementById('pix').value = ix != null ? ix : '0';
+  document.getElementById('pjy').value = jy != null ? jy : '0';
+  document.getElementById('ptooldia').value  = tooldia || 8;
+  document.getElementById('pstepover').value = stepover || 0.5;
+  document.getElementById('pfeed').value     = feed || '';
+  updatePathFields();
+  openModal('pathModal');
+}
+
+function updatePathFields() {
+  const t = document.getElementById('ptype')?.value;
+  if (!t) return;
+  document.getElementById('arcFields').style.display    = (t === 'ARC_CW' || t === 'ARC_CCW') ? '' : 'none';
+  document.getElementById('pocketFields').style.display = t === 'POCKET' ? '' : 'none';
+}
+
+// ── Constants builder ─────────────────────────────────────────────────────
+function addConstRow(builderId, jsonId) {
+  const builder = document.getElementById(builderId);
+  if (!builder) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;';
+  row.innerHTML = `
+    <input type="text" placeholder="Ad (A,B...)" value=""
+      style="width:80px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:monospace;"
+      oninput="syncConst('${builderId}','${jsonId}')" />
+    <span style="color:var(--text-muted);">=</span>
+    <input type="number" placeholder="Değer" value="" step="any"
+      style="width:90px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);"
+      oninput="syncConst('${builderId}','${jsonId}')" />
+    <button type="button" onclick="this.parentElement.remove();syncConst('${builderId}','${jsonId}');"
+      style="padding:4px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--danger);">✕</button>
+  `;
+  builder.appendChild(row);
+}
+
+function syncConst(builderId, jsonId) {
+  const builder = document.getElementById(builderId);
+  const input   = document.getElementById(jsonId);
+  if (!builder || !input) return;
+  const obj = {};
+  builder.querySelectorAll('div').forEach(row => {
+    const ins = row.querySelectorAll('input');
+    if (ins.length >= 2) {
+      const k = ins[0].value.trim();
+      const v = parseFloat(ins[1].value);
+      if (k && !isNaN(v)) obj[k] = v;
+    }
+  });
+  input.value = JSON.stringify(obj);
+}
+
+function initConstBuilder(builderId, jsonId) {
+  const input = document.getElementById(jsonId);
+  if (!input) return;
+  let obj = {};
+  try { obj = JSON.parse(input.value || '{}'); } catch(e) {}
+  for (const [k, v] of Object.entries(obj)) {
+    const builder = document.getElementById(builderId);
+    if (!builder) return;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;';
+    row.innerHTML = `
+      <input type="text" value="${k}"
+        style="width:80px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:monospace;"
+        oninput="syncConst('${builderId}','${jsonId}')" />
+      <span style="color:var(--text-muted);">=</span>
+      <input type="number" value="${v}" step="any"
+        style="width:90px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);"
+        oninput="syncConst('${builderId}','${jsonId}')" />
+      <button type="button" onclick="this.parentElement.remove();syncConst('${builderId}','${jsonId}');"
+        style="padding:4px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--danger);">✕</button>
+    `;
+    builder.appendChild(row);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  initConstBuilder('editConstBuilder', 'editConstJson');
+  initConstBuilder('newConstBuilder',  'newConstJson');
+  updatePathFields();
+});
+
+// ── NC Generator ──────────────────────────────────────────────────────────
+function getNCVars() {
+  const W = parseFloat(document.getElementById('ncW')?.value) || 0;
+  const H = parseFloat(document.getElementById('ncH')?.value) || 0;
+  const T = parseFloat(document.getElementById('ncT')?.value) || 18;
+  const extra = {};
+  for (const k of Object.keys(MODEL_CONSTS)) {
+    const el = document.getElementById('ncConst_' + k);
+    if (el) extra[k] = parseFloat(el.value) || 0;
+  }
+  return { W, H, T, extra };
+}
+
+async function generateNC() {
+  if (!MODEL_ID) return;
+  const { W, H, T, extra } = getNCVars();
+  const statusEl = document.getElementById('ncStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '⏳ Üretiliyor...';
+  try {
+    const fd = new FormData();
+    fd.append('W', W); fd.append('H', H); fd.append('T', T);
+    fd.append('extra_json', JSON.stringify(extra));
+    const res  = await fetch('/membrane/caps/' + MODEL_ID + '/generate', { method:'POST', body:fd });
+    const data = await res.json();
+    if (data.error) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '⚠️ ' + data.error;
+    } else {
+      document.getElementById('ncOutput').value = data.nc;
+      const lines = data.nc.split('\n').length;
+      statusEl.style.color = 'var(--success, #22c55e)';
+      statusEl.textContent = '✅ ' + lines + ' satır G-code üretildi';
+    }
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '⚠️ Hata: ' + e.message;
+  }
+}
+
+function downloadNC() {
+  if (!MODEL_ID) return;
+  const { W, H, T, extra } = getNCVars();
+  const p = new URLSearchParams({ W, H, T, extra: JSON.stringify(extra) });
+  window.location.href = '/membrane/caps/' + MODEL_ID + '/download?' + p;
+}
+
+function copyNC() {
+  const val = document.getElementById('ncOutput')?.value;
+  if (!val) return;
+  navigator.clipboard.writeText(val).then(() => {
+    if (typeof showToast === 'function') showToast('Kopyalandı', 'success');
+  });
+}
+</script>
+{% endblock %}
