@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 {% block page_title %}{{ _T(user.lang if user else 'tr').admin_title }}{% endblock %}
 
-{% set role_tr = {'admin':'Admin','manufacturer':'Üretici','dealer':'Bayi'} %}
-{% set ALL_MENUS = [
-  ('dashboard','Dashboard'),('customers','Müşteriler'),('models','Modeller'),
-  ('options','Opsiyonlar'),('categories','Kategoriler'),('offers','Teklifler'),
-  ('orders','Siparişler'),('costs','Maliyet Analizi'),
-  ('membrane','Membran Kapak'),('loan','Kredi Hesaplama'),
-  ('dealers','Bayiler'),('admin','Ayarlar')
-] %}
-
 {% block content %}
 {% set T = _T(user.lang if user else 'tr') %}
+{% set role_labels = {'admin': T.role_admin, 'manufacturer': T.role_manufacturer, 'dealer': T.role_dealer} %}
+{% set ALL_MENUS = [
+  ('dashboard', T.menu_dashboard), ('customers', T.menu_customers), ('models', T.menu_models),
+  ('options', T.menu_options), ('categories', T.menu_categories), ('offers', T.menu_offers),
+  ('orders', T.menu_orders), ('costs', T.menu_costs),
+  ('membrane', T.menu_membrane), ('loan', T.menu_loan),
+  ('dealers', T.menu_dealers), ('admin', T.menu_settings)
+] %}
+
 <div class="tabs" style="margin-bottom:20px;">
   <button class="tab-btn {% if not request.query_params.get('tab') or request.query_params.get('tab')=='company' %}active{% endif %}"
           data-tab="tab-company" onclick="switchTab('tab-company')">{{ T.admin_company_profile }}</button>
@@ -21,7 +21,7 @@
           data-tab="tab-system" onclick="switchTab('tab-system')">{{ T.admin_system }}</button>
 </div>
 
-<!-- ── Şirket Profili ── -->
+<!-- Company Profile -->
 <div id="tab-company" class="tab-pane" {% if request.query_params.get('tab')=='users' %}style="display:none"{% endif %}>
   <div class="card" style="max-width:640px;">
     <div class="card-header"><h3 class="card-title">{{ T.admin_company_info }}</h3></div>
@@ -70,12 +70,12 @@
   </div>
 </div>
 
-<!-- ── Kullanıcılar ── -->
+<!-- Users -->
 <div id="tab-users" class="tab-pane card" {% if not request.query_params.get('tab')=='users' %}style="display:none"{% endif %}>
   {% set pending = users|selectattr('is_approved','eq',0)|list %}
   {% if pending %}
   <div style="padding:10px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);font-size:13px;color:var(--text-muted);">
-    ⚠️ <strong>{{ pending|length }}</strong> yeni kayıt rol ataması bekliyor — Düzenle ile Bayi veya Üretici yapabilirsiniz.
+    ⚠️ <strong>{{ pending|length }}</strong> {{ T.admin_pending_warn }}
   </div>
   {% endif %}
   <div class="table-wrap">
@@ -93,11 +93,18 @@
       <tbody>
         {% for u in users %}
         <tr {% if not u.is_approved %}style="opacity:.75"{% endif %}>
-          <td>{{ u.email }}</td>
+          <td>
+            {{ u.email }}
+            {% if u.parent_id %}
+            <br><small style="color:var(--text-muted);">
+              ↳ {% for mfr in manufacturers if mfr.id == u.parent_id %}{{ mfr.company_name }}{% endfor %}
+            </small>
+            {% endif %}
+          </td>
           <td>{{ u.company_name or '-' }}</td>
           <td>
             <span class="badge badge-{{ 'red' if u.role=='admin' else ('amber' if u.role=='manufacturer' else 'blue') }}">
-              {{ role_tr.get(u.role, u.role) }}
+              {{ role_labels.get(u.role, u.role) }}
             </span>
           </td>
           <td>
@@ -116,7 +123,7 @@
               <button class="btn btn-outline btn-sm"
                 onclick="openUserModal({{ u.id }}, '{{ u.email|e }}', '{{ u.company_name|e }}', '{{ u.role }}',
                   {{ u.is_approved }}, {{ u.is_active }}, {{ u.can_view_costs }},
-                  '{{ u.allowed_menus or '' }}', '{{ u.allowed_categories or '' }}')">
+                  '{{ u.allowed_menus or '' }}', '{{ u.allowed_categories or '' }}', {{ u.parent_id or 0 }})">
                 ✏️ {{ T.btn_edit }}
               </button>
               <form method="post" action="/dealers/delete" onsubmit="return confirmDelete(this)" style="margin:0;">
@@ -135,7 +142,7 @@
   </div>
 </div>
 
-<!-- ── Sistem ── -->
+<!-- System -->
 <div id="tab-system" class="tab-pane" style="display:none;">
   {% if request.query_params.get('tab') == 'system' and request.query_params.get('msg') %}
   <div class="alert alert-{{ request.query_params.get('msg_type','info') }}" style="margin-bottom:16px;">
@@ -150,36 +157,32 @@
       <div class="card-header"><h3 class="card-title">{{ T.admin_version }}</h3></div>
       <div class="card-body" style="font-size:14px;">
         <div style="margin-bottom:8px;"><strong>B2B Teklif Sistemi</strong></div>
-        <div style="color:var(--text-muted);">Versiyon: 3.0.0 — FastAPI + SQLite</div>
+        <div style="color:var(--text-muted);">v3.0.0 — FastAPI + SQLite</div>
       </div>
     </div>
 
     <!-- Backup Download -->
     <div class="card">
-      <div class="card-header"><h3 class="card-title">💾 Yedek Al</h3></div>
+      <div class="card-header"><h3 class="card-title">💾 {{ T.admin_backup_title }}</h3></div>
       <div class="card-body">
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
-          Tüm veritabanı ve yüklenen görseller ZIP olarak bilgisayarınıza indirilir.
-        </p>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">{{ T.admin_backup_desc }}</p>
         <a href="/admin/backup/download" class="btn btn-primary" style="width:100%;text-align:center;">
-          ⬇️ Yedek İndir
+          ⬇️ {{ T.admin_backup_download }}
         </a>
       </div>
     </div>
 
     <!-- Backup Restore -->
     <div class="card">
-      <div class="card-header"><h3 class="card-title">📂 Yedek Yükle</h3></div>
+      <div class="card-header"><h3 class="card-title">📂 {{ T.admin_restore_title }}</h3></div>
       <div class="card-body">
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
-          Daha önce alınan ZIP yedeği yükleyin. Mevcut veriler üzerine yazılır.
-        </p>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">{{ T.admin_restore_desc }}</p>
         <form method="post" action="/admin/backup/restore" enctype="multipart/form-data"
-              onsubmit="return confirm('Mevcut veriler üzerine yazılacak. Emin misiniz?')">
+              onsubmit="return confirm('{{ T.admin_restore_confirm }}')">
           <input type="file" name="backup_file" accept=".zip" class="form-control" required
                  style="margin-bottom:10px;" />
           <button type="submit" class="btn btn-danger" style="width:100%;">
-            ⬆️ Yedeği Geri Yükle
+            ⬆️ {{ T.admin_restore_btn }}
           </button>
         </form>
       </div>
@@ -188,7 +191,7 @@
   </div>
 </div>
 
-<!-- ── Kullanıcı Düzenleme Modalı ── -->
+<!-- User Edit Modal -->
 <div id="userEditModal" class="modal-overlay">
   <div class="modal-box" style="max-width:600px;">
     <div class="modal-header">
@@ -202,20 +205,20 @@
       <input type="hidden" name="uid" id="uModalUid" />
       <div class="modal-body" style="display:flex;flex-direction:column;gap:20px;">
 
-        <!-- Temel bilgiler -->
+        <!-- Basic info -->
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
           <div class="form-group">
             <label class="form-label">{{ T.admin_role }}</label>
             <select name="role" id="uModalRole" class="form-control">
-              <option value="manufacturer">Üretici</option>
-              <option value="dealer">Bayi</option>
+              <option value="manufacturer">{{ T.role_manufacturer }}</option>
+              <option value="dealer">{{ T.role_dealer }}</option>
             </select>
           </div>
           <div class="form-group">
             <label class="form-label">{{ T.admin_status }}</label>
             <select name="is_approved" id="uModalApproved" class="form-control">
-              <option value="1">Onaylı</option>
-              <option value="0">Bekliyor</option>
+              <option value="1">{{ T.admin_approved_opt }}</option>
+              <option value="0">{{ T.admin_waiting_opt }}</option>
             </select>
           </div>
           <div class="form-group">
@@ -227,7 +230,19 @@
           </div>
         </div>
 
-        <!-- İzinler -->
+        <!-- Parent account linking -->
+        <div class="form-group">
+          <label class="form-label">{{ T.admin_parent_account }}</label>
+          <select name="parent_id" id="uModalParent" class="form-control">
+            <option value="0">{{ T.admin_no_parent }}</option>
+            {% for mfr in manufacturers %}
+            <option value="{{ mfr.id }}">{{ mfr.company_name }}</option>
+            {% endfor %}
+          </select>
+          <small style="color:var(--text-muted);font-size:12px;margin-top:4px;display:block;">{{ T.admin_parent_hint }}</small>
+        </div>
+
+        <!-- Permissions -->
         <div>
           <label class="form-label" style="margin-bottom:8px;display:block;">{{ T.admin_permissions }}</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -239,10 +254,10 @@
           </div>
         </div>
 
-        <!-- Menü İzinleri -->
+        <!-- Menu Permissions -->
         <div>
           <label class="form-label" style="margin-bottom:4px;display:block;">{{ T.admin_menu_perms }}</label>
-          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Boş bırakılırsa tüm menüler erişilebilir olur.</p>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">{{ T.admin_menu_hint }}</p>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
             {% for key, label in ALL_MENUS %}
             {% if key not in ('dealers', 'admin') %}
@@ -259,10 +274,10 @@
           </div>
         </div>
 
-        <!-- Kategori İzinleri -->
+        <!-- Category Permissions -->
         <div>
           <label class="form-label" style="margin-bottom:4px;display:block;">{{ T.admin_cat_perms }}</label>
-          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Boş bırakılırsa tüm kategoriler erişilebilir olur.</p>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">{{ T.admin_cat_hint }}</p>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             {% for cat in categories %}
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
@@ -285,12 +300,13 @@
 
 {% block scripts %}
 <script>
-function openUserModal(uid, email, company, role, approved, active, costs, allowedMenus, allowedCats) {
+function openUserModal(uid, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId) {
   document.getElementById('uModalUid').value = uid;
   document.getElementById('uModalEmail').textContent = email + (company ? ' — ' + company : '');
   document.getElementById('uModalRole').value = role;
   document.getElementById('uModalApproved').value = approved ? '1' : '0';
   document.getElementById('uModalActive').value = active ? '1' : '0';
+  document.getElementById('uModalParent').value = parentId || 0;
   const costsChk = document.getElementById('uModalCosts');
   costsChk.checked = !!costs;
   document.getElementById('uModalCostsHidden').value = costs ? 1 : 0;

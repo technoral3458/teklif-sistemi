@@ -23,11 +23,13 @@ async def admin_page(request: Request):
     users = udb.all_users()
     company = fdb.get_company()
     categories = fdb.get_cats()
+    manufacturers = udb.all_manufacturers()
     return templates.TemplateResponse(request, "admin.html", {
         "user": user,
         "users": users,
         "company": company,
         "categories": categories,
+        "manufacturers": manufacturers,
         "active_page": "admin",
     })
 
@@ -67,7 +69,8 @@ async def update_user(request: Request,
                       role: str = Form("dealer"),
                       is_approved: int = Form(0),
                       is_active: int = Form(0),
-                      can_view_costs: int = Form(0)):
+                      can_view_costs: int = Form(0),
+                      parent_id: int = Form(0)):
     auth.require_admin(request)
     form = await request.form()
     allowed_menus = ",".join(form.getlist("allowed_menus"))
@@ -79,6 +82,7 @@ async def update_user(request: Request,
         can_view_costs=can_view_costs,
         allowed_menus=allowed_menus,
         allowed_categories=allowed_categories,
+        parent_id=parent_id if parent_id else None,
     )
     return RedirectResponse("/admin?tab=users", 303)
 

@@ -38,7 +38,8 @@ async def orders_list(request: Request):
         for s in ["Admin Onaylı", "Üretimde", "Tamamlandı", "Teslim Edildi"]:
             orders += fdb.get_offers(status=s)
     elif role == "manufacturer":
-        orders = [o for o in fdb.get_offers() if o.get("manufacturer_id") == user["id"] and o.get("status") not in ("Beklemede",)]
+        mfr_id = udb.effective_mfr_id(user)
+        orders = [o for o in fdb.get_offers() if o.get("manufacturer_id") == mfr_id and o.get("status") not in ("Beklemede",)]
     elif role == "dealer":
         orders = fdb.get_offers(dealer_id=user["id"])
         orders = [o for o in orders if o["status"] not in ("Beklemede",)]
@@ -79,6 +80,7 @@ async def order_detail(request: Request, oid: int):
     offer["manufacturer_name"] = mfr["company_name"] if mfr else "-"
     offer["dealer_name"]       = dlr["company_name"] if dlr else "-"
     manufacturers = list(mfr_users.values())
+    mfr_id = udb.effective_mfr_id(user)
     return templates.TemplateResponse(request, "order_detail.html", {
         "user": user,
         "offer": offer,
@@ -88,6 +90,7 @@ async def order_detail(request: Request, oid: int):
         "currencies": CURRENCIES,
         "payment_methods": PAYMENT_METHODS,
         "active_page": "orders",
+        "effective_mfr_id": mfr_id,
     })
 
 
@@ -114,7 +117,8 @@ async def confirm_order(request: Request, oid: int,
                         mfr_notes: str = Form("")):
     user = auth.require_user(request)
     offer = fdb.get_offer(oid)
-    if offer and offer.get("manufacturer_id") == user["id"]:
+    mfr_id = udb.effective_mfr_id(user)
+    if offer and offer.get("manufacturer_id") == mfr_id:
         fdb.mfr_confirm_order(oid, termin_date, mfr_notes)
     return RedirectResponse(f"/orders/{oid}", 303)
 
@@ -124,7 +128,8 @@ async def update_status(request: Request, oid: int,
                         mfr_status: str = Form(...)):
     user = auth.require_user(request)
     offer = fdb.get_offer(oid)
-    if offer and (offer.get("manufacturer_id") == user["id"] or user["role"] == "admin"):
+    mfr_id = udb.effective_mfr_id(user)
+    if offer and (offer.get("manufacturer_id") == mfr_id or user["role"] == "admin"):
         fdb.update_mfr_status(oid, mfr_status)
     return RedirectResponse(f"/orders/{oid}", 303)
 
@@ -136,7 +141,8 @@ async def add_stage(request: Request, oid: int,
                     stage_date: str = Form("")):
     user = auth.require_user(request)
     offer = fdb.get_offer(oid)
-    if offer and (offer.get("manufacturer_id") == user["id"] or user["role"] == "admin"):
+    mfr_id = udb.effective_mfr_id(user)
+    if offer and (offer.get("manufacturer_id") == mfr_id or user["role"] == "admin"):
         if not stage_date:
             stage_date = datetime.date.today().isoformat()
         fdb.add_order_stage(oid, stage_name, notes, stage_date)

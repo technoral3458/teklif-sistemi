@@ -136,7 +136,7 @@
           </div>
           <div style="flex:1;">
             <div style="font-weight:600;font-size:13px;">Üretim — {{ MFR_STATUS_TR.get(offer.mfr_status or '', 'Bekleniyor') }}</div>
-            {% if (user.role == 'manufacturer' and offer.manufacturer_id == user.id) or user.role == 'admin' %}
+            {% if (user.role == 'manufacturer' and offer.manufacturer_id == effective_mfr_id) or user.role == 'admin' %}
             {% if mfr_confirmed %}
             <div style="margin-top:8px;">
               <form method="post" action="/orders/{{ offer.id }}/status" style="display:flex;gap:8px;">
