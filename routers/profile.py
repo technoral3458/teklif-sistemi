@@ -20,6 +20,8 @@ async def profile_page(request: Request):
         "user": user,
         "langs": LANGS,
         "active_page": "profile",
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
     })
 
 
@@ -52,7 +54,7 @@ async def save_profile(request: Request,
     if logo_path:
         kw["logo_path"] = logo_path
     udb.update_profile(user["id"], **kw)
-    return RedirectResponse("/profile", 303)
+    return RedirectResponse("/profile?msg=Bilgiler+güncellendi&msg_type=success", 303)
 
 
 @router.post("/password")
@@ -79,13 +81,7 @@ async def change_password(request: Request,
             "active_page": "profile",
         })
     udb.change_pw(user["id"], new_password)
-    return templates.TemplateResponse(request, "profile.html", {
-        "user": user,
-        "msg": "Şifreniz başarıyla güncellendi.",
-        "msg_type": "success",
-        "langs": LANGS,
-        "active_page": "profile",
-    })
+    return RedirectResponse("/profile?msg=Şifreniz+güncellendi&msg_type=success", 303)
 
 
 @router.post("/preferences")
@@ -94,4 +90,4 @@ async def save_prefs(request: Request,
                      theme: str = Form("dark")):
     user = auth.require_user(request)
     udb.update_profile(user["id"], lang=lang, theme=theme)
-    return RedirectResponse("/profile", 303)
+    return RedirectResponse("/profile?msg=Tercihler+kaydedildi&msg_type=success", 303)
