@@ -1073,6 +1073,30 @@ def _init_membrane(c):
         step_over REAL DEFAULT 0.5,
         feed_override TEXT DEFAULT ''
     )""")
+    # Add tool_no to paths (0 = inherit from model)
+    _acol(c, "membrane_cap_paths", "tool_no", "INTEGER DEFAULT 0")
+
+    # Job list tables
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_jobs(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        notes TEXT DEFAULT '',
+        sheet_w REAL DEFAULT 2800,
+        sheet_h REAL DEFAULT 1100,
+        margin REAL DEFAULT 5,
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_job_items(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES membrane_cap_jobs(id) ON DELETE CASCADE,
+        model_id INTEGER DEFAULT NULL,
+        model_name TEXT DEFAULT '',
+        cap_w REAL NOT NULL DEFAULT 400,
+        cap_h REAL NOT NULL DEFAULT 600,
+        qty INTEGER DEFAULT 1,
+        notes TEXT DEFAULT '',
+        seq INTEGER DEFAULT 0
+    )""")
 
 
 def get_membrane_materials():
@@ -1190,7 +1214,7 @@ def set_membrane_rate(currency, rate):
 
 _CM_KEYS = ["id","name","description","tool_no","spindle_speed","feed_xy","feed_z","safe_z","constants_json","created_at"]
 _CM_COLS = ",".join(_CM_KEYS)
-_CP_KEYS = ["id","model_id","seq","label","path_type","x1","y1","z1","x2","y2","z2","ix","jy","tool_dia","step_over","feed_override"]
+_CP_KEYS = ["id","model_id","seq","label","path_type","x1","y1","z1","x2","y2","z2","ix","jy","tool_dia","step_over","feed_override","tool_no"]
 _CP_COLS = ",".join(_CP_KEYS)
 
 
@@ -1239,7 +1263,7 @@ def get_cap_paths(model_id):
 
 
 def save_cap_path(id=0, **kw):
-    allowed = ["model_id","seq","label","path_type","x1","y1","z1","x2","y2","z2","ix","jy","tool_dia","step_over","feed_override"]
+    allowed = ["model_id","seq","label","path_type","x1","y1","z1","x2","y2","z2","ix","jy","tool_dia","step_over","feed_override","tool_no"]
     f = {k: v for k, v in kw.items() if k in allowed}
     with _c() as c:
         if id:
@@ -1255,3 +1279,75 @@ def save_cap_path(id=0, **kw):
 def del_cap_path(pid):
     with _c() as c:
         c.execute("DELETE FROM membrane_cap_paths WHERE id=?", (pid,))
+
+
+# ── Cap Job List ──────────────────────────────────────────────────────────────
+
+_CJ_KEYS  = ["id","name","notes","sheet_w","sheet_h","margin","created_at"]
+_CJ_COLS  = ",".join(_CJ_KEYS)
+_CJI_KEYS = ["id","job_id","model_id","model_name","cap_w","cap_h","qty","notes","seq"]
+_CJI_COLS = ",".join(_CJI_KEYS)
+
+
+def get_cap_jobs():
+    with _c() as c:
+        rows = c.execute(f"""
+            SELECT cj.id,cj.name,cj.notes,cj.sheet_w,cj.sheet_h,cj.margin,cj.created_at,
+                   COUNT(cji.id) AS item_count, COALESCE(SUM(cji.qty),0) AS total_qty
+            FROM membrane_cap_jobs cj
+            LEFT JOIN membrane_cap_job_items cji ON cji.job_id=cj.id
+            GROUP BY cj.id ORDER BY cj.id DESC
+        """).fetchall()
+    keys = _CJ_KEYS + ["item_count","total_qty"]
+    return [dict(zip(keys, r)) for r in rows]
+
+
+def get_cap_job(jid):
+    with _c() as c:
+        r = c.execute(f"SELECT {_CJ_COLS} FROM membrane_cap_jobs WHERE id=?", (jid,)).fetchone()
+    return dict(zip(_CJ_KEYS, r)) if r else None
+
+
+def save_cap_job(id=0, **kw):
+    allowed = ["name","notes","sheet_w","sheet_h","margin"]
+    f = {k: v for k, v in kw.items() if k in allowed}
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{k}=?" for k in f)
+            c.execute(f"UPDATE membrane_cap_jobs SET {sets} WHERE id=?", list(f.values()) + [id])
+            return id
+        cols = ",".join(f.keys()); ph = ",".join("?" * len(f))
+        cur = c.execute(f"INSERT INTO membrane_cap_jobs({cols}) VALUES({ph})", list(f.values()))
+        return cur.lastrowid
+
+
+def del_cap_job(jid):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_cap_jobs WHERE id=?", (jid,))
+
+
+def get_cap_job_items(jid):
+    with _c() as c:
+        rows = c.execute(
+            f"SELECT {_CJI_COLS} FROM membrane_cap_job_items WHERE job_id=? ORDER BY seq,id",
+            (jid,)
+        ).fetchall()
+    return [dict(zip(_CJI_KEYS, r)) for r in rows]
+
+
+def save_cap_job_item(id=0, **kw):
+    allowed = ["job_id","model_id","model_name","cap_w","cap_h","qty","notes","seq"]
+    f = {k: v for k, v in kw.items() if k in allowed}
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{k}=?" for k in f)
+            c.execute(f"UPDATE membrane_cap_job_items SET {sets} WHERE id=?", list(f.values()) + [id])
+            return id
+        cols = ",".join(f.keys()); ph = ",".join("?" * len(f))
+        cur = c.execute(f"INSERT INTO membrane_cap_job_items({cols}) VALUES({ph})", list(f.values()))
+        return cur.lastrowid
+
+
+def del_cap_job_item(item_id):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_cap_job_items WHERE id=?", (item_id,))

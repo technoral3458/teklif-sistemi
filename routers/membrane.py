@@ -25,7 +25,7 @@ def _eval_expr(expr, variables):
     return float(eval(str(expr).strip(), env))
 
 
-def _generate_nc(model, paths, variables):
+def _generate_nc(model, paths, variables, x_off=0.0, y_off=0.0, prog_no=1):
     """Generate Fanuc-compatible G-code from a cap model and plate variables."""
     ev = lambda expr: _eval_expr(expr, variables)
     lines = []
@@ -35,28 +35,36 @@ def _generate_nc(model, paths, variables):
     feed_xy = int(model.get("feed_xy") or 3000)
     feed_z = int(model.get("feed_z") or 1000)
     spindle = int(model.get("spindle_speed") or 18000)
-    tool_no = int(model.get("tool_no") or 1)
+    default_tool = int(model.get("tool_no") or 1)
+    off_comment = f" OFS X{x_off:.1f} Y{y_off:.1f}" if (x_off or y_off) else ""
 
     lines += [
         "%",
-        f"O0001 ({name_upper})",
+        f"O{prog_no:04d} ({name_upper}{off_comment})",
         f"({var_comment})",
         f"(GENERATED {datetime.now().strftime('%Y-%m-%d %H:%M')})",
         "G17 G21 G40 G49 G80 G90",
-        f"T{tool_no} M6",
+        f"T{default_tool} M6",
         f"S{spindle} M3",
         f"G0 G90 Z{safe_z:.3f}",
     ]
+    cur_tool = default_tool
 
     for p in paths:
         label = (p.get("label") or "").strip()
         ptype = p.get("path_type", "LINE")
+        path_tool = int(p.get("tool_no") or 0) or default_tool
+        if path_tool != cur_tool:
+            lines += [f"G0 Z{safe_z:.3f}", "M5",
+                      f"T{path_tool} M6", f"S{spindle} M3",
+                      f"G0 G90 Z{safe_z:.3f}"]
+            cur_tool = path_tool
         if label:
             lines.append(f"({label})")
 
         try:
-            x1, y1 = ev(p["x1"]), ev(p["y1"])
-            x2, y2 = ev(p["x2"]), ev(p["y2"])
+            x1 = ev(p["x1"]) + x_off; y1 = ev(p["y1"]) + y_off
+            x2 = ev(p["x2"]) + x_off; y2 = ev(p["y2"]) + y_off
             z2 = ev(p["z2"])
             feed = int(ev(p["feed_override"])) if str(p.get("feed_override", "")).strip() else feed_xy
 
@@ -69,9 +77,9 @@ def _generate_nc(model, paths, variables):
                 ]
 
             elif ptype in ("ARC_CW", "ARC_CCW"):
-                cx, cy = ev(p.get("ix") or "0"), ev(p.get("jy") or "0")
-                I = round(cx - x1, 3)
-                J = round(cy - y1, 3)
+                cx = ev(p.get("ix") or "0") + x_off
+                cy = ev(p.get("jy") or "0") + y_off
+                I = round(cx - x1, 3); J = round(cy - y1, 3)
                 cmd = "G2" if ptype == "ARC_CW" else "G3"
                 lines += [
                     f"G0 Z{safe_z:.3f}",
@@ -85,44 +93,111 @@ def _generate_nc(model, paths, variables):
                 step_over = float(p.get("step_over") or 0.5)
                 step = max(0.1, tool_dia * step_over)
                 r = tool_dia / 2.0
-                # Ensure x1<x2, y1<y2
-                lx, rx = (min(x1,x2)+r, max(x1,x2)-r)
-                by, ty = (min(y1,y2)+r, max(y1,y2)-r)
+                lx = min(x1, x2) + r; rx = max(x1, x2) - r
+                by = min(y1, y2) + r; ty = max(y1, y2) - r
                 lines.append(f"G0 Z{safe_z:.3f}")
-                direction = 1
-                y = by
+                direction = 1; y = by
                 while y <= ty + 0.001:
                     sx, ex = (lx, rx) if direction == 1 else (rx, lx)
-                    lines += [
-                        f"G0 X{sx:.3f} Y{y:.3f}",
-                        f"G1 Z{z2:.3f} F{feed_z}",
-                        f"G1 X{ex:.3f} F{feed}",
-                        f"G0 Z{safe_z:.3f}",
-                    ]
-                    y = round(y + step, 4)
-                    direction *= -1
-                # Contour finish pass
-                lines += [
-                    f"G0 X{lx:.3f} Y{by:.3f}",
-                    f"G1 Z{z2:.3f} F{feed_z}",
-                    f"G1 X{rx:.3f} F{feed}",
-                    f"G1 Y{ty:.3f}",
-                    f"G1 X{lx:.3f}",
-                    f"G1 Y{by:.3f}",
-                    f"G0 Z{safe_z:.3f}",
-                ]
+                    lines += [f"G0 X{sx:.3f} Y{y:.3f}",
+                              f"G1 Z{z2:.3f} F{feed_z}",
+                              f"G1 X{ex:.3f} F{feed}",
+                              f"G0 Z{safe_z:.3f}"]
+                    y = round(y + step, 4); direction *= -1
+                lines += [f"G0 X{lx:.3f} Y{by:.3f}", f"G1 Z{z2:.3f} F{feed_z}",
+                          f"G1 X{rx:.3f} F{feed}", f"G1 Y{ty:.3f}",
+                          f"G1 X{lx:.3f}", f"G1 Y{by:.3f}", f"G0 Z{safe_z:.3f}"]
 
         except Exception as exc:
             lines.append(f"(ERROR IN PATH '{label or ptype}': {exc})")
 
-    lines += [
-        f"G0 Z{safe_z:.3f}",
-        "M5",
-        "G28 G91 Z0.",
-        "M30",
-        "%",
-    ]
+    lines += [f"G0 Z{safe_z:.3f}", "M5", "G28 G91 Z0.", "M30", "%"]
     return "\n".join(lines)
+
+
+# ── Nesting algorithm (shelf / strip packing with rotation) ───────────────────
+
+_NEST_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6',
+                '#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6']
+
+def _nest(items, sheet_w, sheet_h, margin=5.0):
+    """
+    Pack cap rectangles onto sheets.
+    items: list of {cap_w, cap_h, qty, model_name, model_id}
+    Returns (placements, sheet_count, util_pct)
+    Each placement: {x, y, w, h, label, color, sheet, rotated, group, model_id, cap_w, cap_h}
+    """
+    pieces = []
+    for i, item in enumerate(items):
+        w, h = float(item['cap_w']), float(item['cap_h'])
+        name = (item.get('model_name') or '').strip()
+        label = f"{name}\n{int(w)}×{int(h)}" if name else f"{int(w)}×{int(h)}"
+        for _ in range(max(1, int(item.get('qty', 1)))):
+            pieces.append({'ow': w, 'oh': h, 'label': label,
+                          'color': _NEST_COLORS[i % len(_NEST_COLORS)],
+                          'group': i, 'model_id': item.get('model_id'),
+                          'cap_w': w, 'cap_h': h})
+
+    pieces.sort(key=lambda p: -max(p['ow'], p['oh']))
+
+    # sheets: each sheet is a list of rows {y, row_h, next_x}
+    sheets = []
+
+    def _open_sheet():
+        sheets.append([{'y': margin, 'row_h': 0, 'next_x': margin}])
+        return len(sheets) - 1
+
+    def _try_place(si, w, h):
+        if w > sheet_w - 2*margin or h > sheet_h - 2*margin:
+            return None
+        for row in sheets[si]:
+            if row['next_x'] + w + margin <= sheet_w and row['y'] + h <= sheet_h - margin:
+                pos = (row['next_x'], row['y'])
+                row['row_h'] = max(row['row_h'], h)
+                row['next_x'] += w + margin
+                return pos
+        last = sheets[si][-1]
+        ny = last['y'] + last['row_h'] + margin
+        if ny + h <= sheet_h - margin:
+            sheets[si].append({'y': ny, 'row_h': h, 'next_x': margin + w + margin})
+            return (margin, ny)
+        return None
+
+    placements = []
+    for pc in pieces:
+        placed = False
+        orientations = [(pc['ow'], pc['oh'], False)]
+        if abs(pc['ow'] - pc['oh']) > 0.5:
+            orientations.append((pc['oh'], pc['ow'], True))
+
+        for w, h, rotated in orientations:
+            for si in range(len(sheets)):
+                pos = _try_place(si, w, h)
+                if pos:
+                    placements.append({'x': round(pos[0], 2), 'y': round(pos[1], 2),
+                                      'w': w, 'h': h, 'label': pc['label'],
+                                      'color': pc['color'], 'sheet': si,
+                                      'rotated': rotated, 'group': pc['group'],
+                                      'model_id': pc['model_id'],
+                                      'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+                    placed = True; break
+            if placed: break
+
+        if not placed:
+            si = _open_sheet()
+            w, h = pc['ow'], pc['oh']
+            pos = _try_place(si, w, h) or (margin, margin)
+            placements.append({'x': round(pos[0], 2), 'y': round(pos[1], 2),
+                              'w': w, 'h': h, 'label': pc['label'],
+                              'color': pc['color'], 'sheet': si, 'rotated': False,
+                              'group': pc['group'], 'model_id': pc['model_id'],
+                              'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+
+    n_sheets = len(sheets) if sheets else 1
+    used = sum(p['w'] * p['h'] for p in placements)
+    total = sheet_w * sheet_h * n_sheets
+    util = round(used / total * 100, 1) if total > 0 else 0
+    return placements, n_sheets, util
 
 
 def _eval_paths(model, paths, variables):
@@ -566,12 +641,14 @@ async def cap_path_save(request: Request, mid: int,
                         ix: str = Form("0"), jy: str = Form("0"),
                         tool_dia: float = Form(8.0),
                         step_over: float = Form(0.5),
-                        feed_override: str = Form("")):
+                        feed_override: str = Form(""),
+                        tool_no: int = Form(0)):
     auth.require_user(request)
     fdb.save_cap_path(
         id=id or 0, model_id=mid, seq=seq, label=label, path_type=path_type,
         x1=x1, y1=y1, z1=z1, x2=x2, y2=y2, z2=z2,
         ix=ix, jy=jy, tool_dia=tool_dia, step_over=step_over, feed_override=feed_override,
+        tool_no=tool_no,
     )
     return RedirectResponse(f"/membrane/caps/{mid}?msg=Yol+kaydedildi&msg_type=success", 303)
 
@@ -627,4 +704,153 @@ async def cap_download(request: Request, mid: int,
         content=nc,
         media_type="text/plain",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ── Job List ──────────────────────────────────────────────────────────────────
+
+@router.get("/jobs")
+async def jobs_list(request: Request):
+    user = auth.require_user(request)
+    jobs = fdb.get_cap_jobs()
+    models = fdb.get_cap_models()
+    return templates.TemplateResponse(request, "membrane_jobs.html", {
+        "user": user, "jobs": jobs, "models": models,
+        "edit_job": None, "items": [],
+        "active_page": "membrane",
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
+    })
+
+
+@router.get("/jobs/{jid}")
+async def job_detail(request: Request, jid: int):
+    user = auth.require_user(request)
+    job = fdb.get_cap_job(jid)
+    if not job:
+        return RedirectResponse("/membrane/jobs", 303)
+    items = fdb.get_cap_job_items(jid)
+    models = fdb.get_cap_models()
+    return templates.TemplateResponse(request, "membrane_jobs.html", {
+        "user": user, "edit_job": job, "items": items,
+        "models": models, "jobs": fdb.get_cap_jobs(),
+        "active_page": "membrane",
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
+    })
+
+
+@router.post("/jobs/save")
+async def job_save(request: Request,
+                   id: int = Form(0), name: str = Form(...),
+                   notes: str = Form(""),
+                   sheet_w: float = Form(2800), sheet_h: float = Form(1100),
+                   margin: float = Form(5)):
+    auth.require_user(request)
+    jid = fdb.save_cap_job(id=id or 0, name=name, notes=notes,
+                           sheet_w=sheet_w, sheet_h=sheet_h, margin=margin)
+    return RedirectResponse(f"/membrane/jobs/{jid}?msg=İş+listesi+kaydedildi&msg_type=success", 303)
+
+
+@router.post("/jobs/delete")
+async def job_delete(request: Request, id: int = Form(...)):
+    auth.require_user(request)
+    fdb.del_cap_job(id)
+    return RedirectResponse("/membrane/jobs?msg=Silindi&msg_type=success", 303)
+
+
+@router.post("/jobs/{jid}/item/save")
+async def job_item_save(request: Request, jid: int,
+                        id: int = Form(0),
+                        model_id: int = Form(0),
+                        model_name: str = Form(""),
+                        cap_w: float = Form(...),
+                        cap_h: float = Form(...),
+                        qty: int = Form(1),
+                        notes: str = Form(""),
+                        seq: int = Form(0)):
+    auth.require_user(request)
+    # Auto-fill model_name from model if not given
+    if model_id and not model_name:
+        m = fdb.get_cap_model(model_id)
+        if m:
+            model_name = m["name"]
+    fdb.save_cap_job_item(
+        id=id or 0, job_id=jid, model_id=model_id or None,
+        model_name=model_name, cap_w=cap_w, cap_h=cap_h,
+        qty=qty, notes=notes, seq=seq,
+    )
+    return RedirectResponse(f"/membrane/jobs/{jid}?msg=Kalem+eklendi&msg_type=success", 303)
+
+
+@router.post("/jobs/{jid}/item/delete")
+async def job_item_delete(request: Request, jid: int, item_id: int = Form(...)):
+    auth.require_user(request)
+    fdb.del_cap_job_item(item_id)
+    return RedirectResponse(f"/membrane/jobs/{jid}?msg=Silindi&msg_type=success", 303)
+
+
+@router.post("/jobs/{jid}/nest")
+async def job_nest(request: Request, jid: int,
+                   sheet_w: float = Form(2800), sheet_h: float = Form(1100),
+                   margin: float = Form(5)):
+    auth.require_user(request)
+    items = fdb.get_cap_job_items(jid)
+    if not items:
+        return JSONResponse({"error": "İş listesinde kalem yok"}, status_code=400)
+    placements, n_sheets, util = _nest(items, sheet_w, sheet_h, margin)
+    return JSONResponse({
+        "placements": placements,
+        "sheet_count": n_sheets,
+        "util_pct": util,
+        "sheet_w": sheet_w,
+        "sheet_h": sheet_h,
+        "total_pieces": len(placements),
+    })
+
+
+@router.get("/jobs/{jid}/nc")
+async def job_nc_download(request: Request, jid: int,
+                          sheet_w: float = 2800, sheet_h: float = 1100,
+                          margin: float = 5, T: float = 18):
+    """Download combined NC file for all nested pieces on all sheets."""
+    auth.require_user(request)
+    job = fdb.get_cap_job(jid)
+    if not job:
+        return RedirectResponse("/membrane/jobs", 303)
+    items = fdb.get_cap_job_items(jid)
+    placements, n_sheets, _ = _nest(items, sheet_w, sheet_h, margin)
+
+    all_nc = []
+    prog_no = 1
+    for sheet_idx in range(n_sheets):
+        sheet_placements = [p for p in placements if p['sheet'] == sheet_idx]
+        if not sheet_placements:
+            continue
+        all_nc.append(f"(=== SHEET {sheet_idx+1} ===)")
+        for pl in sheet_placements:
+            mid = pl.get('model_id')
+            if not mid:
+                all_nc.append(f"(SKIPPED: no model for {pl['label']})")
+                continue
+            model = fdb.get_cap_model(mid)
+            if not model:
+                continue
+            paths = fdb.get_cap_paths(mid)
+            W, H = pl['cap_w'], pl['cap_h']
+            variables = {"W": W, "H": H, "T": T}
+            variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
+            x_off, y_off = pl['x'], pl['y']
+            if pl.get('rotated'):
+                variables["W"], variables["H"] = H, W
+            nc = _generate_nc(model, paths, variables,
+                              x_off=x_off, y_off=y_off, prog_no=prog_no)
+            all_nc.append(nc)
+            prog_no += 1
+
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in job["name"])
+    content = "\n\n".join(all_nc)
+    return Response(
+        content=content, media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{safe}_nested.nc"'},
     )

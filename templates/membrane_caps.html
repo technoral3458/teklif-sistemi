@@ -82,6 +82,9 @@
               {% endif %}
               <strong style="font-size:13px;">{{ p.label or ('Yol ' ~ loop.index) }}</strong>
               <span style="font-size:10px;color:var(--text-muted);">sıra:{{ p.seq }}</span>
+              {% if p.tool_no and p.tool_no != 0 %}
+              <span class="badge" style="background:rgba(245,158,11,.18);color:#fbbf24;font-size:10px;">T{{ p.tool_no }}</span>
+              {% endif %}
             </div>
             <div style="font-size:11px;color:var(--text-muted);font-family:monospace;">
               {% if p.path_type == 'LINE' %}
@@ -101,7 +104,8 @@
               {{ p.x1|tojson }}, {{ p.y1|tojson }}, {{ p.z1|tojson }},
               {{ p.x2|tojson }}, {{ p.y2|tojson }}, {{ p.z2|tojson }},
               {{ p.ix|tojson }}, {{ p.jy|tojson }},
-              {{ p.tool_dia }}, {{ p.step_over }}, {{ p.feed_override|tojson }}
+              {{ p.tool_dia }}, {{ p.step_over }}, {{ p.feed_override|tojson }},
+              {{ p.tool_no|default(0) }}
             )'>✏️</button>
             <form method="post" action="/membrane/caps/{{ edit_model.id }}/path/delete"
                   onsubmit="return confirm('Bu yolu sil?')" style="display:inline;">
@@ -368,9 +372,15 @@
           </div>
         </fieldset>
 
-        <div class="form-group" style="margin:0;">
-          <label class="form-label" style="font-size:11px;">Besleme Override <span style="color:var(--text-muted);">(boş = model varsayılanı)</span></label>
-          <input type="text" name="feed_override" id="pfeed" class="form-control" placeholder="örn: 1500" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Besleme Override <span style="color:var(--text-muted);">(boş = model varsayılanı)</span></label>
+            <input type="text" name="feed_override" id="pfeed" class="form-control" placeholder="örn: 1500" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Takım No <span style="color:var(--text-muted);">(0 = model takımı)</span></label>
+            <input type="number" name="tool_no" id="ptoolno" class="form-control" value="0" min="0" max="99" />
+          </div>
         </div>
 
       </div>
@@ -492,7 +502,7 @@ const MODEL_CONSTS = {};
 {% endif %}
 
 // ── Path modal ────────────────────────────────────────────────────────────
-function openPathModal(id, seq, label, ptype, x1,y1,z1,x2,y2,z2,ix,jy,tooldia,stepover,feed) {
+function openPathModal(id, seq, label, ptype, x1,y1,z1,x2,y2,z2,ix,jy,tooldia,stepover,feed,toolno) {
   document.getElementById('pid').value = id || 0;
   document.getElementById('pathModalTitle').textContent = id ? 'Yol Düzenle' : 'Yol Ekle';
   document.getElementById('plabel').value = label != null ? label : '';
@@ -509,6 +519,7 @@ function openPathModal(id, seq, label, ptype, x1,y1,z1,x2,y2,z2,ix,jy,tooldia,st
   document.getElementById('ptooldia').value  = tooldia || 8;
   document.getElementById('pstepover').value = stepover || 0.5;
   document.getElementById('pfeed').value     = feed || '';
+  document.getElementById('ptoolno').value   = toolno || 0;
   updatePathFields();
   openModal('pathModal');
 }

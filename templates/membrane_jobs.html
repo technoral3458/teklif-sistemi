@@ -1,0 +1,518 @@
+{% extends "base.html" %}
+{% block page_title %}CNC İş Listesi{% endblock %}
+
+{% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
+
+<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+  <a href="/membrane" class="btn btn-ghost btn-sm">← Membran</a>
+  <h2 style="margin:0;font-size:18px;font-weight:700;flex:1;">📋 CNC İş Listesi</h2>
+  {% if not edit_job %}
+  <button class="btn btn-primary btn-sm" onclick="openModal('newJobModal')">+ Yeni İş Listesi</button>
+  {% else %}
+  <a href="/membrane/jobs" class="btn btn-ghost btn-sm">← Listeler</a>
+  {% endif %}
+</div>
+
+{% if msg %}
+<div class="alert alert-{{ msg_type }}" style="margin-bottom:12px;">{{ msg }}</div>
+{% endif %}
+
+{% if edit_job %}
+{# ═══ DETAIL VIEW ═══ #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+  {# Left: job info + item list #}
+  <div style="display:flex;flex-direction:column;gap:16px;min-width:0;">
+
+    {# Job header card #}
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 class="card-title" style="margin:0;">📋 {{ edit_job.name }}</h3>
+        <button class="btn btn-outline btn-sm" onclick="openModal('editJobModal')">✏️ Düzenle</button>
+      </div>
+      <div class="card-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">
+        {% for label, val in [
+          ('Levha En', (edit_job.sheet_w|int) ~ ' mm'),
+          ('Levha Boy', (edit_job.sheet_h|int) ~ ' mm'),
+          ('Boşluk', (edit_job.margin|int) ~ ' mm'),
+        ] %}
+        <div style="padding:7px 10px;background:var(--surface-2);border-radius:6px;">
+          <div style="color:var(--text-muted);font-size:10px;">{{ label }}</div>
+          <div style="font-weight:700;margin-top:2px;">{{ val }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if edit_job.notes %}
+      <div style="padding:4px 16px 12px;font-size:12px;color:var(--text-muted);">{{ edit_job.notes }}</div>
+      {% endif %}
+    </div>
+
+    {# Items table #}
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 class="card-title" style="margin:0;">🗂️ Kalemler <span style="font-size:12px;color:var(--text-muted);font-weight:400;">({{ items|length }} satır)</span></h3>
+        <button class="btn btn-primary btn-sm" onclick="openModal('addItemModal')">+ Kalem Ekle</button>
+      </div>
+      {% if items %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th>
+            <th>Model</th>
+            <th style="text-align:right">En (W)</th>
+            <th style="text-align:right">Boy (H)</th>
+            <th style="text-align:center">Adet</th>
+            <th>Not</th>
+            <th style="text-align:center">İşlem</th>
+          </tr></thead>
+          <tbody>
+            {% for it in items %}
+            <tr>
+              <td style="color:var(--text-muted)">{{ loop.index }}</td>
+              <td>
+                {% if it.model_name %}<strong>{{ it.model_name }}</strong>{% else %}<span style="color:var(--text-muted)">—</span>{% endif %}
+              </td>
+              <td style="text-align:right;font-family:monospace;">{{ it.cap_w|int }}</td>
+              <td style="text-align:right;font-family:monospace;">{{ it.cap_h|int }}</td>
+              <td style="text-align:center;font-weight:700;color:var(--accent);">{{ it.qty }}</td>
+              <td style="font-size:12px;color:var(--text-muted);">{{ it.notes or '—' }}</td>
+              <td style="text-align:center;">
+                <button class="btn btn-ghost btn-sm"
+                  onclick='editItem({{ it|tojson }})'>✏️</button>
+                <form method="post" action="/membrane/jobs/{{ edit_job.id }}/item/delete"
+                      onsubmit="return confirm('Kalemi sil?')" style="display:inline;">
+                  <input type="hidden" name="item_id" value="{{ it.id }}" />
+                  <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">🗑</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+            <tr style="background:var(--surface-2);">
+              <td colspan="4" style="text-align:right;font-weight:600;font-size:12px;">TOPLAM ADET:</td>
+              <td style="text-align:center;font-weight:800;color:var(--accent);">{{ items|sum(attribute='qty') }}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="padding:32px;text-align:center;color:var(--text-muted);">
+        Henüz kalem eklenmedi.<br>
+        <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="openModal('addItemModal')">+ İlk Kalemi Ekle</button>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Delete job #}
+    <form method="post" action="/membrane/jobs/delete"
+          onsubmit="return confirm('Bu iş listesini sil?')"
+          style="text-align:right;">
+      <input type="hidden" name="id" value="{{ edit_job.id }}" />
+      <button type="submit" class="btn btn-danger btn-sm">🗑 İş Listesini Sil</button>
+    </form>
+
+  </div>
+
+  {# Right: Nesting panel #}
+  <div>
+    <div class="card" style="position:sticky;top:16px;">
+      <div class="card-header"><h3 class="card-title" style="margin:0;">🧩 Levha Yerleşimi (Nesting)</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Levha Eni (mm)</label>
+            <input type="number" id="nestW" class="form-control" value="{{ edit_job.sheet_w|int }}" step="1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Levha Boyu (mm)</label>
+            <input type="number" id="nestH" class="form-control" value="{{ edit_job.sheet_h|int }}" step="1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Boşluk (mm)</label>
+            <input type="number" id="nestMargin" class="form-control" value="{{ edit_job.margin|int }}" step="1" min="0" />
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Malzeme Kalınlığı T (mm)</label>
+            <input type="number" id="nestT" class="form-control" value="18" step="0.5" />
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button class="btn btn-primary" style="width:100%;" onclick="runNest()">▶ Yerleştir</button>
+          </div>
+        </div>
+
+        <div id="nestStatus" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;background:var(--surface-2);"></div>
+
+        {# Sheet selector #}
+        <div id="sheetNav" style="display:none;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:12px;color:var(--text-muted);">Levha:</span>
+          <div id="sheetBtns" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+          <button class="btn btn-outline btn-sm" onclick="downloadNC()">⬇ NC İndir</button>
+        </div>
+
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <canvas id="nestCanvas" width="480" height="340"
+            style="width:100%;display:block;background:#0f172a;"></canvas>
+        </div>
+
+        <div id="nestStats" style="display:none;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">
+          <div style="padding:8px;background:var(--surface-2);border-radius:6px;text-align:center;">
+            <div style="color:var(--text-muted);font-size:10px;">LEVHA SAYISI</div>
+            <div id="statSheets" style="font-size:20px;font-weight:800;color:var(--accent);">—</div>
+          </div>
+          <div style="padding:8px;background:var(--surface-2);border-radius:6px;text-align:center;">
+            <div style="color:var(--text-muted);font-size:10px;">PARÇA SAYISI</div>
+            <div id="statPieces" style="font-size:20px;font-weight:800;color:var(--accent);">—</div>
+          </div>
+          <div style="padding:8px;background:var(--surface-2);border-radius:6px;text-align:center;">
+            <div style="color:var(--text-muted);font-size:10px;">VERİM</div>
+            <div id="statUtil" style="font-size:20px;font-weight:800;color:var(--accent);">—</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# Edit Job Modal #}
+<div id="editJobModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <h3 class="modal-title">İş Listesi Düzenle</h3>
+      <button class="modal-close" onclick="closeModal('editJobModal')">&times;</button>
+    </div>
+    <form method="post" action="/membrane/jobs/save">
+      <input type="hidden" name="id" value="{{ edit_job.id }}" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">İş Listesi Adı *</label>
+          <input type="text" name="name" class="form-control" required value="{{ edit_job.name }}" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Notlar</label>
+          <input type="text" name="notes" class="form-control" value="{{ edit_job.notes }}" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Levha Eni</label>
+            <input type="number" name="sheet_w" class="form-control" value="{{ edit_job.sheet_w|int }}" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Levha Boyu</label>
+            <input type="number" name="sheet_h" class="form-control" value="{{ edit_job.sheet_h|int }}" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Boşluk mm</label>
+            <input type="number" name="margin" class="form-control" value="{{ edit_job.margin|int }}" step="1" min="0" /></div>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editJobModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Add/Edit Item Modal #}
+<div id="addItemModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:500px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="itemModalTitle">Kalem Ekle</h3>
+      <button class="modal-close" onclick="closeModal('addItemModal')">&times;</button>
+    </div>
+    <form method="post" action="/membrane/jobs/{{ edit_job.id }}/item/save" id="itemForm">
+      <input type="hidden" name="id" id="item_id" value="0" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Kapak Modeli</label>
+          <select name="model_id" id="item_model" class="form-control" onchange="onModelChange()">
+            <option value="0">— Model Seçme (Manuel) —</option>
+            {% for m in models %}
+            <option value="{{ m.id }}">{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Model Adı <span style="color:var(--text-muted);font-size:11px;">(model seçilmezse yazın)</span></label>
+          <input type="text" name="model_name" id="item_model_name" class="form-control"
+                 placeholder="örn: Standart Membran, Özel Model A..." />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">En — W (mm) *</label>
+            <input type="number" name="cap_w" id="item_w" class="form-control"
+                   step="1" min="1" required placeholder="örn: 400" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Boy — H (mm) *</label>
+            <input type="number" name="cap_h" id="item_h" class="form-control"
+                   step="1" min="1" required placeholder="örn: 600" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Adet *</label>
+            <input type="number" name="qty" id="item_qty" class="form-control"
+                   step="1" min="1" value="1" required />
+          </div>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Not</label>
+          <input type="text" name="notes" id="item_notes" class="form-control"
+                 placeholder="örn: Renk: STN Mercan" />
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addItemModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% else %}
+{# ═══ LIST VIEW ═══ #}
+<div class="card">
+  <div style="padding:0;">
+    {% if jobs %}
+    <div class="table-wrap">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">İş Listesi Adı</th>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">Levha</th>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);text-align:center;">Kalem</th>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);text-align:center;">Top. Adet</th>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">Tarih</th>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);">İşlem</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:12px 16px;font-weight:700;">
+              <a href="/membrane/jobs/{{ job.id }}" style="color:var(--accent);">{{ job.name }}</a>
+              {% if job.notes %}<br><small style="color:var(--text-muted);">{{ job.notes }}</small>{% endif %}
+            </td>
+            <td style="padding:12px 16px;font-family:monospace;font-size:12px;">{{ job.sheet_w|int }}×{{ job.sheet_h|int }}</td>
+            <td style="padding:12px 16px;text-align:center;">{{ job.item_count }}</td>
+            <td style="padding:12px 16px;text-align:center;font-weight:700;color:var(--accent);">{{ job.total_qty }}</td>
+            <td style="padding:12px 16px;font-size:12px;color:var(--text-muted);">{{ job.created_at[:16] }}</td>
+            <td style="padding:12px 16px;">
+              <div style="display:flex;gap:4px;">
+                <a href="/membrane/jobs/{{ job.id }}" class="btn btn-outline btn-sm">✏️ Aç</a>
+                <form method="post" action="/membrane/jobs/delete"
+                      onsubmit="return confirm('Bu iş listesini sil?')" style="display:inline;">
+                  <input type="hidden" name="id" value="{{ job.id }}" />
+                  <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:48px;text-align:center;color:var(--text-muted);">
+      <div style="font-size:36px;margin-bottom:8px;">📋</div>
+      <div style="margin-bottom:16px;">Henüz iş listesi oluşturulmadı.</div>
+      <button class="btn btn-primary" onclick="openModal('newJobModal')">+ İlk İş Listesini Oluştur</button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# New Job Modal #}
+<div id="newJobModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Yeni İş Listesi</h3>
+      <button class="modal-close" onclick="closeModal('newJobModal')">&times;</button>
+    </div>
+    <form method="post" action="/membrane/jobs/save">
+      <input type="hidden" name="id" value="0" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">İş Listesi Adı *</label>
+          <input type="text" name="name" class="form-control" required autofocus
+                 placeholder="örn: Ahmet Bey Mutfak, Proje A..." />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Notlar</label>
+          <input type="text" name="notes" class="form-control" placeholder="Opsiyonel" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Levha Eni (mm)</label>
+            <input type="number" name="sheet_w" class="form-control" value="2800" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Levha Boyu (mm)</label>
+            <input type="number" name="sheet_h" class="form-control" value="1100" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Boşluk (mm)</label>
+            <input type="number" name="margin" class="form-control" value="5" min="0" /></div>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('newJobModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Oluştur →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const JOB_ID = {{ edit_job.id if edit_job else 0 }};
+const MODELS = {{ models|tojson }};
+
+// ── Model select auto-fill ─────────────────────────────────────────────────
+function onModelChange() {
+  const sel = document.getElementById('item_model');
+  const nameEl = document.getElementById('item_model_name');
+  const mid = parseInt(sel.value) || 0;
+  if (mid) {
+    const m = MODELS.find(x => x.id === mid);
+    if (m && nameEl) nameEl.value = m.name;
+  }
+}
+
+function editItem(it) {
+  document.getElementById('itemModalTitle').textContent = 'Kalem Düzenle';
+  document.getElementById('item_id').value = it.id;
+  document.getElementById('item_model').value = it.model_id || 0;
+  document.getElementById('item_model_name').value = it.model_name || '';
+  document.getElementById('item_w').value = it.cap_w;
+  document.getElementById('item_h').value = it.cap_h;
+  document.getElementById('item_qty').value = it.qty;
+  document.getElementById('item_notes').value = it.notes || '';
+  openModal('addItemModal');
+}
+
+// ── Nesting ────────────────────────────────────────────────────────────────
+let _nestData = null;
+let _curSheet = 0;
+
+async function runNest() {
+  if (!JOB_ID) return;
+  const sheet_w = parseFloat(document.getElementById('nestW').value) || 2800;
+  const sheet_h = parseFloat(document.getElementById('nestH').value) || 1100;
+  const margin  = parseFloat(document.getElementById('nestMargin').value) || 5;
+  const statusEl = document.getElementById('nestStatus');
+  statusEl.style.display = 'block';
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.textContent = '⏳ Yerleştiriliyor...';
+
+  try {
+    const fd = new FormData();
+    fd.append('sheet_w', sheet_w); fd.append('sheet_h', sheet_h); fd.append('margin', margin);
+    const res = await fetch('/membrane/jobs/' + JOB_ID + '/nest', {method:'POST', body:fd});
+    const data = await res.json();
+    if (data.error) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '⚠️ ' + data.error; return;
+    }
+    _nestData = data;
+    _curSheet = 0;
+    statusEl.style.color = 'var(--success, #22c55e)';
+    statusEl.textContent = `✅ ${data.total_pieces} parça → ${data.sheet_count} levha — Verim: %${data.util_pct}`;
+    document.getElementById('statSheets').textContent = data.sheet_count;
+    document.getElementById('statPieces').textContent = data.total_pieces;
+    document.getElementById('statUtil').textContent = '%' + data.util_pct;
+    document.getElementById('nestStats').style.display = 'grid';
+    _buildSheetBtns(data.sheet_count);
+    document.getElementById('sheetNav').style.display = 'flex';
+    _drawNest(0);
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '⚠️ Hata: ' + e.message;
+  }
+}
+
+function _buildSheetBtns(n) {
+  const el = document.getElementById('sheetBtns');
+  el.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const b = document.createElement('button');
+    b.className = 'btn btn-sm ' + (i === 0 ? 'btn-primary' : 'btn-ghost');
+    b.textContent = 'L' + (i+1);
+    b.onclick = () => { _curSheet = i; _drawNest(i);
+      el.querySelectorAll('button').forEach((x,j) => {
+        x.className = 'btn btn-sm ' + (j===i ? 'btn-primary' : 'btn-ghost');
+      }); };
+    el.appendChild(b);
+  }
+}
+
+function _drawNest(sheetIdx) {
+  if (!_nestData) return;
+  const canvas = document.getElementById('nestCanvas');
+  const ctx = canvas.getContext('2d');
+  const cw = canvas.width, ch = canvas.height;
+  const {placements, sheet_w, sheet_h} = _nestData;
+  const mg = 28;
+  const scale = Math.min((cw-2*mg)/sheet_w, (ch-2*mg)/sheet_h);
+  const ox = mg, oy = ch - mg - sheet_h*scale;
+
+  ctx.clearRect(0,0,cw,ch);
+  // Sheet background
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(ox, oy, sheet_w*scale, sheet_h*scale);
+  // Grid
+  ctx.strokeStyle = 'rgba(100,116,139,0.2)'; ctx.lineWidth=1;
+  for (let x=ox; x<=ox+sheet_w*scale; x+=scale*100)
+    { ctx.beginPath(); ctx.moveTo(x,oy); ctx.lineTo(x,oy+sheet_h*scale); ctx.stroke(); }
+  for (let y=oy; y<=oy+sheet_h*scale; y+=scale*100)
+    { ctx.beginPath(); ctx.moveTo(ox,y); ctx.lineTo(ox+sheet_w*scale,y); ctx.stroke(); }
+  ctx.strokeStyle='#475569'; ctx.lineWidth=2;
+  ctx.strokeRect(ox, oy, sheet_w*scale, sheet_h*scale);
+  // Labels
+  ctx.fillStyle='#64748b'; ctx.font='11px monospace'; ctx.textAlign='center';
+  ctx.fillText(`${sheet_w}mm`, ox+sheet_w*scale/2, oy-8);
+  ctx.save(); ctx.translate(ox-12, oy+sheet_h*scale/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(`${sheet_h}mm`,0,0); ctx.restore();
+
+  // Pieces
+  const sheetPieces = placements.filter(p => p.sheet === sheetIdx);
+  for (const p of sheetPieces) {
+    const px = ox + p.x*scale, py = oy + (sheet_h - p.y - p.h)*scale;
+    const pw = p.w*scale, ph = p.h*scale;
+    // Fill
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(px, py, pw, ph);
+    ctx.globalAlpha = 1;
+    // Border
+    ctx.strokeStyle = '#fff'; ctx.lineWidth=1;
+    ctx.strokeRect(px, py, pw, ph);
+    // Label
+    ctx.fillStyle = '#fff'; ctx.textAlign='center'; ctx.font='bold 10px sans-serif';
+    const lines = p.label.split('\n');
+    const ly = py + ph/2 - (lines.length-1)*6;
+    lines.forEach((l,i) => ctx.fillText(l, px+pw/2, ly+i*12, pw-4));
+    if (p.rotated) {
+      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='9px sans-serif';
+      ctx.fillText('↻', px+pw-8, py+12);
+    }
+  }
+  // Piece count badge
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(ox+2, oy+2, 100, 18);
+  ctx.fillStyle='#94a3b8'; ctx.font='10px monospace'; ctx.textAlign='left';
+  ctx.fillText(`Levha ${sheetIdx+1}/${_nestData.sheet_count} — ${sheetPieces.length} parça`, ox+5, oy+14);
+}
+
+function downloadNC() {
+  if (!JOB_ID) return;
+  const sheet_w = document.getElementById('nestW').value;
+  const sheet_h = document.getElementById('nestH').value;
+  const margin  = document.getElementById('nestMargin').value;
+  const T       = document.getElementById('nestT').value;
+  const p = new URLSearchParams({sheet_w, sheet_h, margin, T});
+  window.location.href = '/membrane/jobs/' + JOB_ID + '/nc?' + p;
+}
+</script>
+{% endblock %}
