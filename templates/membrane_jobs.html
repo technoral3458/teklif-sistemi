@@ -184,7 +184,7 @@
             <div id="sheetBtns" style="display:flex;gap:3px;flex-wrap:wrap;"></div>
           </div>
           <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-            <canvas id="nestCanvas" width="480" height="300" style="width:100%;display:block;background:#0f172a;"></canvas>
+            <canvas id="nestCanvas" width="600" height="520" style="width:100%;display:block;background:#0f172a;"></canvas>
           </div>
         </div>
 
@@ -206,7 +206,7 @@
             <div id="sheetBtnsSim" style="display:flex;gap:3px;flex-wrap:wrap;"></div>
           </div>
           <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-            <canvas id="simCanvas" width="480" height="300" style="width:100%;display:block;background:#0f172a;"></canvas>
+            <canvas id="simCanvas" width="600" height="520" style="width:100%;display:block;background:#0f172a;"></canvas>
           </div>
           <div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap;">
             <button id="simPlayBtn" class="btn btn-primary btn-sm" onclick="simPlay()" disabled>▶ Oynat</button>
@@ -588,8 +588,10 @@ function _drawSheet(ctx, cw, ch, sw, sh, label) {
 
 function _drawPieces(ctx, cw, ch, sw, sh, pieces, alpha=0.75) {
   const mg = 28, scale = Math.min((cw-2*mg)/(sw||1), (ch-2*mg)/(sh||1));
+  const inset = 1.5; // visual gap so adjacent pieces don't visually merge
   for (const p of pieces) {
-    const px = mg+p.x*scale, py = ch-mg-(p.y+p.h)*scale, pw=p.w*scale, ph=p.h*scale;
+    const px = mg+p.x*scale+inset, py = ch-mg-(p.y+p.h)*scale+inset;
+    const pw = p.w*scale-2*inset, ph = p.h*scale-2*inset;
     ctx.globalAlpha = alpha;
     ctx.fillStyle = p.color; ctx.fillRect(px,py,pw,ph);
     ctx.globalAlpha = 1;
