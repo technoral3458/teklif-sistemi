@@ -126,6 +126,11 @@ def _apply_corner(x, y, ref, W, H):
     return x, y  # BL default
 
 
+def _sort_ops_inner_first(ops):
+    """Inner cuts (pockets/holes) before outer profile cuts."""
+    return sorted(ops, key=lambda o: (0 if o.get('op_type', 'inner') == 'inner' else 1, o.get('seq', 0)))
+
+
 def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
     ev = lambda expr: _eval_expr(expr, variables)
     W = float(variables.get('W', 0)); H = float(variables.get('H', 0))
@@ -256,106 +261,103 @@ def _nest(items, sheet_w, sheet_h, margin=5.0, allow_rotate=True):
                           'group': i, 'model_id': item.get('model_id'),
                           'cap_w': w, 'cap_h': h})
 
-    pieces.sort(key=lambda p: -(p['ow'] * p['oh']))
+    # MaxRects BSSF core — run once for a given piece ordering
+    def _maxrects_run(ordered_pieces):
+        sf: list[list[tuple]] = []  # free rect lists per sheet
 
-    # MaxRects: each sheet holds a list of maximal free rectangles (x, y, w, h).
-    # Pieces are searched with effective size (pw+margin, ph+margin) so the gap
-    # between adjacent pieces equals `margin`.
-    sheets_free: list[list[tuple]] = []
+        def _new():
+            sf.append([(margin, margin, sheet_w - 2*margin, sheet_h - 2*margin)])
+            return len(sf) - 1
 
-    def _new_sheet():
-        sheets_free.append([(margin, margin, sheet_w - 2*margin, sheet_h - 2*margin)])
-        return len(sheets_free) - 1
+        def _find(si, pw, ph):
+            ew, eh = pw + margin, ph + margin
+            best_score, best_pos = float('inf'), None
+            for (rx, ry, rw, rh) in sf[si]:
+                if ew <= rw and eh <= rh:
+                    score = min(rw - ew, rh - eh)
+                    if score < best_score:
+                        best_score, best_pos = score, (rx, ry)
+            return best_pos
 
-    def _find_best(si, pw, ph):
-        """Best-short-side-fit in sheet si for pw×ph. Returns (x, y) or None."""
-        ew, eh = pw + margin, ph + margin
-        best_score, best_pos = float('inf'), None
-        for (rx, ry, rw, rh) in sheets_free[si]:
-            if ew <= rw and eh <= rh:
-                score = min(rw - ew, rh - eh)
-                if score < best_score:
-                    best_score, best_pos = score, (rx, ry)
-        return best_pos
+        def _update(si, px, py, pw, ph):
+            ew, eh = pw + margin, ph + margin
+            nr = []
+            for (rx, ry, rw, rh) in sf[si]:
+                if not (px < rx+rw and px+ew > rx and py < ry+rh and py+eh > ry):
+                    nr.append((rx, ry, rw, rh)); continue
+                if px > rx:            nr.append((rx, ry, px-rx, rh))
+                if px+ew < rx+rw:     nr.append((px+ew, ry, rx+rw-px-ew, rh))
+                if py > ry:            nr.append((rx, ry, rw, py-ry))
+                if py+eh < ry+rh:     nr.append((rx, py+eh, rw, ry+rh-py-eh))
+            # Prune non-maximal
+            n, result = len(nr), []
+            for i in range(n):
+                ax, ay, aw, ah = nr[i]
+                if not any(j != i and nr[j][0]<=ax and nr[j][1]<=ay
+                           and nr[j][0]+nr[j][2]>=ax+aw and nr[j][1]+nr[j][3]>=ay+ah
+                           for j in range(n)):
+                    result.append(nr[i])
+            sf[si] = result
 
-    def _update(si, px, py, pw, ph):
-        """Split all free rects that overlap with placed piece; prune non-maximal."""
-        ew, eh = pw + margin, ph + margin
-        new_rects = []
-        for (rx, ry, rw, rh) in sheets_free[si]:
-            # No overlap → keep as-is
-            if not (px < rx + rw and px + ew > rx and py < ry + rh and py + eh > ry):
-                new_rects.append((rx, ry, rw, rh))
-                continue
-            # Split into up to 4 sub-rects around the effective placed rect
-            if px > rx:
-                new_rects.append((rx, ry, px - rx, rh))
-            if px + ew < rx + rw:
-                new_rects.append((px + ew, ry, rx + rw - px - ew, rh))
-            if py > ry:
-                new_rects.append((rx, ry, rw, py - ry))
-            if py + eh < ry + rh:
-                new_rects.append((rx, py + eh, rw, ry + rh - py - eh))
-        # Prune rects fully contained within another rect
-        result = []
-        n = len(new_rects)
-        for i in range(n):
-            ax, ay, aw, ah = new_rects[i]
-            dominated = False
-            for j in range(n):
-                if i == j: continue
-                bx, by, bw, bh = new_rects[j]
-                if bx <= ax and by <= ay and bx + bw >= ax + aw and by + bh >= ay + ah:
-                    dominated = True; break
-            if not dominated:
-                result.append(new_rects[i])
-        sheets_free[si] = result
-
-    def _emit(si, px, py, w, h, rotated, pc):
-        placements.append({'x': round(px, 2), 'y': round(py, 2),
-                          'w': w, 'h': h, 'label': pc['label'],
-                          'color': pc['color'], 'sheet': si,
-                          'rotated': rotated, 'group': pc['group'],
-                          'model_id': pc['model_id'],
-                          'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
-
-    placements = []
-    for pc in pieces:
-        orientations = [(pc['ow'], pc['oh'], False)]
-        if allow_rotate and abs(pc['ow'] - pc['oh']) > 0.5:
-            orientations.append((pc['oh'], pc['ow'], True))
-
-        placed = False
-        for w, h, rotated in orientations:
-            for si in range(len(sheets_free)):
-                pos = _find_best(si, w, h)
-                if pos:
-                    _update(si, pos[0], pos[1], w, h)
-                    _emit(si, pos[0], pos[1], w, h, rotated, pc)
-                    placed = True; break
-            if placed: break
-
-        if not placed:
-            si = _new_sheet()
-            for w, h, rotated in orientations:
-                pos = _find_best(si, w, h)
-                if pos:
-                    _update(si, pos[0], pos[1], w, h)
-                    _emit(si, pos[0], pos[1], w, h, rotated, pc)
-                    placed = True; break
+        result_pl = []
+        for pc in ordered_pieces:
+            orientations = [(pc['ow'], pc['oh'], False)]
+            if allow_rotate and abs(pc['ow'] - pc['oh']) > 0.5:
+                orientations.append((pc['oh'], pc['ow'], True))
+            placed = False
+            for w, h, rot in orientations:
+                for si in range(len(sf)):
+                    pos = _find(si, w, h)
+                    if pos:
+                        _update(si, pos[0], pos[1], w, h)
+                        result_pl.append({'x': round(pos[0],2), 'y': round(pos[1],2),
+                                         'w': w, 'h': h, 'label': pc['label'],
+                                         'color': pc['color'], 'sheet': si,
+                                         'rotated': rot, 'group': pc['group'],
+                                         'model_id': pc['model_id'],
+                                         'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+                        placed = True; break
+                if placed: break
             if not placed:
-                # Piece is larger than the sheet; force-place at origin
-                placements.append({'x': margin, 'y': margin,
-                                  'w': pc['ow'], 'h': pc['oh'], 'label': pc['label'],
-                                  'color': pc['color'], 'sheet': si, 'rotated': False,
-                                  'group': pc['group'], 'model_id': pc['model_id'],
-                                  'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+                si = _new()
+                for w, h, rot in orientations:
+                    pos = _find(si, w, h)
+                    if pos:
+                        _update(si, pos[0], pos[1], w, h)
+                        result_pl.append({'x': round(pos[0],2), 'y': round(pos[1],2),
+                                         'w': w, 'h': h, 'label': pc['label'],
+                                         'color': pc['color'], 'sheet': si,
+                                         'rotated': rot, 'group': pc['group'],
+                                         'model_id': pc['model_id'],
+                                         'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+                        placed = True; break
+                if not placed:
+                    result_pl.append({'x': margin, 'y': margin,
+                                     'w': pc['ow'], 'h': pc['oh'], 'label': pc['label'],
+                                     'color': pc['color'], 'sheet': si, 'rotated': False,
+                                     'group': pc['group'], 'model_id': pc['model_id'],
+                                     'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+        ns = max(1, len(sf))
+        used = sum(p['w'] * p['h'] for p in result_pl)
+        util = round(used / (sheet_w * sheet_h * ns) * 100, 1) if ns else 0
+        return result_pl, ns, util
 
-    n_sheets = max(1, len(sheets_free))
-    used = sum(p['w'] * p['h'] for p in placements)
-    total = sheet_w * sheet_h * n_sheets
-    util = round(used / total * 100, 1) if total > 0 else 0
-    return placements, n_sheets, util
+    # Try multiple sort orders, keep the best (fewest sheets, then highest util)
+    sort_keys = [
+        lambda p: -(p['ow'] * p['oh']),                          # area desc
+        lambda p: -(p['ow'] + p['oh']) * 2,                      # perimeter desc
+        lambda p: -max(p['ow'], p['oh']),                         # longest side desc
+        lambda p: (-min(p['ow'], p['oh']), -max(p['ow'], p['oh'])),  # shortest side desc
+        lambda p: (-(p['ow'] * p['oh']), p['group']),             # area desc, grouped
+    ]
+
+    best_pl, best_ns, best_util = None, float('inf'), 0
+    for sk in sort_keys:
+        pl, ns, util = _maxrects_run(sorted(pieces, key=sk))
+        if ns < best_ns or (ns == best_ns and util > best_util):
+            best_pl, best_ns, best_util = pl, ns, util
+
+    return best_pl, best_ns, best_util
 
 
 def _eval_paths(model, paths, variables, x_off=0.0, y_off=0.0):
@@ -835,7 +837,7 @@ async def cap_generate(request: Request, mid: int,
         pass
     constants = model.get("constants") or {}
     variables.update({k: float(v) for k, v in constants.items()})
-    ops = fdb.get_cap_ops(mid)
+    ops = _sort_ops_inner_first(fdb.get_cap_ops(mid))
     if ops:
         nc = _generate_nc_ops(model, ops, variables)
         sim = _eval_ops(model, ops, variables)
@@ -860,7 +862,7 @@ async def cap_download(request: Request, mid: int,
     except Exception:
         pass
     variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
-    ops = fdb.get_cap_ops(mid)
+    ops = _sort_ops_inner_first(fdb.get_cap_ops(mid))
     if ops:
         nc = _generate_nc_ops(model, ops, variables)
     else:
@@ -887,11 +889,11 @@ async def cap_op_save(request: Request, mid: int,
                       id: int = Form(0), name: str = Form(""),
                       tool_no: int = Form(1), depth: str = Form("-T"),
                       feed: str = Form(""), ref_corner: str = Form("BL"),
-                      seq: int = Form(0)):
+                      seq: int = Form(0), op_type: str = Form("inner")):
     auth.require_user(request)
     op_id = fdb.save_cap_op(id=id or 0, model_id=mid, name=name,
                              tool_no=tool_no, depth=depth, feed=feed,
-                             ref_corner=ref_corner, seq=seq)
+                             ref_corner=ref_corner, seq=seq, op_type=op_type)
     return JSONResponse({"id": op_id})
 
 
@@ -1056,7 +1058,7 @@ async def job_nest_nc(request: Request, jid: int,
         if pl.get('rotated'):
             variables["W"], variables["H"] = H, W
         x_off, y_off = pl['x'], pl['y']
-        ops = fdb.get_cap_ops(mid)
+        ops = _sort_ops_inner_first(fdb.get_cap_ops(mid))
         if ops:
             nc_parts.append(_generate_nc_ops(model, ops, variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
             evp = _eval_ops(model, ops, variables, x_off=x_off, y_off=y_off)

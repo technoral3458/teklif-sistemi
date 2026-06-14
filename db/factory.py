@@ -1085,8 +1085,10 @@ def _init_membrane(c):
         depth TEXT DEFAULT '-T',
         feed TEXT DEFAULT '',
         ref_corner TEXT DEFAULT 'BL',
-        seq INTEGER DEFAULT 0
+        seq INTEGER DEFAULT 0,
+        op_type TEXT DEFAULT 'inner'
     )""")
+    _acol(c, "membrane_cap_ops", "op_type", "TEXT DEFAULT 'inner'")
     c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_moves(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         op_id INTEGER NOT NULL REFERENCES membrane_cap_ops(id) ON DELETE CASCADE,
@@ -1377,7 +1379,7 @@ def del_cap_job_item(item_id):
 
 # ── Cap Ops (structured path editor) ─────────────────────────────────────────
 
-_COP_KEYS = ["id","model_id","name","tool_no","depth","feed","ref_corner","seq"]
+_COP_KEYS = ["id","model_id","name","tool_no","depth","feed","ref_corner","seq","op_type"]
 _CMV_KEYS = ["id","op_id","move_type","x","y","cx","cy","seq"]
 
 def get_cap_moves(op_id):
@@ -1391,7 +1393,7 @@ def get_cap_moves(op_id):
 def get_cap_ops(model_id):
     with _c() as c:
         rows = c.execute(
-            "SELECT id,model_id,name,tool_no,depth,feed,ref_corner,seq FROM membrane_cap_ops WHERE model_id=? ORDER BY seq",
+            "SELECT id,model_id,name,tool_no,depth,feed,ref_corner,seq,op_type FROM membrane_cap_ops WHERE model_id=? ORDER BY seq",
             (model_id,)
         ).fetchall()
     ops = [dict(zip(_COP_KEYS, r)) for r in rows]
@@ -1400,7 +1402,7 @@ def get_cap_ops(model_id):
     return ops
 
 def save_cap_op(id=0, **kw):
-    allowed = ["model_id","name","tool_no","depth","feed","ref_corner","seq"]
+    allowed = ["model_id","name","tool_no","depth","feed","ref_corner","seq","op_type"]
     f = {k: v for k, v in kw.items() if k in allowed}
     with _c() as c:
         if id:

@@ -276,6 +276,20 @@
         </div>
       </div>
 
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Kesim Türü <span style="color:var(--text-muted);font-size:10px;">— G-code sırasını belirler</span></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
+            <input type="radio" name="opType" value="inner" checked style="accent-color:var(--accent);" />
+            <span>● <strong>İç Kesim</strong> <span style="color:var(--text-muted);font-size:10px;">cep / delik</span></span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
+            <input type="radio" name="opType" value="outer" style="accent-color:var(--accent);" />
+            <span>○ <strong>Dış Kontur</strong> <span style="color:var(--text-muted);font-size:10px;">profil / dış</span></span>
+          </label>
+        </div>
+      </div>
+
       <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11px;color:var(--text-muted);">
         Formül değişkenleri: <code>W</code> <code>H</code> <code>T</code>
         {% if edit_model.constants %}{% for k in edit_model.constants.keys() %}<code>{{ k }}</code>{% endfor %}{% endif %}
@@ -632,6 +646,10 @@ function renderOps(ops) {
   ops.forEach((op, idx) => {
     const ref = CORNER_LABELS[op.ref_corner] || op.ref_corner;
     const feedLabel = op.feed ? `F=${op.feed}` : 'F=model';
+    const typeIcon = op.op_type === 'outer' ? '○' : '●';
+    const typeBadge = op.op_type === 'outer'
+      ? `<span style="font-size:10px;color:#f59e0b;background:rgba(245,158,11,0.15);border-radius:4px;padding:1px 5px;">Dış Kontur</span>`
+      : `<span style="font-size:10px;color:#22c55e;background:rgba(34,197,94,0.15);border-radius:4px;padding:1px 5px;">İç Kesim</span>`;
     html += `
     <div style="border-top:1px solid var(--border);">
       <div style="padding:10px 14px;display:flex;align-items:center;gap:8px;background:var(--surface-2);">
@@ -643,6 +661,7 @@ function renderOps(ops) {
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span class="badge" style="background:rgba(245,158,11,.2);color:#fbbf24;font-size:10px;">T${op.tool_no}</span>
             <strong style="font-size:13px;">${op.name || ('İşlem ' + (idx+1))}</strong>
+            ${typeBadge}
             <span style="font-size:10px;color:var(--text-muted);">${ref} · Z=${op.depth} · ${feedLabel}</span>
           </div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${op.moves.length} hareket</div>
@@ -777,6 +796,7 @@ function openOpModal(opId) {
       document.getElementById('opDepth').value = op.depth || '-T';
       document.getElementById('opFeed').value  = op.feed || '';
       document.querySelectorAll('[name=opRefCorner]').forEach(r => r.checked = r.value === (op.ref_corner||'BL'));
+      document.querySelectorAll('[name=opType]').forEach(r => r.checked = r.value === (op.op_type||'inner'));
     }
   } else {
     document.getElementById('opName').value  = '';
@@ -784,13 +804,15 @@ function openOpModal(opId) {
     document.getElementById('opDepth').value = '-T';
     document.getElementById('opFeed').value  = '';
     document.querySelectorAll('[name=opRefCorner]').forEach(r => r.checked = r.value === 'BL');
+    document.querySelectorAll('[name=opType]').forEach(r => r.checked = r.value === 'inner');
   }
   openModal('opModal');
 }
 
 async function saveOp() {
   const opId = parseInt(document.getElementById('opId').value) || 0;
-  const ref = document.querySelector('[name=opRefCorner]:checked')?.value || 'BL';
+  const ref     = document.querySelector('[name=opRefCorner]:checked')?.value || 'BL';
+  const opType  = document.querySelector('[name=opType]:checked')?.value || 'inner';
   const seq = opId ? (_opsData.find(o=>o.id===opId)?.seq||0) : _opsData.length * 10 + 10;
   const fd = new FormData();
   fd.append('id', opId);
@@ -799,6 +821,7 @@ async function saveOp() {
   fd.append('depth', document.getElementById('opDepth').value);
   fd.append('feed', document.getElementById('opFeed').value);
   fd.append('ref_corner', ref);
+  fd.append('op_type', opType);
   fd.append('seq', seq);
   const res = await fetch(`/membrane/caps/${MODEL_ID}/op/save`, {method:'POST', body:fd});
   const data = await res.json();
