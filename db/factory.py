@@ -1418,26 +1418,23 @@ def get_tool(tid):
 def save_tool(id=0, **kw):
     allowed = ["name","tool_no","diameter","length","feed_xy","feed_z","notes"]
     f = {k: v for k, v in kw.items() if k in allowed}
-    conn = sqlite3.connect(FACTORY_DB, check_same_thread=False)
+    conn = sqlite3.connect(FACTORY_DB, isolation_level=None, check_same_thread=False)
     try:
+        cur = conn.cursor()
         if id:
             sets = ",".join(f"{k}=?" for k in f)
-            conn.execute(f"UPDATE membrane_tools SET {sets} WHERE id=?", list(f.values()) + [id])
-            conn.commit()
+            cur.execute(f"UPDATE membrane_tools SET {sets} WHERE id=?", list(f.values()) + [id])
             return id
         cols = ",".join(f.keys()); ph = ",".join("?" * len(f))
-        cur = conn.execute(f"INSERT INTO membrane_tools({cols}) VALUES({ph})", list(f.values()))
-        new_id = cur.lastrowid
-        conn.commit()
-        return new_id
+        cur.execute(f"INSERT INTO membrane_tools({cols}) VALUES({ph})", list(f.values()))
+        return cur.lastrowid
     finally:
         conn.close()
 
 def del_tool(tid):
-    conn = sqlite3.connect(FACTORY_DB, check_same_thread=False)
+    conn = sqlite3.connect(FACTORY_DB, isolation_level=None, check_same_thread=False)
     try:
         conn.execute("DELETE FROM membrane_tools WHERE id=?", (tid,))
-        conn.commit()
     finally:
         conn.close()
 

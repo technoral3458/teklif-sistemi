@@ -1058,10 +1058,15 @@ async def tool_save(request: Request,
                     length: float = Form(0), feed_xy: int = Form(3000),
                     feed_z: int = Form(1000), notes: str = Form("")):
     auth.require_user(request)
-    tid = fdb.save_tool(id=id or 0, name=name, tool_no=tool_no,
-                        diameter=diameter, length=length,
-                        feed_xy=feed_xy, feed_z=feed_z, notes=notes)
-    return JSONResponse({"id": tid, "ok": True, "tools": fdb.get_tools()})
+    import traceback as _tb
+    try:
+        tid = fdb.save_tool(id=id or 0, name=name, tool_no=tool_no,
+                            diameter=diameter, length=length,
+                            feed_xy=feed_xy, feed_z=feed_z, notes=notes)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e), "trace": _tb.format_exc()}, status_code=500)
+    tools_after = fdb.get_tools()
+    return JSONResponse({"id": tid, "ok": True, "count": len(tools_after), "tools": tools_after})
 
 @router.post("/caps/tools/delete")
 async def tool_delete(request: Request, id: int = Form(...)):
