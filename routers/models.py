@@ -15,6 +15,20 @@ router = APIRouter(prefix="/models")
 from tmpl import templates
 
 
+def _options_for_category(category_id):
+    """Return options that match the given category, plus uncategorized (universal) options."""
+    all_opts = fdb.get_options()
+    if not category_id:
+        return all_opts
+    cid = str(category_id)
+    result = []
+    for o in all_opts:
+        ids = [x.strip() for x in (o.get("category_ids") or "").split(",") if x.strip()]
+        if not ids or cid in ids:
+            result.append(o)
+    return result
+
+
 def _calc_cost(purchase_price, shipping_cost, customs_pct, extra_tax_pct,
                port_cost, document_cost, installation_cost, other_cost):
     return (
@@ -53,7 +67,7 @@ async def models_list(request: Request, category_id: int = 0):
 async def model_new(request: Request):
     user = auth.require_user(request)
     cats = fdb.get_cats()
-    options = fdb.get_options()
+    options = fdb.get_options()  # no category yet — show all
     return templates.TemplateResponse(request, "model_form.html", {
         "user": user,
         "model": {},
@@ -73,7 +87,7 @@ async def model_copy(request: Request, model_id: int):
     if not m:
         return RedirectResponse("/models", 303)
     cats = fdb.get_cats()
-    options = fdb.get_options()
+    options = _options_for_category(m.get("category_id"))
     compatible = []
     if m.get("compatible_options"):
         try:
@@ -106,7 +120,7 @@ async def model_edit(request: Request, model_id: int):
         if allowed_ids and model_id not in allowed_ids:
             return RedirectResponse("/models", 303)
     cats = fdb.get_cats()
-    options = fdb.get_options()
+    options = _options_for_category(m.get("category_id"))
     compatible = []
     if m.get("compatible_options"):
         try:
