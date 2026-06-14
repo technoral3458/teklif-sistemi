@@ -8,6 +8,7 @@
   <a href="/membrane" class="btn btn-ghost btn-sm">← Membran</a>
   <h2 style="margin:0;font-size:18px;font-weight:700;flex:1;">🔧 Parametrik Kapak Makroları</h2>
   {% if not edit_model %}
+  <button class="btn btn-ghost btn-sm" onclick="openModal('toolLibModal');loadTools();">🔧 Takım Kütüphanesi</button>
   <button class="btn btn-outline btn-sm" onclick="openModal('dxfModal')">📐 DXF'ten İçe Aktar</button>
   <button class="btn btn-primary btn-sm" onclick="openModal('newModelModal')">+ Yeni Model</button>
   {% else %}
@@ -258,62 +259,135 @@
 
 {# Op Add/Edit Modal #}
 <div id="opModal" class="modal-overlay">
-  <div class="modal-box" style="max-width:480px;">
+  <div class="modal-box" style="max-width:560px;">
     <div class="modal-header">
       <h3 class="modal-title" id="opModalTitle">Frezeleme İşlemi</h3>
       <button class="modal-close" onclick="closeModal('opModal')">&times;</button>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
       <input type="hidden" id="opId" value="0" />
+      <input type="hidden" id="opToolId" value="0" />
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <div class="form-group" style="margin:0;grid-column:1/-1;">
-          <label class="form-label">İşlem Adı <span style="color:var(--text-muted);font-weight:400;">(opsiyonel)</span></label>
-          <input type="text" id="opName" class="form-control" placeholder="örn: Çerçeve kesim" />
+      {# Row 1: Name #}
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">İşlem Adı <span style="color:var(--text-muted);font-weight:400;">(opsiyonel)</span></label>
+        <input type="text" id="opName" class="form-control" placeholder="örn: Çerçeve kesim" />
+      </div>
+
+      {# Row 2: Tool selector from library #}
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="display:flex;justify-content:space-between;">
+          <span>Takım Seç</span>
+          <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:10px;" onclick="openModal('toolLibModal');loadTools();">+ Kütüphane</button>
+        </label>
+        <div id="opToolCards" style="display:flex;gap:6px;flex-wrap:wrap;min-height:36px;padding:4px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+          <span style="font-size:11px;color:var(--text-muted);align-self:center;padding:2px 4px;">Yükleniyor...</span>
         </div>
+      </div>
+
+      {# Row 3: Tool No + Depth + Feed #}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
         <div class="form-group" style="margin:0;">
-          <label class="form-label">Takım No</label>
+          <label class="form-label" style="font-size:11px;">Takım No <span style="color:var(--text-muted);font-size:9px;">(manuel)</span></label>
           <input type="number" id="opTool" class="form-control" value="1" min="1" max="99" />
         </div>
         <div class="form-group" style="margin:0;">
-          <label class="form-label">Besleme <span style="color:var(--text-muted);font-size:10px;">(boş=model)</span></label>
-          <input type="text" id="opFeed" class="form-control" placeholder="örn: 3000" />
+          <label class="form-label" style="font-size:11px;">Derinlik <span style="color:var(--text-muted);font-size:9px;">(formül)</span></label>
+          <input type="text" id="opDepth" class="form-control" value="-LPZ" placeholder="-LPZ veya -5" />
         </div>
-        <div class="form-group" style="margin:0;grid-column:1/-1;">
-          <label class="form-label">Kesim Derinliği <span style="color:var(--text-muted);font-size:10px;">(formül olabilir)</span></label>
-          <input type="text" id="opDepth" class="form-control" value="-LPZ" placeholder="örn: -LPZ veya -5" />
-        </div>
-      </div>
-
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Referans Köşe <span style="color:var(--text-muted);font-size:10px;">— koordinatlar bu köşeden ölçülür</span></label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          {% for val, lbl, desc in [('TL','Sol-Üst','X→ Y↓'),('TR','Sağ-Üst','X← Y↓'),('BL','Sol-Alt','X→ Y↑'),('BR','Sağ-Alt','X← Y↑')] %}
-          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
-            <input type="radio" name="opRefCorner" value="{{ val }}" {% if val == 'BL' %}checked{% endif %} style="accent-color:var(--accent);" />
-            <span><strong>{{ lbl }}</strong> <span style="color:var(--text-muted);font-size:10px;">{{ desc }}</span></span>
-          </label>
-          {% endfor %}
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Besleme <span style="color:var(--text-muted);font-size:9px;">(boş=model)</span></label>
+          <input type="text" id="opFeed" class="form-control" placeholder="3000" />
         </div>
       </div>
 
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Kesim Türü <span style="color:var(--text-muted);font-size:10px;">— G-code sırasını belirler</span></label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
-            <input type="radio" name="opType" value="inner" checked style="accent-color:var(--accent);" />
-            <span>● <strong>İç Kesim</strong> <span style="color:var(--text-muted);font-size:10px;">cep / delik</span></span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
-            <input type="radio" name="opType" value="outer" style="accent-color:var(--accent);" />
-            <span>○ <strong>Dış Kontur</strong> <span style="color:var(--text-muted);font-size:10px;">profil / dış</span></span>
-          </label>
+      {# Row 4: Corner picker + op type side by side #}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+        {# Graphical corner picker #}
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Referans Köşe</label>
+          <input type="hidden" id="opRefCorner" value="BL" />
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;grid-template-rows:1fr auto 1fr;gap:4px;width:140px;">
+              <!-- TL -->
+              <button type="button" id="cpBtnTL" onclick="setCorner('TL')"
+                style="padding:4px 6px;font-size:10px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:1px;">
+                <span style="font-size:9px;font-weight:700;">TL</span>
+                <span style="font-size:8px;color:var(--text-muted);">X→ Y↓</span>
+              </button>
+              <!-- top edge -->
+              <div style="display:flex;align-items:center;justify-content:center;">
+                <div style="height:2px;width:28px;background:var(--border);border-radius:1px;"></div>
+              </div>
+              <!-- TR -->
+              <button type="button" id="cpBtnTR" onclick="setCorner('TR')"
+                style="padding:4px 6px;font-size:10px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+                <span style="font-size:9px;font-weight:700;">TR</span>
+                <span style="font-size:8px;color:var(--text-muted);">X← Y↓</span>
+              </button>
+              <!-- left edge -->
+              <div style="display:flex;align-items:center;justify-content:center;">
+                <div style="width:2px;height:24px;background:var(--border);border-radius:1px;"></div>
+              </div>
+              <!-- center label -->
+              <div style="display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text-muted);">
+                LPX×LPY
+              </div>
+              <!-- right edge -->
+              <div style="display:flex;align-items:center;justify-content:center;">
+                <div style="width:2px;height:24px;background:var(--border);border-radius:1px;"></div>
+              </div>
+              <!-- BL -->
+              <button type="button" id="cpBtnBL" onclick="setCorner('BL')"
+                style="padding:4px 6px;font-size:10px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:1px;">
+                <span style="font-size:9px;font-weight:700;">BL</span>
+                <span style="font-size:8px;color:var(--text-muted);">X→ Y↑</span>
+              </button>
+              <!-- bottom edge -->
+              <div style="display:flex;align-items:center;justify-content:center;">
+                <div style="height:2px;width:28px;background:var(--border);border-radius:1px;"></div>
+              </div>
+              <!-- BR -->
+              <button type="button" id="cpBtnBR" onclick="setCorner('BR')"
+                style="padding:4px 6px;font-size:10px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+                <span style="font-size:9px;font-weight:700;">BR</span>
+                <span style="font-size:8px;color:var(--text-muted);">X← Y↑</span>
+              </button>
+            </div>
+          </div>
         </div>
+
+        {# Op type + comp mode #}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Kesim Türü</label>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;cursor:pointer;font-size:12px;">
+                <input type="radio" name="opType" value="inner" checked style="accent-color:var(--accent);" />
+                <span>● <strong>İç Kesim</strong> <span style="color:var(--text-muted);font-size:10px;">cep/delik</span></span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;cursor:pointer;font-size:12px;">
+                <input type="radio" name="opType" value="outer" style="accent-color:var(--accent);" />
+                <span>○ <strong>Dış Kontur</strong> <span style="color:var(--text-muted);font-size:10px;">profil/dış</span></span>
+              </label>
+            </div>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Takım Yolu Tipi <span style="color:var(--text-muted);font-size:9px;">(G40/G41/G42)</span></label>
+            <select id="opCompMode" class="form-control" style="font-size:12px;">
+              <option value="none">Merkez — G40 (kompansasyon yok)</option>
+              <option value="G41">İçten — G41 (sol kompansasyon)</option>
+              <option value="G42">Dıştan — G42 (sağ kompansasyon)</option>
+            </select>
+          </div>
+        </div>
+
       </div>
 
       <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11px;color:var(--text-muted);">
         Formül değişkenleri: <code>LPX</code> <code>LPY</code> <code>LPZ</code>
-        {% if edit_model.constants %}{% for k in edit_model.constants.keys() %}<code>{{ k }}</code>{% endfor %}{% endif %}
+        {% if edit_model and edit_model.constants %}{% for k in edit_model.constants.keys() %}<code>{{ k }}</code>{% endfor %}{% endif %}
       </div>
     </div>
     <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
@@ -474,6 +548,58 @@
   </div>
 </div>
 {% endif %}
+
+{# Tool Library Modal #}
+<div id="toolLibModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:640px;">
+    <div class="modal-header">
+      <h3 class="modal-title">🔧 Takım Kütüphanesi</h3>
+      <button class="modal-close" onclick="closeModal('toolLibModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div id="toolLibList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+      <div style="border-top:1px solid var(--border);padding-top:10px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text-muted);">Yeni Takım / Düzenle</div>
+        <input type="hidden" id="tlId" value="0" />
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" style="font-size:11px;">Takım Adı *</label>
+            <input type="text" id="tlName" class="form-control" placeholder="örn: 6mm Düz Freze" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Takım No (T)</label>
+            <input type="number" id="tlNo" class="form-control" value="1" min="1" max="99" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Çap Ø (mm)</label>
+            <input type="number" id="tlDia" class="form-control" value="6" step="0.1" min="0.1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Boy (mm)</label>
+            <input type="number" id="tlLen" class="form-control" value="0" step="1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Besleme XY (mm/dk)</label>
+            <input type="number" id="tlFeedXY" class="form-control" value="3000" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Dalış Z (mm/dk)</label>
+            <input type="number" id="tlFeedZ" class="form-control" value="1000" />
+          </div>
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" style="font-size:11px;">Not</label>
+            <input type="text" id="tlNotes" class="form-control" placeholder="opsiyonel" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="btn btn-ghost" onclick="tlClear()">Temizle</button>
+      <button type="button" class="btn btn-ghost" onclick="closeModal('toolLibModal')">Kapat</button>
+      <button type="button" class="btn btn-primary" onclick="tlSave()">Kaydet</button>
+    </div>
+  </div>
+</div>
 
 {# DXF Import Modal #}
 <div id="dxfModal" class="modal-overlay">
@@ -754,6 +880,10 @@ function renderOps(ops) {
     const typeBadge = op.op_type === 'outer'
       ? `<span style="font-size:10px;color:#f59e0b;background:rgba(245,158,11,0.15);border-radius:4px;padding:1px 5px;">Dış Kontur</span>`
       : `<span style="font-size:10px;color:#22c55e;background:rgba(34,197,94,0.15);border-radius:4px;padding:1px 5px;">İç Kesim</span>`;
+    const cm = op.comp_mode || 'none';
+    const compBadge = cm !== 'none'
+      ? `<span style="font-size:10px;color:#60a5fa;background:rgba(96,165,250,.12);border-radius:4px;padding:1px 5px;">${cm==='G41'?'İçten G41':'Dıştan G42'}</span>`
+      : '';
     const isCollapsed = _collapsedOps.has(op.id);
     const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${OP_COLORS[idx%OP_COLORS.length]};margin-right:4px;flex-shrink:0;"></span>`;
     html += `
@@ -768,7 +898,7 @@ function renderOps(ops) {
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span class="badge" style="background:rgba(245,158,11,.2);color:#fbbf24;font-size:10px;">T${op.tool_no}</span>
             <strong style="font-size:13px;">${op.name || ('İşlem ' + (idx+1))}</strong>
-            ${typeBadge}
+            ${typeBadge}${compBadge}
             <span style="font-size:10px;color:var(--text-muted);">${ref} · Z=${op.depth} · ${feedLabel}</span>
           </div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${op.moves.length} hareket</div>
@@ -1000,40 +1130,50 @@ async function deleteMove(mvId) {
 function openOpModal(opId) {
   document.getElementById('opId').value = opId;
   document.getElementById('opModalTitle').textContent = opId ? 'İşlem Düzenle' : 'Yeni İşlem';
+  if (!_tools.length) loadTools();
   if (opId) {
     const op = _opsData.find(o => o.id === opId);
     if (op) {
-      document.getElementById('opName').value  = op.name || '';
-      document.getElementById('opTool').value  = op.tool_no || 1;
-      document.getElementById('opDepth').value = op.depth || '-LPZ';
-      document.getElementById('opFeed').value  = op.feed || '';
-      document.querySelectorAll('[name=opRefCorner]').forEach(r => r.checked = r.value === (op.ref_corner||'BL'));
+      document.getElementById('opName').value   = op.name || '';
+      document.getElementById('opTool').value   = op.tool_no || 1;
+      document.getElementById('opToolId').value = op.tool_id || 0;
+      document.getElementById('opDepth').value  = op.depth || '-LPZ';
+      document.getElementById('opFeed').value   = op.feed || '';
+      document.getElementById('opCompMode').value = op.comp_mode || 'none';
       document.querySelectorAll('[name=opType]').forEach(r => r.checked = r.value === (op.op_type||'inner'));
+      setCorner(op.ref_corner || 'BL');
+      renderOpToolCards();
     }
   } else {
-    document.getElementById('opName').value  = '';
-    document.getElementById('opTool').value  = 1;
-    document.getElementById('opDepth').value = '-LPZ';
-    document.getElementById('opFeed').value  = '';
-    document.querySelectorAll('[name=opRefCorner]').forEach(r => r.checked = r.value === 'BL');
+    document.getElementById('opName').value   = '';
+    document.getElementById('opTool').value   = 1;
+    document.getElementById('opToolId').value = 0;
+    document.getElementById('opDepth').value  = '-LPZ';
+    document.getElementById('opFeed').value   = '';
+    document.getElementById('opCompMode').value = 'none';
     document.querySelectorAll('[name=opType]').forEach(r => r.checked = r.value === 'inner');
+    setCorner('BL');
+    renderOpToolCards();
   }
   openModal('opModal');
 }
 
 async function saveOp() {
-  const opId = parseInt(document.getElementById('opId').value) || 0;
-  const ref     = document.querySelector('[name=opRefCorner]:checked')?.value || 'BL';
-  const opType  = document.querySelector('[name=opType]:checked')?.value || 'inner';
-  const seq = opId ? (_opsData.find(o=>o.id===opId)?.seq||0) : _opsData.length * 10 + 10;
+  const opId   = parseInt(document.getElementById('opId').value) || 0;
+  const ref    = document.getElementById('opRefCorner')?.value || 'BL';
+  const opType = document.querySelector('[name=opType]:checked')?.value || 'inner';
+  const seq    = opId ? (_opsData.find(o=>o.id===opId)?.seq||0) : _opsData.length * 10 + 10;
   const fd = new FormData();
   fd.append('id', opId);
   fd.append('name', document.getElementById('opName').value);
   fd.append('tool_no', document.getElementById('opTool').value);
+  fd.append('tool_id', document.getElementById('opToolId').value || 0);
   fd.append('depth', document.getElementById('opDepth').value);
   fd.append('feed', document.getElementById('opFeed').value);
   fd.append('ref_corner', ref);
   fd.append('op_type', opType);
+  fd.append('comp_mode', document.getElementById('opCompMode').value || 'none');
+  fd.append('offset_side', 'center');
   fd.append('seq', seq);
   const res = await fetch(`/membrane/caps/${MODEL_ID}/op/save`, {method:'POST', body:fd});
   const data = await res.json();
@@ -1394,6 +1534,134 @@ function _animStep(ts) {
     return;
   }
   simState.animId = requestAnimationFrame(_animStep);
+}
+
+// ── Tool Library ────────────────────────────────────────────────────────────
+let _tools = [];
+
+async function loadTools() {
+  try {
+    const res = await fetch('/membrane/caps/tools');
+    _tools = await res.json();
+  } catch(e) { _tools = []; }
+  renderToolLib();
+  renderOpToolCards();
+}
+
+function renderToolLib() {
+  const list = document.getElementById('toolLibList');
+  if (!list) return;
+  if (!_tools.length) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px;">— Henüz takım yok —</div>';
+    return;
+  }
+  list.innerHTML = _tools.map(t => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);">
+      <div style="width:34px;height:34px;border-radius:50%;background:rgba(245,158,11,.15);color:#fbbf24;
+           display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">
+        T${t.tool_no}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:600;">${t.name}</div>
+        <div style="font-size:10px;color:var(--text-muted);">
+          Ø${t.diameter}mm &nbsp;·&nbsp; L=${t.length}mm &nbsp;·&nbsp; F=${t.feed_xy}mm/dk &nbsp;·&nbsp; Z=${t.feed_z}mm/dk
+        </div>
+        ${t.notes ? `<div style="font-size:10px;color:var(--text-muted);">${t.notes}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0;">
+        <button class="btn btn-ghost btn-sm" onclick="tlEdit(${t.id})" style="padding:3px 7px;font-size:10px;">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="tlDelete(${t.id})" style="padding:3px 7px;font-size:10px;">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderOpToolCards() {
+  const c = document.getElementById('opToolCards');
+  if (!c) return;
+  const selId = parseInt(document.getElementById('opToolId')?.value || 0);
+  if (!_tools.length) {
+    c.innerHTML = '<span style="font-size:11px;color:var(--text-muted);padding:4px;">— Kütüphane boş —</span>';
+    return;
+  }
+  c.innerHTML = _tools.map(t => {
+    const sel = t.id === selId;
+    return `<button type="button" onclick="selectTool(${t.id})"
+      style="padding:5px 9px;font-size:11px;border-radius:5px;cursor:pointer;white-space:nowrap;
+             border:1.5px solid ${sel ? 'var(--accent)' : 'var(--border)'};
+             background:${sel ? 'rgba(59,130,246,.15)' : 'var(--surface)'};
+             color:${sel ? 'var(--accent)' : 'var(--text-primary)'};">
+      <strong>T${t.tool_no}</strong> ${t.name} <span style="opacity:.65;">Ø${t.diameter}</span>
+    </button>`;
+  }).join('');
+}
+
+function selectTool(tid) {
+  const t = _tools.find(x => x.id === tid);
+  if (!t) return;
+  document.getElementById('opToolId').value = tid;
+  document.getElementById('opTool').value   = t.tool_no;
+  if (t.feed_xy) document.getElementById('opFeed').value = t.feed_xy;
+  renderOpToolCards();
+}
+
+function tlClear() {
+  ['tlId','tlName','tlNo','tlDia','tlLen','tlFeedXY','tlFeedZ','tlNotes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = {tlId:'0',tlNo:'1',tlDia:'6',tlLen:'0',tlFeedXY:'3000',tlFeedZ:'1000'}[id] ?? '';
+  });
+}
+
+function tlEdit(tid) {
+  const t = _tools.find(x => x.id === tid);
+  if (!t) return;
+  document.getElementById('tlId').value     = t.id;
+  document.getElementById('tlName').value   = t.name;
+  document.getElementById('tlNo').value     = t.tool_no;
+  document.getElementById('tlDia').value    = t.diameter;
+  document.getElementById('tlLen').value    = t.length;
+  document.getElementById('tlFeedXY').value = t.feed_xy;
+  document.getElementById('tlFeedZ').value  = t.feed_z;
+  document.getElementById('tlNotes').value  = t.notes || '';
+}
+
+async function tlSave() {
+  const name = document.getElementById('tlName').value.trim();
+  if (!name) { alert('Takım adı gerekli'); return; }
+  const fd = new FormData();
+  fd.append('id',      document.getElementById('tlId').value);
+  fd.append('name',    name);
+  fd.append('tool_no', document.getElementById('tlNo').value);
+  fd.append('diameter',document.getElementById('tlDia').value);
+  fd.append('length',  document.getElementById('tlLen').value);
+  fd.append('feed_xy', document.getElementById('tlFeedXY').value);
+  fd.append('feed_z',  document.getElementById('tlFeedZ').value);
+  fd.append('notes',   document.getElementById('tlNotes').value);
+  await fetch('/membrane/caps/tools/save', {method:'POST', body:fd});
+  await loadTools();
+  tlClear();
+}
+
+async function tlDelete(tid) {
+  if (!confirm('Takımı sil?')) return;
+  const fd = new FormData(); fd.append('id', tid);
+  await fetch('/membrane/caps/tools/delete', {method:'POST', body:fd});
+  await loadTools();
+}
+
+// ── Graphical Corner Picker ──────────────────────────────────────────────────
+function setCorner(val) {
+  const hid = document.getElementById('opRefCorner');
+  if (hid) hid.value = val;
+  ['TL','TR','BL','BR'].forEach(c => {
+    const btn = document.getElementById(`cpBtn${c}`);
+    if (!btn) return;
+    const sel = c === val;
+    btn.style.borderColor = sel ? 'var(--accent)' : 'var(--border)';
+    btn.style.background  = sel ? 'rgba(59,130,246,.18)' : 'var(--surface-2)';
+    btn.style.color       = sel ? 'var(--accent)' : '';
+    btn.querySelector('span').style.color = sel ? 'var(--accent)' : '';
+  });
 }
 
 // ── DXF Import ──────────────────────────────────────────────────────────────

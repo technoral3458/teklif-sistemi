@@ -182,10 +182,20 @@ def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
                       f"T{op_tool} M6", f"S{spindle} M3", f"G0 G90 Z{safe_z:.3f}"]
         cur_tool = op_tool
 
-        op_name = (op.get('name') or '').strip() or f"OP{op.get('seq',0)}"
-        lines.append(f"({op_name} T{op_tool} F{op_feed} Z{op_depth:.3f} REF:{_CORNER_LABELS.get(ref,ref)})")
+        # Tool radius compensation
+        comp = (op.get('comp_mode') or 'none').upper()
+        offset_side = op.get('offset_side') or 'center'
+        tool_dia = 0.0
+        if comp in ('G41', 'G42'):
+            tid = op.get('tool_id')
+            t = fdb.get_tool(tid) if tid else None
+            tool_dia = float(t['diameter']) if t else 0.0
 
-        cur_x = cur_y = 0.0; plunged = False
+        op_name = (op.get('name') or '').strip() or f"OP{op.get('seq',0)}"
+        comp_label = f" {comp} R={tool_dia:.1f}mm" if comp != 'NONE' else ""
+        lines.append(f"({op_name} T{op_tool} F{op_feed} Z{op_depth:.3f} REF:{_CORNER_LABELS.get(ref,ref)}{comp_label})")
+
+        cur_x = cur_y = 0.0; plunged = False; comp_active = False
         for mv in op.get('moves', []):
             mt = mv.get('move_type', 'line')
             try:
@@ -193,13 +203,21 @@ def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
                 ax, ay = _apply_corner(mx, my, ref, W, H)
                 ax += x_off; ay += y_off
                 if mt == 'start':
-                    if plunged: lines.append(f"G0 Z{safe_z:.3f}")
+                    if plunged:
+                        if comp_active: lines.append("G40"); comp_active = False
+                        lines.append(f"G0 Z{safe_z:.3f}")
                     lines += [f"G0 X{ax:.3f} Y{ay:.3f}", f"G1 Z{op_depth:.3f} F{feed_z}"]
                     cur_x = ax; cur_y = ay; plunged = True
                 elif mt == 'line' and plunged:
+                    if comp in ('G41', 'G42') and not comp_active:
+                        lines.append(f"{comp} D{op_tool:02d}")
+                        comp_active = True
                     lines.append(f"G1 X{ax:.3f} Y{ay:.3f} F{op_feed}")
                     cur_x = ax; cur_y = ay
                 elif mt in ('arc_cw','arc_ccw') and plunged:
+                    if comp in ('G41', 'G42') and not comp_active:
+                        lines.append(f"{comp} D{op_tool:02d}")
+                        comp_active = True
                     mcx = ev(mv.get('cx') or '0'); mcy = ev(mv.get('cy') or '0')
                     acx, acy = _apply_corner(mcx, mcy, ref, W, H)
                     acx += x_off; acy += y_off
@@ -209,7 +227,9 @@ def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
                     cur_x = ax; cur_y = ay
             except Exception as exc:
                 lines.append(f"(ERROR: {exc})")
-        if plunged: lines.append(f"G0 Z{safe_z:.3f}")
+        if plunged:
+            if comp_active: lines.append("G40")
+            lines.append(f"G0 Z{safe_z:.3f}")
 
     lines += ["M5", "G28 G91 Z0.", "M30", "%"]
     return "\n".join(lines)
@@ -963,6 +983,30 @@ async def caps_delete(request: Request, id: int = Form(...)):
     return RedirectResponse("/membrane/caps?msg=Model+silindi&msg_type=success", 303)
 
 
+@router.get("/caps/tools")
+async def tools_list_api(request: Request):
+    auth.require_user(request)
+    return JSONResponse(fdb.get_tools())
+
+@router.post("/caps/tools/save")
+async def tool_save(request: Request,
+                    id: int = Form(0), name: str = Form(""),
+                    tool_no: int = Form(1), diameter: float = Form(6.0),
+                    length: float = Form(0), feed_xy: int = Form(3000),
+                    feed_z: int = Form(1000), notes: str = Form("")):
+    auth.require_user(request)
+    tid = fdb.save_tool(id=id or 0, name=name, tool_no=tool_no,
+                        diameter=diameter, length=length,
+                        feed_xy=feed_xy, feed_z=feed_z, notes=notes)
+    return JSONResponse({"id": tid, "ok": True})
+
+@router.post("/caps/tools/delete")
+async def tool_delete(request: Request, id: int = Form(...)):
+    auth.require_user(request)
+    fdb.del_tool(id)
+    return JSONResponse({"ok": True})
+
+
 @router.post("/caps/dxf_preview")
 async def caps_dxf_preview(request: Request, file: UploadFile = File(...)):
     auth.require_user(request)
@@ -1106,13 +1150,18 @@ async def cap_ops_list(request: Request, mid: int):
 @router.post("/caps/{mid}/op/save")
 async def cap_op_save(request: Request, mid: int,
                       id: int = Form(0), name: str = Form(""),
-                      tool_no: int = Form(1), depth: str = Form("-T"),
-                      feed: str = Form(""), ref_corner: str = Form("BL"),
-                      seq: int = Form(0), op_type: str = Form("inner")):
+                      tool_no: int = Form(1), tool_id: int = Form(0),
+                      depth: str = Form("-LPZ"), feed: str = Form(""),
+                      ref_corner: str = Form("BL"), seq: int = Form(0),
+                      op_type: str = Form("inner"),
+                      comp_mode: str = Form("none"),
+                      offset_side: str = Form("center")):
     auth.require_user(request)
     op_id = fdb.save_cap_op(id=id or 0, model_id=mid, name=name,
-                             tool_no=tool_no, depth=depth, feed=feed,
-                             ref_corner=ref_corner, seq=seq, op_type=op_type)
+                             tool_no=tool_no, tool_id=tool_id or None,
+                             depth=depth, feed=feed, ref_corner=ref_corner,
+                             seq=seq, op_type=op_type,
+                             comp_mode=comp_mode, offset_side=offset_side)
     return JSONResponse({"id": op_id})
 
 

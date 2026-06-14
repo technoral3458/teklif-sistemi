@@ -1088,7 +1088,21 @@ def _init_membrane(c):
         seq INTEGER DEFAULT 0,
         op_type TEXT DEFAULT 'inner'
     )""")
-    _acol(c, "membrane_cap_ops", "op_type", "TEXT DEFAULT 'inner'")
+    _acol(c, "membrane_cap_ops", "op_type",      "TEXT DEFAULT 'inner'")
+    _acol(c, "membrane_cap_ops", "tool_id",      "INTEGER")
+    _acol(c, "membrane_cap_ops", "comp_mode",    "TEXT DEFAULT 'none'")
+    _acol(c, "membrane_cap_ops", "offset_side",  "TEXT DEFAULT 'center'")
+    c.execute("""CREATE TABLE IF NOT EXISTS membrane_tools(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        tool_no INTEGER DEFAULT 1,
+        diameter REAL DEFAULT 6.0,
+        length REAL DEFAULT 0,
+        feed_xy INTEGER DEFAULT 3000,
+        feed_z INTEGER DEFAULT 1000,
+        notes TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
     c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_moves(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         op_id INTEGER NOT NULL REFERENCES membrane_cap_ops(id) ON DELETE CASCADE,
@@ -1379,8 +1393,42 @@ def del_cap_job_item(item_id):
 
 # ── Cap Ops (structured path editor) ─────────────────────────────────────────
 
-_COP_KEYS = ["id","model_id","name","tool_no","depth","feed","ref_corner","seq","op_type"]
+_COP_KEYS = ["id","model_id","name","tool_no","depth","feed","ref_corner","seq","op_type","tool_id","comp_mode","offset_side"]
 _CMV_KEYS = ["id","op_id","move_type","x","y","cx","cy","seq"]
+
+# ── Tool Library ──────────────────────────────────────────────────────────────
+_TOOL_KEYS = ["id","name","tool_no","diameter","length","feed_xy","feed_z","notes"]
+
+def get_tools():
+    with _c() as c:
+        rows = c.execute(
+            "SELECT id,name,tool_no,diameter,length,feed_xy,feed_z,notes FROM membrane_tools ORDER BY tool_no,name"
+        ).fetchall()
+    return [dict(zip(_TOOL_KEYS, r)) for r in rows]
+
+def get_tool(tid):
+    with _c() as c:
+        r = c.execute(
+            "SELECT id,name,tool_no,diameter,length,feed_xy,feed_z,notes FROM membrane_tools WHERE id=?", (tid,)
+        ).fetchone()
+    return dict(zip(_TOOL_KEYS, r)) if r else None
+
+def save_tool(id=0, **kw):
+    allowed = ["name","tool_no","diameter","length","feed_xy","feed_z","notes"]
+    f = {k: v for k, v in kw.items() if k in allowed}
+    with _c() as c:
+        if id:
+            sets = ",".join(f"{k}=?" for k in f)
+            c.execute(f"UPDATE membrane_tools SET {sets} WHERE id=?", list(f.values()) + [id])
+            return id
+        cols = ",".join(f.keys()); ph = ",".join("?" * len(f))
+        cur = c.execute(f"INSERT INTO membrane_tools({cols}) VALUES({ph})", list(f.values()))
+        return cur.lastrowid
+
+def del_tool(tid):
+    with _c() as c:
+        c.execute("DELETE FROM membrane_tools WHERE id=?", (tid,))
+
 
 def get_cap_moves(op_id):
     with _c() as c:
@@ -1393,7 +1441,8 @@ def get_cap_moves(op_id):
 def get_cap_ops(model_id):
     with _c() as c:
         rows = c.execute(
-            "SELECT id,model_id,name,tool_no,depth,feed,ref_corner,seq,op_type FROM membrane_cap_ops WHERE model_id=? ORDER BY seq",
+            "SELECT id,model_id,name,tool_no,depth,feed,ref_corner,seq,op_type,tool_id,comp_mode,offset_side"
+            " FROM membrane_cap_ops WHERE model_id=? ORDER BY seq",
             (model_id,)
         ).fetchall()
     ops = [dict(zip(_COP_KEYS, r)) for r in rows]
@@ -1402,7 +1451,7 @@ def get_cap_ops(model_id):
     return ops
 
 def save_cap_op(id=0, **kw):
-    allowed = ["model_id","name","tool_no","depth","feed","ref_corner","seq","op_type"]
+    allowed = ["model_id","name","tool_no","depth","feed","ref_corner","seq","op_type","tool_id","comp_mode","offset_side"]
     f = {k: v for k, v in kw.items() if k in allowed}
     with _c() as c:
         if id:
