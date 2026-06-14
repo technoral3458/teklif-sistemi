@@ -182,7 +182,7 @@ def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
     for op in ops:
         ref = op.get('ref_corner') or 'BL'
         op_tool = int(op.get('tool_no') or 1)
-        try:    op_depth = ev(op.get('depth') or '-T')
+        try:    op_depth = ev(op.get('depth') or '-LPZ')
         except: op_depth = -5.0
         feed_str = str(op.get('feed') or '').strip()
         try:    op_feed = int(ev(feed_str)) if feed_str else feed_xy
@@ -278,7 +278,7 @@ def _eval_ops(model, ops, variables, x_off=0.0, y_off=0.0):
     result = []
     for op in ops:
         ref = op.get('ref_corner') or 'BL'
-        try:    depth = ev(op.get('depth') or '-T')
+        try:    depth = ev(op.get('depth') or '-LPZ')
         except: depth = -5.0
         cur_x = cur_y = 0.0; plunged = False
         for mv in op.get('moves', []):
@@ -1086,7 +1086,7 @@ async def caps_dxf_create(request: Request):
             id=0, model_id=mid,
             name=op_data.get('name', 'Op'),
             tool_no=int(op_data.get('tool_no', 1)),
-            depth=str(op_data.get('depth', '-T')),
+            depth=str(op_data.get('depth', '-LPZ')),
             feed=str(op_data.get('feed', '')),
             ref_corner=op_data.get('ref_corner', 'BL'),
             seq=int(op_data.get('seq', 10)),
@@ -1144,7 +1144,7 @@ async def cap_generate(request: Request, mid: int,
     if not model:
         return JSONResponse({"error": "Model bulunamadı"}, status_code=404)
     paths = fdb.get_cap_paths(mid)
-    variables = {"LPX": W, "LPY": H, "LPZ": T}
+    variables = {"LPX": W, "LPY": H, "LPZ": T, "W": W, "H": H, "T": T}
     try:
         extra = json.loads(extra_json or "{}")
         variables.update({k: float(v) for k, v in extra.items()})
@@ -1171,7 +1171,7 @@ async def cap_download(request: Request, mid: int,
     model = fdb.get_cap_model(mid)
     if not model:
         return RedirectResponse("/membrane/caps", 303)
-    variables = {"LPX": W, "LPY": H, "LPZ": T}
+    variables = {"LPX": W, "LPY": H, "LPZ": T, "W": W, "H": H, "T": T}
     try:
         variables.update({k: float(v) for k, v in json.loads(extra).items()})
     except Exception:
@@ -1374,10 +1374,11 @@ async def job_nest_nc(request: Request, jid: int,
             pl_ctx.append(None); continue
         safe_z = float(model.get("safe_z") or 5.0)
         W, H = pl['cap_w'], pl['cap_h']
-        variables = {"LPX": W, "LPY": H, "LPZ": T}
+        variables = {"LPX": W, "LPY": H, "LPZ": T, "W": W, "H": H, "T": T}
         variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
         if pl.get('rotated'):
             variables["LPX"], variables["LPY"] = H, W
+            variables["W"],   variables["H"]   = H, W
         all_ops = fdb.get_cap_ops(mid)
         paths = [] if all_ops else fdb.get_cap_paths(mid)
         pl_ctx.append({"model": model, "ops": all_ops, "paths": paths,
@@ -1471,10 +1472,11 @@ async def job_nc_download(request: Request, jid: int,
         model = fdb.get_cap_model(mid)
         if not model: continue
         W, H = pl['cap_w'], pl['cap_h']
-        variables = {"LPX": W, "LPY": H, "LPZ": T}
+        variables = {"LPX": W, "LPY": H, "LPZ": T, "W": W, "H": H, "T": T}
         variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
         if pl.get('rotated'):
             variables["LPX"], variables["LPY"] = H, W
+            variables["W"],   variables["H"]   = H, W
         x_off, y_off = pl['x'], pl['y']
         all_ops = fdb.get_cap_ops(mid)
         if all_ops:
