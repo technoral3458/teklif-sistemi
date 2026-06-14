@@ -240,7 +240,7 @@ _NEST_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6',
 
 def _nest(items, sheet_w, sheet_h, margin=5.0, allow_rotate=True):
     """
-    Pack cap rectangles onto sheets.
+    Pack cap rectangles onto sheets using guillotine algorithm.
     items: list of {cap_w, cap_h, qty, model_name, model_id}
     Returns (placements, sheet_count, util_pct)
     Each placement: {x, y, w, h, label, color, sheet, rotated, group, model_id, cap_w, cap_h}
@@ -256,46 +256,55 @@ def _nest(items, sheet_w, sheet_h, margin=5.0, allow_rotate=True):
                           'group': i, 'model_id': item.get('model_id'),
                           'cap_w': w, 'cap_h': h})
 
-    pieces.sort(key=lambda p: -max(p['ow'], p['oh']))
+    # Sort by area descending so large pieces are placed first
+    pieces.sort(key=lambda p: -(p['ow'] * p['oh']))
 
-    # sheets: each sheet is a list of rows {y, row_h, next_x}
-    sheets = []
+    # Each sheet holds a list of free rectangles: (x, y, w, h)
+    sheets_free: list[list[tuple]] = []
 
-    def _open_sheet():
-        sheets.append([{'y': margin, 'row_h': 0, 'next_x': margin}])
-        return len(sheets) - 1
+    def _new_sheet():
+        sheets_free.append([(margin, margin, sheet_w - 2*margin, sheet_h - 2*margin)])
+        return len(sheets_free) - 1
 
-    def _try_place(si, w, h):
-        if w > sheet_w - 2*margin or h > sheet_h - 2*margin:
-            return None
-        for row in sheets[si]:
-            row_empty = row['row_h'] == 0
-            fits_height = row_empty or h <= row['row_h']
-            if (row['next_x'] + w + margin <= sheet_w
-                    and row['y'] + h <= sheet_h - margin
-                    and fits_height):
-                pos = (row['next_x'], row['y'])
-                row['row_h'] = max(row['row_h'], h)
-                row['next_x'] += w + margin
-                return pos
-        last = sheets[si][-1]
-        ny = last['y'] + last['row_h'] + margin
-        if ny + h <= sheet_h - margin:
-            sheets[si].append({'y': ny, 'row_h': h, 'next_x': margin + w + margin})
-            return (margin, ny)
-        return None
+    def _best_fit(si, pw, ph):
+        """Find the free rect in sheet si that best fits pw×ph (min short-side waste).
+        Returns (rect_index, x, y) or None. Does NOT modify free rects."""
+        best_ri, best_score = None, float('inf')
+        for ri, (rx, ry, rw, rh) in enumerate(sheets_free[si]):
+            if pw <= rw and ph <= rh:
+                score = min(rw - pw, rh - ph)
+                if score < best_score:
+                    best_score, best_ri = score, ri
+                    best_pos = (rx, ry)
+        return (best_ri, *best_pos) if best_ri is not None else None
+
+    def _place(si, ri, pw, ph):
+        """Place pw×ph in free rect ri on sheet si (guillotine split)."""
+        rx, ry, rw, rh = sheets_free[si].pop(ri)
+        right_w = rw - pw - margin
+        top_h   = rh - ph - margin
+        # Longer-axis split: bigger leftover gets the full span
+        if right_w >= top_h:
+            if right_w > 0: sheets_free[si].append((rx + pw + margin, ry, right_w, rh))
+            if top_h   > 0: sheets_free[si].append((rx, ry + ph + margin, pw, top_h))
+        else:
+            if top_h   > 0: sheets_free[si].append((rx, ry + ph + margin, rw, top_h))
+            if right_w > 0: sheets_free[si].append((rx + pw + margin, ry, right_w, ph))
+        return (rx, ry)
 
     placements = []
     for pc in pieces:
-        placed = False
         orientations = [(pc['ow'], pc['oh'], False)]
         if allow_rotate and abs(pc['ow'] - pc['oh']) > 0.5:
             orientations.append((pc['oh'], pc['ow'], True))
 
+        placed = False
         for w, h, rotated in orientations:
-            for si in range(len(sheets)):
-                pos = _try_place(si, w, h)
-                if pos:
+            for si in range(len(sheets_free)):
+                fit = _best_fit(si, w, h)
+                if fit:
+                    ri, rx, ry = fit
+                    pos = _place(si, ri, w, h)
                     placements.append({'x': round(pos[0], 2), 'y': round(pos[1], 2),
                                       'w': w, 'h': h, 'label': pc['label'],
                                       'color': pc['color'], 'sheet': si,
@@ -306,16 +315,28 @@ def _nest(items, sheet_w, sheet_h, margin=5.0, allow_rotate=True):
             if placed: break
 
         if not placed:
-            si = _open_sheet()
-            w, h = pc['ow'], pc['oh']
-            pos = _try_place(si, w, h) or (margin, margin)
-            placements.append({'x': round(pos[0], 2), 'y': round(pos[1], 2),
-                              'w': w, 'h': h, 'label': pc['label'],
-                              'color': pc['color'], 'sheet': si, 'rotated': False,
-                              'group': pc['group'], 'model_id': pc['model_id'],
-                              'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+            si = _new_sheet()
+            for w, h, rotated in orientations:
+                fit = _best_fit(si, w, h)
+                if fit:
+                    ri, rx, ry = fit
+                    pos = _place(si, ri, w, h)
+                    placements.append({'x': round(pos[0], 2), 'y': round(pos[1], 2),
+                                      'w': w, 'h': h, 'label': pc['label'],
+                                      'color': pc['color'], 'sheet': si,
+                                      'rotated': rotated, 'group': pc['group'],
+                                      'model_id': pc['model_id'],
+                                      'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+                    placed = True; break
+            if not placed:
+                # Piece is larger than the sheet; force-place at origin
+                placements.append({'x': margin, 'y': margin,
+                                  'w': pc['ow'], 'h': pc['oh'], 'label': pc['label'],
+                                  'color': pc['color'], 'sheet': si, 'rotated': False,
+                                  'group': pc['group'], 'model_id': pc['model_id'],
+                                  'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
 
-    n_sheets = len(sheets) if sheets else 1
+    n_sheets = max(1, len(sheets_free))
     used = sum(p['w'] * p['h'] for p in placements)
     total = sheet_w * sheet_h * n_sheets
     util = round(used / total * 100, 1) if total > 0 else 0
