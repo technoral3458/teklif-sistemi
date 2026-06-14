@@ -238,7 +238,7 @@ def _eval_ops(model, ops, variables, x_off=0.0, y_off=0.0):
 _NEST_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6',
                 '#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6']
 
-def _nest(items, sheet_w, sheet_h, margin=5.0):
+def _nest(items, sheet_w, sheet_h, margin=5.0, allow_rotate=True):
     """
     Pack cap rectangles onto sheets.
     items: list of {cap_w, cap_h, qty, model_name, model_id}
@@ -289,7 +289,7 @@ def _nest(items, sheet_w, sheet_h, margin=5.0):
     for pc in pieces:
         placed = False
         orientations = [(pc['ow'], pc['oh'], False)]
-        if abs(pc['ow'] - pc['oh']) > 0.5:
+        if allow_rotate and abs(pc['ow'] - pc['oh']) > 0.5:
             orientations.append((pc['oh'], pc['ow'], True))
 
         for w, h, rotated in orientations:
@@ -971,12 +971,12 @@ async def job_item_delete(request: Request, jid: int, item_id: int = Form(...)):
 @router.post("/jobs/{jid}/nest")
 async def job_nest(request: Request, jid: int,
                    sheet_w: float = Form(2800), sheet_h: float = Form(1100),
-                   margin: float = Form(5)):
+                   margin: float = Form(5), allow_rotate: int = Form(1)):
     auth.require_user(request)
     items = fdb.get_cap_job_items(jid)
     if not items:
         return JSONResponse({"error": "İş listesinde kalem yok"}, status_code=400)
-    placements, n_sheets, util = _nest(items, sheet_w, sheet_h, margin)
+    placements, n_sheets, util = _nest(items, sheet_w, sheet_h, margin, allow_rotate=bool(allow_rotate))
     return JSONResponse({
         "placements": placements,
         "sheet_count": n_sheets,
@@ -990,7 +990,8 @@ async def job_nest(request: Request, jid: int,
 @router.post("/jobs/{jid}/nest_nc")
 async def job_nest_nc(request: Request, jid: int,
                       sheet_w: float = Form(2800), sheet_h: float = Form(1100),
-                      margin: float = Form(5), T: float = Form(18)):
+                      margin: float = Form(5), T: float = Form(18),
+                      allow_rotate: int = Form(1)):
     """Generate NC code + simulation data for all nested pieces."""
     auth.require_user(request)
     job = fdb.get_cap_job(jid)
@@ -1000,7 +1001,7 @@ async def job_nest_nc(request: Request, jid: int,
     if not items:
         return JSONResponse({"error": "İş listesinde kalem yok"}, status_code=400)
 
-    placements, n_sheets, util = _nest(items, sheet_w, sheet_h, margin)
+    placements, n_sheets, util = _nest(items, sheet_w, sheet_h, margin, allow_rotate=bool(allow_rotate))
     nc_parts, sim_paths = [], []
     safe_z = 5.0
     prog_no = 1
