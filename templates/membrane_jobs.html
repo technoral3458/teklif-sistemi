@@ -55,8 +55,8 @@
         <table>
           <thead><tr>
             <th>#</th><th>Model</th>
-            <th style="text-align:right">En W</th>
-            <th style="text-align:right">Boy H</th>
+            <th style="text-align:right">En LPX</th>
+            <th style="text-align:right">Boy LPY</th>
             <th style="text-align:center">Adet</th>
             <th>Not</th>
             <th style="text-align:center">İşlem</th>
@@ -124,8 +124,8 @@
             <input type="number" id="nestMargin" class="form-control" value="{{ edit_job.margin|int }}" step="1" min="0" />
           </div>
           <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:10px;">Kalınlık T</label>
-            <input type="number" id="nestT" class="form-control" value="18" step="0.5" />
+            <label class="form-label" style="font-size:10px;">Kalınlık LPZ</label>
+            <input type="number" id="nestLPZ" class="form-control" value="18" step="0.5" />
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;padding:4px 2px;">
@@ -295,9 +295,9 @@
                  placeholder="örn: Standart Membran, Özel Model A..." />
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-          <div class="form-group" style="margin:0;"><label class="form-label">En — W (mm) *</label>
+          <div class="form-group" style="margin:0;"><label class="form-label">En — LPX (mm) *</label>
             <input type="number" name="cap_w" id="item_w" class="form-control" step="1" min="1" required placeholder="400" /></div>
-          <div class="form-group" style="margin:0;"><label class="form-label">Boy — H (mm) *</label>
+          <div class="form-group" style="margin:0;"><label class="form-label">Boy — LPY (mm) *</label>
             <input type="number" name="cap_h" id="item_h" class="form-control" step="1" min="1" required placeholder="600" /></div>
           <div class="form-group" style="margin:0;"><label class="form-label">Adet *</label>
             <input type="number" name="qty" id="item_qty" class="form-control" step="1" min="1" value="1" required /></div>
@@ -455,7 +455,7 @@ function _getParams() {
     sheet_w:      parseFloat(document.getElementById('nestW')?.value)      || 2800,
     sheet_h:      parseFloat(document.getElementById('nestH')?.value)      || 1100,
     margin:       parseFloat(document.getElementById('nestMargin')?.value)  || 5,
-    T:            parseFloat(document.getElementById('nestT')?.value)       || 18,
+    T:            parseFloat(document.getElementById('nestLPZ')?.value)      || 18,
     allow_rotate: document.getElementById('nestRotate')?.checked ? 1 : 0,
   };
 }

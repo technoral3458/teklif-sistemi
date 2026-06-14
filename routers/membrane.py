@@ -146,7 +146,7 @@ def _split_op_at_last_start(op):
 
 def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
     ev = lambda expr: _eval_expr(expr, variables)
-    W = float(variables.get('W', 0)); H = float(variables.get('H', 0))
+    W = float(variables.get('LPX', 0)); H = float(variables.get('LPY', 0))
     name_upper = model["name"].upper().replace("(", "").replace(")", "")
     var_comment = " ".join(f"{k}={v}" for k, v in sorted(variables.items()))
     safe_z = float(model.get("safe_z") or 5.0)
@@ -217,7 +217,7 @@ def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
 
 def _eval_ops(model, ops, variables, x_off=0.0, y_off=0.0):
     ev = lambda expr: _eval_expr(expr, variables)
-    W = float(variables.get('W', 0)); H = float(variables.get('H', 0))
+    W = float(variables.get('LPX', 0)); H = float(variables.get('LPY', 0))
     safe_z = float(model.get('safe_z') or 5.0)
     result = []
     for op in ops:
@@ -1016,7 +1016,7 @@ async def cap_path_save(request: Request, mid: int,
                         label: str = Form(""),
                         path_type: str = Form("LINE"),
                         x1: str = Form("0"), y1: str = Form("0"), z1: str = Form("0"),
-                        x2: str = Form("W"), y2: str = Form("H"), z2: str = Form("-T"),
+                        x2: str = Form("LPX"), y2: str = Form("LPY"), z2: str = Form("-LPZ"),
                         ix: str = Form("0"), jy: str = Form("0"),
                         tool_dia: float = Form(8.0),
                         step_over: float = Form(0.5),
@@ -1048,7 +1048,7 @@ async def cap_generate(request: Request, mid: int,
     if not model:
         return JSONResponse({"error": "Model bulunamadı"}, status_code=404)
     paths = fdb.get_cap_paths(mid)
-    variables = {"W": W, "H": H, "T": T}
+    variables = {"LPX": W, "LPY": H, "LPZ": T}
     try:
         extra = json.loads(extra_json or "{}")
         variables.update({k: float(v) for k, v in extra.items()})
@@ -1064,7 +1064,7 @@ async def cap_generate(request: Request, mid: int,
         paths = fdb.get_cap_paths(mid)
         nc = _generate_nc(model, paths, variables)
         sim = _eval_paths(model, paths, variables)
-    return JSONResponse({"nc": nc, "sim": sim, "W": W, "H": H, "T": T})
+    return JSONResponse({"nc": nc, "sim": sim, "LPX": W, "LPY": H, "LPZ": T})
 
 
 @router.get("/caps/{mid}/download")
@@ -1075,7 +1075,7 @@ async def cap_download(request: Request, mid: int,
     model = fdb.get_cap_model(mid)
     if not model:
         return RedirectResponse("/membrane/caps", 303)
-    variables = {"W": W, "H": H, "T": T}
+    variables = {"LPX": W, "LPY": H, "LPZ": T}
     try:
         variables.update({k: float(v) for k, v in json.loads(extra).items()})
     except Exception:
@@ -1273,10 +1273,10 @@ async def job_nest_nc(request: Request, jid: int,
             pl_ctx.append(None); continue
         safe_z = float(model.get("safe_z") or 5.0)
         W, H = pl['cap_w'], pl['cap_h']
-        variables = {"W": W, "H": H, "T": T}
+        variables = {"LPX": W, "LPY": H, "LPZ": T}
         variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
         if pl.get('rotated'):
-            variables["W"], variables["H"] = H, W
+            variables["LPX"], variables["LPY"] = H, W
         all_ops = fdb.get_cap_ops(mid)
         paths = [] if all_ops else fdb.get_cap_paths(mid)
         pl_ctx.append({"model": model, "ops": all_ops, "paths": paths,
@@ -1370,10 +1370,10 @@ async def job_nc_download(request: Request, jid: int,
         model = fdb.get_cap_model(mid)
         if not model: continue
         W, H = pl['cap_w'], pl['cap_h']
-        variables = {"W": W, "H": H, "T": T}
+        variables = {"LPX": W, "LPY": H, "LPZ": T}
         variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
         if pl.get('rotated'):
-            variables["W"], variables["H"] = H, W
+            variables["LPX"], variables["LPY"] = H, W
         x_off, y_off = pl['x'], pl['y']
         all_ops = fdb.get_cap_ops(mid)
         if all_ops:

@@ -74,14 +74,14 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);">📐 Takım Yolu Önizleme</div>
           <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
-            <span style="font-size:10px;color:var(--text-muted);">W=</span>
-            <input type="number" id="prevW" class="form-control" value="600"
+            <span style="font-size:10px;color:var(--text-muted);">LPX=</span>
+            <input type="number" id="prevLPX" class="form-control" value="600"
               style="width:58px;height:24px;font-size:11px;padding:2px 4px;" oninput="updateOpsPreviewFromInputs()" />
-            <span style="font-size:10px;color:var(--text-muted);">H=</span>
-            <input type="number" id="prevH" class="form-control" value="900"
+            <span style="font-size:10px;color:var(--text-muted);">LPY=</span>
+            <input type="number" id="prevLPY" class="form-control" value="900"
               style="width:58px;height:24px;font-size:11px;padding:2px 4px;" oninput="updateOpsPreviewFromInputs()" />
-            <span style="font-size:10px;color:var(--text-muted);">T=</span>
-            <input type="number" id="prevT" class="form-control" value="18"
+            <span style="font-size:10px;color:var(--text-muted);">LPZ=</span>
+            <input type="number" id="prevLPZ" class="form-control" value="18"
               style="width:50px;height:24px;font-size:11px;padding:2px 4px;" oninput="updateOpsPreviewFromInputs()" />
           </div>
         </div>
@@ -109,28 +109,28 @@
 
         <div style="padding:9px 12px;background:var(--surface-2);border-radius:8px;font-size:12px;">
           <strong style="color:var(--accent);">Değişkenler:</strong>
-          <code>W</code>=Genişlik, <code>H</code>=Yükseklik, <code>T</code>=Kalınlık
+          <code>LPX</code>=Genişlik, <code>LPY</code>=Yükseklik, <code>LPZ</code>=Kalınlık
           {% if edit_model.constants %}
           &nbsp;|&nbsp;
           {% for k,v in edit_model.constants.items() %}
           <code>{{ k }}</code>=<em>{{ v }}</em>{% if not loop.last %}, {% endif %}
           {% endfor %}
           {% endif %}
-          <br><span style="color:var(--text-muted);font-size:11px;">Formül örn: <code>W-50</code>, <code>H/2</code>, <code>-T*0.8</code></span>
+          <br><span style="color:var(--text-muted);font-size:11px;">Formül örn: <code>LPX-50</code>, <code>LPY/2</code>, <code>-LPZ*0.8</code></span>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
           <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">W — Genişlik</label>
-            <input type="number" id="ncW" class="form-control" value="600" step="1" />
+            <label class="form-label" style="font-size:11px;">LPX — Genişlik</label>
+            <input type="number" id="ncLPX" class="form-control" value="600" step="1" />
           </div>
           <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">H — Yükseklik</label>
-            <input type="number" id="ncH" class="form-control" value="900" step="1" />
+            <label class="form-label" style="font-size:11px;">LPY — Yükseklik</label>
+            <input type="number" id="ncLPY" class="form-control" value="900" step="1" />
           </div>
           <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">T — Kalınlık</label>
-            <input type="number" id="ncT" class="form-control" value="18" step="0.5" />
+            <label class="form-label" style="font-size:11px;">LPZ — Kalınlık</label>
+            <input type="number" id="ncLPZ" class="form-control" value="18" step="0.5" />
           </div>
         </div>
 
@@ -281,7 +281,7 @@
         </div>
         <div class="form-group" style="margin:0;grid-column:1/-1;">
           <label class="form-label">Kesim Derinliği <span style="color:var(--text-muted);font-size:10px;">(formül olabilir)</span></label>
-          <input type="text" id="opDepth" class="form-control" value="-T" placeholder="örn: -T veya -5" />
+          <input type="text" id="opDepth" class="form-control" value="-LPZ" placeholder="örn: -LPZ veya -5" />
         </div>
       </div>
 
@@ -312,7 +312,7 @@
       </div>
 
       <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11px;color:var(--text-muted);">
-        Formül değişkenleri: <code>W</code> <code>H</code> <code>T</code>
+        Formül değişkenleri: <code>LPX</code> <code>LPY</code> <code>LPZ</code>
         {% if edit_model.constants %}{% for k in edit_model.constants.keys() %}<code>{{ k }}</code>{% endfor %}{% endif %}
       </div>
     </div>
@@ -357,9 +357,9 @@
 
         <div style="padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:11px;color:var(--text-muted);">
           <strong>Formül değişkenleri:</strong>
-          <code>W</code> <code>H</code> <code>T</code>
+          <code>LPX</code> <code>LPY</code> <code>LPZ</code>
           {% for k in edit_model.constants.keys() %}<code>{{ k }}</code>{% endfor %}
-          — Örn: <code>W/2-10</code>, <code>H-50</code>, <code>-T*0.8</code>
+          — Örn: <code>LPX/2-10</code>, <code>LPY-50</code>, <code>-LPZ*0.8</code>
         </div>
 
         <fieldset style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
@@ -378,11 +378,11 @@
           <legend style="font-size:11px;font-weight:600;padding:0 6px;color:var(--text-muted);">Bitiş Noktası</legend>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
             <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">X Bitiş</label>
-              <input type="text" name="x2" id="px2" class="form-control" value="W" /></div>
+              <input type="text" name="x2" id="px2" class="form-control" value="LPX" /></div>
             <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Y Bitiş</label>
-              <input type="text" name="y2" id="py2" class="form-control" value="H" /></div>
+              <input type="text" name="y2" id="py2" class="form-control" value="LPY" /></div>
             <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Z Kesim Derinliği</label>
-              <input type="text" name="z2" id="pz2" class="form-control" value="-T" /></div>
+              <input type="text" name="z2" id="pz2" class="form-control" value="-LPZ" /></div>
           </div>
         </fieldset>
 
@@ -609,9 +609,9 @@ function openPathModal(id, seq, label, ptype, x1,y1,z1,x2,y2,z2,ix,jy,tooldia,st
   document.getElementById('px1').value = x1 != null ? x1 : '0';
   document.getElementById('py1').value = y1 != null ? y1 : '0';
   document.getElementById('pz1').value = z1 != null ? z1 : '0';
-  document.getElementById('px2').value = x2 != null ? x2 : 'W';
-  document.getElementById('py2').value = y2 != null ? y2 : 'H';
-  document.getElementById('pz2').value = z2 != null ? z2 : '-T';
+  document.getElementById('px2').value = x2 != null ? x2 : 'LPX';
+  document.getElementById('py2').value = y2 != null ? y2 : 'LPY';
+  document.getElementById('pz2').value = z2 != null ? z2 : '-LPZ';
   document.getElementById('pix').value = ix != null ? ix : '0';
   document.getElementById('pjy').value = jy != null ? jy : '0';
   document.getElementById('ptooldia').value  = tooldia || 8;
@@ -804,15 +804,15 @@ function renderOps(ops) {
 }
 
 // ── Live path preview ───────────────────────────────────────────────────────
-function _evalExprJS(expr, W, H, T) {
-  try { return +new Function('W','H','T','return (' + expr + ')')(W, H, T); }
+function _evalExprJS(expr, LPX, LPY, LPZ) {
+  try { return +new Function('LPX','LPY','LPZ','return (' + expr + ')')(LPX, LPY, LPZ); }
   catch { return 0; }
 }
 
-function _applyCornerJS(x, y, ref, W, H) {
-  if (ref === 'TL') return [x, H - y];
-  if (ref === 'BR') return [W - x, y];
-  if (ref === 'TR') return [W - x, H - y];
+function _applyCornerJS(x, y, ref, LPX, LPY) {
+  if (ref === 'TL') return [x, LPY - y];
+  if (ref === 'BR') return [LPX - x, y];
+  if (ref === 'TR') return [LPX - x, LPY - y];
   return [x, y];
 }
 
@@ -821,17 +821,17 @@ function updateOpsPreview(ops) {
   if (!ops || !ops.length) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
 
-  // sync W/H/T with NC panel if user hasn't touched the preview inputs
-  const prevW = document.getElementById('prevW');
-  const prevH = document.getElementById('prevH');
-  const prevT = document.getElementById('prevT');
-  if (!prevW._touched) { const v = document.getElementById('ncW')?.value; if (v) prevW.value = v; }
-  if (!prevH._touched) { const v = document.getElementById('ncH')?.value; if (v) prevH.value = v; }
-  if (!prevT._touched) { const v = document.getElementById('ncT')?.value; if (v) prevT.value = v; }
+  // sync LPX/LPY/LPZ with NC panel if user hasn't touched the preview inputs
+  const prevLPX = document.getElementById('prevLPX');
+  const prevLPY = document.getElementById('prevLPY');
+  const prevLPZ = document.getElementById('prevLPZ');
+  if (!prevLPX._touched) { const v = document.getElementById('ncLPX')?.value; if (v) prevLPX.value = v; }
+  if (!prevLPY._touched) { const v = document.getElementById('ncLPY')?.value; if (v) prevLPY.value = v; }
+  if (!prevLPZ._touched) { const v = document.getElementById('ncLPZ')?.value; if (v) prevLPZ.value = v; }
 
-  const W = parseFloat(prevW.value) || 600;
-  const H = parseFloat(prevH.value) || 900;
-  const T = parseFloat(prevT.value) || 18;
+  const LPX = parseFloat(prevLPX.value) || 600;
+  const LPY = parseFloat(prevLPY.value) || 900;
+  const LPZ = parseFloat(prevLPZ.value) || 18;
 
   const canvas = document.getElementById('opsPreviewCanvas');
   const ctx = canvas.getContext('2d');
@@ -839,14 +839,14 @@ function updateOpsPreview(ops) {
   ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, cw, ch);
 
   const mg = 14;
-  const scale = Math.min((cw - 2*mg) / (W||1), (ch - 2*mg) / (H||1));
-  const ox = (cw - W * scale) / 2;
-  const oy = (ch - H * scale) / 2;
+  const scale = Math.min((cw - 2*mg) / (LPX||1), (ch - 2*mg) / (LPY||1));
+  const ox = (cw - LPX * scale) / 2;
+  const oy = (ch - LPY * scale) / 2;
 
   // Sheet outline
   ctx.strokeStyle = 'rgba(255,255,255,0.12)';
   ctx.lineWidth = 1;
-  ctx.strokeRect(ox, oy, W * scale, H * scale);
+  ctx.strokeRect(ox, oy, LPX * scale, LPY * scale);
 
   const tx = x => ox + x * scale;
   const ty = y => ch - oy - y * scale;
@@ -868,9 +868,9 @@ function updateOpsPreview(ops) {
     ctx.lineWidth = 1.5;
 
     for (const mv of op.moves) {
-      const mx = _evalExprJS(mv.x || '0', W, H, T);
-      const my = _evalExprJS(mv.y || '0', W, H, T);
-      const [ax, ay] = _applyCornerJS(mx, my, ref, W, H);
+      const mx = _evalExprJS(mv.x || '0', LPX, LPY, LPZ);
+      const my = _evalExprJS(mv.y || '0', LPX, LPY, LPZ);
+      const [ax, ay] = _applyCornerJS(mx, my, ref, LPX, LPY);
 
       if (mv.move_type === 'start') {
         ctx.stroke();
@@ -883,9 +883,9 @@ function updateOpsPreview(ops) {
         ctx.lineTo(tx(ax), ty(ay));
         cx_ = ax; cy_ = ay;
       } else if ((mv.move_type === 'arc_cw' || mv.move_type === 'arc_ccw') && started) {
-        const mcx = _evalExprJS(mv.cx || '0', W, H, T);
-        const mcy = _evalExprJS(mv.cy || '0', W, H, T);
-        const [acx, acy] = _applyCornerJS(mcx, mcy, ref, W, H);
+        const mcx = _evalExprJS(mv.cx || '0', LPX, LPY, LPZ);
+        const mcy = _evalExprJS(mv.cy || '0', LPX, LPY, LPZ);
+        const [acx, acy] = _applyCornerJS(mcx, mcy, ref, LPX, LPY);
         const r = Math.hypot(cx_ - acx, cy_ - acy);
         const sa = Math.atan2(cy_ - acy, cx_ - acx);
         const ea = Math.atan2(ay - acy, ax - acx);
@@ -900,9 +900,9 @@ function updateOpsPreview(ops) {
 }
 
 function updateOpsPreviewFromInputs() {
-  document.getElementById('prevW')._touched = true;
-  document.getElementById('prevH')._touched = true;
-  document.getElementById('prevT')._touched = true;
+  document.getElementById('prevLPX')._touched = true;
+  document.getElementById('prevLPY')._touched = true;
+  document.getElementById('prevLPZ')._touched = true;
   if (_opsData) updateOpsPreview(_opsData);
 }
 
@@ -1005,7 +1005,7 @@ function openOpModal(opId) {
     if (op) {
       document.getElementById('opName').value  = op.name || '';
       document.getElementById('opTool').value  = op.tool_no || 1;
-      document.getElementById('opDepth').value = op.depth || '-T';
+      document.getElementById('opDepth').value = op.depth || '-LPZ';
       document.getElementById('opFeed').value  = op.feed || '';
       document.querySelectorAll('[name=opRefCorner]').forEach(r => r.checked = r.value === (op.ref_corner||'BL'));
       document.querySelectorAll('[name=opType]').forEach(r => r.checked = r.value === (op.op_type||'inner'));
@@ -1013,7 +1013,7 @@ function openOpModal(opId) {
   } else {
     document.getElementById('opName').value  = '';
     document.getElementById('opTool').value  = 1;
-    document.getElementById('opDepth').value = '-T';
+    document.getElementById('opDepth').value = '-LPZ';
     document.getElementById('opFeed').value  = '';
     document.querySelectorAll('[name=opRefCorner]').forEach(r => r.checked = r.value === 'BL');
     document.querySelectorAll('[name=opType]').forEach(r => r.checked = r.value === 'inner');
@@ -1063,26 +1063,26 @@ function switchTab(t) {
 
 // ── NC Generator ──────────────────────────────────────────────────────────
 function getNCVars() {
-  const W = parseFloat(document.getElementById('ncW')?.value) || 0;
-  const H = parseFloat(document.getElementById('ncH')?.value) || 0;
-  const T = parseFloat(document.getElementById('ncT')?.value) || 18;
+  const LPX = parseFloat(document.getElementById('ncLPX')?.value) || 0;
+  const LPY = parseFloat(document.getElementById('ncLPY')?.value) || 0;
+  const LPZ = parseFloat(document.getElementById('ncLPZ')?.value) || 18;
   const extra = {};
   for (const k of Object.keys(MODEL_CONSTS)) {
     const el = document.getElementById('ncConst_' + k);
     if (el) extra[k] = parseFloat(el.value) || 0;
   }
-  return { W, H, T, extra };
+  return { LPX, LPY, LPZ, extra };
 }
 
 async function generateNC() {
   if (!MODEL_ID) return;
-  const { W, H, T, extra } = getNCVars();
+  const { LPX, LPY, LPZ, extra } = getNCVars();
   const statusEl = document.getElementById('ncStatus');
   statusEl.style.display = 'block';
   statusEl.textContent = '⏳ Üretiliyor...';
   try {
     const fd = new FormData();
-    fd.append('W', W); fd.append('H', H); fd.append('T', T);
+    fd.append('W', LPX); fd.append('H', LPY); fd.append('T', LPZ);
     fd.append('extra_json', JSON.stringify(extra));
     const res  = await fetch('/membrane/caps/' + MODEL_ID + '/generate', { method:'POST', body:fd });
     const data = await res.json();
@@ -1097,7 +1097,7 @@ async function generateNC() {
     statusEl.textContent = '✅ ' + lines + ' satır G-code üretildi — Simülasyon sekmesinden izleyin';
     // Build simulation
     if (data.sim) {
-      simBuild(data.sim.paths, data.W, data.H, data.sim.safe_z);
+      simBuild(data.sim.paths, data.LPX, data.LPY, data.sim.safe_z);
       document.getElementById('simPlayBtn').disabled = false;
     }
   } catch(e) {
@@ -1108,8 +1108,8 @@ async function generateNC() {
 
 function downloadNC() {
   if (!MODEL_ID) return;
-  const { W, H, T, extra } = getNCVars();
-  const p = new URLSearchParams({ W, H, T, extra: JSON.stringify(extra) });
+  const { LPX, LPY, LPZ, extra } = getNCVars();
+  const p = new URLSearchParams({ W: LPX, H: LPY, T: LPZ, extra: JSON.stringify(extra) });
   window.location.href = '/membrane/caps/' + MODEL_ID + '/download?' + p;
 }
 
@@ -1507,7 +1507,7 @@ function _dxfBuildList(d) {
       </div>
       <div class="form-group" style="margin:0;width:80px;">
         <label style="font-size:10px;color:var(--text-muted);">Derinlik</label>
-        <input type="text" id="dxf_depth_${i}" class="form-control" value="-T" style="height:28px;font-size:12px;font-family:monospace;" />
+        <input type="text" id="dxf_depth_${i}" class="form-control" value="-LPZ" style="height:28px;font-size:12px;font-family:monospace;" />
       </div>
       <div class="form-group" style="margin:0;width:110px;">
         <label style="font-size:10px;color:var(--text-muted);">Kesim Türü</label>
@@ -1532,7 +1532,7 @@ async function dxfCreate() {
   const ops = _dxfParsed.contours.map((c, i) => ({
     name:      document.getElementById(`dxf_name_${i}`).value || `Op ${i+1}`,
     tool_no:   parseInt(document.getElementById(`dxf_tool_${i}`).value) || 1,
-    depth:     document.getElementById(`dxf_depth_${i}`).value.trim() || '-T',
+    depth:     document.getElementById(`dxf_depth_${i}`).value.trim() || '-LPZ',
     feed:      '',
     ref_corner: 'BL',
     seq:       (i + 1) * 10,
