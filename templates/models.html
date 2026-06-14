@@ -52,6 +52,7 @@
           <td>
             <div style="display:flex;gap:6px;">
               <a href="/models/{{ m.id }}/edit" class="btn btn-ghost btn-sm">{{ T.btn_edit }}</a>
+              <a href="/models/{{ m.id }}/copy" class="btn btn-outline btn-sm">📋 Kopyala</a>
               <form method="post" action="/models/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ mname(m) }}' modelini silmek istiyor musunuz?">
                 <input type="hidden" name="id" value="{{ m.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>

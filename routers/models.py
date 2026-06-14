@@ -66,6 +66,35 @@ async def model_new(request: Request):
     })
 
 
+@router.get("/{model_id}/copy")
+async def model_copy(request: Request, model_id: int):
+    user = auth.require_user(request)
+    m = fdb.get_model(model_id)
+    if not m:
+        return RedirectResponse("/models", 303)
+    cats = fdb.get_cats()
+    options = fdb.get_options()
+    compatible = []
+    if m.get("compatible_options"):
+        try:
+            compatible = json.loads(m["compatible_options"])
+        except Exception:
+            pass
+    m_copy = dict(m)
+    m_copy["id"] = 0
+    m_copy["name"] = m["name"] + " (Kopya)"
+    return templates.TemplateResponse(request, "model_form.html", {
+        "user": user,
+        "model": m_copy,
+        "categories": cats,
+        "options": options,
+        "compatible_options_selected": compatible,
+        "currencies": CURRENCIES,
+        "active_page": "models",
+        "line_images": {},
+    })
+
+
 @router.get("/{model_id}/edit")
 async def model_edit(request: Request, model_id: int):
     user = auth.require_user(request)

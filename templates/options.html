@@ -91,6 +91,24 @@
                 {{ (o.name_zh or "")|tojson }},
                 {{ (o.description_zh or "")|tojson }}
               )'>✏️ {{ T.btn_edit }}</button>
+              <button class="btn btn-outline btn-sm" onclick='editOpt(
+                0,
+                {{ (o.name + " (Kopya)")|tojson }},
+                {{ (o.description or "")|tojson }},
+                {{ o.price|float if o.price != none else 0 }},
+                {{ (o.currency or "USD")|tojson }},
+                {{ (o.category_ids or "")|tojson }},
+                {{ (o.qty_type or "MANUAL")|tojson }},
+                {{ (o.conflict_group or "")|tojson }},
+                {{ (o.image_path or "")|tojson }},
+                {{ o.image_priority or 0 }},
+                {{ (o.variation_image_path or "")|tojson }},
+                {{ (o.video_url or "")|tojson }},
+                {{ (o.name_en or "")|tojson }},
+                {{ (o.description_en or "")|tojson }},
+                {{ (o.name_zh or "")|tojson }},
+                {{ (o.description_zh or "")|tojson }}
+              )'>📋 Kopyala</button>
               <form method="post" action="/options/delete" onsubmit="return confirmDelete(this)">
                 <input type="hidden" name="id" value="{{ o.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
