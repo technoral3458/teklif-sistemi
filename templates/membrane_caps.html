@@ -1642,7 +1642,14 @@ function tlEdit(tid) {
 
 async function tlSave() {
   const name = document.getElementById('tlName').value.trim();
-  if (!name) { alert('Takım adı gerekli'); return; }
+  const nameInput = document.getElementById('tlName');
+  if (!name) {
+    nameInput.style.borderColor = '#ef4444';
+    nameInput.placeholder = '⚠ Takım adı zorunlu!';
+    nameInput.focus();
+    return;
+  }
+  nameInput.style.borderColor = '';
   const fd = new FormData();
   fd.append('id',      document.getElementById('tlId').value);
   fd.append('name',    name);
@@ -1652,7 +1659,11 @@ async function tlSave() {
   fd.append('feed_xy', document.getElementById('tlFeedXY').value);
   fd.append('feed_z',  document.getElementById('tlFeedZ').value);
   fd.append('notes',   document.getElementById('tlNotes').value);
-  await fetch('/membrane/caps/tools/save', {method:'POST', body:fd});
+  try {
+    const res = await fetch('/membrane/caps/tools/save', {method:'POST', body:fd});
+    if (!res.ok) { alert('Kayıt hatası: ' + res.status + ' ' + res.statusText); return; }
+    await res.json();
+  } catch(e) { alert('Bağlantı hatası: ' + e.message); return; }
   await loadTools();
   tlClear();
 }
