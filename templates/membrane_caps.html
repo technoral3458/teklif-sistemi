@@ -22,189 +22,159 @@
 
 {% if edit_model %}
 {# ═══════════ EDIT VIEW ═══════════ #}
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
 
-  {# Left panel: model info + paths #}
-  <div style="display:flex;flex-direction:column;gap:16px;min-width:0;">
+{# Header row #}
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+  <h3 style="margin:0;font-size:17px;font-weight:700;flex:1;">⚙️ {{ edit_model.name }}</h3>
+  <button class="btn btn-outline btn-sm" onclick="openModal('editModelModal')">✏️ Düzenle</button>
+  <form method="post" action="/membrane/caps/delete"
+        onsubmit="return confirm('\"{{ edit_model.name }}\" silinsin?')" style="margin:0;">
+    <input type="hidden" name="id" value="{{ edit_model.id }}" />
+    <button type="submit" class="btn btn-danger btn-sm">🗑 Sil</button>
+  </form>
+</div>
 
-    {# Model info card #}
-    <div class="card">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 class="card-title" style="margin:0;">⚙️ {{ edit_model.name }}</h3>
-        <button class="btn btn-outline btn-sm" onclick="openModal('editModelModal')">✏️ Düzenle</button>
-      </div>
-      <div class="card-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">
-        {% for label, val in [
-          ('Takım', 'T' ~ edit_model.tool_no),
-          ('Devir (S)', edit_model.spindle_speed),
-          ('Besleme XY', edit_model.feed_xy ~ ' mm/dk'),
-          ('Besleme Z', edit_model.feed_z ~ ' mm/dk'),
-          ('Güvenli Z', edit_model.safe_z ~ ' mm'),
-        ] %}
-        <div style="padding:7px 10px;background:var(--surface-2);border-radius:6px;">
-          <div style="color:var(--text-muted);font-size:10px;">{{ label }}</div>
-          <div style="font-weight:700;margin-top:2px;">{{ val }}</div>
-        </div>
-        {% endfor %}
-        <div style="padding:7px 10px;background:var(--surface-2);border-radius:6px;">
-          <div style="color:var(--text-muted);font-size:10px;">Sabitler</div>
-          <div style="font-weight:700;margin-top:2px;font-size:11px;font-family:monospace;">
-            {% for k,v in edit_model.constants.items() %}{{ k }}={{ v }} {% else %}—{% endfor %}
-          </div>
-        </div>
-      </div>
-      {% if edit_model.description %}
-      <div style="padding:4px 16px 12px;font-size:12px;color:var(--text-muted);">{{ edit_model.description }}</div>
-      {% endif %}
-    </div>
-
-    {# Operations card #}
-    <div class="card">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 class="card-title" style="margin:0;">⚙️ Frezeleme İşlemleri</h3>
-        <button class="btn btn-primary btn-sm" onclick="openOpModal(0)">+ İşlem Ekle</button>
-      </div>
-      <div id="opsContainer" style="padding:0;">
-        <div style="padding:32px;text-align:center;color:var(--text-muted);">
-          <div style="font-size:24px;margin-bottom:8px;">⏳</div>
-          <div>Yükleniyor...</div>
-        </div>
-      </div>
-      {# Live path preview #}
-      <div id="opsPreviewWrap" style="display:none;padding:12px 14px;border-top:1px solid var(--border);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);">📐 Takım Yolu Önizleme</div>
-          <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
-            <span style="font-size:10px;color:var(--text-muted);">LPX=</span>
-            <input type="number" id="prevLPX" class="form-control" value="600"
-              style="width:58px;height:24px;font-size:11px;padding:2px 4px;" oninput="updateOpsPreviewFromInputs()" />
-            <span style="font-size:10px;color:var(--text-muted);">LPY=</span>
-            <input type="number" id="prevLPY" class="form-control" value="900"
-              style="width:58px;height:24px;font-size:11px;padding:2px 4px;" oninput="updateOpsPreviewFromInputs()" />
-            <span style="font-size:10px;color:var(--text-muted);">LPZ=</span>
-            <input type="number" id="prevLPZ" class="form-control" value="18"
-              style="width:50px;height:24px;font-size:11px;padding:2px 4px;" oninput="updateOpsPreviewFromInputs()" />
-          </div>
-        </div>
-        <canvas id="opsPreviewCanvas" width="360" height="220"
-          style="width:100%;border-radius:6px;border:1px solid var(--border);background:#0f172a;display:block;"></canvas>
-        <div id="opsPreviewLegend" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;font-size:10px;"></div>
-      </div>
-    </div>
-
-    {# Delete model #}
-    <form method="post" action="/membrane/caps/delete"
-          onsubmit="return confirm('\"{{ edit_model.name }}\" modelini ve tüm işlemlerini sil?')"
-          style="text-align:right;">
-      <input type="hidden" name="id" value="{{ edit_model.id }}" />
-      <button type="submit" class="btn btn-danger btn-sm">🗑 Modeli Sil</button>
-    </form>
-
+{# Stage 1: Dimensions + Corner #}
+<div class="card" style="margin-bottom:14px;">
+  <div class="card-header" style="padding:10px 14px;">
+    <span class="card-title" style="margin:0;font-size:13px;">📐 Levha Ölçüleri</span>
   </div>
-
-  {# Right panel: NC generator #}
-  <div>
-    <div class="card" style="position:sticky;top:16px;">
-      <div class="card-header"><h3 class="card-title" style="margin:0;">🖥️ NC Kodu Üret</h3></div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-
-        <div style="padding:9px 12px;background:var(--surface-2);border-radius:8px;font-size:12px;">
-          <strong style="color:var(--accent);">Değişkenler:</strong>
-          <code>LPX</code>=Genişlik, <code>LPY</code>=Yükseklik, <code>LPZ</code>=Kalınlık
-          {% if edit_model.constants %}
-          &nbsp;|&nbsp;
-          {% for k,v in edit_model.constants.items() %}
-          <code>{{ k }}</code>=<em>{{ v }}</em>{% if not loop.last %}, {% endif %}
-          {% endfor %}
-          {% endif %}
-          <br><span style="color:var(--text-muted);font-size:11px;">Formül örn: <code>LPX-50</code>, <code>LPY/2</code>, <code>-LPZ*0.8</code></span>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-          <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">LPX — Genişlik</label>
-            <input type="number" id="ncLPX" class="form-control" value="600" step="1" />
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">LPY — Yükseklik</label>
-            <input type="number" id="ncLPY" class="form-control" value="900" step="1" />
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">LPZ — Kalınlık</label>
-            <input type="number" id="ncLPZ" class="form-control" value="18" step="0.5" />
-          </div>
-        </div>
-
-        {% if edit_model.constants %}
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;">
-          {% for k,v in edit_model.constants.items() %}
-          <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">{{ k }}</label>
-            <input type="number" id="ncConst_{{ k }}" class="form-control" value="{{ v }}" step="any" />
-          </div>
+  <div class="card-body" style="padding:12px 14px;">
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;flex:1;min-width:80px;">
+        <label class="form-label" style="font-size:11px;">Boy — LPY</label>
+        <input type="number" id="ncLPY" class="form-control" value="900" step="1" oninput="updateOpsPreview(_opsData)" />
+      </div>
+      <div class="form-group" style="margin:0;flex:1;min-width:80px;">
+        <label class="form-label" style="font-size:11px;">En — LPX</label>
+        <input type="number" id="ncLPX" class="form-control" value="600" step="1" oninput="updateOpsPreview(_opsData)" />
+      </div>
+      <div class="form-group" style="margin:0;flex:1;min-width:80px;">
+        <label class="form-label" style="font-size:11px;">Kalınlık — LPZ</label>
+        <input type="number" id="ncLPZ" class="form-control" value="18" step="0.5" oninput="updateOpsPreview(_opsData)" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="font-size:11px;">Referans Köşe</label>
+        <input type="hidden" id="ncRefCorner" value="BL" />
+        <div style="display:flex;gap:4px;">
+          {% for corner, label in [('TL','Sol Üst'),('TR','Sağ Üst'),('BL','Sol Alt'),('BR','Sağ Alt')] %}
+          <button type="button" id="ncCpBtn{{ corner }}" onclick="setNcCorner('{{ corner }}')"
+            style="padding:5px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1.5px solid var(--border);
+                   background:var(--surface-2);cursor:pointer;{% if corner == 'BL' %}border-color:var(--accent);background:rgba(59,130,246,.18);color:var(--accent);{% endif %}">
+            {{ corner }}
+          </button>
           {% endfor %}
         </div>
-        {% endif %}
-
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary" style="flex:1;" onclick="generateNC()">▶ Ön İzleme</button>
-          <button class="btn btn-outline" style="flex:1;" onclick="downloadNC()">⬇ .nc İndir</button>
-        </div>
-
-        <div id="ncStatus" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;background:var(--surface-2);"></div>
-
-        {# Tab switcher: G-Code / Simülasyon #}
-        <div style="display:flex;border-bottom:1px solid var(--border);gap:0;">
-          <button id="tabGcode" onclick="switchTab('gcode')"
-            style="padding:6px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);">
-            G-Code
-          </button>
-          <button id="tabSim" onclick="switchTab('sim')"
-            style="padding:6px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);">
-            🎬 Simülasyon
-          </button>
-        </div>
-
-        {# G-Code panel #}
-        <div id="panelGcode" style="position:relative;">
-          <textarea id="ncOutput" readonly
-            style="width:100%;height:340px;font-family:monospace;font-size:11px;line-height:1.5;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text-primary);resize:vertical;box-sizing:border-box;"
-            placeholder="Parametreleri girin → Ön İzleme..."></textarea>
-          <button onclick="copyNC()"
-            style="position:absolute;top:8px;right:8px;padding:3px 9px;font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-muted);">
-            📋 Kopyala
-          </button>
-        </div>
-
-        {# Simulation panel #}
-        <div id="panelSim" style="display:none;">
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-            <canvas id="simCanvas" width="480" height="340"
-              style="width:100%;display:block;background:#0f172a;"></canvas>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
-            <button id="simPlayBtn" class="btn btn-primary btn-sm" onclick="simPlay()" disabled>▶ Oynat</button>
-            <button class="btn btn-ghost btn-sm" onclick="simReset()">↺ Sıfırla</button>
-            <div style="flex:1;display:flex;align-items:center;gap:6px;">
-              <span style="font-size:11px;color:var(--text-muted);">Hız:</span>
-              <input type="range" id="simSpeed" min="0" max="10" value="3" style="flex:1;" oninput="updateSpeedLabel()" />
-              <span id="simSpeedLabel" style="font-size:11px;color:var(--text-muted);min-width:28px;">x1</span>
-            </div>
-            <div id="simInfo" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">—</div>
-          </div>
-          <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;flex-wrap:wrap;">
-            <span>⬜ Hızlı hareket</span>
-            <span style="color:#3b82f6;">━ Düz kesim</span>
-            <span style="color:#a855f7;">━ Yay kesim</span>
-            <span style="color:#22c55e;">━ Cep kesim</span>
-            <span style="color:#ef4444;">● Takım</span>
-          </div>
-        </div>
-
       </div>
     </div>
+    {% if edit_model.constants %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:12px;">
+      {% for k,v in edit_model.constants.items() %}
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="font-size:11px;">{{ k }}</label>
+        <input type="number" id="ncConst_{{ k }}" class="form-control" value="{{ v }}" step="any" oninput="updateOpsPreview(_opsData)" />
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
+</div>
 
+{# Stage 2: Operations #}
+<div class="card" style="margin-bottom:14px;">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3 class="card-title" style="margin:0;">⚙️ Freze İşlemleri</h3>
+    <button class="btn btn-primary btn-sm" onclick="openOpModal(0)">+ İşlem Ekle</button>
+  </div>
+  <div id="opsContainer" style="padding:0;">
+    <div style="padding:32px;text-align:center;color:var(--text-muted);">
+      <div style="font-size:24px;margin-bottom:8px;">⏳</div>
+      <div>Yükleniyor...</div>
+    </div>
+  </div>
+</div>
+
+{# Stage 3: Path preview (shown when ops exist) #}
+<div id="opsPreviewWrap" style="display:none;margin-bottom:14px;">
+  <div class="card">
+    <div class="card-header" style="padding:10px 14px;">
+      <span class="card-title" style="margin:0;font-size:13px;">📐 Takım Yolu Önizleme</span>
+    </div>
+    <div style="padding:10px 14px;">
+      <canvas id="opsPreviewCanvas" width="800" height="280"
+        style="width:100%;border-radius:6px;border:1px solid var(--border);background:#0f172a;display:block;"></canvas>
+      <div id="opsPreviewLegend" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:10px;"></div>
+    </div>
+  </div>
+</div>
+
+{# Stage 4: NC Output + Download #}
+<div class="card">
+  <div class="card-header"><h3 class="card-title" style="margin:0;">🖥️ NC Kodu</h3></div>
+  <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+
+    {% if edit_model.constants %}
+    <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11px;color:var(--text-muted);">
+      Sabitler: {% for k,v in edit_model.constants.items() %}<code>{{ k }}</code>={{ v }}{% if not loop.last %}, {% endif %}{% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="generateNC()">▶ Ön İzleme</button>
+      <button class="btn btn-outline" style="flex:1;" onclick="downloadNC()">⬇ .nc İndir</button>
+    </div>
+
+    <div id="ncStatus" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;background:var(--surface-2);"></div>
+
+    {# Tab switcher #}
+    <div style="display:flex;border-bottom:1px solid var(--border);gap:0;">
+      <button id="tabGcode" onclick="switchTab('gcode')"
+        style="padding:6px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);">
+        G-Code
+      </button>
+      <button id="tabSim" onclick="switchTab('sim')"
+        style="padding:6px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);">
+        🎬 Simülasyon
+      </button>
+    </div>
+
+    {# G-Code panel #}
+    <div id="panelGcode" style="position:relative;">
+      <textarea id="ncOutput" readonly
+        style="width:100%;height:340px;font-family:monospace;font-size:11px;line-height:1.5;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text-primary);resize:vertical;box-sizing:border-box;"
+        placeholder="Parametreleri girin → Ön İzleme..."></textarea>
+      <button onclick="copyNC()"
+        style="position:absolute;top:8px;right:8px;padding:3px 9px;font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-muted);">
+        📋 Kopyala
+      </button>
+    </div>
+
+    {# Simulation panel #}
+    <div id="panelSim" style="display:none;">
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <canvas id="simCanvas" width="800" height="400"
+          style="width:100%;display:block;background:#0f172a;"></canvas>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+        <button id="simPlayBtn" class="btn btn-primary btn-sm" onclick="simPlay()" disabled>▶ Oynat</button>
+        <button class="btn btn-ghost btn-sm" onclick="simReset()">↺ Sıfırla</button>
+        <div style="flex:1;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--text-muted);">Hız:</span>
+          <input type="range" id="simSpeed" min="0" max="10" value="3" style="flex:1;" oninput="updateSpeedLabel()" />
+          <span id="simSpeedLabel" style="font-size:11px;color:var(--text-muted);min-width:28px;">x1</span>
+        </div>
+        <div id="simInfo" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">—</div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;flex-wrap:wrap;">
+        <span>⬜ Hızlı hareket</span>
+        <span style="color:#3b82f6;">━ Düz kesim</span>
+        <span style="color:#a855f7;">━ Yay kesim</span>
+        <span style="color:#22c55e;">━ Cep kesim</span>
+        <span style="color:#ef4444;">● Takım</span>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 {# Edit Model Modal #}
@@ -943,17 +913,9 @@ function updateOpsPreview(ops) {
   if (!ops || !ops.length) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
 
-  // sync LPX/LPY/LPZ with NC panel if user hasn't touched the preview inputs
-  const prevLPX = document.getElementById('prevLPX');
-  const prevLPY = document.getElementById('prevLPY');
-  const prevLPZ = document.getElementById('prevLPZ');
-  if (!prevLPX._touched) { const v = document.getElementById('ncLPX')?.value; if (v) prevLPX.value = v; }
-  if (!prevLPY._touched) { const v = document.getElementById('ncLPY')?.value; if (v) prevLPY.value = v; }
-  if (!prevLPZ._touched) { const v = document.getElementById('ncLPZ')?.value; if (v) prevLPZ.value = v; }
-
-  const LPX = parseFloat(prevLPX.value) || 600;
-  const LPY = parseFloat(prevLPY.value) || 900;
-  const LPZ = parseFloat(prevLPZ.value) || 18;
+  const LPX = parseFloat(document.getElementById('ncLPX')?.value) || 600;
+  const LPY = parseFloat(document.getElementById('ncLPY')?.value) || 900;
+  const LPZ = parseFloat(document.getElementById('ncLPZ')?.value) || 18;
 
   const canvas = document.getElementById('opsPreviewCanvas');
   const ctx = canvas.getContext('2d');
@@ -1050,9 +1012,6 @@ function updateOpsPreview(ops) {
 }
 
 function updateOpsPreviewFromInputs() {
-  document.getElementById('prevLPX')._touched = true;
-  document.getElementById('prevLPY')._touched = true;
-  document.getElementById('prevLPZ')._touched = true;
   if (_opsData) updateOpsPreview(_opsData);
 }
 
@@ -1196,7 +1155,7 @@ function openOpModal(opId) {
     document.getElementById('opFeed').value   = '';
     document.getElementById('opCompMode').value = 'none';
     document.querySelectorAll('[name=opType]').forEach(r => r.checked = r.value === 'inner');
-    setCorner('BL');
+    setCorner(document.getElementById('ncRefCorner')?.value || 'BL');
     renderOpToolCards();
   }
   openModal('opModal');
@@ -1706,6 +1665,19 @@ function setCorner(val) {
     const spans = btn.querySelectorAll('span');
     spans[0].style.color = sel ? 'var(--accent)' : '';   // corner label
     if (spans[1]) spans[1].style.color = sel ? 'rgba(99,155,255,.7)' : 'var(--text-muted)'; // arrows
+  });
+}
+
+function setNcCorner(val) {
+  const hid = document.getElementById('ncRefCorner');
+  if (hid) hid.value = val;
+  ['TL','TR','BL','BR'].forEach(c => {
+    const btn = document.getElementById(`ncCpBtn${c}`);
+    if (!btn) return;
+    const sel = c === val;
+    btn.style.borderColor = sel ? 'var(--accent)' : 'var(--border)';
+    btn.style.background  = sel ? 'rgba(59,130,246,.18)' : 'var(--surface-2)';
+    btn.style.color       = sel ? 'var(--accent)' : '';
   });
 }
 
