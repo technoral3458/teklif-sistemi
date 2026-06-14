@@ -877,8 +877,10 @@ function renderOps(ops) {
 
 // ── Live path preview ───────────────────────────────────────────────────────
 function _evalExprJS(expr, LPX, LPY, LPZ) {
-  try { return +new Function('LPX','LPY','LPZ','return (' + expr + ')')(LPX, LPY, LPZ); }
-  catch { return 0; }
+  try {
+    expr = String(expr).replace(/\blpx\b/gi,'LPX').replace(/\blpy\b/gi,'LPY').replace(/\blpz\b/gi,'LPZ');
+    return +new Function('LPX','LPY','LPZ','return (' + expr + ')')(LPX, LPY, LPZ);
+  } catch { return 0; }
 }
 
 function _circumcenterJS(x1, y1, x2, y2, x3, y3) {

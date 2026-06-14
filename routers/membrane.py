@@ -15,14 +15,25 @@ import auth
 from tmpl import templates
 
 
+import re as _re
+
 # ── NC Code Generator ─────────────────────────────────────────────────────────
+
+_VAR_NORM = [('lpx', 'LPX'), ('lpy', 'LPY'), ('lpz', 'LPZ')]
+
+def _normalize_expr(expr: str) -> str:
+    """Normalize LPX/LPY/LPZ variable names to uppercase regardless of input case."""
+    for lower, upper in _VAR_NORM:
+        expr = _re.sub(r'(?i)\b' + lower + r'\b', upper, expr)
+    return expr
 
 def _eval_expr(expr, variables):
     """Safely evaluate a parametric expression using the given variables."""
+    expr = _normalize_expr(str(expr).strip())
     env = {k: float(v) for k, v in variables.items()}
     env.update({k: getattr(_math, k) for k in dir(_math) if not k.startswith("_")})
     env["__builtins__"] = None
-    return float(eval(str(expr).strip(), env))
+    return float(eval(expr, env))
 
 
 def _generate_nc(model, paths, variables, x_off=0.0, y_off=0.0, prog_no=1):
