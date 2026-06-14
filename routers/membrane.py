@@ -131,6 +131,19 @@ def _sort_ops_inner_first(ops):
     return sorted(ops, key=lambda o: (0 if o.get('op_type', 'inner') == 'inner' else 1, o.get('seq', 0)))
 
 
+def _split_op_at_last_start(op):
+    """Split a single op's moves at the last START move.
+    Returns (inner_op, outer_op) dicts. outer_op is None if < 2 STARTs."""
+    moves = op.get('moves', [])
+    start_idxs = [i for i, m in enumerate(moves) if m.get('move_type') == 'start']
+    if len(start_idxs) < 2:
+        return op, None
+    last = start_idxs[-1]
+    inner_op = dict(op, moves=moves[:last])
+    outer_op = dict(op, moves=moves[last:])
+    return inner_op, outer_op
+
+
 def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
     ev = lambda expr: _eval_expr(expr, variables)
     W = float(variables.get('W', 0)); H = float(variables.get('H', 0))
@@ -1065,7 +1078,8 @@ async def job_nest_nc(request: Request, jid: int,
 
     # Two-pass NC: inner ops for all pieces first, then outer ops
     # (pieces stay attached to sheet during inner cuts, released last)
-    nc_inner, nc_outer, sim_paths = [], [], []
+    nc_inner, nc_outer = [], []
+    sim_inner_paths, sim_outer_paths = [], []
 
     for ctx in pl_ctx:
         if not ctx:
@@ -1077,40 +1091,44 @@ async def job_nest_nc(request: Request, jid: int,
         if all_ops:
             explicit_outer = [o for o in all_ops if o.get('op_type') == 'outer']
             if explicit_outer:
-                # User explicitly marked some ops as outer
                 inner_ops = [o for o in all_ops if o.get('op_type') != 'outer']
                 outer_ops = explicit_outer
             elif len(all_ops) >= 2:
-                # Heuristic: last op by seq = outer profile, all others = inner
                 by_seq = sorted(all_ops, key=lambda o: o.get('seq', 0))
                 inner_ops = by_seq[:-1]
                 outer_ops = by_seq[-1:]
             else:
-                # Single op: no split, goes to inner pass
-                inner_ops = all_ops
-                outer_ops = []
+                # Single op: split at last START move for inner/outer separation
+                inner_op_split, outer_op_split = _split_op_at_last_start(all_ops[0])
+                if outer_op_split:
+                    inner_ops = [inner_op_split]
+                    outer_ops = [outer_op_split]
+                else:
+                    inner_ops = all_ops
+                    outer_ops = []
             if inner_ops:
                 nc_inner.append(_generate_nc_ops(model, sorted(inner_ops, key=lambda o: o.get('seq',0)),
                                                  variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
                 evp = _eval_ops(model, inner_ops, variables, x_off=x_off, y_off=y_off)
                 for p in evp['paths']:
                     p['sheet'] = pl['sheet']; p['piece_color'] = pl['color']
-                sim_paths.extend(evp['paths'])
+                sim_inner_paths.extend(evp['paths'])
             if outer_ops:
                 nc_outer.append(_generate_nc_ops(model, sorted(outer_ops, key=lambda o: o.get('seq',0)),
                                                  variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
                 evp = _eval_ops(model, outer_ops, variables, x_off=x_off, y_off=y_off)
                 for p in evp['paths']:
                     p['sheet'] = pl['sheet']; p['piece_color'] = pl['color']
-                sim_paths.extend(evp['paths'])
+                sim_outer_paths.extend(evp['paths'])
         else:
             nc_inner.append(_generate_nc(model, paths, variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
             evp = _eval_paths(model, paths, variables, x_off=x_off, y_off=y_off)
             for p in evp['paths']:
                 p['sheet'] = pl['sheet']; p['piece_color'] = pl['color']
-            sim_paths.extend(evp['paths'])
+            sim_inner_paths.extend(evp['paths'])
         prog_no += 1
 
+    sim_paths = sim_inner_paths + sim_outer_paths
     nc_parts = nc_inner + nc_outer
 
     return JSONResponse({
@@ -1161,7 +1179,12 @@ async def job_nc_download(request: Request, jid: int,
                 by_seq = sorted(all_ops, key=lambda o: o.get('seq', 0))
                 inner_ops, outer_ops = by_seq[:-1], by_seq[-1:]
             else:
-                inner_ops, outer_ops = all_ops, []
+                inner_op_split, outer_op_split = _split_op_at_last_start(all_ops[0])
+                if outer_op_split:
+                    inner_ops = [inner_op_split]
+                    outer_ops = [outer_op_split]
+                else:
+                    inner_ops, outer_ops = all_ops, []
             if inner_ops:
                 nc_inner.append(_generate_nc_ops(model, sorted(inner_ops, key=lambda o: o.get('seq',0)),
                                                  variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
