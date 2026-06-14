@@ -1128,44 +1128,54 @@ async def job_nest_nc(request: Request, jid: int,
 @router.get("/jobs/{jid}/nc")
 async def job_nc_download(request: Request, jid: int,
                           sheet_w: float = 2800, sheet_h: float = 1100,
-                          margin: float = 5, T: float = 18):
-    """Download combined NC file for all nested pieces on all sheets."""
+                          margin: float = 5, T: float = 18,
+                          allow_rotate: int = 1):
+    """Download combined NC file — same 2-pass logic as nest_nc."""
     auth.require_user(request)
     job = fdb.get_cap_job(jid)
     if not job:
         return RedirectResponse("/membrane/jobs", 303)
     items = fdb.get_cap_job_items(jid)
-    placements, n_sheets, _ = _nest(items, sheet_w, sheet_h, margin)
+    placements, n_sheets, _ = _nest(items, sheet_w, sheet_h, margin, allow_rotate=bool(allow_rotate))
 
-    all_nc = []
+    nc_inner, nc_outer = [], []
     prog_no = 1
-    for sheet_idx in range(n_sheets):
-        sheet_placements = [p for p in placements if p['sheet'] == sheet_idx]
-        if not sheet_placements:
-            continue
-        all_nc.append(f"(=== SHEET {sheet_idx+1} ===)")
-        for pl in sheet_placements:
-            mid = pl.get('model_id')
-            if not mid:
-                all_nc.append(f"(SKIPPED: no model for {pl['label']})")
-                continue
-            model = fdb.get_cap_model(mid)
-            if not model:
-                continue
+    for pl in placements:
+        mid = pl.get('model_id')
+        if not mid: continue
+        model = fdb.get_cap_model(mid)
+        if not model: continue
+        W, H = pl['cap_w'], pl['cap_h']
+        variables = {"W": W, "H": H, "T": T}
+        variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
+        if pl.get('rotated'):
+            variables["W"], variables["H"] = H, W
+        x_off, y_off = pl['x'], pl['y']
+        all_ops = fdb.get_cap_ops(mid)
+        if all_ops:
+            explicit_outer = [o for o in all_ops if o.get('op_type') == 'outer']
+            if explicit_outer:
+                inner_ops = [o for o in all_ops if o.get('op_type') != 'outer']
+                outer_ops = explicit_outer
+            elif len(all_ops) >= 2:
+                by_seq = sorted(all_ops, key=lambda o: o.get('seq', 0))
+                inner_ops, outer_ops = by_seq[:-1], by_seq[-1:]
+            else:
+                inner_ops, outer_ops = all_ops, []
+            if inner_ops:
+                nc_inner.append(_generate_nc_ops(model, sorted(inner_ops, key=lambda o: o.get('seq',0)),
+                                                 variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
+            if outer_ops:
+                nc_outer.append(_generate_nc_ops(model, sorted(outer_ops, key=lambda o: o.get('seq',0)),
+                                                 variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
+        else:
             paths = fdb.get_cap_paths(mid)
-            W, H = pl['cap_w'], pl['cap_h']
-            variables = {"W": W, "H": H, "T": T}
-            variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
-            x_off, y_off = pl['x'], pl['y']
-            if pl.get('rotated'):
-                variables["W"], variables["H"] = H, W
-            nc = _generate_nc(model, paths, variables,
-                              x_off=x_off, y_off=y_off, prog_no=prog_no)
-            all_nc.append(nc)
-            prog_no += 1
+            nc_inner.append(_generate_nc(model, paths, variables,
+                                         x_off=x_off, y_off=y_off, prog_no=prog_no))
+        prog_no += 1
 
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in job["name"])
-    content = "\n\n".join(all_nc)
+    content = "\n\n".join(nc_inner + nc_outer)
     return Response(
         content=content, media_type="text/plain",
         headers={"Content-Disposition": f'attachment; filename="{safe}_nested.nc"'},

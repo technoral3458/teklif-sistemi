@@ -523,9 +523,16 @@ async function genNC() {
 }
 
 function downloadNC() {
-  if (!JOB_ID) return;
-  const {sheet_w, sheet_h, margin, T} = _getParams();
-  window.location.href = `/membrane/jobs/${JOB_ID}/nc?sheet_w=${sheet_w}&sheet_h=${sheet_h}&margin=${margin}&T=${T}`;
+  // Download the already-generated NC directly from the textarea
+  // (same content as shown, includes 2-pass inner→outer ordering)
+  const nc = document.getElementById('ncOutput')?.value;
+  if (!nc) return;
+  const blob = new Blob([nc], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `job_${JOB_ID}_nest.nc`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function copyNC() {
