@@ -1075,11 +1075,20 @@ async def job_nest_nc(request: Request, jid: int,
         x_off, y_off = pl['x'], pl['y']
 
         if all_ops:
-            inner_ops = [o for o in all_ops if o.get('op_type', 'inner') == 'inner']
-            outer_ops = [o for o in all_ops if o.get('op_type', 'inner') == 'outer']
-            if not outer_ops:
-                # No outer ops defined → all ops treated as inner (single-pass)
+            explicit_outer = [o for o in all_ops if o.get('op_type') == 'outer']
+            if explicit_outer:
+                # User explicitly marked some ops as outer
+                inner_ops = [o for o in all_ops if o.get('op_type') != 'outer']
+                outer_ops = explicit_outer
+            elif len(all_ops) >= 2:
+                # Heuristic: last op by seq = outer profile, all others = inner
+                by_seq = sorted(all_ops, key=lambda o: o.get('seq', 0))
+                inner_ops = by_seq[:-1]
+                outer_ops = by_seq[-1:]
+            else:
+                # Single op: no split, goes to inner pass
                 inner_ops = all_ops
+                outer_ops = []
             if inner_ops:
                 nc_inner.append(_generate_nc_ops(model, sorted(inner_ops, key=lambda o: o.get('seq',0)),
                                                  variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
