@@ -240,7 +240,7 @@ _NEST_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6',
 
 def _nest(items, sheet_w, sheet_h, margin=5.0, allow_rotate=True):
     """
-    Pack cap rectangles onto sheets using guillotine algorithm.
+    Pack cap rectangles onto sheets using MaxRects (BSSF) algorithm.
     items: list of {cap_w, cap_h, qty, model_name, model_id}
     Returns (placements, sheet_count, util_pct)
     Each placement: {x, y, w, h, label, color, sheet, rotated, group, model_id, cap_w, cap_h}
@@ -256,41 +256,68 @@ def _nest(items, sheet_w, sheet_h, margin=5.0, allow_rotate=True):
                           'group': i, 'model_id': item.get('model_id'),
                           'cap_w': w, 'cap_h': h})
 
-    # Sort by area descending so large pieces are placed first
     pieces.sort(key=lambda p: -(p['ow'] * p['oh']))
 
-    # Each sheet holds a list of free rectangles: (x, y, w, h)
+    # MaxRects: each sheet holds a list of maximal free rectangles (x, y, w, h).
+    # Pieces are searched with effective size (pw+margin, ph+margin) so the gap
+    # between adjacent pieces equals `margin`.
     sheets_free: list[list[tuple]] = []
 
     def _new_sheet():
         sheets_free.append([(margin, margin, sheet_w - 2*margin, sheet_h - 2*margin)])
         return len(sheets_free) - 1
 
-    def _best_fit(si, pw, ph):
-        """Find the free rect in sheet si that best fits pw×ph (min short-side waste).
-        Returns (rect_index, x, y) or None. Does NOT modify free rects."""
-        best_ri, best_score = None, float('inf')
-        for ri, (rx, ry, rw, rh) in enumerate(sheets_free[si]):
-            if pw <= rw and ph <= rh:
-                score = min(rw - pw, rh - ph)
+    def _find_best(si, pw, ph):
+        """Best-short-side-fit in sheet si for pw×ph. Returns (x, y) or None."""
+        ew, eh = pw + margin, ph + margin
+        best_score, best_pos = float('inf'), None
+        for (rx, ry, rw, rh) in sheets_free[si]:
+            if ew <= rw and eh <= rh:
+                score = min(rw - ew, rh - eh)
                 if score < best_score:
-                    best_score, best_ri = score, ri
-                    best_pos = (rx, ry)
-        return (best_ri, *best_pos) if best_ri is not None else None
+                    best_score, best_pos = score, (rx, ry)
+        return best_pos
 
-    def _place(si, ri, pw, ph):
-        """Place pw×ph in free rect ri on sheet si (guillotine split)."""
-        rx, ry, rw, rh = sheets_free[si].pop(ri)
-        right_w = rw - pw - margin
-        top_h   = rh - ph - margin
-        # Longer-axis split: bigger leftover gets the full span
-        if right_w >= top_h:
-            if right_w > 0: sheets_free[si].append((rx + pw + margin, ry, right_w, rh))
-            if top_h   > 0: sheets_free[si].append((rx, ry + ph + margin, pw, top_h))
-        else:
-            if top_h   > 0: sheets_free[si].append((rx, ry + ph + margin, rw, top_h))
-            if right_w > 0: sheets_free[si].append((rx + pw + margin, ry, right_w, ph))
-        return (rx, ry)
+    def _update(si, px, py, pw, ph):
+        """Split all free rects that overlap with placed piece; prune non-maximal."""
+        ew, eh = pw + margin, ph + margin
+        new_rects = []
+        for (rx, ry, rw, rh) in sheets_free[si]:
+            # No overlap → keep as-is
+            if not (px < rx + rw and px + ew > rx and py < ry + rh and py + eh > ry):
+                new_rects.append((rx, ry, rw, rh))
+                continue
+            # Split into up to 4 sub-rects around the effective placed rect
+            if px > rx:
+                new_rects.append((rx, ry, px - rx, rh))
+            if px + ew < rx + rw:
+                new_rects.append((px + ew, ry, rx + rw - px - ew, rh))
+            if py > ry:
+                new_rects.append((rx, ry, rw, py - ry))
+            if py + eh < ry + rh:
+                new_rects.append((rx, py + eh, rw, ry + rh - py - eh))
+        # Prune rects fully contained within another rect
+        result = []
+        n = len(new_rects)
+        for i in range(n):
+            ax, ay, aw, ah = new_rects[i]
+            dominated = False
+            for j in range(n):
+                if i == j: continue
+                bx, by, bw, bh = new_rects[j]
+                if bx <= ax and by <= ay and bx + bw >= ax + aw and by + bh >= ay + ah:
+                    dominated = True; break
+            if not dominated:
+                result.append(new_rects[i])
+        sheets_free[si] = result
+
+    def _emit(si, px, py, w, h, rotated, pc):
+        placements.append({'x': round(px, 2), 'y': round(py, 2),
+                          'w': w, 'h': h, 'label': pc['label'],
+                          'color': pc['color'], 'sheet': si,
+                          'rotated': rotated, 'group': pc['group'],
+                          'model_id': pc['model_id'],
+                          'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
 
     placements = []
     for pc in pieces:
@@ -301,32 +328,20 @@ def _nest(items, sheet_w, sheet_h, margin=5.0, allow_rotate=True):
         placed = False
         for w, h, rotated in orientations:
             for si in range(len(sheets_free)):
-                fit = _best_fit(si, w, h)
-                if fit:
-                    ri, rx, ry = fit
-                    pos = _place(si, ri, w, h)
-                    placements.append({'x': round(pos[0], 2), 'y': round(pos[1], 2),
-                                      'w': w, 'h': h, 'label': pc['label'],
-                                      'color': pc['color'], 'sheet': si,
-                                      'rotated': rotated, 'group': pc['group'],
-                                      'model_id': pc['model_id'],
-                                      'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+                pos = _find_best(si, w, h)
+                if pos:
+                    _update(si, pos[0], pos[1], w, h)
+                    _emit(si, pos[0], pos[1], w, h, rotated, pc)
                     placed = True; break
             if placed: break
 
         if not placed:
             si = _new_sheet()
             for w, h, rotated in orientations:
-                fit = _best_fit(si, w, h)
-                if fit:
-                    ri, rx, ry = fit
-                    pos = _place(si, ri, w, h)
-                    placements.append({'x': round(pos[0], 2), 'y': round(pos[1], 2),
-                                      'w': w, 'h': h, 'label': pc['label'],
-                                      'color': pc['color'], 'sheet': si,
-                                      'rotated': rotated, 'group': pc['group'],
-                                      'model_id': pc['model_id'],
-                                      'cap_w': pc['cap_w'], 'cap_h': pc['cap_h']})
+                pos = _find_best(si, w, h)
+                if pos:
+                    _update(si, pos[0], pos[1], w, h)
+                    _emit(si, pos[0], pos[1], w, h, rotated, pc)
                     placed = True; break
             if not placed:
                 # Piece is larger than the sheet; force-place at origin
