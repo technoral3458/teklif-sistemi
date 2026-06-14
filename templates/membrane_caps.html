@@ -8,6 +8,7 @@
   <a href="/membrane" class="btn btn-ghost btn-sm">← Membran</a>
   <h2 style="margin:0;font-size:18px;font-weight:700;flex:1;">🔧 Parametrik Kapak Makroları</h2>
   {% if not edit_model %}
+  <button class="btn btn-outline btn-sm" onclick="openModal('dxfModal')">📐 DXF'ten İçe Aktar</button>
   <button class="btn btn-primary btn-sm" onclick="openModal('newModelModal')">+ Yeni Model</button>
   {% else %}
   <a href="/membrane/caps" class="btn btn-ghost btn-sm">← Modeller</a>
@@ -453,6 +454,70 @@
   </div>
 </div>
 {% endif %}
+
+{# DXF Import Modal #}
+<div id="dxfModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:780px;width:95%;">
+    <div class="modal-header">
+      <h3 class="modal-title">📐 DXF'ten Model İçe Aktar</h3>
+      <button class="modal-close" onclick="closeDxfModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+
+      {# Step 1: upload #}
+      <div id="dxfStep1">
+        <label for="dxfFile" style="display:block;border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:border-color 0.15s;">
+          <div style="font-size:36px;margin-bottom:8px;">📐</div>
+          <div style="font-size:14px;font-weight:600;">DXF Dosyasını Seç</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">.dxf uzantılı dosya</div>
+          <input type="file" id="dxfFile" accept=".dxf" style="display:none;" onchange="dxfLoad(this)" />
+        </label>
+        <div id="dxfStatus" style="display:none;margin-top:10px;font-size:13px;padding:8px 12px;border-radius:6px;background:var(--surface-2);"></div>
+      </div>
+
+      {# Step 2: preview + assign #}
+      <div id="dxfStep2" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">ÖNİZLEME</div>
+            <canvas id="dxfCanvas" width="340" height="240"
+              style="width:100%;border-radius:8px;border:1px solid var(--border);background:#0f172a;"></canvas>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:11px;">Model Adı *</label>
+              <input type="text" id="dxfModelName" class="form-control" placeholder="örn: Standart Kapak" />
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Besleme XY (mm/dk)</label>
+                <input type="number" id="dxfFeedXY" class="form-control" value="3000" /></div>
+              <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Besleme Z (mm/dk)</label>
+                <input type="number" id="dxfFeedZ" class="form-control" value="1000" /></div>
+              <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Devir (S)</label>
+                <input type="number" id="dxfSpindle" class="form-control" value="18000" /></div>
+              <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Güvenli Z (mm)</label>
+                <input type="number" id="dxfSafeZ" class="form-control" value="5" step="0.5" /></div>
+            </div>
+            <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11px;">
+              <strong>Boyut:</strong> <span id="dxfDimText">—</span><br>
+              <span style="color:var(--text-muted);">Koordinatlar sol-alt köşeye (BL) normalize edildi.</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text-muted);">KONTURLAR — her biri ayrı bir işlem olacak</div>
+        <div id="dxfContourList" style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
+      </div>
+
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="btn btn-ghost" onclick="closeDxfModal()">İptal</button>
+      <button type="button" id="dxfCreateBtn" class="btn btn-primary" style="display:none;" onclick="dxfCreate()">
+        ✓ Modeli Oluştur
+      </button>
+    </div>
+  </div>
+</div>
 
 {# New Model Modal (list view) #}
 <div id="newModelModal" class="modal-overlay">
@@ -1182,6 +1247,184 @@ function _animStep(ts) {
     return;
   }
   simState.animId = requestAnimationFrame(_animStep);
+}
+
+// ── DXF Import ──────────────────────────────────────────────────────────────
+let _dxfParsed = null;
+
+function closeDxfModal() {
+  closeModal('dxfModal');
+  // reset for next use
+  document.getElementById('dxfStep2').style.display = 'none';
+  document.getElementById('dxfCreateBtn').style.display = 'none';
+  document.getElementById('dxfStatus').style.display = 'none';
+  document.getElementById('dxfFile').value = '';
+  _dxfParsed = null;
+}
+
+async function dxfLoad(inp) {
+  const f = inp.files[0];
+  if (!f) return;
+  const st = document.getElementById('dxfStatus');
+  st.style.display = 'block';
+  st.style.color = 'var(--text-muted)';
+  st.textContent = '⏳ Yükleniyor...';
+
+  const fd = new FormData();
+  fd.append('file', f);
+  try {
+    const res = await fetch('/membrane/caps/dxf_preview', {method: 'POST', body: fd});
+    const d = await res.json();
+    if (d.error) {
+      st.style.color = 'var(--danger, #ef4444)';
+      st.textContent = '❌ ' + d.error;
+      return;
+    }
+    st.style.display = 'none';
+    _dxfParsed = d;
+    _dxfShowStep2(d, f.name);
+  } catch(e) {
+    st.style.color = 'var(--danger, #ef4444)';
+    st.textContent = '❌ Hata: ' + e.message;
+  }
+}
+
+function _dxfShowStep2(d, fname) {
+  document.getElementById('dxfStep2').style.display = '';
+  document.getElementById('dxfCreateBtn').style.display = '';
+  document.getElementById('dxfModelName').value = fname.replace(/\.dxf$/i, '').replace(/[_-]/g, ' ');
+  document.getElementById('dxfDimText').textContent = `W = ${d.width} mm × H = ${d.height} mm`;
+  _dxfDraw(d);
+  _dxfBuildList(d);
+}
+
+const _DXF_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316','#ef4444'];
+
+function _dxfDraw(d) {
+  const cv = document.getElementById('dxfCanvas');
+  const ctx = cv.getContext('2d');
+  const cw = cv.width, ch = cv.height;
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, cw, ch);
+  if (!d.contours.length || d.width <= 0 || d.height <= 0) return;
+  const mg = 18;
+  const scale = Math.min((cw - 2*mg) / d.width, (ch - 2*mg) / d.height);
+  const ox = (cw - d.width * scale) / 2;
+  const oy = (ch - d.height * scale) / 2;
+  const tx = x => ox + x * scale;
+  const ty = y => ch - oy - y * scale;  // flip Y
+
+  d.contours.forEach((c, ci) => {
+    ctx.strokeStyle = _DXF_COLORS[ci % _DXF_COLORS.length];
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let cx_ = 0, cy_ = 0, started = false;
+    for (const m of c.moves) {
+      const mx = parseFloat(m.x || 0), my = parseFloat(m.y || 0);
+      if (m.move_type === 'start') {
+        ctx.moveTo(tx(mx), ty(my));
+        cx_ = mx; cy_ = my; started = true;
+      } else if (m.move_type === 'line' && started) {
+        ctx.lineTo(tx(mx), ty(my));
+        cx_ = mx; cy_ = my;
+      } else if ((m.move_type === 'arc_cw' || m.move_type === 'arc_ccw') && started) {
+        const ccx = parseFloat(m.cx || 0), ccy = parseFloat(m.cy || 0);
+        const r = Math.hypot(cx_ - ccx, cy_ - ccy);
+        const sa = Math.atan2(cy_ - ccy, cx_ - ccx);
+        const ea = Math.atan2(my - ccy, mx - ccx);
+        // canvas arc: anticlockwise=true means CCW in canvas coords (which is CW in our Y-up space)
+        const ccw_canvas = m.move_type === 'arc_cw';
+        ctx.arc(tx(ccx), ty(ccy), r * scale, -sa, -ea, ccw_canvas);
+        cx_ = mx; cy_ = my;
+      }
+    }
+    ctx.stroke();
+  });
+}
+
+function _dxfBuildList(d) {
+  const list = document.getElementById('dxfContourList');
+  list.innerHTML = '';
+  d.contours.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;';
+    div.innerHTML = `
+      <div style="width:12px;height:12px;border-radius:50%;background:${_DXF_COLORS[i%_DXF_COLORS.length]};margin-bottom:6px;flex-shrink:0;"></div>
+      <div class="form-group" style="margin:0;flex:2;min-width:100px;">
+        <label style="font-size:10px;color:var(--text-muted);">Ad (Layer: ${c.layer})</label>
+        <input type="text" id="dxf_name_${i}" class="form-control" value="${c.name}" style="height:28px;font-size:12px;" />
+      </div>
+      <div class="form-group" style="margin:0;width:70px;">
+        <label style="font-size:10px;color:var(--text-muted);">Takım No</label>
+        <input type="number" id="dxf_tool_${i}" class="form-control" value="1" min="1" style="height:28px;font-size:12px;" />
+      </div>
+      <div class="form-group" style="margin:0;width:80px;">
+        <label style="font-size:10px;color:var(--text-muted);">Derinlik</label>
+        <input type="text" id="dxf_depth_${i}" class="form-control" value="-T" style="height:28px;font-size:12px;font-family:monospace;" />
+      </div>
+      <div class="form-group" style="margin:0;width:110px;">
+        <label style="font-size:10px;color:var(--text-muted);">Kesim Türü</label>
+        <select id="dxf_optype_${i}" class="form-control" style="height:28px;font-size:11px;padding:0 6px;">
+          <option value="inner" ${c.op_type==='inner'?'selected':''}>İç Kesim</option>
+          <option value="outer" ${c.op_type==='outer'?'selected':''}>Dış Kontur</option>
+        </select>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:7px;min-width:60px;">
+        ${c.moves.length} hamle<br>${c.closed?'✓ kapalı':'⚠ açık'}
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+async function dxfCreate() {
+  const name = document.getElementById('dxfModelName').value.trim();
+  if (!name) { alert('Model adı gerekli'); return; }
+  if (!_dxfParsed) return;
+
+  const ops = _dxfParsed.contours.map((c, i) => ({
+    name:      document.getElementById(`dxf_name_${i}`).value || `Op ${i+1}`,
+    tool_no:   parseInt(document.getElementById(`dxf_tool_${i}`).value) || 1,
+    depth:     document.getElementById(`dxf_depth_${i}`).value.trim() || '-T',
+    feed:      '',
+    ref_corner: 'BL',
+    seq:       (i + 1) * 10,
+    op_type:   document.getElementById(`dxf_optype_${i}`).value,
+    moves:     c.moves,
+  }));
+
+  const fname = document.getElementById('dxfFile').files[0]?.name || '';
+  const body = {
+    name,
+    description: fname ? `DXF: ${fname}` : '',
+    tool_no:       1,
+    spindle_speed: parseInt(document.getElementById('dxfSpindle').value) || 18000,
+    feed_xy:       parseInt(document.getElementById('dxfFeedXY').value) || 3000,
+    feed_z:        parseInt(document.getElementById('dxfFeedZ').value) || 1000,
+    safe_z:        parseFloat(document.getElementById('dxfSafeZ').value) || 5,
+    constants_json: '{}',
+    ops,
+  };
+
+  const btn = document.getElementById('dxfCreateBtn');
+  btn.disabled = true; btn.textContent = '⏳ Oluşturuluyor...';
+  try {
+    const res = await fetch('/membrane/caps/dxf_create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await res.json();
+    if (d.ok) {
+      window.location.href = `/membrane/caps/${d.model_id}`;
+    } else {
+      alert('Hata: ' + JSON.stringify(d));
+      btn.disabled = false; btn.textContent = '✓ Modeli Oluştur';
+    }
+  } catch(e) {
+    alert('Hata: ' + e.message);
+    btn.disabled = false; btn.textContent = '✓ Modeli Oluştur';
+  }
 }
 </script>
 {% endblock %}

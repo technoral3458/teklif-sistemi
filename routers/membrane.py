@@ -743,6 +743,166 @@ async def delete_door_old(request: Request, id: int = Form(...)):
 
 # ── Parametric Cap Models ─────────────────────────────────────────────────────
 
+def _parse_dxf_file(data: bytes):
+    """Parse DXF bytes → contours with moves + bounding box."""
+    try:
+        import ezdxf
+        import io as _bio
+    except ImportError:
+        return {"error": "ezdxf kütüphanesi yüklü değil (pip install ezdxf)."}
+
+    try:
+        doc = ezdxf.read(_bio.BytesIO(data))
+    except Exception as e:
+        return {"error": f"DXF okuma hatası: {e}"}
+
+    msp = doc.modelspace()
+    layer_segs = {}
+
+    def _add(layer, seg):
+        layer_segs.setdefault(layer, []).append(seg)
+
+    def _proc_line(layer, e):
+        s, en = e.dxf.start, e.dxf.end
+        _add(layer, {'type': 'line',
+                     'x1': float(s.x), 'y1': float(s.y),
+                     'x2': float(en.x), 'y2': float(en.y)})
+
+    def _proc_arc(layer, e):
+        cx, cy = float(e.dxf.center.x), float(e.dxf.center.y)
+        r = float(e.dxf.radius)
+        sa = _math.radians(float(e.dxf.start_angle))
+        ea = _math.radians(float(e.dxf.end_angle))
+        _add(layer, {'type': 'arc_ccw',
+                     'x1': cx + r * _math.cos(sa), 'y1': cy + r * _math.sin(sa),
+                     'x2': cx + r * _math.cos(ea), 'y2': cy + r * _math.sin(ea),
+                     'cx': cx, 'cy': cy})
+
+    def _proc_circle(layer, e):
+        cx, cy = float(e.dxf.center.x), float(e.dxf.center.y)
+        _add(layer, {'type': 'circle', 'cx': cx, 'cy': cy, 'r': float(e.dxf.radius)})
+
+    for entity in msp:
+        try:
+            layer = entity.dxf.layer if entity.dxf.hasattr('layer') else '0'
+            t = entity.dxftype()
+            if t == 'LINE':
+                _proc_line(layer, entity)
+            elif t == 'ARC':
+                _proc_arc(layer, entity)
+            elif t == 'CIRCLE':
+                _proc_circle(layer, entity)
+            elif t in ('LWPOLYLINE', 'POLYLINE'):
+                for sub in entity.virtual_entities():
+                    st = sub.dxftype()
+                    if st == 'LINE': _proc_line(layer, sub)
+                    elif st == 'ARC': _proc_arc(layer, sub)
+            elif t == 'SPLINE':
+                pts = list(entity.flattening(0.5))
+                for i in range(len(pts) - 1):
+                    _add(layer, {'type': 'line',
+                                 'x1': float(pts[i].x), 'y1': float(pts[i].y),
+                                 'x2': float(pts[i + 1].x), 'y2': float(pts[i + 1].y)})
+        except Exception:
+            pass
+
+    if not any(layer_segs.values()):
+        return {"error": "DXF dosyasında çizilebilir varlık bulunamadı."}
+
+    TOL = 0.05
+    contours = []
+
+    for layer, segs in layer_segs.items():
+        circles = [s for s in segs if s['type'] == 'circle']
+        edges = [s for s in segs if s['type'] != 'circle']
+
+        for c in circles:
+            cx, cy, r = c['cx'], c['cy'], c['r']
+            pts = [(cx + r * _math.cos(_math.radians(a)), cy + r * _math.sin(_math.radians(a)))
+                   for a in range(0, 361, 10)]
+            moves = [
+                {'move_type': 'start', 'x': str(round(cx + r, 3)), 'y': str(round(cy, 3))},
+                {'move_type': 'arc_ccw', 'x': str(round(cx - r, 3)), 'y': str(round(cy, 3)),
+                 'cx': str(round(cx, 3)), 'cy': str(round(cy, 3))},
+                {'move_type': 'arc_ccw', 'x': str(round(cx + r, 3)), 'y': str(round(cy, 3)),
+                 'cx': str(round(cx, 3)), 'cy': str(round(cy, 3))},
+            ]
+            contours.append({'layer': layer, 'moves': moves, 'preview_pts': pts, 'closed': True})
+
+        remaining = list(edges)
+        while remaining:
+            chain = [remaining.pop(0)]
+            grew = True
+            while grew:
+                grew = False
+                tx, ty = chain[-1]['x2'], chain[-1]['y2']
+                for i, seg in enumerate(remaining):
+                    if abs(seg['x1'] - tx) < TOL and abs(seg['y1'] - ty) < TOL:
+                        chain.append(remaining.pop(i)); grew = True; break
+                    elif abs(seg['x2'] - tx) < TOL and abs(seg['y2'] - ty) < TOL:
+                        rs = dict(seg, x1=seg['x2'], y1=seg['y2'], x2=seg['x1'], y2=seg['y1'])
+                        if rs['type'] == 'arc_ccw': rs['type'] = 'arc_cw'
+                        elif rs['type'] == 'arc_cw': rs['type'] = 'arc_ccw'
+                        chain.append(rs); remaining.pop(i); grew = True; break
+
+            hx, hy = chain[0]['x1'], chain[0]['y1']
+            closed = abs(chain[-1]['x2'] - hx) < TOL and abs(chain[-1]['y2'] - hy) < TOL
+            if len(chain) < 2 and not closed:
+                continue
+
+            moves = [{'move_type': 'start', 'x': str(round(hx, 3)), 'y': str(round(hy, 3))}]
+            pts = [(hx, hy)]
+            for seg in chain:
+                mv = {'move_type': seg['type'],
+                      'x': str(round(seg['x2'], 3)), 'y': str(round(seg['y2'], 3))}
+                if seg['type'] in ('arc_cw', 'arc_ccw'):
+                    mv['cx'] = str(round(seg['cx'], 3)); mv['cy'] = str(round(seg['cy'], 3))
+                moves.append(mv)
+                pts.append((seg['x2'], seg['y2']))
+            contours.append({'layer': layer, 'moves': moves, 'preview_pts': pts, 'closed': closed})
+
+    if not contours:
+        return {"error": "Kontur zincirlenemedi."}
+
+    all_x = [p[0] for c in contours for p in c['preview_pts']]
+    all_y = [p[1] for c in contours for p in c['preview_pts']]
+    min_x, min_y = min(all_x), min(all_y)
+    max_x, max_y = max(all_x), max(all_y)
+    W = round(max_x - min_x, 2)
+    H = round(max_y - min_y, 2)
+
+    for c in contours:
+        c['preview_pts'] = [(round(x - min_x, 2), round(y - min_y, 2)) for x, y in c['preview_pts']]
+        for m in c['moves']:
+            if 'x' in m: m['x'] = str(round(float(m['x']) - min_x, 3))
+            if 'y' in m: m['y'] = str(round(float(m['y']) - min_y, 3))
+            if 'cx' in m: m['cx'] = str(round(float(m['cx']) - min_x, 3))
+            if 'cy' in m: m['cy'] = str(round(float(m['cy']) - min_y, 3))
+        xs = [p[0] for p in c['preview_pts']]
+        ys = [p[1] for p in c['preview_pts']]
+        c['bbox'] = {'x': min(xs), 'y': min(ys), 'w': max(xs) - min(xs), 'h': max(ys) - min(ys)}
+
+    inner_kw = ['ic', 'inner', 'pocket', 'hole', 'cep', 'kanal', 'delik']
+    outer_kw = ['dc', 'dis', 'outer', 'profil', 'kontur', 'profile', 'contour', 'frame']
+    areas = [(c['bbox']['w'] * c['bbox']['h'], i) for i, c in enumerate(contours)]
+    max_area_idx = max(areas, key=lambda a: a[0])[1] if areas else -1
+
+    layers = sorted(set(c['layer'] for c in contours))
+    for i, c in enumerate(contours):
+        ll = c['layer'].lower()
+        if any(k in ll for k in inner_kw):
+            c['op_type'] = 'inner'
+        elif any(k in ll for k in outer_kw):
+            c['op_type'] = 'outer'
+        elif i == max_area_idx:
+            c['op_type'] = 'outer'
+        else:
+            c['op_type'] = 'inner'
+        c['id'] = i
+        c['name'] = (f"{c['layer']} {i + 1}" if c['layer'] != '0' else f"Op {i + 1}")
+
+    return {'contours': contours, 'width': W, 'height': H, 'layers': layers}
+
 @router.get("/caps")
 async def caps_list(request: Request):
     user = auth.require_user(request)
@@ -801,6 +961,52 @@ async def caps_delete(request: Request, id: int = Form(...)):
     auth.require_user(request)
     fdb.del_cap_model(id)
     return RedirectResponse("/membrane/caps?msg=Model+silindi&msg_type=success", 303)
+
+
+@router.post("/caps/dxf_preview")
+async def caps_dxf_preview(request: Request, file: UploadFile = File(...)):
+    auth.require_user(request)
+    data = await file.read()
+    return JSONResponse(_parse_dxf_file(data))
+
+
+@router.post("/caps/dxf_create")
+async def caps_dxf_create(request: Request):
+    auth.require_user(request)
+    body = await request.json()
+    mid = fdb.save_cap_model(
+        id=0,
+        name=body.get('name', 'DXF Model'),
+        description=body.get('description', ''),
+        tool_no=int(body.get('tool_no', 1)),
+        spindle_speed=int(body.get('spindle_speed', 18000)),
+        feed_xy=int(body.get('feed_xy', 3000)),
+        feed_z=int(body.get('feed_z', 1000)),
+        safe_z=float(body.get('safe_z', 5)),
+        constants_json=body.get('constants_json', '{}'),
+    )
+    for op_data in body.get('ops', []):
+        op_id = fdb.save_cap_op(
+            id=0, model_id=mid,
+            name=op_data.get('name', 'Op'),
+            tool_no=int(op_data.get('tool_no', 1)),
+            depth=str(op_data.get('depth', '-T')),
+            feed=str(op_data.get('feed', '')),
+            ref_corner=op_data.get('ref_corner', 'BL'),
+            seq=int(op_data.get('seq', 10)),
+            op_type=op_data.get('op_type', 'inner'),
+        )
+        for seq_i, mv in enumerate(op_data.get('moves', []), 1):
+            fdb.save_cap_move(
+                id=0, op_id=op_id,
+                move_type=mv.get('move_type', 'line'),
+                x=str(mv.get('x', '0')),
+                y=str(mv.get('y', '0')),
+                cx=str(mv.get('cx', '')) if 'cx' in mv else '',
+                cy=str(mv.get('cy', '')) if 'cy' in mv else '',
+                seq=seq_i,
+            )
+    return JSONResponse({'ok': True, 'model_id': mid})
 
 
 @router.post("/caps/{mid}/path/save")
