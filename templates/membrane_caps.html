@@ -237,8 +237,6 @@
           <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Besleme Z</label>
             <input type="number" name="feed_z" class="form-control" value="{{ edit_model.feed_z }}" /></div>
         </div>
-        <div class="form-group" style="margin:0;">
-          <label class="form-label" style="font-size:11px;">Özel Sabitler (JSON) <span style="color:var(--text-muted);">örn: {"A":50,"B":25}</span></label>
           <input type="text" name="constants_json" id="editConstJson" class="form-control" style="font-family:monospace;"
                  value="{{ edit_model.constants_json }}" />
         </div>
@@ -662,18 +660,6 @@
         <div class="form-group" style="margin:0;">
           <label class="form-label">Açıklama</label>
           <input type="text" name="description" class="form-control" placeholder="Opsiyonel" />
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Takım No</label>
-            <input type="number" name="tool_no" class="form-control" value="1" min="1" /></div>
-          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Devir (S)</label>
-            <input type="number" name="spindle_speed" class="form-control" value="18000" /></div>
-          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Güvenli Z</label>
-            <input type="number" name="safe_z" class="form-control" value="5" step="0.5" /></div>
-          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Besleme XY</label>
-            <input type="number" name="feed_xy" class="form-control" value="3000" /></div>
-          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Besleme Z</label>
-            <input type="number" name="feed_z" class="form-control" value="1000" /></div>
         </div>
         <div class="form-group" style="margin:0;">
           <label class="form-label" style="font-size:11px;">Özel Sabitler (JSON) <span style="color:var(--text-muted);">örn: {"A":50,"B":25}</span></label>
