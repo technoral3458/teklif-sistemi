@@ -92,12 +92,15 @@ async def order_detail(request: Request, oid: int):
     offer["dealer_name"]       = dlr["company_name"] if dlr else "-"
     manufacturers = list(mfr_users.values())
     mfr_id = udb.effective_mfr_id(user)
+    # default manufacturer comes from model if not yet assigned
+    default_mfr_id = model.get("manufacturer_id") or 0
     return templates.TemplateResponse(request, "order_detail.html", {
         "user": user,
         "offer": offer,
         "items": items,
         "stages": stages,
         "manufacturers": manufacturers,
+        "default_mfr_id": default_mfr_id,
         "currencies": CURRENCIES,
         "payment_methods": PAYMENT_METHODS,
         "active_page": "orders",

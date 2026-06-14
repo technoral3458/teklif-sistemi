@@ -53,6 +53,20 @@
               </select>
             </div>
           </div>
+          {% if user.role == 'admin' and manufacturers %}
+          <div class="form-group">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+              Varsayılan Üretici
+            </label>
+            <select name="manufacturer_id" class="form-control">
+              <option value="0">-- Atanmadı --</option>
+              {% for mfr in manufacturers %}
+              <option value="{{ mfr.id }}" {% if model.manufacturer_id == mfr.id %}selected{% endif %}>{{ mfr.company_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
           <div class="form-group">
             <label class="form-label">{{ T.model_sale_price }}</label>
             <input type="number" name="base_price" class="form-control" step="0.01" min="0" value="{{ model.base_price|default(0) }}" />

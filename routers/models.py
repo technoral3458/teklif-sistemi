@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 import db.factory as fdb
+import db.users as udb
 import auth
 from config import IMAGES_DIR, CURRENCIES
 
@@ -68,6 +69,7 @@ async def model_new(request: Request):
     user = auth.require_user(request)
     cats = fdb.get_cats()
     options = fdb.get_options()  # no category yet — show all
+    manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     return templates.TemplateResponse(request, "model_form.html", {
         "user": user,
         "model": {},
@@ -75,6 +77,7 @@ async def model_new(request: Request):
         "options": options,
         "compatible_options_selected": [],
         "currencies": CURRENCIES,
+        "manufacturers": manufacturers,
         "active_page": "models",
         "line_images": {},
     })
@@ -88,6 +91,7 @@ async def model_copy(request: Request, model_id: int):
         return RedirectResponse("/models", 303)
     cats = fdb.get_cats()
     options = _options_for_category(m.get("category_id"))
+    manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     compatible = []
     if m.get("compatible_options"):
         try:
@@ -104,6 +108,7 @@ async def model_copy(request: Request, model_id: int):
         "options": options,
         "compatible_options_selected": compatible,
         "currencies": CURRENCIES,
+        "manufacturers": manufacturers,
         "active_page": "models",
         "line_images": {},
     })
@@ -121,6 +126,7 @@ async def model_edit(request: Request, model_id: int):
             return RedirectResponse("/models", 303)
     cats = fdb.get_cats()
     options = _options_for_category(m.get("category_id"))
+    manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     compatible = []
     if m.get("compatible_options"):
         try:
@@ -135,6 +141,7 @@ async def model_edit(request: Request, model_id: int):
         "options": options,
         "compatible_options_selected": compatible,
         "currencies": CURRENCIES,
+        "manufacturers": manufacturers,
         "active_page": "models",
         "line_images": {img["line_count"]: img for img in line_images},
     })
@@ -166,7 +173,8 @@ async def save_model(request: Request,
                      specs_en: str = Form(""),
                      specs_zh: str = Form(""),
                      is_line: int = Form(0),
-                     line_configs: str = Form("2,3,4")):
+                     line_configs: str = Form("2,3,4"),
+                     manufacturer_id: int = Form(0)):
     auth.require_user(request)
 
     total_cost = _calc_cost(
@@ -222,6 +230,7 @@ async def save_model(request: Request,
         specs_zh=specs_zh,
         is_line=is_line,
         line_configs=line_configs.strip(),
+        manufacturer_id=manufacturer_id or None,
     )
     if image_path:
         kw["image_path"] = image_path

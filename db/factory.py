@@ -153,8 +153,9 @@ def init():
         """)
 
         # Hat (line) machine support
-        _acol(cur, "models", "is_line",      "INTEGER DEFAULT 0")
-        _acol(cur, "models", "line_configs", "TEXT DEFAULT '2,3,4'")
+        _acol(cur, "models", "is_line",         "INTEGER DEFAULT 0")
+        _acol(cur, "models", "line_configs",    "TEXT DEFAULT '2,3,4'")
+        _acol(cur, "models", "manufacturer_id", "INTEGER DEFAULT NULL")
         cur.execute("""CREATE TABLE IF NOT EXISTS model_line_images(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             model_id INTEGER NOT NULL,
@@ -367,14 +368,14 @@ _MCOLS = ("id,name,category_id,description,base_price,currency,specs,"
           "port_cost,document_cost,installation_cost,other_cost,total_cost,"
           "image_path,compatible_options,"
           "name_en,description_en,name_zh,description_zh,specs_en,specs_zh,created_at,"
-          "is_line,line_configs")
+          "is_line,line_configs,manufacturer_id")
 
 _MKEYS = ["id", "name", "category_id", "description", "base_price", "currency", "specs",
           "purchase_price", "purchase_currency", "shipping_cost", "customs_pct", "extra_tax_pct",
           "port_cost", "document_cost", "installation_cost", "other_cost", "total_cost",
           "image_path", "compatible_options",
           "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh",
-          "created_at", "is_line", "line_configs"]
+          "created_at", "is_line", "line_configs", "manufacturer_id"]
 
 
 def _rm(r):
@@ -405,7 +406,7 @@ def add_model(**kw):
                "extra_tax_pct", "port_cost", "document_cost", "installation_cost",
                "other_cost", "total_cost", "image_path", "compatible_options",
                "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh",
-               "is_line", "line_configs"]
+               "is_line", "line_configs", "manufacturer_id"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -420,7 +421,7 @@ def upd_model(mid, **kw):
                "extra_tax_pct", "port_cost", "document_cost", "installation_cost",
                "other_cost", "total_cost", "image_path", "compatible_options",
                "name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh",
-               "is_line", "line_configs"]
+               "is_line", "line_configs", "manufacturer_id"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return
