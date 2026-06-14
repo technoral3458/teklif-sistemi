@@ -892,6 +892,13 @@ function _circumcenterJS(x1, y1, x2, y2, x3, y3) {
   return [x1+ux, y1+uy];
 }
 
+// Returns true if angle `a` falls within the CW arc from `sa` to `ea`
+function _isAngleInArcCW(sa, ea, a) {
+  const n = x => ((x % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI);
+  const ns = n(sa), ne = n(ea), na = n(a);
+  return ns <= ne ? (na >= ns && na <= ne) : (na >= ns || na <= ne);
+}
+
 function _centerFromRadiusJS(x1, y1, x2, y2, R, isCW) {
   const dx = x2-x1, dy = y2-y1, d = Math.hypot(dx, dy);
   const absR = Math.abs(R);
@@ -989,9 +996,12 @@ function updateOpsPreview(ops) {
           const r = Math.hypot(cx_ - acx, cy_ - acy);
           const sa = Math.atan2(cy_ - acy, cx_ - acx);
           const ea = Math.atan2(ay - acy, ax - acx);
-          const cross = (amid_x - cx_) * (ay - cy_) - (amid_y - cy_) * (ax - cx_);
+          const ma = Math.atan2(amid_y - acy, amid_x - acx);
+          // In canvas space Y is flipped, so angles negate. Determine which
+          // arc direction (anticlockwise flag) places the through-point inside.
+          const antiCCW = !_isAngleInArcCW(-sa, -ea, -ma);
           ctx.stroke(); ctx.beginPath();
-          ctx.arc(tx(acx), ty(acy), r * scale, -sa, -ea, cross < 0);
+          ctx.arc(tx(acx), ty(acy), r * scale, -sa, -ea, antiCCW);
         }
         cx_ = ax; cy_ = ay;
       } else if ((mv.move_type === 'arc_cw_r' || mv.move_type === 'arc_ccw_r') && started) {
