@@ -119,6 +119,19 @@ def _generate_nc(model, paths, variables, x_off=0.0, y_off=0.0, prog_no=1):
 
 _CORNER_LABELS = {'BL':'Sol-Alt','TL':'Sol-Ust','BR':'Sag-Alt','TR':'Sag-Ust'}
 
+
+def _circumcenter(x1, y1, x2, y2, x3, y3):
+    """Return (cx, cy) of circumcircle passing through 3 points."""
+    ax, ay = x2 - x1, y2 - y1
+    bx, by = x3 - x1, y3 - y1
+    D = 2.0 * (ax * by - ay * bx)
+    if abs(D) < 1e-10:
+        raise ValueError("Collinear points – cannot form arc")
+    ux = (by * (ax*ax + ay*ay) - ay * (bx*bx + by*by)) / D
+    uy = (ax * (bx*bx + by*by) - bx * (ax*ax + ay*ay)) / D
+    return x1 + ux, y1 + uy
+
+
 def _apply_corner(x, y, ref, W, H):
     if ref == 'TL':   return x, H - y
     elif ref == 'BR': return W - x, y
@@ -225,6 +238,29 @@ def _generate_nc_ops(model, ops, variables, x_off=0.0, y_off=0.0, prog_no=1):
                     cmd = 'G2' if mt == 'arc_cw' else 'G3'
                     lines.append(f"{cmd} X{ax:.3f} Y{ay:.3f} I{I:.3f} J{J:.3f} F{op_feed}")
                     cur_x = ax; cur_y = ay
+                elif mt == 'arc_3p' and plunged:
+                    if comp in ('G41', 'G42') and not comp_active:
+                        lines.append(f"{comp} D{op_tool:02d}")
+                        comp_active = True
+                    # cx,cy store the through/mid point
+                    mid_x = ev(mv.get('cx') or '0'); mid_y = ev(mv.get('cy') or '0')
+                    amid_x, amid_y = _apply_corner(mid_x, mid_y, ref, W, H)
+                    amid_x += x_off; amid_y += y_off
+                    ccx, ccy = _circumcenter(cur_x, cur_y, amid_x, amid_y, ax, ay)
+                    # cross product sign → CCW (G3) if positive, CW (G2) if negative
+                    cross = (amid_x - cur_x) * (ay - cur_y) - (amid_y - cur_y) * (ax - cur_x)
+                    I = round(ccx - cur_x, 3); J = round(ccy - cur_y, 3)
+                    cmd = 'G3' if cross > 0 else 'G2'
+                    lines.append(f"{cmd} X{ax:.3f} Y{ay:.3f} I{I:.3f} J{J:.3f} F{op_feed}")
+                    cur_x = ax; cur_y = ay
+                elif mt in ('arc_cw_r', 'arc_ccw_r') and plunged:
+                    if comp in ('G41', 'G42') and not comp_active:
+                        lines.append(f"{comp} D{op_tool:02d}")
+                        comp_active = True
+                    r_val = ev(mv.get('r') or '0')
+                    cmd = 'G2' if mt == 'arc_cw_r' else 'G3'
+                    lines.append(f"{cmd} X{ax:.3f} Y{ay:.3f} R{r_val:.3f} F{op_feed}")
+                    cur_x = ax; cur_y = ay
             except Exception as exc:
                 lines.append(f"(ERROR: {exc})")
         if plunged:
@@ -265,6 +301,22 @@ def _eval_ops(model, ops, variables, x_off=0.0, y_off=0.0):
                     result.append({'type':'ARC_CW' if mt=='arc_cw' else 'ARC_CCW',
                                    'x1':cur_x,'y1':cur_y,'x2':ax,'y2':ay,
                                    'cx':acx,'cy':acy,'z2':depth})
+                    cur_x = ax; cur_y = ay
+                elif mt == 'arc_3p' and plunged:
+                    mid_x = ev(mv.get('cx') or '0'); mid_y = ev(mv.get('cy') or '0')
+                    amid_x, amid_y = _apply_corner(mid_x, mid_y, ref, W, H)
+                    amid_x += x_off; amid_y += y_off
+                    ccx, ccy = _circumcenter(cur_x, cur_y, amid_x, amid_y, ax, ay)
+                    cross = (amid_x - cur_x) * (ay - cur_y) - (amid_y - cur_y) * (ax - cur_x)
+                    atype = 'ARC_CCW' if cross > 0 else 'ARC_CW'
+                    result.append({'type': atype, 'x1':cur_x,'y1':cur_y,'x2':ax,'y2':ay,
+                                   'cx':ccx,'cy':ccy,'z2':depth})
+                    cur_x = ax; cur_y = ay
+                elif mt in ('arc_cw_r', 'arc_ccw_r') and plunged:
+                    r_val = ev(mv.get('r') or '0')
+                    atype = 'ARC_CW' if mt == 'arc_cw_r' else 'ARC_CCW'
+                    result.append({'type': atype, 'x1':cur_x,'y1':cur_y,'x2':ax,'y2':ay,
+                                   'r': r_val, 'z2':depth})
                     cur_x = ax; cur_y = ay
             except Exception as exc:
                 result.append({'type':'ERROR','label':str(exc),'x1':x_off,'y1':y_off,'x2':x_off,'y2':y_off,'z2':0})
@@ -1177,10 +1229,10 @@ async def cap_move_save(request: Request, oid: int,
                         id: int = Form(0), move_type: str = Form("line"),
                         x: str = Form("0"), y: str = Form("0"),
                         cx: str = Form("0"), cy: str = Form("0"),
-                        seq: int = Form(0)):
+                        r: str = Form("0"), seq: int = Form(0)):
     auth.require_user(request)
     mv_id = fdb.save_cap_move(id=id or 0, op_id=oid, move_type=move_type,
-                               x=x, y=y, cx=cx, cy=cy, seq=seq)
+                               x=x, y=y, cx=cx, cy=cy, r=r, seq=seq)
     return JSONResponse({"id": mv_id})
 
 

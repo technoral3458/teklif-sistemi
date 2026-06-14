@@ -1111,8 +1111,10 @@ def _init_membrane(c):
         y TEXT DEFAULT '0',
         cx TEXT DEFAULT '0',
         cy TEXT DEFAULT '0',
+        r TEXT DEFAULT '0',
         seq INTEGER DEFAULT 0
     )""")
+    _acol(c, "membrane_cap_moves", "r", "TEXT DEFAULT '0'")
 
     # Job list tables
     c.execute("""CREATE TABLE IF NOT EXISTS membrane_cap_jobs(
@@ -1394,7 +1396,7 @@ def del_cap_job_item(item_id):
 # ── Cap Ops (structured path editor) ─────────────────────────────────────────
 
 _COP_KEYS = ["id","model_id","name","tool_no","depth","feed","ref_corner","seq","op_type","tool_id","comp_mode","offset_side"]
-_CMV_KEYS = ["id","op_id","move_type","x","y","cx","cy","seq"]
+_CMV_KEYS = ["id","op_id","move_type","x","y","cx","cy","r","seq"]
 
 # ── Tool Library ──────────────────────────────────────────────────────────────
 _TOOL_KEYS = ["id","name","tool_no","diameter","length","feed_xy","feed_z","notes"]
@@ -1433,7 +1435,7 @@ def del_tool(tid):
 def get_cap_moves(op_id):
     with _c() as c:
         rows = c.execute(
-            "SELECT id,op_id,move_type,x,y,cx,cy,seq FROM membrane_cap_moves WHERE op_id=? ORDER BY seq",
+            "SELECT id,op_id,move_type,x,y,cx,cy,r,seq FROM membrane_cap_moves WHERE op_id=? ORDER BY seq",
             (op_id,)
         ).fetchall()
     return [dict(zip(_CMV_KEYS, r)) for r in rows]
@@ -1467,7 +1469,7 @@ def del_cap_op(op_id):
         c.execute("DELETE FROM membrane_cap_ops WHERE id=?", (op_id,))
 
 def save_cap_move(id=0, **kw):
-    allowed = ["op_id","move_type","x","y","cx","cy","seq"]
+    allowed = ["op_id","move_type","x","y","cx","cy","r","seq"]
     f = {k: v for k, v in kw.items() if k in allowed}
     with _c() as c:
         if id:
