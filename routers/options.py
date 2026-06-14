@@ -15,11 +15,14 @@ from tmpl import templates
 
 
 @router.get("")
-async def options_list(request: Request):
+async def options_list(request: Request, category_id: int = 0):
     user = auth.require_user(request)
-    if user["role"] == "manufacturer":
-        return RedirectResponse("/", 303)
-    options = fdb.get_options()
+    is_mfr = user["role"] == "manufacturer"
+    created_by_filter = user["id"] if is_mfr else None
+    options = fdb.get_options(
+        category_id=category_id if category_id else None,
+        created_by=created_by_filter,
+    )
     cats = fdb.get_cats()
     cat_map = {c["id"]: c["name"] for c in cats}
     for o in options:
@@ -29,6 +32,7 @@ async def options_list(request: Request):
         "user": user,
         "options": options,
         "categories": cats,
+        "selected_cat": category_id,
         "currencies": CURRENCIES,
         "qty_types": QTY_TYPES,
         "option_scopes": OPTION_SCOPES,
@@ -59,7 +63,7 @@ async def save_option(request: Request,
                       name_zh: str = Form(""),
                       description_zh: str = Form(""),
                       video_url: str = Form("")):
-    auth.require_user(request)
+    user = auth.require_user(request)
 
     def _save_file(upload: UploadFile, prefix: str) -> str:
         raise NotImplementedError
@@ -92,8 +96,14 @@ async def save_option(request: Request,
     )
     try:
         if id:
+            # manufacturers can only edit their own options
+            if user["role"] == "manufacturer":
+                existing = fdb.get_option(id)
+                if not existing or existing.get("created_by") != user["id"]:
+                    return RedirectResponse("/options?msg=Yetkisiz+işlem&msg_type=error", 303)
             fdb.upd_option(id, **kw)
         else:
+            kw["created_by"] = user["id"]
             fdb.add_option(**kw)
     except Exception as e:
         return RedirectResponse(f"/options?msg=Kayıt+hatası:+{e}&msg_type=error", 303)
@@ -102,7 +112,11 @@ async def save_option(request: Request,
 
 @router.post("/delete")
 async def delete_option(request: Request, id: int = Form(...)):
-    auth.require_user(request)
+    user = auth.require_user(request)
+    if user["role"] == "manufacturer":
+        existing = fdb.get_option(id)
+        if not existing or existing.get("created_by") != user["id"]:
+            return RedirectResponse("/options?msg=Yetkisiz+işlem&msg_type=error", 303)
     fdb.del_option(id)
     return RedirectResponse("/options", 303)
 
