@@ -1040,37 +1040,69 @@ async def job_nest_nc(request: Request, jid: int,
         return JSONResponse({"error": "İş listesinde kalem yok"}, status_code=400)
 
     placements, n_sheets, util = _nest(items, sheet_w, sheet_h, margin, allow_rotate=bool(allow_rotate))
-    nc_parts, sim_paths = [], []
     safe_z = 5.0
     prog_no = 1
 
+    # Build per-placement context (model, ops, variables) once
+    pl_ctx = []
     for pl in placements:
         mid = pl.get('model_id')
         if not mid:
-            continue
+            pl_ctx.append(None); continue
         model = fdb.get_cap_model(mid)
         if not model:
-            continue
+            pl_ctx.append(None); continue
         safe_z = float(model.get("safe_z") or 5.0)
         W, H = pl['cap_w'], pl['cap_h']
         variables = {"W": W, "H": H, "T": T}
         variables.update({k: float(v) for k, v in (model.get("constants") or {}).items()})
         if pl.get('rotated'):
             variables["W"], variables["H"] = H, W
+        all_ops = fdb.get_cap_ops(mid)
+        paths = [] if all_ops else fdb.get_cap_paths(mid)
+        pl_ctx.append({"model": model, "ops": all_ops, "paths": paths,
+                       "variables": variables, "pl": pl})
+
+    # Two-pass NC: inner ops for all pieces first, then outer ops
+    # (pieces stay attached to sheet during inner cuts, released last)
+    nc_inner, nc_outer, sim_paths = [], [], []
+
+    for ctx in pl_ctx:
+        if not ctx:
+            continue
+        model, all_ops, paths = ctx["model"], ctx["ops"], ctx["paths"]
+        variables, pl = ctx["variables"], ctx["pl"]
         x_off, y_off = pl['x'], pl['y']
-        ops = _sort_ops_inner_first(fdb.get_cap_ops(mid))
-        if ops:
-            nc_parts.append(_generate_nc_ops(model, ops, variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
-            evp = _eval_ops(model, ops, variables, x_off=x_off, y_off=y_off)
+
+        if all_ops:
+            inner_ops = [o for o in all_ops if o.get('op_type', 'inner') == 'inner']
+            outer_ops = [o for o in all_ops if o.get('op_type', 'inner') == 'outer']
+            if not outer_ops:
+                # No outer ops defined → all ops treated as inner (single-pass)
+                inner_ops = all_ops
+            if inner_ops:
+                nc_inner.append(_generate_nc_ops(model, sorted(inner_ops, key=lambda o: o.get('seq',0)),
+                                                 variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
+                evp = _eval_ops(model, inner_ops, variables, x_off=x_off, y_off=y_off)
+                for p in evp['paths']:
+                    p['sheet'] = pl['sheet']; p['piece_color'] = pl['color']
+                sim_paths.extend(evp['paths'])
+            if outer_ops:
+                nc_outer.append(_generate_nc_ops(model, sorted(outer_ops, key=lambda o: o.get('seq',0)),
+                                                 variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
+                evp = _eval_ops(model, outer_ops, variables, x_off=x_off, y_off=y_off)
+                for p in evp['paths']:
+                    p['sheet'] = pl['sheet']; p['piece_color'] = pl['color']
+                sim_paths.extend(evp['paths'])
         else:
-            paths = fdb.get_cap_paths(mid)
-            nc_parts.append(_generate_nc(model, paths, variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
+            nc_inner.append(_generate_nc(model, paths, variables, x_off=x_off, y_off=y_off, prog_no=prog_no))
             evp = _eval_paths(model, paths, variables, x_off=x_off, y_off=y_off)
-        for p in evp['paths']:
-            p['sheet'] = pl['sheet']
-            p['piece_color'] = pl['color']
-        sim_paths.extend(evp['paths'])
+            for p in evp['paths']:
+                p['sheet'] = pl['sheet']; p['piece_color'] = pl['color']
+            sim_paths.extend(evp['paths'])
         prog_no += 1
+
+    nc_parts = nc_inner + nc_outer
 
     return JSONResponse({
         "nc": "\n\n".join(nc_parts),
