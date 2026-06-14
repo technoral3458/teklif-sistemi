@@ -1557,8 +1557,9 @@ let _tools = [];
 async function loadTools() {
   try {
     const res = await fetch('/membrane/caps/tools');
-    _tools = await res.json();
-  } catch(e) { _tools = []; }
+    if (!res.ok) { console.error('loadTools error', res.status); _tools = []; }
+    else _tools = await res.json();
+  } catch(e) { console.error('loadTools fetch error', e); _tools = []; }
   renderToolLib();
   renderOpToolCards();
 }
@@ -1659,11 +1660,17 @@ async function tlSave() {
   fd.append('feed_xy', document.getElementById('tlFeedXY').value);
   fd.append('feed_z',  document.getElementById('tlFeedZ').value);
   fd.append('notes',   document.getElementById('tlNotes').value);
+  let saveRes;
   try {
-    const res = await fetch('/membrane/caps/tools/save', {method:'POST', body:fd});
-    if (!res.ok) { alert('Kayıt hatası: ' + res.status + ' ' + res.statusText); return; }
-    await res.json();
+    saveRes = await fetch('/membrane/caps/tools/save', {method:'POST', body:fd});
   } catch(e) { alert('Bağlantı hatası: ' + e.message); return; }
+  if (!saveRes.ok) {
+    const txt = await saveRes.text().catch(() => saveRes.statusText);
+    alert('Kayıt hatası ' + saveRes.status + ':\n' + txt.substring(0, 300));
+    return;
+  }
+  const saveData = await saveRes.json().catch(() => null);
+  if (!saveData || !saveData.ok) { alert('Sunucu kayıt hatası: ' + JSON.stringify(saveData)); return; }
   await loadTools();
   tlClear();
 }
