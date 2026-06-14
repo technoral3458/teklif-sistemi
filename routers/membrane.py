@@ -1061,7 +1061,7 @@ async def tool_save(request: Request,
     tid = fdb.save_tool(id=id or 0, name=name, tool_no=tool_no,
                         diameter=diameter, length=length,
                         feed_xy=feed_xy, feed_z=feed_z, notes=notes)
-    return JSONResponse({"id": tid, "ok": True})
+    return JSONResponse({"id": tid, "ok": True, "tools": fdb.get_tools()})
 
 @router.post("/caps/tools/delete")
 async def tool_delete(request: Request, id: int = Form(...)):

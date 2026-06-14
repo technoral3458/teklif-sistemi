@@ -1418,18 +1418,28 @@ def get_tool(tid):
 def save_tool(id=0, **kw):
     allowed = ["name","tool_no","diameter","length","feed_xy","feed_z","notes"]
     f = {k: v for k, v in kw.items() if k in allowed}
-    with _c() as c:
+    conn = sqlite3.connect(FACTORY_DB, check_same_thread=False)
+    try:
         if id:
             sets = ",".join(f"{k}=?" for k in f)
-            c.execute(f"UPDATE membrane_tools SET {sets} WHERE id=?", list(f.values()) + [id])
+            conn.execute(f"UPDATE membrane_tools SET {sets} WHERE id=?", list(f.values()) + [id])
+            conn.commit()
             return id
         cols = ",".join(f.keys()); ph = ",".join("?" * len(f))
-        cur = c.execute(f"INSERT INTO membrane_tools({cols}) VALUES({ph})", list(f.values()))
-        return cur.lastrowid
+        cur = conn.execute(f"INSERT INTO membrane_tools({cols}) VALUES({ph})", list(f.values()))
+        new_id = cur.lastrowid
+        conn.commit()
+        return new_id
+    finally:
+        conn.close()
 
 def del_tool(tid):
-    with _c() as c:
-        c.execute("DELETE FROM membrane_tools WHERE id=?", (tid,))
+    conn = sqlite3.connect(FACTORY_DB, check_same_thread=False)
+    try:
+        conn.execute("DELETE FROM membrane_tools WHERE id=?", (tid,))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_cap_moves(op_id):

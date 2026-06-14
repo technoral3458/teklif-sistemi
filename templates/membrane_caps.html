@@ -1671,7 +1671,14 @@ async function tlSave() {
   }
   const saveData = await saveRes.json().catch(() => null);
   if (!saveData || !saveData.ok) { alert('Sunucu kayıt hatası: ' + JSON.stringify(saveData)); return; }
-  await loadTools();
+  // Use the tools list returned directly in the save response (avoids a second DB read)
+  if (Array.isArray(saveData.tools)) {
+    _tools = saveData.tools;
+    renderToolLib();
+    renderOpToolCards();
+  } else {
+    await loadTools();
+  }
   tlClear();
 }
 
