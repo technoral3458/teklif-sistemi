@@ -338,8 +338,8 @@ function newOpt() {
   document.getElementById('oid').value = '0';
   document.getElementById('oname').value = '';
   document.getElementById('odesc').value = '';
-  document.getElementById('oprice').value = '0';
-  document.getElementById('ocurrency').value = 'USD';
+  const _p0 = document.getElementById('oprice'); if (_p0) _p0.value = '0';
+  const _c0 = document.getElementById('ocurrency'); if (_c0) _c0.value = 'USD';
   document.getElementById('oqty_type').value = 'MANUAL';
   _setCatChecks('');
   document.getElementById('oqty_type').value = 'MANUAL';
@@ -362,8 +362,8 @@ function editOpt(id, name, desc, price, currency, catIds, qtyType, conflict, ima
   document.getElementById('oid').value = id;
   document.getElementById('oname').value = name;
   document.getElementById('odesc').value = desc;
-  document.getElementById('oprice').value = price;
-  document.getElementById('ocurrency').value = currency;
+  const _pe = document.getElementById('oprice'); if (_pe) _pe.value = price;
+  const _ce = document.getElementById('ocurrency'); if (_ce) _ce.value = currency;
   _setCatChecks(catIds);
   document.getElementById('oqty_type').value = qtyType;
   document.getElementById('oconflict').value = conflict;
