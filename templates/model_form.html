@@ -221,7 +221,7 @@
               <input type="checkbox" name="compatible_options" value="{{ opt.id }}"
                 {% if compatible_options_selected and opt.id in compatible_options_selected %}checked{% endif %} />
               <span style="font-size:13px;">{{ (opt.get('name_'+user.lang) or opt.name) if user.lang and user.lang != 'tr' else opt.name }}</span>
-              <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">{{ "%.0f"|format(opt.price|default(0)|float) }} {{ opt.currency }}</span>
+              {% if user.role != 'manufacturer' %}<span style="font-size:11px;color:var(--text-muted);margin-left:auto;">{{ "%.0f"|format(opt.price|default(0)|float) }} {{ opt.currency }}</span>{% endif %}
             </label>
             {% endfor %}
           </div>
