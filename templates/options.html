@@ -43,7 +43,7 @@
           <th>{{ T.option_name }}</th>
           <th>{{ T.model_category }}</th>
           <th>{{ T.opt_qty_type }}</th>
-          <th>{{ T.option_price }}</th>
+          {% if user.role != 'manufacturer' %}<th>{{ T.option_price }}</th>{% endif %}
           <th style="width:60px;text-align:center;"></th>
           <th></th>
         </tr>
@@ -71,7 +71,7 @@
           </td>
           <td>{{ o.category_names or 'Genel' }}</td>
           <td><span class="badge badge-{{ 'blue' if o.qty_type == 'MANUAL' else ('amber' if o.qty_type == 'PER_MACHINE' else 'green') }}">{{ qty_labels.get(o.qty_type, o.qty_type) }}</span></td>
-          <td>{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</td>
+          {% if user.role != 'manufacturer' %}<td>{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</td>{% endif %}
           <td style="text-align:center;">
             {% if o.image_priority %}
             <span class="badge badge-amber">{{ o.image_priority }}</span>
@@ -179,6 +179,7 @@
             </div>
           </div>
 
+          {% if user.role != 'manufacturer' %}
           <div class="form-group">
             <label class="form-label">{{ T.option_price }}</label>
             <input type="number" name="price" id="oprice" class="form-control" step="0.01" min="0" value="0" />
@@ -192,6 +193,7 @@
               {% endfor %}
             </select>
           </div>
+          {% endif %}
 
           <div class="form-group">
             <label class="form-label">{{ T.opt_qty_type }}</label>
