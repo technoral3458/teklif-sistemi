@@ -46,11 +46,10 @@ async def models_list(request: Request, category_id: int = 0):
     cats = fdb.get_cats()
     models = fdb.get_models(category_id if category_id else None)
     if user["role"] == "manufacturer":
-        allowed_ids = [int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit()]
-        if allowed_ids:
-            models = [m for m in models if m["id"] in allowed_ids]
-        else:
-            models = []
+        allowed_ids = set(int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit())
+        uid = user["id"]
+        # show models explicitly allowed OR assigned to this manufacturer
+        models = [m for m in models if m["id"] in allowed_ids or m.get("manufacturer_id") == uid]
     cat_map = {c["id"]: c["name"] for c in cats}
     for m in models:
         m["category_name"] = cat_map.get(m.get("category_id"), "-")
@@ -121,8 +120,8 @@ async def model_edit(request: Request, model_id: int):
     if not m:
         return RedirectResponse("/models", 303)
     if user["role"] == "manufacturer":
-        allowed_ids = [int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit()]
-        if allowed_ids and model_id not in allowed_ids:
+        allowed_ids = set(int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit())
+        if model_id not in allowed_ids and m.get("manufacturer_id") != user["id"]:
             return RedirectResponse("/models", 303)
     cats = fdb.get_cats()
     options = _options_for_category(m.get("category_id"))
