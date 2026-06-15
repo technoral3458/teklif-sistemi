@@ -38,3 +38,5 @@ LANGS = {
     "en": "🇬🇧 English",
     "zh": "🇨🇳 中文",
 }
+
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

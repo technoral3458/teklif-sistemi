@@ -78,23 +78,29 @@
             <textarea name="description" class="form-control" rows="3">{{ model.description|default('') }}</textarea>
           </div>
           <div style="border-left:3px solid var(--border);padding-left:12px;margin-bottom:12px;">
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">{{ T.model_translations }}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:600;">{{ T.model_translations }}</div>
+              <button type="button" class="btn btn-ghost btn-sm" id="autoTranslateModelBtn" onclick="autoTranslateModel()" style="font-size:12px;">
+                🌐 Otomatik Çevir
+              </button>
+            </div>
+            <div id="autoTranslateModelStatus" style="display:none;font-size:12px;color:var(--text-muted);margin-bottom:6px;"></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div class="form-group">
                 <label class="form-label">🇬🇧 {{ T.model_name }} (EN)</label>
-                <input type="text" name="name_en" class="form-control" value="{{ model.name_en|default('') }}" />
+                <input type="text" name="name_en" id="mname_en" class="form-control" value="{{ model.name_en|default('') }}" />
               </div>
               <div class="form-group">
                 <label class="form-label">🇨🇳 {{ T.model_name }} (ZH)</label>
-                <input type="text" name="name_zh" class="form-control" value="{{ model.name_zh|default('') }}" />
+                <input type="text" name="name_zh" id="mname_zh" class="form-control" value="{{ model.name_zh|default('') }}" />
               </div>
               <div class="form-group">
                 <label class="form-label">🇬🇧 {{ T.model_desc }} (EN)</label>
-                <textarea name="description_en" class="form-control" rows="2">{{ model.description_en|default('') }}</textarea>
+                <textarea name="description_en" id="mdesc_en" class="form-control" rows="2">{{ model.description_en|default('') }}</textarea>
               </div>
               <div class="form-group">
                 <label class="form-label">🇨🇳 {{ T.model_desc }} (ZH)</label>
-                <textarea name="description_zh" class="form-control" rows="2">{{ model.description_zh|default('') }}</textarea>
+                <textarea name="description_zh" id="mdesc_zh" class="form-control" rows="2">{{ model.description_zh|default('') }}</textarea>
               </div>
             </div>
           </div>
@@ -512,5 +518,81 @@ document.addEventListener('DOMContentLoaded', function() {
     renderLineImageInputs();
   }
 });
+
+// ── Auto-translate ─────────────────────────────────────────────────────────
+async function autoTranslateModel() {
+  const btn    = document.getElementById('autoTranslateModelBtn');
+  const status = document.getElementById('autoTranslateModelStatus');
+
+  // Detect filled language and build source texts
+  const nameTR = (document.querySelector('[name="name"]')?.value || '').trim();
+  const nameEN = (document.getElementById('mname_en')?.value || '').trim();
+  const nameZH = (document.getElementById('mname_zh')?.value || '').trim();
+  const descTR = (document.querySelector('[name="description"]')?.value || '').trim();
+  const descEN = (document.getElementById('mdesc_en')?.value || '').trim();
+  const descZH = (document.getElementById('mdesc_zh')?.value || '').trim();
+
+  // Determine source language (the one with the most content)
+  const scores = {
+    tr: (nameTR ? 2 : 0) + (descTR ? 1 : 0),
+    en: (nameEN ? 2 : 0) + (descEN ? 1 : 0),
+    zh: (nameZH ? 2 : 0) + (descZH ? 1 : 0),
+  };
+  const srcLang = Object.entries(scores).sort((a,b) => b[1]-a[1])[0][0];
+  const nameMap = {tr: nameTR, en: nameEN, zh: nameZH};
+  const descMap = {tr: descTR, en: descEN, zh: descZH};
+
+  const texts = {};
+  if (nameMap[srcLang]) texts['name'] = nameMap[srcLang];
+  if (descMap[srcLang]) texts['description'] = descMap[srcLang];
+
+  if (!Object.keys(texts).length) {
+    status.style.display = 'block';
+    status.textContent = '⚠ Çevrilecek metin bulunamadı.';
+    return;
+  }
+
+  const targetLangs = ['tr','en','zh'].filter(l => l !== srcLang);
+  btn.disabled = true;
+  btn.textContent = '⏳ Çevriliyor...';
+  status.style.display = 'block';
+  status.textContent = '';
+
+  try {
+    const resp = await fetch('/api/translate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({texts, source_lang: srcLang, target_langs: targetLangs})
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || 'Sunucu hatası');
+
+    const setField = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    const setTA    = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    const nameInputTR = document.querySelector('[name="name"]');
+    const descTA_TR   = document.querySelector('[name="description"]');
+
+    for (const [lang, vals] of Object.entries(data.translations)) {
+      if (lang === 'tr') {
+        if (vals.name        && nameInputTR) nameInputTR.value = vals.name;
+        if (vals.description && descTA_TR)   descTA_TR.value   = vals.description;
+      } else if (lang === 'en') {
+        setField('mname_en', vals.name);
+        setTA('mdesc_en', vals.description);
+      } else if (lang === 'zh') {
+        setField('mname_zh', vals.name);
+        setTA('mdesc_zh', vals.description);
+      }
+    }
+    status.style.color = 'var(--success, #22c55e)';
+    status.textContent = '✓ Çeviri tamamlandı. Kaydetmeyi unutmayın.';
+  } catch(e) {
+    status.style.color = 'var(--danger, #ef4444)';
+    status.textContent = '✗ Hata: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🌐 Otomatik Çevir';
+  }
+}
 </script>
 {% endblock %}
