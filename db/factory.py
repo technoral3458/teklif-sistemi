@@ -144,8 +144,9 @@ def init():
         _acol(cur, "options", "variation_image_path", "TEXT DEFAULT ''")
         _acol(cur, "options", "video_url",            "TEXT DEFAULT ''")
         _acol(cur, "options", "category_ids",         "TEXT DEFAULT ''")
-        _acol(cur, "options", "created_by",           "INTEGER DEFAULT NULL")
-        _acol(cur, "options", "manufacturer_id",      "INTEGER DEFAULT NULL")
+        _acol(cur, "options", "created_by",            "INTEGER DEFAULT NULL")
+        _acol(cur, "options", "manufacturer_id",       "INTEGER DEFAULT NULL")
+        _acol(cur, "options", "requires_option_ids",   "TEXT DEFAULT ''")
         # Migrate old single category_id to category_ids
         cur.execute("""
             UPDATE options SET category_ids = CAST(category_id AS TEXT)
@@ -483,11 +484,11 @@ def del_model_line_image(image_id):
 
 # ── Options ───────────────────────────────────────────────────────────────────
 
-_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,video_url,name_en,description_en,name_zh,description_zh,created_at,category_ids,created_by,manufacturer_id"
+_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,video_url,name_en,description_en,name_zh,description_zh,created_at,category_ids,created_by,manufacturer_id,requires_option_ids"
 _OKEYS = ["id", "name", "description", "price", "currency", "scope",
           "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
           "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-          "created_at", "category_ids", "created_by", "manufacturer_id"]
+          "created_at", "category_ids", "created_by", "manufacturer_id", "requires_option_ids"]
 
 
 def _ro(r):
@@ -525,7 +526,7 @@ def add_option(**kw):
     allowed = ["name", "description", "price", "currency", "scope",
                "category_ids", "qty_type", "conflict_group", "image_path", "image_priority",
                "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-               "created_by", "manufacturer_id"]
+               "created_by", "manufacturer_id", "requires_option_ids"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -538,7 +539,7 @@ def upd_option(oid, **kw):
     allowed = ["name", "description", "price", "currency", "scope",
                "category_ids", "qty_type", "conflict_group", "image_path", "image_priority",
                "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-               "created_by", "manufacturer_id"]
+               "created_by", "manufacturer_id", "requires_option_ids"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return
