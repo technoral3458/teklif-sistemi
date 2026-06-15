@@ -107,9 +107,10 @@ async def save_option(request: Request,
     except Exception as e:
         return RedirectResponse(f"/options?msg=Resim+kaydedilemedi:+{e}&msg_type=error", 303)
 
-    # Manufacturers cannot set prices
+    # Manufacturers cannot set prices and automatically own their options
     if user["role"] == "manufacturer":
         price = 0.0
+        manufacturer_id = udb.effective_mfr_id(user)
 
     kw = dict(
         name=name, description=description, price=price, currency=currency,

@@ -188,11 +188,12 @@ async def save_model(request: Request,
                      manufacturer_id: int = Form(0)):
     user = auth.require_user(request)
 
-    # Manufacturers must not set any pricing fields
+    # Manufacturers must not set any pricing fields, and own their models
     if user["role"] == "manufacturer":
         base_price = 0.0
         purchase_price = shipping_cost = customs_pct = extra_tax_pct = 0.0
         port_cost = document_cost = installation_cost = other_cost = 0.0
+        manufacturer_id = udb.effective_mfr_id(user)
 
     total_cost = _calc_cost(
         purchase_price, shipping_cost, customs_pct, extra_tax_pct,
