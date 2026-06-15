@@ -170,6 +170,23 @@ def create_user_by_admin(email, password, company_name, role, phone=""):
         return True, "ok"
     except: return False, "email_in_use"
 
+def get_manufacturer_group_ids(user):
+    """Return all manufacturer IDs in the same group (self + parent + siblings + children)."""
+    uid = user["id"]
+    parent_id = user.get("parent_id")
+    with _c() as c:
+        if parent_id:
+            rows = c.execute(
+                "SELECT id FROM users WHERE id=? OR parent_id=?",
+                (parent_id, parent_id)
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT id FROM users WHERE id=? OR parent_id=?",
+                (uid, uid)
+            ).fetchall()
+    return {r[0] for r in rows}
+
 def delete_user(uid):
     with _c() as c:
         c.execute("DELETE FROM users WHERE id=?",(uid,))

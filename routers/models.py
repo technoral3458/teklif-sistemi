@@ -47,7 +47,7 @@ async def models_list(request: Request, category_id: int = 0):
     models = fdb.get_models(category_id if category_id else None)
     if user["role"] == "manufacturer":
         allowed_ids = set(int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit())
-        uid = user["id"]
+        group_ids = udb.get_manufacturer_group_ids(user)
         # allowed_categories stored as names (e.g. "CNC İşleme,PVC Kenar Bantlama")
         allowed_cat_names = set(x.strip() for x in (user.get("allowed_categories") or "").split(",") if x.strip())
         if allowed_cat_names:
@@ -58,7 +58,7 @@ async def models_list(request: Request, category_id: int = 0):
             allowed_cat_ids = set()
         models = [
             m for m in models
-            if (m["id"] in allowed_ids or m.get("manufacturer_id") == uid)
+            if (m["id"] in allowed_ids or m.get("manufacturer_id") in group_ids)
             and (not allowed_cat_ids or m.get("category_id") in allowed_cat_ids)
         ]
     cat_map = {c["id"]: c["name"] for c in cats}
@@ -132,7 +132,8 @@ async def model_edit(request: Request, model_id: int):
         return RedirectResponse("/models", 303)
     if user["role"] == "manufacturer":
         allowed_ids = set(int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit())
-        if model_id not in allowed_ids and m.get("manufacturer_id") != user["id"]:
+        group_ids = udb.get_manufacturer_group_ids(user)
+        if model_id not in allowed_ids and m.get("manufacturer_id") not in group_ids:
             return RedirectResponse("/models", 303)
     cats = fdb.get_cats()
     options = _options_for_category(m.get("category_id"))

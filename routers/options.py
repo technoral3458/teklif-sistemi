@@ -19,7 +19,7 @@ from tmpl import templates
 async def options_list(request: Request, category_id: int = 0):
     user = auth.require_user(request)
     is_mfr = user["role"] == "manufacturer"
-    mfr_filter = user["id"] if is_mfr else None
+    mfr_filter = udb.get_manufacturer_group_ids(user) if is_mfr else None
     options = fdb.get_options(
         category_id=category_id if category_id else None,
         manufacturer_filter=mfr_filter,

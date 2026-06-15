@@ -488,9 +488,14 @@ def get_options(category_id=None, manufacturer_filter=None):
         q += " AND (',' || category_ids || ',' LIKE ? OR category_ids=?)"
         p += [f"%,{category_id},%", str(category_id)]
     if manufacturer_filter is not None:
-        # show options assigned to this manufacturer OR created by them
-        q += " AND (manufacturer_id=? OR created_by=?)"
-        p += [manufacturer_filter, manufacturer_filter]
+        if isinstance(manufacturer_filter, (list, set, frozenset)):
+            ids = list(manufacturer_filter)
+            ph = ",".join("?" * len(ids))
+            q += f" AND (manufacturer_id IN ({ph}) OR created_by IN ({ph}))"
+            p += ids + ids
+        else:
+            q += " AND (manufacturer_id=? OR created_by=?)"
+            p += [manufacturer_filter, manufacturer_filter]
     q += " ORDER BY name"
     with _c() as c:
         rows = c.execute(q, p).fetchall()
