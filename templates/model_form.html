@@ -67,10 +67,12 @@
             </select>
           </div>
           {% endif %}
+          {% if user.role != 'manufacturer' %}
           <div class="form-group">
             <label class="form-label">{{ T.model_sale_price }}</label>
             <input type="number" name="base_price" class="form-control" step="0.01" min="0" value="{{ model.base_price|default(0) }}" />
           </div>
+          {% endif %}
           <div class="form-group">
             <label class="form-label">{{ T.model_desc }}</label>
             <textarea name="description" class="form-control" rows="3">{{ model.description|default('') }}</textarea>

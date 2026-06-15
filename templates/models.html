@@ -28,8 +28,10 @@
           <th>{{ T.model_image }}</th>
           <th>{{ T.model_name }}</th>
           <th>{{ T.model_category }}</th>
+          {% if user.role != 'manufacturer' %}
           <th>{{ T.model_price }}</th>
           <th>{{ T.model_currency }}</th>
+          {% endif %}
           <th>{{ T.model_actions }}</th>
         </tr>
       </thead>
@@ -47,21 +49,25 @@
           </td>
           <td><strong>{{ mname(m) }}</strong></td>
           <td>{{ m.category_name or '-' }}</td>
+          {% if user.role != 'manufacturer' %}
           <td>{{ "%.2f"|format(m.base_price|default(0)|float) }}</td>
           <td>{{ m.currency or 'USD' }}</td>
+          {% endif %}
           <td>
             <div style="display:flex;gap:6px;">
               <a href="/models/{{ m.id }}/edit" class="btn btn-ghost btn-sm">{{ T.btn_edit }}</a>
+              {% if user.role != 'manufacturer' %}
               <a href="/models/{{ m.id }}/copy" class="btn btn-outline btn-sm">📋 Kopyala</a>
               <form method="post" action="/models/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ mname(m) }}' modelini silmek istiyor musunuz?">
                 <input type="hidden" name="id" value="{{ m.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
               </form>
+              {% endif %}
             </div>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.model_no_records }}</td></tr>
+        <tr><td colspan="{{ 6 if user.role != 'manufacturer' else 4 }}" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.model_no_records }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
