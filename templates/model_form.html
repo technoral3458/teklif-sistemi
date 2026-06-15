@@ -503,5 +503,12 @@ function renderLineImageInputs() {
   html += '</div>';
   area.innerHTML = html;
 }
+
+// Initialize on page load if already a line machine
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('isLineCb') && document.getElementById('isLineCb').checked) {
+    renderLineImageInputs();
+  }
+});
 </script>
 {% endblock %}

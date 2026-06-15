@@ -37,6 +37,38 @@ def _resolve_opt_fields(item, opt, lang):
     item["video_url"]   = opt.get("video_url", "") or ""
 
 
+def _best_display_image(model, offer, items, opts):
+    """Return the best image path for an offer.
+
+    Priority order (highest wins):
+      - Option variation images (opt.image_priority)
+      - Line-variant image matching offer.machine_count (treated as priority=100 baseline)
+      - Model's main image (fallback)
+    """
+    best_prio = -1
+    display_image = (model.get("image_path", "") if model else "")
+
+    # Check option variation images
+    for item in items:
+        opt = opts.get(item.get("option_id"), {})
+        var_img = opt.get("variation_image_path", "")
+        prio = opt.get("image_priority") or 0
+        if var_img and prio > best_prio:
+            display_image, best_prio = var_img, prio
+
+    # Check line-machine variant image for selected machine_count
+    if model and model.get("is_line") and offer:
+        mc = offer.get("machine_count") or 1
+        line_imgs = fdb.get_model_line_images(model["id"])
+        for li in line_imgs:
+            if li["line_count"] == mc and li.get("image_path"):
+                line_prio = (li.get("priority") or 0) + 100  # offset so explicit priority wins
+                if line_prio > best_prio:
+                    display_image, best_prio = li["image_path"], line_prio
+
+    return display_image
+
+
 def _parse_specs(model, lang):
     """Return parsed specs list for the given language."""
     if not model:
@@ -295,15 +327,11 @@ async def offer_detail(request: Request, offer_id: int):
     customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
     model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
     opts = {o["id"]: o for o in fdb.get_options()}
-    best_prio, display_image = -1, (model.get("image_path", "") if model else "")
     lang = user.get("lang", "tr")
     for item in items:
         opt = opts.get(item.get("option_id"), {})
         _resolve_opt_fields(item, opt, lang)
-        var_img = opt.get("variation_image_path", "")
-        prio = opt.get("image_priority") or 0
-        if var_img and prio > best_prio:
-            display_image, best_prio = var_img, prio
+    display_image = _best_display_image(model, offer, items, opts)
     return templates.TemplateResponse(request, "offer_detail.html", {
         "user": user,
         "offer": offer,
@@ -326,16 +354,11 @@ async def offer_print(request: Request, offer_id: int):
     customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
     model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
     opts = {o["id"]: o for o in fdb.get_options()}
-
-    best_prio, display_image = -1, (model.get("image_path", "") if model else "")
     lang = user.get("lang", "tr")
     for item in items:
         opt = opts.get(item.get("option_id"), {})
         _resolve_opt_fields(item, opt, lang)
-        var_img = opt.get("variation_image_path", "")
-        prio = opt.get("image_priority") or 0
-        if var_img and prio > best_prio:
-            display_image, best_prio = var_img, prio
+    display_image = _best_display_image(model, offer, items, opts)
 
     specs = _filter_specs(_parse_specs(model, lang), items, opts)
 
@@ -375,16 +398,11 @@ async def offer_pdf(request: Request, offer_id: int, dl: int = 0):
     customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
     model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
     opts = {o["id"]: o for o in fdb.get_options()}
-
-    best_prio, display_image = -1, (model.get("image_path", "") if model else "")
     lang = user.get("lang", "tr")
     for item in items:
         opt = opts.get(item.get("option_id"), {})
         _resolve_opt_fields(item, opt, lang)
-        var_img = opt.get("variation_image_path", "")
-        prio = opt.get("image_priority") or 0
-        if var_img and prio > best_prio:
-            display_image, best_prio = var_img, prio
+    display_image = _best_display_image(model, offer, items, opts)
 
     specs = _filter_specs(_parse_specs(model, lang), items, opts)
 
