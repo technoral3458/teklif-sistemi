@@ -145,6 +145,7 @@ def init():
         _acol(cur, "options", "video_url",            "TEXT DEFAULT ''")
         _acol(cur, "options", "category_ids",         "TEXT DEFAULT ''")
         _acol(cur, "options", "created_by",           "INTEGER DEFAULT NULL")
+        _acol(cur, "options", "manufacturer_id",      "INTEGER DEFAULT NULL")
         # Migrate old single category_id to category_ids
         cur.execute("""
             UPDATE options SET category_ids = CAST(category_id AS TEXT)
@@ -469,27 +470,27 @@ def del_model_line_image(image_id):
 
 # ── Options ───────────────────────────────────────────────────────────────────
 
-_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,video_url,name_en,description_en,name_zh,description_zh,created_at,category_ids,created_by"
+_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,video_url,name_en,description_en,name_zh,description_zh,created_at,category_ids,created_by,manufacturer_id"
 _OKEYS = ["id", "name", "description", "price", "currency", "scope",
           "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
           "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-          "created_at", "category_ids", "created_by"]
+          "created_at", "category_ids", "created_by", "manufacturer_id"]
 
 
 def _ro(r):
     return dict(zip(_OKEYS, r))
 
 
-def get_options(category_id=None, created_by=None):
+def get_options(category_id=None, manufacturer_filter=None):
     q = f"SELECT {_OCOLS} FROM options WHERE 1=1"
     p = []
     if category_id:
-        # category_ids is a comma-separated string; match if the id appears in it
         q += " AND (',' || category_ids || ',' LIKE ? OR category_ids=?)"
         p += [f"%,{category_id},%", str(category_id)]
-    if created_by is not None:
-        q += " AND created_by=?"
-        p.append(created_by)
+    if manufacturer_filter is not None:
+        # show options assigned to this manufacturer OR created by them
+        q += " AND (manufacturer_id=? OR created_by=?)"
+        p += [manufacturer_filter, manufacturer_filter]
     q += " ORDER BY name"
     with _c() as c:
         rows = c.execute(q, p).fetchall()
@@ -506,7 +507,7 @@ def add_option(**kw):
     allowed = ["name", "description", "price", "currency", "scope",
                "category_ids", "qty_type", "conflict_group", "image_path", "image_priority",
                "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-               "created_by"]
+               "created_by", "manufacturer_id"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -519,7 +520,7 @@ def upd_option(oid, **kw):
     allowed = ["name", "description", "price", "currency", "scope",
                "category_ids", "qty_type", "conflict_group", "image_path", "image_priority",
                "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-               "created_by"]
+               "created_by", "manufacturer_id"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return

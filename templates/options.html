@@ -97,7 +97,8 @@
                 {{ (o.name_en or "")|tojson }},
                 {{ (o.description_en or "")|tojson }},
                 {{ (o.name_zh or "")|tojson }},
-                {{ (o.description_zh or "")|tojson }}
+                {{ (o.description_zh or "")|tojson }},
+                {{ o.manufacturer_id or 0 }}
               )'>✏️ {{ T.btn_edit }}</button>
               <button class="btn btn-outline btn-sm" onclick='editOpt(
                 0,
@@ -218,6 +219,21 @@
             <input type="text" name="conflict_group" id="oconflict" class="form-control" placeholder="" />
           </div>
 
+          {% if user.role == 'admin' and manufacturers %}
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+              Üretici (bu opsiyonun sahibi)
+            </label>
+            <select name="manufacturer_id" id="omanufacturer_id" class="form-control">
+              <option value="0">-- Atanmadı --</option>
+              {% for mfr in manufacturers %}
+              <option value="{{ mfr.id }}">{{ mfr.company_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
           <!-- Option thumbnail -->
           <div class="form-group" style="grid-column:1/-1;">
             <label class="form-label">Opsiyon Resmi <span style="font-size:11px;color:var(--text-muted);">(liste küçük resmi)</span></label>
@@ -334,10 +350,12 @@ function newOpt() {
   document.getElementById('oname_zh').value = '';
   document.getElementById('odesc_zh').value = '';
   document.getElementById('ovideo_url').value = '';
+  const mfrSel = document.getElementById('omanufacturer_id');
+  if (mfrSel) mfrSel.value = 0;
   openModal('optModal');
 }
 
-function editOpt(id, name, desc, price, currency, catIds, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh) {
+function editOpt(id, name, desc, price, currency, catIds, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh, manufacturerId) {
   document.getElementById('optModalTitle').textContent = '{{ T.btn_edit }} {{ T.options_title }}';
   document.getElementById('oid').value = id;
   document.getElementById('oname').value = name;
@@ -357,6 +375,8 @@ function editOpt(id, name, desc, price, currency, catIds, qtyType, conflict, ima
   document.getElementById('oname_zh').value = nameZh || '';
   document.getElementById('odesc_zh').value = descZh || '';
   document.getElementById('ovideo_url').value = videoUrl || '';
+  const mfrSel = document.getElementById('omanufacturer_id');
+  if (mfrSel) mfrSel.value = manufacturerId || 0;
   setImgPreview('oImgPreview', 'oClearImg', imagePath);
   setImgPreview('oVarImgPreview', 'oClearVarImg', varImagePath);
   openModal('optModal');

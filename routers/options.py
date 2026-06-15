@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import RedirectResponse, Response
 
 import db.factory as fdb
+import db.users as udb
 import auth
 from config import CURRENCIES, QTY_TYPES, OPTION_SCOPES, IMAGES_DIR
 
@@ -18,16 +19,17 @@ from tmpl import templates
 async def options_list(request: Request, category_id: int = 0):
     user = auth.require_user(request)
     is_mfr = user["role"] == "manufacturer"
-    created_by_filter = user["id"] if is_mfr else None
+    mfr_filter = user["id"] if is_mfr else None
     options = fdb.get_options(
         category_id=category_id if category_id else None,
-        created_by=created_by_filter,
+        manufacturer_filter=mfr_filter,
     )
     cats = fdb.get_cats()
     cat_map = {c["id"]: c["name"] for c in cats}
     for o in options:
         cids = [int(x) for x in (o.get("category_ids") or "").split(",") if x.strip().isdigit()]
         o["category_names"] = ", ".join(cat_map[c] for c in cids if c in cat_map) or "Genel"
+    manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     return templates.TemplateResponse(request, "options.html", {
         "user": user,
         "options": options,
@@ -36,6 +38,7 @@ async def options_list(request: Request, category_id: int = 0):
         "currencies": CURRENCIES,
         "qty_types": QTY_TYPES,
         "option_scopes": OPTION_SCOPES,
+        "manufacturers": manufacturers,
         "active_page": "options",
         "msg": request.query_params.get("msg", ""),
         "msg_type": request.query_params.get("msg_type", "info"),
@@ -62,7 +65,8 @@ async def save_option(request: Request,
                       description_en: str = Form(""),
                       name_zh: str = Form(""),
                       description_zh: str = Form(""),
-                      video_url: str = Form("")):
+                      video_url: str = Form(""),
+                      manufacturer_id: int = Form(0)):
     user = auth.require_user(request)
 
     def _save_file(upload: UploadFile, prefix: str) -> str:
@@ -85,6 +89,10 @@ async def save_option(request: Request,
     except Exception as e:
         return RedirectResponse(f"/options?msg=Resim+kaydedilemedi:+{e}&msg_type=error", 303)
 
+    # Manufacturers cannot set prices
+    if user["role"] == "manufacturer":
+        price = 0.0
+
     kw = dict(
         name=name, description=description, price=price, currency=currency,
         scope=scope, category_ids=",".join(str(c) for c in category_ids), qty_type=qty_type,
@@ -93,6 +101,7 @@ async def save_option(request: Request,
         video_url=video_url.strip(),
         name_en=name_en, description_en=description_en,
         name_zh=name_zh, description_zh=description_zh,
+        manufacturer_id=manufacturer_id or None,
     )
     try:
         if id:
