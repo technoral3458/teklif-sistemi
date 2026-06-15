@@ -169,6 +169,10 @@
              data-priority="{{ o.image_priority or 0 }}"
              data-imgpath="{{ (o.image_path or '')|e }}"
              data-qty-type="{{ o.qty_type or 'MANUAL' }}"
+             data-requires="{{ (o.requires_option_ids or '')|e }}"
+             data-price="{{ o.price|default(0) }}"
+             data-name="{{ (o.get('name_'+user.lang) or o.name if user.lang != 'tr' else o.name)|e }}"
+             data-currency="{{ o.currency|e }}"
              style="padding:12px 16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <input type="checkbox" id="opt_{{ o.id }}"
@@ -390,29 +394,56 @@ function wizardLoadOptions() {
   });
 }
 
+function _wizardOptQty(row, optId) {
+  const qtyType = row?.dataset.qtyType || 'MANUAL';
+  const machineQty = wizardLineCount || parseInt(document.getElementById('wMachineCount')?.value) || 1;
+  if (qtyType === 'PER_MACHINE') return machineQty;
+  if (qtyType === 'FIXED_1') return 1;
+  const qtyEl = document.getElementById('optqty_' + optId);
+  return qtyEl ? parseInt(qtyEl.value) || 1 : 1;
+}
+
+function _wizardAutoSelectRequired(startOptId) {
+  const queue = [startOptId];
+  const visited = new Set([startOptId]);
+  const autoAdded = [];
+  while (queue.length > 0) {
+    const curId = queue.shift();
+    const curRow = document.querySelector(`.option-row[data-opt-id="${curId}"]`);
+    if (!curRow || curRow.style.display === 'none') continue;
+    const reqIds = (curRow.dataset.requires || '').split(',').map(s => parseInt(s.trim())).filter(n => n > 0);
+    reqIds.forEach(reqId => {
+      if (visited.has(reqId)) return;
+      visited.add(reqId);
+      const reqCb = document.getElementById('opt_' + reqId);
+      const reqRow = document.querySelector(`.option-row[data-opt-id="${reqId}"]`);
+      if (reqCb && !reqCb.checked && reqRow && reqRow.style.display !== 'none') {
+        const reqName = reqRow.dataset.name || ('Opsiyon ' + reqId);
+        const reqPrice = parseFloat(reqRow.dataset.price) || 0;
+        const reqCurrency = reqRow.dataset.currency || 'USD';
+        reqCb.checked = true;
+        const qty = _wizardOptQty(reqRow, reqId);
+        wizardSelectedOptions[reqId] = { id: reqId, name: reqName, price: reqPrice, qty, currency: reqCurrency, line_total: reqPrice * qty };
+        autoAdded.push(reqName);
+        queue.push(reqId);
+      }
+    });
+  }
+  return autoAdded;
+}
+
 function wizardToggleOption(optId, price, name, currency) {
   const cb = document.getElementById('opt_' + optId);
   if (cb.checked) {
     const row = document.querySelector(`.option-row[data-opt-id="${optId}"]`);
-    const qtyType = row?.dataset.qtyType || 'MANUAL';
-    const machineQty = wizardLineCount || parseInt(document.getElementById('wMachineCount')?.value) || 1;
-    let qty = 1;
-    if (qtyType === 'PER_MACHINE') {
-      qty = machineQty;
-    } else if (qtyType === 'FIXED_1') {
-      qty = 1;
-    } else {
-      const qtyEl = document.getElementById('optqty_' + optId);
-      qty = qtyEl ? parseInt(qtyEl.value) || 1 : 1;
-    }
+    const qty = _wizardOptQty(row, optId);
     wizardSelectedOptions[optId] = { id: optId, name, price: parseFloat(price), qty, currency, line_total: parseFloat(price) * qty };
 
     // Auto-deselect other options in the same conflict group
-    const thisRow = document.querySelector(`.option-row[data-opt-id="${optId}"]`);
-    const cg = thisRow ? thisRow.dataset.conflict : '';
+    const cg = row ? row.dataset.conflict : '';
     if (cg) {
-      document.querySelectorAll(`.option-row[data-conflict="${cg}"]`).forEach(row => {
-        const otherId = parseInt(row.dataset.optId);
+      document.querySelectorAll(`.option-row[data-conflict="${cg}"]`).forEach(r => {
+        const otherId = parseInt(r.dataset.optId);
         if (otherId !== optId) {
           const otherCb = document.getElementById('opt_' + otherId);
           if (otherCb && otherCb.checked) {
@@ -421,6 +452,12 @@ function wizardToggleOption(optId, price, name, currency) {
           }
         }
       });
+    }
+
+    // Auto-select required options
+    const autoAdded = _wizardAutoSelectRequired(optId);
+    if (autoAdded.length > 0) {
+      showToast('Bu opsiyon ile şunlar da eklendi: ' + autoAdded.join(', '), 'info');
     }
   } else {
     delete wizardSelectedOptions[optId];

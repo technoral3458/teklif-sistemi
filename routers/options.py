@@ -84,7 +84,8 @@ async def save_option(request: Request,
                       name_zh: str = Form(""),
                       description_zh: str = Form(""),
                       video_url: str = Form(""),
-                      manufacturer_id: int = Form(0)):
+                      manufacturer_id: int = Form(0),
+                      requires_option_ids: List[int] = Form([])):
     user = auth.require_user(request)
 
     def _save_file(upload: UploadFile, prefix: str) -> str:
@@ -121,6 +122,7 @@ async def save_option(request: Request,
         name_en=name_en, description_en=description_en,
         name_zh=name_zh, description_zh=description_zh,
         manufacturer_id=manufacturer_id or None,
+        requires_option_ids=",".join(str(i) for i in requires_option_ids),
     )
     try:
         if id:
