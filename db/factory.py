@@ -236,6 +236,19 @@ def init():
 
         _init_membrane(cur)
         _init_loan_rates(cur)
+
+        # Deletion requests from manufacturers
+        cur.execute("""CREATE TABLE IF NOT EXISTS deletion_requests(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_type TEXT NOT NULL,
+            item_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            requested_by INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT DEFAULT(datetime('now')),
+            resolved_at TEXT DEFAULT NULL
+        )""")
+
         c.commit()
 
 
@@ -1504,3 +1517,34 @@ def save_cap_move(id=0, **kw):
 def del_cap_move(move_id):
     with _c() as c:
         c.execute("DELETE FROM membrane_cap_moves WHERE id=?", (move_id,))
+
+
+# ── Deletion Requests ──────────────────────────────────────────────────────
+
+def add_deletion_request(item_type, item_id, item_name, requested_by):
+    with _c() as c:
+        c.execute(
+            "INSERT INTO deletion_requests(item_type,item_id,item_name,requested_by) VALUES(?,?,?,?)",
+            (item_type, item_id, item_name, requested_by)
+        )
+
+def get_deletion_requests(status=None):
+    with _c() as c:
+        if status:
+            rows = c.execute(
+                "SELECT * FROM deletion_requests WHERE status=? ORDER BY created_at DESC",
+                (status,)
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT * FROM deletion_requests ORDER BY created_at DESC"
+            ).fetchall()
+    keys = ["id","item_type","item_id","item_name","requested_by","status","created_at","resolved_at"]
+    return [dict(zip(keys, r)) for r in rows]
+
+def resolve_deletion_request(req_id, status):
+    with _c() as c:
+        c.execute(
+            "UPDATE deletion_requests SET status=?, resolved_at=datetime('now') WHERE id=?",
+            (status, req_id)
+        )

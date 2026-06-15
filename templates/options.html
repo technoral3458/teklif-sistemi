@@ -118,10 +118,18 @@
                 {{ (o.name_zh or "")|tojson }},
                 {{ (o.description_zh or "")|tojson }}
               )'>📋 Kopyala</button>
+              {% if user.role == 'admin' %}
               <form method="post" action="/options/delete" onsubmit="return confirmDelete(this)">
                 <input type="hidden" name="id" value="{{ o.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
               </form>
+              {% elif user.role == 'manufacturer' %}
+              <form method="post" action="/options/request-delete"
+                    onsubmit="return confirm('{{ o.name }} için silme talebi yöneticiye gönderilsin mi?')">
+                <input type="hidden" name="id" value="{{ o.id }}" />
+                <button type="submit" class="btn btn-outline btn-sm" style="color:var(--danger);">🗑 Silme Talebi</button>
+              </form>
+              {% endif %}
             </div>
           </td>
         </tr>

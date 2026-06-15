@@ -131,6 +131,11 @@
         <span class="nav-icon" style="background:linear-gradient(135deg,#64748b,#94a3b8);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></span>
         <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_manufacturers }}</span>
       </a>
+      {% set _preq = _pending_requests_count() %}
+      <a href="/admin/requests" class="nav-link {% if active_page == 'admin_requests' %}active{% endif %}" style="position:relative;">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        <span class="nav-label">Talepler{% if _preq > 0 %} <span style="background:#ef4444;color:#fff;border-radius:999px;padding:1px 6px;font-size:11px;font-weight:700;margin-left:4px;">{{ _preq }}</span>{% endif %}</span>
+      </a>
       <a href="/admin" class="nav-link {% if active_page == 'admin' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#ef4444,#f87171);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
         <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_settings }}</span>

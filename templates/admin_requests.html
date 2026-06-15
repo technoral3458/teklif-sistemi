@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block page_title %}Silme Talepleri{% endblock %}
+
+{% block content %}
+{% set msg = request.query_params.get('msg','') %}
+{% set msg_type = request.query_params.get('msg_type','info') %}
+{% if msg %}
+<div class="alert alert-{{ msg_type }}" style="margin-bottom:16px;">{{ msg.replace('+',' ') }}</div>
+{% endif %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+  <h2 style="margin:0;font-size:20px;">Silme Talepleri
+    {% if pending_count > 0 %}
+    <span class="badge badge-amber" style="margin-left:8px;font-size:13px;">{{ pending_count }} bekleyen</span>
+    {% endif %}
+  </h2>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>Tarih</th>
+          <th>Üretici</th>
+          <th>Tür</th>
+          <th>İçerik Adı</th>
+          <th>Durum</th>
+          <th style="text-align:center;">İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr>
+          <td style="white-space:nowrap;font-size:12px;color:var(--text-muted);">{{ r.created_at[:16] if r.created_at else '-' }}</td>
+          <td>
+            <strong>{{ r.requester.company_name or r.requester.email or '-' }}</strong>
+            {% if r.requester.email %}<br><small style="color:var(--text-muted);">{{ r.requester.email }}</small>{% endif %}
+          </td>
+          <td>
+            {% if r.item_type == 'model' %}
+            <span class="badge badge-amber">Model</span>
+            {% else %}
+            <span class="badge badge-blue">Opsiyon</span>
+            {% endif %}
+          </td>
+          <td><strong>{{ r.item_name }}</strong></td>
+          <td>
+            {% if r.status == 'pending' %}
+            <span class="badge badge-amber">Bekliyor</span>
+            {% elif r.status == 'approved' %}
+            <span class="badge badge-green">Onaylandı</span>
+            {% else %}
+            <span class="badge badge-red">Reddedildi</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;">
+            {% if r.status == 'pending' %}
+            <div style="display:flex;gap:6px;justify-content:center;">
+              <form method="post" action="/admin/requests/approve" style="margin:0;">
+                <input type="hidden" name="req_id" value="{{ r.id }}" />
+                <button type="submit" class="btn btn-success btn-sm"
+                  onclick="return confirm('{{ r.item_name }} silinsin mi?')">
+                  ✓ Onayla
+                </button>
+              </form>
+              <form method="post" action="/admin/requests/reject" style="margin:0;">
+                <input type="hidden" name="req_id" value="{{ r.id }}" />
+                <button type="submit" class="btn btn-outline btn-sm">✕ Reddet</button>
+              </form>
+            </div>
+            {% else %}
+            <span style="font-size:12px;color:var(--text-muted);">{{ r.resolved_at[:10] if r.resolved_at else '' }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">Talep bulunmuyor.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof initTableSearch === 'function') initTableSearch('tableSearch', 'mainTable');
+});
+</script>
+{% endblock %}

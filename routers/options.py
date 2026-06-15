@@ -141,12 +141,23 @@ async def save_option(request: Request,
 @router.post("/delete")
 async def delete_option(request: Request, id: int = Form(...)):
     user = auth.require_user(request)
-    if user["role"] == "manufacturer":
-        existing = fdb.get_option(id)
-        if not existing or existing.get("created_by") != user["id"]:
-            return RedirectResponse("/options?msg=Yetkisiz+işlem&msg_type=error", 303)
+    if user["role"] != "admin":
+        return RedirectResponse("/options?msg=Yetkisiz+işlem&msg_type=error", 303)
     fdb.del_option(id)
     return RedirectResponse("/options", 303)
+
+
+@router.post("/request-delete")
+async def request_delete_option(request: Request, id: int = Form(...)):
+    user = auth.require_user(request)
+    opt = fdb.get_option(id)
+    if not opt:
+        return RedirectResponse("/options?msg=Opsiyon+bulunamadı&msg_type=error", 303)
+    group_ids = udb.get_manufacturer_group_ids(user)
+    if opt.get("manufacturer_id") not in group_ids and opt.get("created_by") not in group_ids:
+        return RedirectResponse("/options?msg=Yetkisiz+işlem&msg_type=error", 303)
+    fdb.add_deletion_request("option", id, opt["name"], user["id"])
+    return RedirectResponse("/options?msg=Silme+talebi+yöneticiye+gönderildi&msg_type=success", 303)
 
 
 @router.get("/excel-template")

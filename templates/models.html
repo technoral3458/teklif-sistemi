@@ -56,11 +56,17 @@
           <td>
             <div style="display:flex;gap:6px;">
               <a href="/models/{{ m.id }}/edit" class="btn btn-ghost btn-sm">{{ T.btn_edit }}</a>
-              {% if user.role != 'manufacturer' %}
+              {% if user.role == 'admin' %}
               <a href="/models/{{ m.id }}/copy" class="btn btn-outline btn-sm">📋 Kopyala</a>
               <form method="post" action="/models/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ mname(m) }}' modelini silmek istiyor musunuz?">
                 <input type="hidden" name="id" value="{{ m.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
+              </form>
+              {% elif user.role == 'manufacturer' %}
+              <form method="post" action="/models/request-delete"
+                    onsubmit="return confirm('{{ mname(m) }} için silme talebi yöneticiye gönderilsin mi?')">
+                <input type="hidden" name="id" value="{{ m.id }}" />
+                <button type="submit" class="btn btn-outline btn-sm" style="color:var(--danger);">🗑 Silme Talebi</button>
               </form>
               {% endif %}
             </div>

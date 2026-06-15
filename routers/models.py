@@ -314,9 +314,25 @@ async def delete_line_image(request: Request, id: int = Form(...), model_id: int
 
 @router.post("/delete")
 async def delete_model(request: Request, id: int = Form(...)):
-    auth.require_user(request)
+    user = auth.require_user(request)
+    if user["role"] != "admin":
+        return RedirectResponse("/models?msg=Yetkisiz+işlem&msg_type=error", 303)
     fdb.del_model(id)
     return RedirectResponse("/models", 303)
+
+
+@router.post("/request-delete")
+async def request_delete_model(request: Request, id: int = Form(...)):
+    user = auth.require_user(request)
+    m = fdb.get_model(id)
+    if not m:
+        return RedirectResponse("/models?msg=Model+bulunamadı&msg_type=error", 303)
+    group_ids = udb.get_manufacturer_group_ids(user)
+    allowed_ids = set(int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit())
+    if id not in allowed_ids and m.get("manufacturer_id") not in group_ids:
+        return RedirectResponse("/models?msg=Yetkisiz+işlem&msg_type=error", 303)
+    fdb.add_deletion_request("model", id, m["name"], user["id"])
+    return RedirectResponse("/models?msg=Silme+talebi+yöneticiye+gönderildi&msg_type=success", 303)
 
 
 @router.get("/excel-template")
