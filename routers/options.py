@@ -25,6 +25,23 @@ async def options_list(request: Request, category_id: int = 0):
         manufacturer_filter=mfr_filter,
     )
     cats = fdb.get_cats()
+
+    # Apply allowed_categories restriction for manufacturers
+    allowed_cats = set()
+    if is_mfr:
+        allowed_cats = set(int(x) for x in (user.get("allowed_categories") or "").split(",") if x.strip().isdigit())
+        if allowed_cats:
+            cats = [c for c in cats if c["id"] in allowed_cats]
+            options = [
+                o for o in options
+                if not (o.get("category_ids") or "").strip()  # uncategorized = visible to all
+                or any(
+                    int(x) in allowed_cats
+                    for x in (o.get("category_ids") or "").split(",")
+                    if x.strip().isdigit()
+                )
+            ]
+
     cat_map = {c["id"]: c["name"] for c in cats}
     for o in options:
         cids = [int(x) for x in (o.get("category_ids") or "").split(",") if x.strip().isdigit()]

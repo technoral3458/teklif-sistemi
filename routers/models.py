@@ -47,9 +47,15 @@ async def models_list(request: Request, category_id: int = 0):
     models = fdb.get_models(category_id if category_id else None)
     if user["role"] == "manufacturer":
         allowed_ids = set(int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit())
+        allowed_cats = set(int(x) for x in (user.get("allowed_categories") or "").split(",") if x.strip().isdigit())
         uid = user["id"]
-        # show models explicitly allowed OR assigned to this manufacturer
-        models = [m for m in models if m["id"] in allowed_ids or m.get("manufacturer_id") == uid]
+        models = [
+            m for m in models
+            if (m["id"] in allowed_ids or m.get("manufacturer_id") == uid)
+            and (not allowed_cats or m.get("category_id") in allowed_cats)
+        ]
+        if allowed_cats:
+            cats = [c for c in cats if c["id"] in allowed_cats]
     cat_map = {c["id"]: c["name"] for c in cats}
     for m in models:
         m["category_name"] = cat_map.get(m.get("category_id"), "-")
