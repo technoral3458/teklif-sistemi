@@ -217,7 +217,7 @@
           </div>
 
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">{{ T.model_category }} <span style="font-size:11px;color:var(--text-muted);">(Boş = tüm kategorilerde görünür)</span></label>
+            <label class="form-label">{{ T.model_category }} <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_cat_hint }})</span></label>
             <div id="ocatChecks" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
               {% for cat in categories %}
               <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;">
@@ -229,7 +229,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Conflict Group</label>
+            <label class="form-label">{{ T.opt_conflict_group }}</label>
             <input type="text" name="conflict_group" id="oconflict" class="form-control" placeholder="" />
           </div>
 
@@ -237,10 +237,10 @@
           <div class="form-group" style="grid-column:1/-1;">
             <label class="form-label" style="display:flex;align-items:center;gap:6px;">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
-              Üretici (bu opsiyonun sahibi)
+              {{ T.opt_owner_label }}
             </label>
             <select name="manufacturer_id" id="omanufacturer_id" class="form-control">
-              <option value="0">-- Atanmadı --</option>
+              <option value="0">{{ T.opt_not_assigned }}</option>
               {% for mfr in manufacturers %}
               <option value="{{ mfr.id }}">{{ mfr.company_name }}</option>
               {% endfor %}
@@ -250,53 +250,47 @@
 
           <!-- Option thumbnail -->
           <div class="form-group" style="grid-column:1/-1;">
-            <label class="form-label">Opsiyon Resmi <span style="font-size:11px;color:var(--text-muted);">(liste küçük resmi)</span></label>
+            <label class="form-label">{{ T.opt_image_label }} <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_image_hint }})</span></label>
             <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
               <img id="oImgPreview" style="display:none;width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;" />
               <div style="flex:1;min-width:200px;">
                 <input type="file" name="image" id="oimage" accept="image/*" class="form-control"
                   onchange="previewImg(this,'oImgPreview','oClearImg')" />
                 <button type="button" id="oClearImg" class="btn btn-ghost btn-sm" style="display:none;margin-top:6px;"
-                  onclick="clearImg('oimage','ocurrent_image','oImgPreview','oClearImg')">✕ Kaldır</button>
+                  onclick="clearImg('oimage','ocurrent_image','oImgPreview','oClearImg')">{{ T.opt_remove }}</button>
               </div>
             </div>
           </div>
 
           <!-- Variation image (overrides machine main image in offers) -->
           <div class="form-group" style="grid-column:1/-1;padding:12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
-            <label class="form-label" style="color:var(--accent);">Varyasyon Resmi <span style="font-size:11px;color:var(--text-muted);">(teklif ekranında makine ana resmini değiştirir)</span></label>
+            <label class="form-label" style="color:var(--accent);">{{ T.opt_var_image_label }} <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_var_image_hint }})</span></label>
             <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
               <img id="oVarImgPreview" style="display:none;width:120px;height:90px;object-fit:cover;border-radius:6px;border:2px solid var(--accent);flex-shrink:0;" />
               <div style="flex:1;min-width:200px;">
                 <input type="file" name="variation_image" id="ovarimage" accept="image/*" class="form-control"
                   onchange="previewImg(this,'oVarImgPreview','oClearVarImg')" />
                 <button type="button" id="oClearVarImg" class="btn btn-ghost btn-sm" style="display:none;margin-top:6px;"
-                  onclick="clearImg('ovarimage','ocurrent_varimage','oVarImgPreview','oClearVarImg')">✕ Kaldır</button>
-                <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">
-                  Bu opsiyon seçildiğinde teklifte makine resmi bu görselle değiştirilir.
-                </p>
+                  onclick="clearImg('ovarimage','ocurrent_varimage','oVarImgPreview','oClearVarImg')">{{ T.opt_remove }}</button>
+                <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">{{ T.opt_var_image_desc }}</p>
               </div>
             </div>
           </div>
 
           <div class="form-group">
             <label class="form-label">
-              Varyasyon Önceliği
-              <span style="font-size:11px;color:var(--text-muted);margin-left:4px;">(0 = yok, yüksek = öncelikli)</span>
+              {{ T.opt_priority_label }}
+              <span style="font-size:11px;color:var(--text-muted);margin-left:4px;">({{ T.opt_priority_hint }})</span>
             </label>
             <input type="number" name="image_priority" id="oimage_priority" class="form-control" min="0" max="100" value="0" />
-            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
-              Birden fazla varyasyon resimli opsiyon seçilirse en yüksek öncelikli gösterilir.
-            </p>
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ T.opt_priority_desc }}</p>
           </div>
 
           <!-- Video URL -->
           <div class="form-group" style="grid-column:1/-1;border-left:3px solid #e67e22;padding-left:12px;">
-            <label class="form-label">▶ Video URL <span style="font-size:11px;color:var(--text-muted);">(YouTube, Vimeo veya doğrudan mp4 linki)</span></label>
-            <input type="url" name="video_url" id="ovideo_url" class="form-control" placeholder="https://youtube.com/watch?v=... veya https://youtu.be/..." />
-            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
-              Teklif ekranında müşteriye "Video İzle" butonu gösterilir. YouTube gizli (unlisted) videolar da desteklenir.
-            </p>
+            <label class="form-label">▶ {{ T.opt_video_label }} <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_video_hint }})</span></label>
+            <input type="url" name="video_url" id="ovideo_url" class="form-control" placeholder="{{ T.opt_video_placeholder }}" />
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ T.opt_video_desc }}</p>
           </div>
 
         </div>
