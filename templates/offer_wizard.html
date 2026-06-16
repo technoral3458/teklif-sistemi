@@ -238,6 +238,25 @@
         </div>
       </div>
 
+      <!-- Teslim Şekli -->
+      {% if delivery_terms %}
+      <div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--accent);">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">🚢 Teslim Şekli</div>
+        <div class="form-group" style="margin-bottom:0;">
+          <select name="delivery_term_id" id="wDeliveryTermId" class="form-control" onchange="wizardOnDeliveryTermChange()">
+            <option value="0">-- Teslim Şekli Seçin --</option>
+            {% for dt in delivery_terms %}
+            <option value="{{ dt.id }}" data-disc="{{ dt.discount_pct }}"
+              {% if edit_offer and edit_offer.delivery_term_id == dt.id %}selected{% endif %}>
+              {{ dt.name }}{% if dt.discount_pct > 0 %} (-%{{ "%.1f"|format(dt.discount_pct) }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <div id="wDeliveryTermInfo" style="margin-top:6px;font-size:12px;color:var(--text-muted);"></div>
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Delivery / Payment terms -->
       <div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
         <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">{{ T.offer_delivery }} / {{ T.offer_payment }}</div>
@@ -522,10 +541,31 @@ function wizardCheckConflicts() {
   if (warn) warn.style.display = Object.values(groups).some(v => v > 1) ? 'block' : 'none';
 }
 
+function _wizardDeliveryTermDisc() {
+  const sel = document.getElementById('wDeliveryTermId');
+  if (!sel || !sel.value || sel.value === '0') return 0;
+  return parseFloat(sel.options[sel.selectedIndex]?.dataset.disc || '0') || 0;
+}
+
+function wizardOnDeliveryTermChange() {
+  const termDisc = _wizardDeliveryTermDisc();
+  const info = document.getElementById('wDeliveryTermInfo');
+  if (info) {
+    if (termDisc > 0) {
+      info.textContent = `Bu teslim şekli %${termDisc.toFixed(1)} otomatik iskonto uygular.`;
+      info.style.color = 'var(--success)';
+    } else {
+      info.textContent = '';
+    }
+  }
+  wizardBuildSummary();
+}
+
 function wizardBuildSummary() {
   if (!wizardSelectedModel) return;
-  const qty    = parseInt(document.getElementById('wMachineCount')?.value) || 1;
-  const disc   = parseFloat(document.getElementById('wDiscount')?.value) || 0;
+  const qty      = parseInt(document.getElementById('wMachineCount')?.value) || 1;
+  const disc     = parseFloat(document.getElementById('wDiscount')?.value) || 0;
+  const termDisc = _wizardDeliveryTermDisc();
   const baseTotal = wizardSelectedModel.price * qty;
   let optTotal = 0, optRows = '';
 
@@ -546,7 +586,7 @@ function wizardBuildSummary() {
   });
 
   const subtotal = baseTotal + optTotal;
-  const total    = subtotal * (1 - disc / 100);
+  const total    = subtotal * (1 - termDisc / 100) * (1 - disc / 100);
   const cur      = wizardSelectedModel.currency;
 
   // Get machine image
@@ -620,14 +660,21 @@ function wizardBuildSummary() {
     </table>`;
   }
 
+  const termSel = document.getElementById('wDeliveryTermId');
+  const termName = (termSel && termSel.value !== '0') ? termSel.options[termSel.selectedIndex]?.text || '' : '';
+
   html += `<div style="padding:10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);margin-top:8px;">
     <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
       <span style="color:var(--text-muted);">{{ T.offer_subtotal }}</span>
       <strong>${subtotal.toFixed(2)} ${cur}</strong>
     </div>
+    ${termDisc>0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:var(--success);">
+      <span>🚢 ${termName} (${termDisc}%)</span>
+      <span>-${(subtotal*termDisc/100).toFixed(2)} ${cur}</span>
+    </div>` : ''}
     ${disc>0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:var(--success);">
       <span>{{ T.offer_discount }} (${disc}%)</span>
-      <span>-${(subtotal*disc/100).toFixed(2)} ${cur}</span>
+      <span>-${(subtotal*(1-termDisc/100)*disc/100).toFixed(2)} ${cur}</span>
     </div>` : ''}
     <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:800;color:var(--accent);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
       <span>{{ T.wiz_net_total }}</span>

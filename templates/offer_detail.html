@@ -85,14 +85,24 @@
             {% endfor %}
           </tbody>
           <tfoot>
-            {% if offer.discount_pct and offer.discount_pct > 0 %}
+            {% set _subtotal = (offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int) + (offer.options_total|default(0)|float) %}
+            {% set _show_sub = (offer.discount_pct and offer.discount_pct > 0) or (offer.delivery_term_discount and offer.delivery_term_discount > 0) %}
+            {% if _show_sub %}
             <tr>
               <td colspan="3" style="text-align:right;color:var(--text-muted);">{{ T.offer_subtotal }}</td>
-              <td style="text-align:right">{{ "%.2f"|format(((offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int)) + (offer.options_total|default(0)|float)) }} {{ offer.currency }}</td>
+              <td style="text-align:right">{{ "%.2f"|format(_subtotal) }} {{ offer.currency }}</td>
             </tr>
+            {% endif %}
+            {% if offer.delivery_term_discount and offer.delivery_term_discount > 0 %}
+            <tr>
+              <td colspan="3" style="text-align:right;color:var(--success);">🚢 Teslim Şekli İskontosu ({{ offer.delivery_term_discount }}%)</td>
+              <td style="text-align:right;color:var(--success);">-{{ "%.2f"|format(_subtotal * (offer.delivery_term_discount|default(0)|float)/100) }}</td>
+            </tr>
+            {% endif %}
+            {% if offer.discount_pct and offer.discount_pct > 0 %}
             <tr>
               <td colspan="3" style="text-align:right;color:var(--success);">{{ T.offer_discount }} ({{ offer.discount_pct }}%)</td>
-              <td style="text-align:right;color:var(--success);">-{{ "%.2f"|format(((offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int) + (offer.options_total|default(0)|float)) * (offer.discount_pct|default(0)|float)/100) }}</td>
+              <td style="text-align:right;color:var(--success);">-{{ "%.2f"|format(_subtotal * (1 - (offer.delivery_term_discount|default(0)|float)/100) * (offer.discount_pct|default(0)|float)/100) }}</td>
             </tr>
             {% endif %}
             <tr style="font-size:16px;font-weight:700;">

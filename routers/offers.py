@@ -136,6 +136,7 @@ async def offer_new(request: Request):
                 pass
         m["compatible_options_list"] = compat
         m["line_images_map"] = {img["line_count"]: img for img in fdb.get_model_line_images(m["id"])}
+    delivery_terms = fdb.get_delivery_terms(active_only=True)
     return templates.TemplateResponse(request, "offer_wizard.html", {
         "user": user,
         "customers": customers,
@@ -143,6 +144,7 @@ async def offer_new(request: Request):
         "models": models,
         "options": options,
         "currencies": CURRENCIES,
+        "delivery_terms": delivery_terms,
         "active_page": "offers",
     })
 
@@ -158,6 +160,7 @@ async def create_offer(request: Request,
                        machine_count: int = Form(1),
                        currency: str = Form("USD"),
                        discount_pct: float = Form(0.0),
+                       delivery_term_id: int = Form(0),
                        notes: str = Form(""),
                        validity_date: str = Form(""),
                        delivery_method: str = Form(""),
@@ -187,7 +190,10 @@ async def create_offer(request: Request,
 
     options_total = sum(float(o.get("line_total", 0)) for o in selected_options)
     subtotal = base_price * machine_count + options_total
-    total_price = subtotal * (1 - discount_pct / 100)
+
+    term = fdb.get_delivery_term(delivery_term_id) if delivery_term_id else None
+    delivery_term_discount = float(term["discount_pct"]) if term else 0.0
+    total_price = subtotal * (1 - delivery_term_discount / 100) * (1 - discount_pct / 100)
 
     offer_no = f"TKL-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
 
@@ -209,6 +215,8 @@ async def create_offer(request: Request,
         logistics=logistics,
         payment_notes=payment_notes,
         dealer_id=user["id"],
+        delivery_term_id=delivery_term_id or None,
+        delivery_term_discount=delivery_term_discount,
     )
 
     if selected_options:
@@ -248,6 +256,7 @@ async def offer_edit(request: Request, offer_id: int):
                 pass
         m["compatible_options_list"] = compat
         m["line_images_map"] = {img["line_count"]: img for img in fdb.get_model_line_images(m["id"])}
+    delivery_terms = fdb.get_delivery_terms(active_only=True)
     return templates.TemplateResponse(request, "offer_wizard.html", {
         "user": user,
         "customers": customers,
@@ -255,6 +264,7 @@ async def offer_edit(request: Request, offer_id: int):
         "models": models,
         "options": options,
         "currencies": CURRENCIES,
+        "delivery_terms": delivery_terms,
         "edit_offer": offer,
         "edit_items": items,
         "active_page": "offers",
@@ -269,6 +279,7 @@ async def update_offer(request: Request,
                        machine_count: int = Form(1),
                        currency: str = Form("USD"),
                        discount_pct: float = Form(0.0),
+                       delivery_term_id: int = Form(0),
                        notes: str = Form(""),
                        validity_date: str = Form(""),
                        delivery_method: str = Form(""),
@@ -289,7 +300,10 @@ async def update_offer(request: Request,
 
     options_total = sum(float(o.get("line_total", 0)) for o in selected_options)
     subtotal = base_price * machine_count + options_total
-    total_price = subtotal * (1 - discount_pct / 100)
+
+    term = fdb.get_delivery_term(delivery_term_id) if delivery_term_id else None
+    delivery_term_discount = float(term["discount_pct"]) if term else 0.0
+    total_price = subtotal * (1 - delivery_term_discount / 100) * (1 - discount_pct / 100)
 
     fdb.upd_offer(offer_id,
         customer_id=customer_id or None,
@@ -306,6 +320,8 @@ async def update_offer(request: Request,
         delivery_time=delivery_time,
         logistics=logistics,
         payment_notes=payment_notes,
+        delivery_term_id=delivery_term_id or None,
+        delivery_term_discount=delivery_term_discount,
     )
 
     fdb.save_offer_items(offer_id, [

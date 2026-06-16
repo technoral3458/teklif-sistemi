@@ -141,6 +141,41 @@ async def backup_download(request: Request):
     )
 
 
+@router.get("/delivery-terms")
+async def delivery_terms_page(request: Request):
+    user = auth.require_admin(request)
+    terms = fdb.get_delivery_terms()
+    return templates.TemplateResponse(request, "delivery_terms.html", {
+        "user": user,
+        "terms": terms,
+        "active_page": "admin",
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
+    })
+
+
+@router.post("/delivery-terms/save")
+async def save_delivery_term(request: Request,
+                              id: int = Form(0),
+                              name: str = Form(...),
+                              discount_pct: float = Form(0.0),
+                              sort_order: int = Form(0),
+                              is_active: int = Form(1)):
+    auth.require_admin(request)
+    if id:
+        fdb.upd_delivery_term(id, name, discount_pct, sort_order, is_active)
+    else:
+        fdb.add_delivery_term(name, discount_pct, sort_order)
+    return RedirectResponse("/admin/delivery-terms?msg=Kaydedildi&msg_type=success", 303)
+
+
+@router.post("/delivery-terms/delete")
+async def delete_delivery_term(request: Request, id: int = Form(...)):
+    auth.require_admin(request)
+    fdb.del_delivery_term(id)
+    return RedirectResponse("/admin/delivery-terms?msg=Silindi&msg_type=success", 303)
+
+
 @router.post("/backup/restore")
 async def backup_restore(request: Request, backup_file: UploadFile = File(...)):
     auth.require_admin(request)

@@ -250,6 +250,24 @@ def init():
             resolved_at TEXT DEFAULT NULL
         )""")
 
+        # Delivery terms (Incoterms presets with automatic discount rates)
+        cur.execute("""CREATE TABLE IF NOT EXISTS delivery_terms(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            discount_pct REAL DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1
+        )""")
+        # Seed defaults if empty
+        _cnt = cur.execute("SELECT COUNT(*) FROM delivery_terms").fetchone()[0]
+        if _cnt == 0:
+            cur.execute("INSERT INTO delivery_terms(name,discount_pct,sort_order) VALUES(?,?,?)", ("Antrepo Teslim (DDP)", 0, 1))
+            cur.execute("INSERT INTO delivery_terms(name,discount_pct,sort_order) VALUES(?,?,?)", ("Liman Teslim (FOB)", 10, 2))
+
+        # delivery_term_id + delivery_term_discount on offers
+        _acol(cur, "offers", "delivery_term_id",       "INTEGER DEFAULT NULL")
+        _acol(cur, "offers", "delivery_term_discount",  "REAL DEFAULT 0")
+
         c.commit()
 
 
@@ -615,12 +633,14 @@ _OFCOLS = ("id,offer_no,customer_id,model_id,machine_count,currency,"
            "base_price,options_total,discount_pct,total_price,status,"
            "notes,validity_date,dealer_id,manufacturer_id,admin_status,"
            "admin_notes,termin_date,mfr_status,mfr_notes,"
-           "delivery_method,delivery_time,logistics,payment_notes,created_at")
+           "delivery_method,delivery_time,logistics,payment_notes,created_at,"
+           "delivery_term_id,delivery_term_discount")
 _OFKEYS = ["id","offer_no","customer_id","model_id","machine_count","currency",
            "base_price","options_total","discount_pct","total_price","status",
            "notes","validity_date","dealer_id","manufacturer_id","admin_status",
            "admin_notes","termin_date","mfr_status","mfr_notes",
-           "delivery_method","delivery_time","logistics","payment_notes","created_at"]
+           "delivery_method","delivery_time","logistics","payment_notes","created_at",
+           "delivery_term_id","delivery_term_discount"]
 
 
 def _rof(r):
@@ -670,11 +690,45 @@ def get_offer(oid):
     return _rof(r) if r else None
 
 
+def get_delivery_terms(active_only=False):
+    q = "SELECT id,name,discount_pct,sort_order,is_active FROM delivery_terms"
+    if active_only:
+        q += " WHERE is_active=1"
+    q += " ORDER BY sort_order,id"
+    with _c() as c:
+        rows = c.execute(q).fetchall()
+    return [dict(id=r[0], name=r[1], discount_pct=r[2], sort_order=r[3], is_active=r[4]) for r in rows]
+
+
+def add_delivery_term(name, discount_pct=0, sort_order=0):
+    with _c() as c:
+        c.execute("INSERT INTO delivery_terms(name,discount_pct,sort_order) VALUES(?,?,?)",
+                  (name, discount_pct, sort_order))
+
+
+def upd_delivery_term(tid, name, discount_pct, sort_order, is_active):
+    with _c() as c:
+        c.execute("UPDATE delivery_terms SET name=?,discount_pct=?,sort_order=?,is_active=? WHERE id=?",
+                  (name, discount_pct, sort_order, is_active, tid))
+
+
+def del_delivery_term(tid):
+    with _c() as c:
+        c.execute("DELETE FROM delivery_terms WHERE id=?", (tid,))
+
+
+def get_delivery_term(tid):
+    with _c() as c:
+        r = c.execute("SELECT id,name,discount_pct,sort_order,is_active FROM delivery_terms WHERE id=?", (tid,)).fetchone()
+    return dict(id=r[0], name=r[1], discount_pct=r[2], sort_order=r[3], is_active=r[4]) if r else None
+
+
 def create_offer(**kw):
     allowed = ["offer_no", "customer_id", "model_id", "machine_count", "currency",
                "base_price", "options_total", "discount_pct", "total_price",
                "status", "notes", "validity_date", "dealer_id",
-               "delivery_method", "delivery_time", "logistics", "payment_notes"]
+               "delivery_method", "delivery_time", "logistics", "payment_notes",
+               "delivery_term_id", "delivery_term_discount"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -692,7 +746,8 @@ def upd_offer(oid, **kw):
     allowed = ["customer_id", "model_id", "machine_count", "currency",
                "base_price", "options_total", "discount_pct", "total_price",
                "status", "notes", "validity_date",
-               "delivery_method", "delivery_time", "logistics", "payment_notes"]
+               "delivery_method", "delivery_time", "logistics", "payment_notes",
+               "delivery_term_id", "delivery_term_discount"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return
