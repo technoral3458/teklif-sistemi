@@ -348,12 +348,16 @@ async def offer_detail(request: Request, offer_id: int):
         opt = opts.get(item.get("option_id"), {})
         _resolve_opt_fields(item, opt, lang)
     display_image = _best_display_image(model, offer, items, opts)
+    specs = _filter_specs(_parse_specs(model, lang), items, opts)
+    delivery_term = fdb.get_delivery_term(offer["delivery_term_id"]) if offer.get("delivery_term_id") else None
     return templates.TemplateResponse(request, "offer_detail.html", {
         "user": user,
         "offer": offer,
         "items": items,
         "customer": customer,
         "model": model,
+        "specs": specs,
+        "delivery_term": delivery_term,
         "display_image": display_image,
         "statuses": OFFER_STATUSES,
         "active_page": "offers",
@@ -423,6 +427,7 @@ async def offer_pdf(request: Request, offer_id: int, dl: int = 0):
     specs = _filter_specs(_parse_specs(model, lang), items, opts)
 
     company = fdb.get_company() or {}
+    delivery_term = fdb.get_delivery_term(offer["delivery_term_id"]) if offer.get("delivery_term_id") else None
     html_str = templates.get_template("offer_pdf.html").render(
         offer=offer,
         customer=customer or {},
@@ -433,6 +438,7 @@ async def offer_pdf(request: Request, offer_id: int, dl: int = 0):
         lang=lang,
         admin_logo=company.get("logo_path", "") or "",
         admin_company=company.get("company_name", "") or "",
+        delivery_term=delivery_term,
     )
     from weasyprint import HTML as WH
     pdf_bytes = WH(string=html_str, base_url="http://127.0.0.1:8501/").write_pdf()

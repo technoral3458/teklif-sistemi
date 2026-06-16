@@ -181,6 +181,170 @@
   </div>
 </div>
 
+<!-- ── SÖZLEŞME / TEKLİF ÖZETİ ─────────────────────────────────── -->
+{% set _subtotal2 = (offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int) + (offer.options_total|default(0)|float) %}
+{% set _td = offer.delivery_term_discount|default(0)|float %}
+{% set _md = offer.discount_pct|default(0)|float %}
+<div class="card" style="margin-top:24px;border:2px solid var(--accent);border-radius:12px;page-break-inside:avoid;">
+  <div class="card-header" style="background:var(--accent);border-radius:10px 10px 0 0;padding:12px 20px;">
+    <h3 class="card-title" style="color:#fff;margin:0;">📋 Teklif &amp; Sözleşme Özeti</h3>
+  </div>
+  <div class="card-body" style="padding:20px;">
+
+    <!-- Row 1: Makine bilgileri + Fiyat + Koşullar -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-bottom:20px;">
+
+      <!-- Makine & Standart Özellikler -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">🔩 Makine Bilgileri</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);width:90px;vertical-align:top;">Model</td>
+            <td style="padding:5px 0;font-weight:700;">{{ (model.get('name_'+user.lang) or model.name) if user.lang and user.lang != 'tr' else model.name if model else '-' }}</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Adet</td>
+            <td style="padding:5px 0;font-weight:700;">{{ offer.machine_count }}</td>
+          </tr>
+          {% if specs %}
+          <tr><td colspan="2" style="padding:8px 0 4px;font-weight:600;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);">Standart Özellikler:</td></tr>
+          {% for spec in specs %}
+          {% if spec.title or spec.desc %}
+          <tr>
+            <td style="padding:3px 0;color:var(--text-muted);font-size:12px;vertical-align:top;">{{ spec.title }}</td>
+            <td style="padding:3px 0;font-size:12px;">{{ spec.desc }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+          {% endif %}
+        </table>
+      </div>
+
+      <!-- Fiyat Özeti -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">💰 Fiyat Özeti</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);">Baz Fiyat ({{ offer.machine_count }} adet)</td>
+            <td style="padding:5px 0;text-align:right;">{{ "%.2f"|format((offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int)) }} {{ offer.currency }}</td>
+          </tr>
+          {% if offer.options_total and offer.options_total > 0 %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);">Opsiyonlar</td>
+            <td style="padding:5px 0;text-align:right;">{{ "%.2f"|format(offer.options_total|float) }} {{ offer.currency }}</td>
+          </tr>
+          {% endif %}
+          {% if _td > 0 or _md > 0 %}
+          <tr>
+            <td colspan="2" style="border-top:1px solid var(--border);"></td>
+          </tr>
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);">Ara Toplam</td>
+            <td style="padding:5px 0;text-align:right;font-weight:600;">{{ "%.2f"|format(_subtotal2) }} {{ offer.currency }}</td>
+          </tr>
+          {% if _td > 0 %}
+          <tr>
+            <td style="padding:3px 0;color:var(--success);font-size:12px;">🚢 Teslim İskontosu (%{{ "%.1f"|format(_td) }})</td>
+            <td style="padding:3px 0;text-align:right;color:var(--success);font-size:12px;">-{{ "%.2f"|format(_subtotal2 * _td/100) }} {{ offer.currency }}</td>
+          </tr>
+          {% endif %}
+          {% if _md > 0 %}
+          <tr>
+            <td style="padding:3px 0;color:var(--success);font-size:12px;">Ek İskonto (%{{ "%.1f"|format(_md) }})</td>
+            <td style="padding:3px 0;text-align:right;color:var(--success);font-size:12px;">-{{ "%.2f"|format(_subtotal2*(1-_td/100)*_md/100) }} {{ offer.currency }}</td>
+          </tr>
+          {% endif %}
+          {% endif %}
+          <tr style="border-top:2px solid var(--accent);">
+            <td style="padding:10px 0 4px;font-weight:800;font-size:15px;">NET FİYAT (KDV Hariç)</td>
+            <td style="padding:10px 0 4px;text-align:right;font-weight:800;font-size:15px;color:var(--accent);">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Koşullar -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">📑 Sözleşme Koşulları</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          {% if delivery_term %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);width:100px;vertical-align:top;">Teslim Şekli</td>
+            <td style="padding:5px 0;font-weight:700;color:var(--accent);">{{ delivery_term.name }}{% if delivery_term.discount_pct > 0 %} <span style="font-size:11px;font-weight:400;">(-%{{ "%.1f"|format(delivery_term.discount_pct) }} iskonto)</span>{% endif %}</td>
+          </tr>
+          {% elif offer.delivery_method %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);width:100px;vertical-align:top;">Teslim Şekli</td>
+            <td style="padding:5px 0;font-weight:600;">{{ offer.delivery_method }}</td>
+          </tr>
+          {% endif %}
+          {% if offer.delivery_time %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Teslim Süresi</td>
+            <td style="padding:5px 0;">{{ offer.delivery_time }}</td>
+          </tr>
+          {% endif %}
+          {% if offer.logistics %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Lojistik</td>
+            <td style="padding:5px 0;">{{ offer.logistics }}</td>
+          </tr>
+          {% endif %}
+          {% if offer.payment_notes %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Ödeme</td>
+            <td style="padding:5px 0;white-space:pre-line;">{{ offer.payment_notes }}</td>
+          </tr>
+          {% endif %}
+          {% if offer.validity_date %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Geçerlilik</td>
+            <td style="padding:5px 0;font-weight:600;color:#e67e22;">{{ offer.validity_date }}</td>
+          </tr>
+          {% endif %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Teklif No</td>
+            <td style="padding:5px 0;"><code>{{ offer.offer_no }}</code></td>
+          </tr>
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Tarih</td>
+            <td style="padding:5px 0;">{{ offer.created_at[:10] if offer.created_at else '-' }}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Row 2: Opsiyonlar -->
+    {% if items %}
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">⚙️ Dahil Opsiyonlar / Donanımlar</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        {% for item in items %}
+        <div style="display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
+          <span style="color:var(--accent);font-weight:600;">✓</span>
+          <span>{{ item.option_name }}</span>
+          {% if item.qty > 1 %}<span style="font-size:11px;color:var(--text-muted);">({{ item.qty }} adet)</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Row 3: Notlar -->
+    {% if offer.notes %}
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;font-size:13px;">
+      <span style="font-weight:600;color:var(--text-muted);">Not: </span>
+      <span style="white-space:pre-line;">{{ offer.notes }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Footer note -->
+    <div style="margin-top:16px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);text-align:center;">
+      Bu teklif {{ offer.created_at[:10] if offer.created_at else '' }} tarihinde oluşturulmuştur.
+      Yukarıdaki koşullar ve fiyat geçerlilik tarihi dahilinde geçerlidir.
+    </div>
+  </div>
+</div>
+
 <!-- Video Modal -->
 <div id="videoModal" class="modal-overlay" onclick="if(event.target===this)closeVideoModal()">
   <div class="modal-box" style="max-width:760px;padding:0;overflow:hidden;">
