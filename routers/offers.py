@@ -95,8 +95,9 @@ def _parse_specs(model, lang):
 @router.get("")
 async def offers_list(request: Request, status: str = "", q: str = ""):
     user = auth.require_user(request)
-    offers = fdb.get_offers(status=status or None)
-    customers = {c["id"]: c for c in fdb.get_customers()}
+    _dl = None if user["role"] == "admin" else user["id"]
+    offers = fdb.get_offers(status=status or None, dealer_id=_dl)
+    customers = {c["id"]: c for c in fdb.get_customers(dealer_id=_dl)}
     models = {m["id"]: m for m in fdb.get_models()}
     for o in offers:
         o["customer_name"] = customers.get(o.get("customer_id"), {}).get("name", "-")
@@ -121,7 +122,8 @@ async def offers_list(request: Request, status: str = "", q: str = ""):
 @router.get("/new")
 async def offer_new(request: Request):
     user = auth.require_user(request)
-    customers = fdb.get_customers()
+    _cust_dealer = None if user["role"] == "admin" else user["id"]
+    customers = fdb.get_customers(dealer_id=_cust_dealer)
     cats = fdb.get_cats()
     models = fdb.get_models()
     options = fdb.get_options()
@@ -241,7 +243,8 @@ async def offer_edit(request: Request, offer_id: int):
     if not offer:
         return RedirectResponse("/offers", 303)
     items = fdb.get_offer_items(offer_id)
-    customers = fdb.get_customers()
+    _cust_dealer = None if user["role"] == "admin" else user["id"]
+    customers = fdb.get_customers(dealer_id=_cust_dealer)
     cats = fdb.get_cats()
     models = fdb.get_models()
     options = fdb.get_options()

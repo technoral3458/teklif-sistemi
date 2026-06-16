@@ -10,7 +10,8 @@ from tmpl import templates
 @router.get("")
 async def customers_list(request: Request, q: str = ""):
     user = auth.require_user(request)
-    customers = fdb.get_customers()
+    dealer_id = None if user["role"] == "admin" else user["id"]
+    customers = fdb.get_customers(dealer_id=dealer_id)
     if q:
         ql = q.lower()
         customers = [
@@ -55,6 +56,9 @@ async def save_customer(request: Request,
 
 @router.post("/delete")
 async def delete_customer(request: Request, id: int = Form(...)):
-    auth.require_user(request)
+    user = auth.require_user(request)
+    c = fdb.get_customer(id)
+    if c and user["role"] != "admin" and c.get("dealer_id") != user["id"]:
+        return RedirectResponse("/customers", 303)
     fdb.del_customer(id)
     return RedirectResponse("/customers", 303)
