@@ -8,6 +8,12 @@
   <a href="/offers" class="btn btn-ghost btn-sm">{{ T.offer_back }}</a>
   <a href="/offers/{{ offer.id }}/edit" class="btn btn-outline btn-sm">✏️ {{ T.btn_edit }}</a>
   <a href="/offers/{{ offer.id }}/pdf-view" class="btn btn-primary btn-sm">📄 {{ T.btn_pdf }}</a>
+  {% if offer.model_id %}
+  <a href="/offers/{{ offer.id }}/catalog-pdf" target="_blank" class="btn btn-outline btn-sm" style="border-color:#C9961A;color:#C9961A;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+    Katalog PDF
+  </a>
+  {% endif %}
 </div>
 
 {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray'} %}
