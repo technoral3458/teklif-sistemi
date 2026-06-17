@@ -214,6 +214,19 @@
           </div>
           {% endif %}
 
+          {% if user.role == 'manufacturer' %}
+          {# Manufacturer sets their purchase price on new option; change requests for existing #}
+          <div class="form-group" id="mfr-price-new">
+            <label class="form-label">💰 Satış Fiyatınız (Alış Fiyatı)</label>
+            <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;">
+              <input type="number" name="purchase_price" id="opurchase_price" class="form-control" step="0.01" min="0" value="0" />
+              <select name="purchase_currency" id="opurchase_currency" class="form-control">
+                {% for cur in currencies %}<option value="{{ cur }}">{{ cur }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          {% endif %}
+
           <div class="form-group">
             <label class="form-label">{{ T.opt_qty_type }}</label>
             <select name="qty_type" id="oqty_type" class="form-control">

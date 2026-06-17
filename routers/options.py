@@ -85,7 +85,9 @@ async def save_option(request: Request,
                       description_zh: str = Form(""),
                       video_url: str = Form(""),
                       manufacturer_id: int = Form(0),
-                      requires_option_ids: List[int] = Form([])):
+                      requires_option_ids: List[int] = Form([]),
+                      purchase_price: float = Form(0.0),
+                      purchase_currency: str = Form("USD")):
     user = auth.require_user(request)
 
     def _save_file(upload: UploadFile, prefix: str) -> str:
@@ -108,10 +110,14 @@ async def save_option(request: Request,
     except Exception as e:
         return RedirectResponse(f"/options?msg=Resim+kaydedilemedi:+{e}&msg_type=error", 303)
 
-    # Manufacturers cannot set prices and automatically own their options
+    # Manufacturers automatically own their options; can set purchase_price on first creation only
     if auth.is_mfr(user):
         price = 0.0
         manufacturer_id = udb.effective_mfr_id(user)
+        if id:  # editing existing → block purchase_price changes (must use request)
+            existing = fdb.get_option(id)
+            purchase_price = float(existing.get("purchase_price") or 0) if existing else 0.0
+            purchase_currency = existing.get("purchase_currency", "USD") if existing else "USD"
 
     kw = dict(
         name=name, description=description, price=price, currency=currency,
@@ -123,6 +129,8 @@ async def save_option(request: Request,
         name_zh=name_zh, description_zh=description_zh,
         manufacturer_id=manufacturer_id or None,
         requires_option_ids=",".join(str(i) for i in requires_option_ids),
+        purchase_price=purchase_price,
+        purchase_currency=purchase_currency,
     )
     try:
         if id:

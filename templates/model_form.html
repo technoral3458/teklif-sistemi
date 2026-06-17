@@ -137,6 +137,62 @@
         </div>
       </div>
 
+      {# Manufacturer: purchase price section #}
+      {% if user.role == 'manufacturer' %}
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><h3 class="card-title">💰 Satış Fiyatım (Alış Fiyatı)</h3></div>
+        <div class="card-body">
+          {% if model.id %}
+            {# Existing model: show current price + request form #}
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px;">
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Mevcut Fiyat</div>
+                <div style="font-size:20px;font-weight:700;color:var(--primary);">{{ "%.2f"|format(model.purchase_price|default(0)|float) }} {{ model.purchase_currency or 'USD' }}</div>
+              </div>
+            </div>
+            <div style="background:var(--surface-2);border-radius:8px;padding:14px;border:1px solid var(--border);">
+              <div style="font-size:13px;font-weight:600;margin-bottom:10px;">📋 Fiyat Değişikliği Talebi Gönder</div>
+              <form method="post" action="/price-requests/submit" style="display:grid;grid-template-columns:1fr 120px;gap:10px;align-items:end;">
+                <input type="hidden" name="entity_type" value="model" />
+                <input type="hidden" name="entity_id" value="{{ model.id }}" />
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:12px;">Yeni Fiyat</label>
+                  <input type="number" name="new_price" class="form-control" step="0.01" min="0" placeholder="0.00" required />
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:12px;">Para Birimi</label>
+                  <select name="currency" class="form-control">
+                    {% for cur in currencies %}<option value="{{ cur }}" {% if model.purchase_currency == cur %}selected{% endif %}>{{ cur }}</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="form-group" style="margin:0;grid-column:1/-1;">
+                  <label class="form-label" style="font-size:12px;">Açıklama (isteğe bağlı)</label>
+                  <input type="text" name="note" class="form-control" placeholder="Fiyat değişikliği nedeni..." />
+                </div>
+                <div style="grid-column:1/-1;">
+                  <button type="submit" class="btn btn-primary btn-sm">Talep Gönder</button>
+                </div>
+              </form>
+            </div>
+          {% else %}
+            {# New model: directly enter purchase price #}
+            <div style="display:grid;grid-template-columns:1fr 160px;gap:12px;">
+              <div class="form-group">
+                <label class="form-label">Satış Fiyatınız (Alış Fiyatı)</label>
+                <input type="number" name="purchase_price" class="form-control" step="0.01" min="0" value="0" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Para Birimi</label>
+                <select name="purchase_currency" class="form-control">
+                  {% for cur in currencies %}<option value="{{ cur }}">{{ cur }}</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
       {% if user.can_view_costs %}
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header"><h3 class="card-title">{{ T.model_cost_info }}</h3></div>

@@ -280,6 +280,27 @@ def init():
         _acol(cur, "offers", "delivery_term_id",       "INTEGER DEFAULT NULL")
         _acol(cur, "offers", "delivery_term_discount",  "REAL DEFAULT 0")
 
+        # Purchase price tracking for options (set by manufacturers)
+        _acol(cur, "options", "purchase_price",    "REAL DEFAULT 0")
+        _acol(cur, "options", "purchase_currency", "TEXT DEFAULT 'USD'")
+
+        # Price change requests from manufacturers
+        cur.execute("""CREATE TABLE IF NOT EXISTS price_requests(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity_type TEXT NOT NULL,
+            entity_id INTEGER NOT NULL,
+            entity_name TEXT NOT NULL,
+            manufacturer_id INTEGER NOT NULL,
+            current_price REAL DEFAULT 0,
+            new_price REAL NOT NULL,
+            currency TEXT DEFAULT 'USD',
+            note TEXT DEFAULT '',
+            status TEXT DEFAULT 'pending',
+            admin_note TEXT DEFAULT '',
+            created_at TEXT DEFAULT(datetime('now')),
+            resolved_at TEXT DEFAULT NULL
+        )""")
+
         c.commit()
 
 
@@ -517,11 +538,12 @@ def del_model_line_image(image_id):
 
 # ── Options ───────────────────────────────────────────────────────────────────
 
-_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,video_url,name_en,description_en,name_zh,description_zh,created_at,category_ids,created_by,manufacturer_id,requires_option_ids"
+_OCOLS = "id,name,description,price,currency,scope,category_id,qty_type,conflict_group,image_path,image_priority,variation_image_path,video_url,name_en,description_en,name_zh,description_zh,created_at,category_ids,created_by,manufacturer_id,requires_option_ids,purchase_price,purchase_currency"
 _OKEYS = ["id", "name", "description", "price", "currency", "scope",
           "category_id", "qty_type", "conflict_group", "image_path", "image_priority",
           "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-          "created_at", "category_ids", "created_by", "manufacturer_id", "requires_option_ids"]
+          "created_at", "category_ids", "created_by", "manufacturer_id", "requires_option_ids",
+          "purchase_price", "purchase_currency"]
 
 
 def _ro(r):
@@ -559,7 +581,8 @@ def add_option(**kw):
     allowed = ["name", "description", "price", "currency", "scope",
                "category_ids", "qty_type", "conflict_group", "image_path", "image_priority",
                "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-               "created_by", "manufacturer_id", "requires_option_ids"]
+               "created_by", "manufacturer_id", "requires_option_ids",
+               "purchase_price", "purchase_currency"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -572,7 +595,8 @@ def upd_option(oid, **kw):
     allowed = ["name", "description", "price", "currency", "scope",
                "category_ids", "qty_type", "conflict_group", "image_path", "image_priority",
                "variation_image_path", "video_url", "name_en", "description_en", "name_zh", "description_zh",
-               "created_by", "manufacturer_id", "requires_option_ids"]
+               "created_by", "manufacturer_id", "requires_option_ids",
+               "purchase_price", "purchase_currency"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return
@@ -1619,3 +1643,59 @@ def resolve_deletion_request(req_id, status):
             "UPDATE deletion_requests SET status=?, resolved_at=datetime('now') WHERE id=?",
             (status, req_id)
         )
+
+
+# ── Price Change Requests ──────────────────────────────────────────────────────
+
+_PRCOLS = "id,entity_type,entity_id,entity_name,manufacturer_id,current_price,new_price,currency,note,status,admin_note,created_at,resolved_at"
+_PRKEYS = ["id","entity_type","entity_id","entity_name","manufacturer_id","current_price","new_price","currency","note","status","admin_note","created_at","resolved_at"]
+
+
+def _rpr(r):
+    return dict(zip(_PRKEYS, r))
+
+
+def add_price_request(entity_type, entity_id, entity_name, manufacturer_id, current_price, new_price, currency, note=""):
+    with _c() as c:
+        cur = c.execute(
+            "INSERT INTO price_requests(entity_type,entity_id,entity_name,manufacturer_id,current_price,new_price,currency,note) VALUES(?,?,?,?,?,?,?,?)",
+            (entity_type, entity_id, entity_name, manufacturer_id, current_price, new_price, currency, note)
+        )
+        return cur.lastrowid
+
+
+def get_price_requests(status=None, manufacturer_id=None):
+    q = f"SELECT {_PRCOLS} FROM price_requests WHERE 1=1"
+    p = []
+    if status:
+        q += " AND status=?"
+        p.append(status)
+    if manufacturer_id:
+        q += " AND manufacturer_id=?"
+        p.append(manufacturer_id)
+    q += " ORDER BY created_at DESC"
+    with _c() as c:
+        rows = c.execute(q, p).fetchall()
+    return [_rpr(r) for r in rows]
+
+
+def get_price_request(rid):
+    with _c() as c:
+        r = c.execute(f"SELECT {_PRCOLS} FROM price_requests WHERE id=?", (rid,)).fetchone()
+    return _rpr(r) if r else None
+
+
+def resolve_price_request(rid, status, admin_note=""):
+    with _c() as c:
+        c.execute(
+            "UPDATE price_requests SET status=?,admin_note=?,resolved_at=datetime('now') WHERE id=?",
+            (status, admin_note, rid)
+        )
+
+
+def pending_price_requests_count():
+    try:
+        with _c() as c:
+            return c.execute("SELECT COUNT(*) FROM price_requests WHERE status='pending'").fetchone()[0]
+    except Exception:
+        return 0

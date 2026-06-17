@@ -10,7 +10,9 @@ templates.env.globals['_get_impersonator'] = get_impersonator
 def _pending_requests_count():
     try:
         import db.factory as fdb
-        return sum(1 for r in fdb.get_deletion_requests(status="pending") if True)
+        del_count = sum(1 for r in fdb.get_deletion_requests(status="pending") if True)
+        price_count = fdb.pending_price_requests_count()
+        return del_count + price_count
     except Exception:
         return 0
 

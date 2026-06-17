@@ -204,12 +204,16 @@ async def save_model(request: Request,
                      catalog_sort: int = Form(999)):
     user = auth.require_user(request)
 
-    # Manufacturers must not set any pricing fields, and own their models
+    # Manufacturers own their models; can set purchase_price on first creation only
     if auth.is_mfr(user):
         base_price = 0.0
-        purchase_price = shipping_cost = customs_pct = extra_tax_pct = 0.0
+        shipping_cost = customs_pct = extra_tax_pct = 0.0
         port_cost = document_cost = installation_cost = other_cost = 0.0
         manufacturer_id = udb.effective_mfr_id(user)
+        if id:  # editing existing → block purchase_price changes (must use request)
+            existing = fdb.get_model(id)
+            purchase_price = float(existing.get("purchase_price") or 0) if existing else 0.0
+            purchase_currency = existing.get("purchase_currency", "USD") if existing else "USD"
 
     total_cost = _calc_cost(
         purchase_price, shipping_cost, customs_pct, extra_tax_pct,
