@@ -94,21 +94,21 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #0F172A; background
 .m-rhdr-name { font-size: 7pt; font-weight: 700; color: #1E3A8A; text-transform: uppercase; letter-spacing: 1px; }
 
 /* Full-width hero image with overlay */
-.m-hero { width: 100%; height: 78mm; overflow: hidden; position: relative; }
+.m-hero { width: 100%; height: 65mm; overflow: hidden; position: relative; }
 .m-hero img { width: 100%; height: 100%; object-fit: cover; }
 .m-hero-overlay {
   position: absolute; bottom: 0; left: 0; right: 0;
   background: linear-gradient(transparent 0%, rgba(30,58,138,0.88) 100%);
-  padding: 8mm 12mm 5mm;
+  padding: 7mm 12mm 4mm;
 }
 .m-model-name {
   color: #fff; font-size: 18pt; font-weight: 700;
   line-height: 1.1; letter-spacing: -0.3px;
 }
 .m-no-hero {
-  width: 100%; height: 78mm;
+  width: 100%; height: 65mm;
   background: #DBEAFE; position: relative;
-  text-align: center; padding-top: 25mm; color: #93C5FD; font-size: 40pt;
+  text-align: center; padding-top: 18mm; color: #93C5FD; font-size: 40pt;
 }
 
 /* Category + tagline row */
@@ -132,34 +132,54 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #0F172A; background
 /* Description */
 .m-desc {
   padding: 0 12mm 4mm;
-  font-size: 9.5pt; color: #374151; line-height: 1.75; text-align: justify;
+  font-size: 9.5pt; color: #374151; line-height: 1.72; text-align: justify;
 }
 
-/* Specs grid — 4 cells */
-.m-specs {
-  margin: 0 12mm 5mm;
+/* Specs section title */
+.m-specs-title {
+  padding: 2mm 12mm 3mm;
+  font-size: 8pt; font-weight: 700; color: #1E3A8A;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  border-top: 0.3mm solid #DBEAFE;
+  position: relative;
+}
+
+/* Spec cards — 4 per row, image top */
+.m-cards-tbl {
+  width: 100%; border-collapse: separate;
+  border-spacing: 2mm 2mm;
+  padding: 0 11mm;
+}
+.m-cards-tbl td { width: 25%; vertical-align: top; }
+
+.m-card {
   border: 0.3mm solid #DBEAFE;
-  border-collapse: collapse;
-  width: calc(100% - 24mm);
+  background: #fff; overflow: hidden;
 }
-.m-specs thead tr { background: #1E3A8A; }
-.m-specs thead th {
-  color: #93C5FD; font-size: 6.5pt; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 1px;
-  padding: 2mm 3mm; text-align: left; width: 25%;
-  border-right: 0.3mm solid #2D4F9E;
+/* Image area */
+.m-card-img {
+  width: 100%; height: 26mm; overflow: hidden;
+  background: #EFF6FF; position: relative;
+  border-bottom: 0.6mm solid #3B82F6;
 }
-.m-specs thead th:last-child { border-right: none; }
-.m-specs tbody td {
-  padding: 2.5mm 3mm; font-size: 9pt; color: #0F172A;
-  font-weight: 700; vertical-align: top; width: 25%;
-  border-right: 0.3mm solid #DBEAFE;
-  line-height: 1.4;
+.m-card-img img { width: 100%; height: 100%; object-fit: cover; }
+/* No-image: blue gradient with icon */
+.m-card-noimg {
+  width: 100%; height: 26mm;
+  background: #EFF6FF;
+  border-bottom: 0.6mm solid #3B82F6;
+  text-align: center; padding-top: 7mm;
+  color: #BFDBFE; font-size: 14pt;
 }
-.m-specs tbody td:last-child { border-right: none; }
-
-/* Divider */
-.m-divider { height: 0.3mm; background: #DBEAFE; margin: 0 12mm; }
+/* Card body */
+.m-card-body { padding: 2.5mm 2.5mm 3mm; }
+.m-card-title {
+  font-size: 7.5pt; font-weight: 700; color: #1E3A8A;
+  margin-bottom: 1.5mm; line-height: 1.3;
+}
+.m-card-val {
+  font-size: 7pt; color: #475569; line-height: 1.4;
+}
 
 /* Page footer */
 .m-footer {
@@ -301,25 +321,34 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #0F172A; background
     <div class="m-desc">{{ mdesc[:380] }}{% if mdesc|length > 380 %}…{% endif %}</div>
     {% endif %}
 
-    <!-- 4 key specs -->
+    <!-- Spec cards — 4 per row, image + title + value -->
     {% if m._specs %}
-    <table class="m-specs">
-      <thead>
-        <tr>
-          {% for s in m._specs[:4] %}
-          <th>{{ s.title }}</th>
-          {% endfor %}
-          {% for _ in range(4 - [m._specs|length, 4]|min) %}<th></th>{% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          {% for s in m._specs[:4] %}
-          <td>{% set d = s.get('desc_'+lang) or s.get('desc') or '—' %}{{ d[:55] }}{% if d|length > 55 %}…{% endif %}</td>
-          {% endfor %}
-          {% for _ in range(4 - [m._specs|length, 4]|min) %}<td></td>{% endfor %}
-        </tr>
-      </tbody>
+    <div class="m-specs-title">{{ label_specs }}</div>
+    <table class="m-cards-tbl">
+      {% for i in range(0, m._specs|length, 4) %}
+      <tr>
+        {% for j in range(4) %}
+        {% set idx = i + j %}
+        <td>
+          {% if idx < m._specs|length %}
+          {% set s = m._specs[idx] %}
+          <div class="m-card">
+            {% if s.get('img') %}
+            <div class="m-card-img"><img src="{{ base_url }}/static/{{ s.img }}" /></div>
+            {% else %}
+            <div class="m-card-noimg">◈</div>
+            {% endif %}
+            <div class="m-card-body">
+              <div class="m-card-title">{{ s.title }}</div>
+              {% set d = s.get('desc_'+lang) or s.get('desc') or '' %}
+              <div class="m-card-val">{{ d[:60] }}{% if d|length > 60 %}…{% endif %}</div>
+            </div>
+          </div>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
     </table>
     {% endif %}
 

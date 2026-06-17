@@ -366,13 +366,16 @@ async def general_catalog_pdf(request: Request, lang: str = "", category_id: int
     _L = {
         "tr": {"product_catalog": "Ürün Kataloğu", "products": "Ürün",
                "contact_us": "İletişim", "phone": "Telefon",
-               "email": "E-posta", "web": "Web", "address": "Adres"},
+               "email": "E-posta", "web": "Web", "address": "Adres",
+               "specs": "Teknik Özellikler"},
         "en": {"product_catalog": "Product Catalog", "products": "Products",
                "contact_us": "Contact Us", "phone": "Phone",
-               "email": "Email", "web": "Website", "address": "Address"},
+               "email": "Email", "web": "Website", "address": "Address",
+               "specs": "Technical Specifications"},
         "zh": {"product_catalog": "产品目录", "products": "产品",
                "contact_us": "联系我们", "phone": "电话",
-               "email": "邮箱", "web": "网站", "address": "地址"},
+               "email": "邮箱", "web": "网站", "address": "地址",
+               "specs": "技术规格"},
     }
     lbl = _L.get(lang, _L["tr"])
 
@@ -394,6 +397,7 @@ async def general_catalog_pdf(request: Request, lang: str = "", category_id: int
         "label_email":           lbl["email"],
         "label_web":             lbl["web"],
         "label_address":         lbl["address"],
+        "label_specs":           lbl["specs"],
     })
 
     def _render():
