@@ -5,333 +5,344 @@
 <style>
 @page { size: A4; margin: 0; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1a1a2e; background: #fff; }
+body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background: #fff; }
 
-/* ═══════════ COVER — WHITE THEME ═══════════ */
+/* ══════════════════════════════════════════════
+   COVER
+══════════════════════════════════════════════ */
 .cover {
   width: 210mm;
   height: 297mm;
-  background: #fff;
   position: relative;
-  page-break-after: always;
   overflow: hidden;
-}
-.cov-topbar {
   background: #fff;
-  padding: 8mm 12mm 6mm;
+  page-break-after: always;
+}
+
+/* Thin gold accent top */
+.cov-gold-top { height: 2mm; background: #C9961A; width: 100%; }
+
+/* Header: logo left, company right */
+.cov-head {
+  padding: 7mm 12mm 5mm;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 0.5mm solid #E8E8E8;
+  border-bottom: 0.3mm solid #E5E7EB;
 }
-.cov-logo { height: 14mm; max-width: 50mm; object-fit: contain; }
-.cov-logo-text { color: #0A1628; font-size: 15pt; font-weight: 700; }
-.cov-topright { text-align: right; }
-.cov-cat {
+.cov-logo    { height: 13mm; max-width: 52mm; object-fit: contain; }
+.cov-co-name { color: #0A1628; font-size: 12pt; font-weight: 700; letter-spacing: 0.3px; }
+.cov-head-right { text-align: right; }
+.cov-cat-pill {
   display: inline-block;
-  background: #D4A843;
-  color: #fff;
+  border: 0.4mm solid #C9961A;
+  color: #C9961A;
   font-size: 7pt;
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
-  padding: 1.5mm 4mm;
-  margin-bottom: 1.5mm;
+  padding: 1.2mm 3.5mm;
+  margin-bottom: 1mm;
 }
 .cov-date { color: #9CA3AF; font-size: 7.5pt; }
 
-/* image frame */
-.cov-img-frame {
-  margin: 5mm 12mm;
-  height: 108mm;
+/* Full-width machine image */
+.cov-img {
+  width: 100%;
+  height: 118mm;
   overflow: hidden;
   position: relative;
-  background: #F5F6F8;
-  border: 0.3mm solid #E2E8F0;
+  background: #F1F3F5;
 }
-.cov-img-frame img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.cov-img img  { width: 100%; height: 100%; object-fit: cover; }
+.cov-img-fade {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 35mm;
+  background: linear-gradient(transparent, rgba(255,255,255,0.95));
 }
 .cov-no-img {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #CBD5E1;
-  font-size: 55pt;
-}
-/* bottom-left gold stripe on image */
-.cov-img-stripe {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 1.2mm;
-  background: #D4A843;
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  color: #D1D5DB; font-size: 60pt;
 }
 
-/* name + headline */
-.cov-body {
-  padding: 6mm 12mm 4mm;
+/* Name block overlapping image bottom */
+.cov-name-block {
+  padding: 5mm 12mm 0;
+  margin-top: -2mm;
 }
 .cov-name {
-  font-size: 23pt;
-  font-weight: 700;
-  color: #0A1628;
-  line-height: 1.1;
-  letter-spacing: -0.5px;
+  font-size: 26pt; font-weight: 700;
+  color: #0A1628; line-height: 1.08; letter-spacing: -0.5px;
 }
-.cov-gold-bar {
-  width: 14mm;
-  height: 1mm;
-  background: #D4A843;
-  margin: 3.5mm 0;
+.cov-bar {
+  width: 12mm; height: 1mm;
+  background: #C9961A; margin: 3.5mm 0 3mm;
 }
 .cov-headline {
-  font-size: 11pt;
-  color: #4B5563;
-  line-height: 1.55;
-  max-width: 148mm;
-  font-style: italic;
+  font-size: 10.5pt; color: #4B5563;
+  line-height: 1.6; max-width: 160mm;
 }
 
-/* bottom footer bar */
+/* 3-column spec strip */
+.cov-spec-strip {
+  display: table; width: 100%;
+  margin: 5mm 0 0;
+  border-top: 0.3mm solid #E5E7EB;
+  border-bottom: 0.3mm solid #E5E7EB;
+}
+.cov-spec-cell {
+  display: table-cell;
+  width: 33.3%;
+  padding: 3.5mm 12mm;
+  border-right: 0.3mm solid #E5E7EB;
+  vertical-align: middle;
+}
+.cov-spec-cell:last-child { border-right: none; }
+.cov-spec-label { font-size: 7pt; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1mm; }
+.cov-spec-val   { font-size: 9.5pt; font-weight: 700; color: #0A1628; }
+
+/* Bottom navy bar */
 .cov-footer {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
+  position: absolute; bottom: 0; left: 0; right: 0;
   background: #0A1628;
-  padding: 5mm 12mm;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  padding: 4.5mm 12mm;
+  display: flex; align-items: center; justify-content: space-between;
 }
-.cov-footer-brand { color: #fff; font-size: 9pt; font-weight: 700; }
+.cov-footer-label { color: #C9961A; font-size: 7.5pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 .cov-footer-contact { color: #8BAEC8; font-size: 8pt; text-align: right; line-height: 1.6; }
-.cov-footer-contact span { color: #D4A843; }
 
-/* ═══════════ CONTENT PAGES ═══════════ */
+/* ══════════════════════════════════════════════
+   CONTENT PAGES
+══════════════════════════════════════════════ */
 .page {
   width: 210mm;
   min-height: 297mm;
-  padding: 13mm 14mm 24mm;
+  padding: 12mm 13mm 23mm;
   page-break-after: always;
   position: relative;
 }
-.run-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6mm;
-  padding-bottom: 3mm;
-  border-bottom: 0.4mm solid #0A1628;
-}
-.run-sec  { font-size: 7pt; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1.5px; }
-.run-name { font-size: 7pt; font-weight: 700; color: #D4A843; text-transform: uppercase; letter-spacing: 1px; }
 
-.sec-title {
-  font-size: 13pt;
-  font-weight: 700;
-  color: #0A1628;
-  margin-bottom: 4.5mm;
-  padding-bottom: 2.5mm;
-  border-bottom: 0.25mm solid #E9ECF0;
+/* Running header */
+.rhdr {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6mm; padding-bottom: 3mm;
+  border-bottom: 0.5mm solid #0A1628;
+}
+.rhdr-sec  { font-size: 7pt; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1.5px; }
+.rhdr-name { font-size: 7pt; font-weight: 700; color: #C9961A; text-transform: uppercase; letter-spacing: 1px; }
+
+/* Section title */
+.stitle {
+  font-size: 14pt; font-weight: 700; color: #0A1628;
+  margin-bottom: 4mm; padding-bottom: 2.5mm;
+  border-bottom: 0.25mm solid #E5E7EB;
   position: relative;
 }
-.sec-title::after {
-  content: "";
-  position: absolute;
+.stitle::after {
+  content: ""; position: absolute;
   bottom: -0.25mm; left: 0;
-  width: 11mm; height: 0.7mm;
-  background: #D4A843;
+  width: 10mm; height: 0.7mm;
+  background: #C9961A;
 }
 
-/* intro */
+/* Two-column intro layout */
+.intro-wrap { display: table; width: 100%; margin-bottom: 6mm; }
+.intro-main { display: table-cell; width: 100%; vertical-align: top; }
 .intro-p {
-  font-size: 10pt;
-  line-height: 1.78;
-  color: #374151;
-  margin-bottom: 5.5mm;
-  text-align: justify;
+  font-size: 10pt; line-height: 1.78;
+  color: #374151; text-align: justify; margin-bottom: 3mm;
 }
 
-/* highlights box */
+/* Highlights */
 .hl-box {
   background: #FAFBFC;
-  border: 0.25mm solid #E2E8F0;
-  border-left: 1.2mm solid #D4A843;
-  padding: 4.5mm 6mm;
-  margin-bottom: 5mm;
+  border: 0.25mm solid #E5E7EB;
+  border-left: 1.5mm solid #C9961A;
+  padding: 4mm 5mm; margin-bottom: 5mm;
 }
-.hl-label {
-  font-size: 7pt; font-weight: 700; color: #0A1628;
-  text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3.5mm;
-}
-.hl-table { width: 100%; border-collapse: collapse; }
-.hl-td {
+.hl-lbl { font-size: 7pt; font-weight: 700; color: #0A1628; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3.5mm; }
+.hl-tbl { width: 100%; border-collapse: collapse; }
+.hl-td  {
   width: 50%; padding: 1.5mm 0 1.5mm 5mm;
   font-size: 9.5pt; color: #1E3A5F; line-height: 1.4;
   vertical-align: top; position: relative;
 }
-.hl-td::before { content: "◆"; position: absolute; left: 0; top: 2mm; color: #D4A843; font-size: 5.5pt; }
+.hl-td::before { content: "▸"; position: absolute; left: 0; top: 1.5mm; color: #C9961A; font-size: 8pt; }
 
-/* option benefits box */
+/* Option benefits */
 .ob-box {
-  background: #F0F7FF;
+  background: #EFF6FF;
   border: 0.25mm solid #BFDBFE;
-  border-left: 1.2mm solid #3B82F6;
-  padding: 4.5mm 6mm;
-  margin-bottom: 5mm;
+  border-left: 1.5mm solid #3B82F6;
+  padding: 4mm 5mm; margin-bottom: 5mm;
 }
-.ob-label {
-  font-size: 7pt; font-weight: 700; color: #1D4ED8;
-  text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3mm;
-}
-.ob-item {
-  font-size: 9.5pt; color: #1E3A5F; line-height: 1.55;
-  padding: 1.2mm 0 1.2mm 5mm; position: relative;
-}
-.ob-item::before { content: "✓"; position: absolute; left: 0; top: 1.5mm; color: #3B82F6; font-weight: 700; font-size: 8.5pt; }
+.ob-lbl { font-size: 7pt; font-weight: 700; color: #1D4ED8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3mm; }
+.ob-row { font-size: 9.5pt; color: #1E3A5F; line-height: 1.55; padding: 1mm 0 1mm 5.5mm; position: relative; }
+.ob-row::before { content: "✓"; position: absolute; left: 0; top: 1mm; color: #3B82F6; font-size: 8.5pt; font-weight: 700; }
 
-/* specs table */
+/* Specs table */
 .sp-intro { font-size: 8.5pt; color: #6B7280; font-style: italic; margin-bottom: 3.5mm; }
 .sp-tbl { width: 100%; border-collapse: collapse; font-size: 9pt; }
 .sp-tbl thead tr { background: #0A1628; }
-.sp-tbl thead th { color: #fff; padding: 2.5mm 4mm; text-align: left; font-size: 8.5pt; font-weight: 700; }
-.sp-tbl thead th:first-child { width: 38%; }
-.sp-tbl tbody tr { border-bottom: 0.2mm solid #E9ECF0; }
+.sp-tbl thead th { color: #fff; padding: 2.8mm 4mm; text-align: left; font-size: 8.5pt; font-weight: 700; }
+.sp-tbl thead th:first-child { width: 37%; }
+.sp-tbl tbody tr { border-bottom: 0.2mm solid #E9ECEF; }
 .sp-tbl tbody tr:nth-child(even) { background: #F8F9FB; }
-.sp-tbl tbody td { padding: 2.2mm 4mm; vertical-align: top; line-height: 1.5; }
+.sp-tbl tbody td { padding: 2.5mm 4mm; vertical-align: top; line-height: 1.5; }
 .sp-tbl tbody td:first-child { font-weight: 700; color: #0A1628; }
-.sp-tbl tbody td:last-child  { color: #374151; }
-.sp-thumb { max-width: 26mm; max-height: 16mm; object-fit: contain; margin-top: 1.5mm; }
+.sp-thumb { max-width: 22mm; max-height: 14mm; object-fit: contain; margin-top: 1.5mm; display: block; }
 
-/* ═══════════ OPTIONS PAGE ═══════════ */
-.opt-grid { width: 100%; border-collapse: separate; border-spacing: 0 4mm; display: table; }
-.opt-row  { display: table-row; }
-.opt-cell { display: table-cell; width: 50%; vertical-align: top; padding: 0 2mm; }
+/* ══════════════════════════════════════════════
+   OPTIONS PAGE — IMAGE-FIRST CARDS
+══════════════════════════════════════════════ */
+.opt-tbl { width: 100%; border-collapse: separate; border-spacing: 3.5mm 3.5mm; display: table; }
+.opt-tr   { display: table-row; }
+.opt-td   { display: table-cell; width: 50%; vertical-align: top; }
+
 .opt-card {
-  border: 0.25mm solid #E2E8F0;
-  border-top: 1.2mm solid #0A1628;
+  border: 0.3mm solid #E5E7EB;
   background: #fff;
   overflow: hidden;
 }
-.opt-img-wrap {
-  height: 36mm;
-  background: #F5F6F8;
+.opt-img-box {
+  height: 42mm;
+  background: #F3F4F6;
   overflow: hidden;
   position: relative;
+  border-bottom: 0.8mm solid #C9961A;
 }
-.opt-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+.opt-img-box img { width: 100%; height: 100%; object-fit: cover; }
 .opt-no-img {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
-  color: #CBD5E1; font-size: 24pt;
+  color: #D1D5DB; font-size: 28pt;
 }
-.opt-body { padding: 3mm 3.5mm 3.5mm; }
+.opt-body { padding: 3.5mm 4mm; }
 .opt-name { font-size: 9.5pt; font-weight: 700; color: #0A1628; margin-bottom: 2mm; }
-.opt-text { font-size: 8.5pt; color: #4B5563; line-height: 1.5; }
+.opt-desc { font-size: 8.5pt; color: #4B5563; line-height: 1.5; }
 
-/* page footer */
-.pg-foot {
-  position: absolute;
-  bottom: 7mm; left: 14mm; right: 14mm;
+/* Page footer */
+.pgfoot {
+  position: absolute; bottom: 7mm; left: 13mm; right: 13mm;
   display: flex; justify-content: space-between; align-items: center;
   font-size: 7pt; color: #9CA3AF;
-  border-top: 0.25mm solid #E2E8F0; padding-top: 2.5mm;
+  border-top: 0.25mm solid #E5E7EB; padding-top: 2.5mm;
 }
-.pg-co  { color: #D4A843; font-weight: 700; }
-.pg-num {
+.pgfoot-co  { color: #C9961A; font-weight: 700; }
+.pgfoot-num {
   background: #0A1628; color: #fff;
   font-size: 7pt; font-weight: 700;
-  padding: 1mm 2.5mm; min-width: 5mm; text-align: center;
+  padding: 1mm 2.5mm;
 }
 
-/* ═══════════ BACK COVER ═══════════ */
-.back-cover {
+/* ══════════════════════════════════════════════
+   BACK COVER
+══════════════════════════════════════════════ */
+.back {
   width: 210mm; height: 297mm;
   background: #0A1628;
   position: relative; overflow: hidden;
   page-break-before: always;
 }
-.bc-top { height: 2mm; background: #D4A843; }
-.bc-body { padding: 30mm 18mm; text-align: center; }
-.bc-contact-label {
-  color: #D4A843; font-size: 7.5pt; font-weight: 700;
+.back-gold-top { height: 2mm; background: #C9961A; }
+.back-body { padding: 32mm 18mm; text-align: center; }
+.back-eyebrow {
+  color: #C9961A; font-size: 7.5pt; font-weight: 700;
   letter-spacing: 3px; text-transform: uppercase; margin-bottom: 5mm;
 }
-.bc-company { color: #fff; font-size: 22pt; font-weight: 700; margin-bottom: 3mm; line-height: 1.15; }
-.bc-gold-bar { width: 12mm; height: 0.8mm; background: #D4A843; margin: 0 auto 7mm; }
-.bc-cta { color: #8BAEC8; font-size: 10.5pt; line-height: 1.65; max-width: 130mm; margin: 0 auto 14mm; }
-.bc-info-tbl { display: table; margin: 0 auto; border-spacing: 0 2.5mm; }
-.bc-info-row { display: table-row; }
-.bc-info-label { display: table-cell; color: #D4A843; font-size: 8.5pt; font-weight: 700; padding: 1.5mm 5mm 1.5mm 0; text-align: right; vertical-align: top; }
-.bc-info-val   { display: table-cell; color: #E2E8F0; font-size: 8.5pt; padding: 1.5mm 0; line-height: 1.5; }
-.bc-footer {
+.back-co { color: #fff; font-size: 22pt; font-weight: 700; margin-bottom: 3mm; }
+.back-bar { width: 12mm; height: 0.8mm; background: #C9961A; margin: 0 auto 7mm; }
+.back-cta { color: #94A3B8; font-size: 10.5pt; line-height: 1.7; max-width: 130mm; margin: 0 auto 16mm; }
+.back-tbl  { display: table; margin: 0 auto; border-spacing: 0 2.5mm; }
+.back-row  { display: table-row; }
+.back-lbl  { display: table-cell; color: #C9961A; font-size: 8.5pt; font-weight: 700; padding: 1.5mm 5mm 1.5mm 0; text-align: right; vertical-align: top; }
+.back-val  { display: table-cell; color: #E2E8F0; font-size: 8.5pt; padding: 1.5mm 0; line-height: 1.5; }
+.back-foot {
   position: absolute; bottom: 0; left: 0; right: 0;
   border-top: 0.5mm solid #1E3A5F;
   padding: 4mm 18mm;
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; justify-content: space-between;
 }
-.bc-model { color: #D4A843; font-size: 8pt; font-weight: 700; }
-.bc-date  { color: #4B5563; font-size: 8pt; }
+.back-foot-model { color: #C9961A; font-size: 8pt; font-weight: 700; }
+.back-foot-date  { color: #4B5563; font-size: 8pt; }
 
 .nb { break-inside: avoid; }
 </style>
 </head>
 <body>
 
-<!-- ════════════════════════════ COVER ════════════════════════════════════════ -->
+<!-- ═══════════════════════════════ COVER ════════════════════════════════════ -->
 <div class="cover">
-  <div class="cov-topbar">
+  <div class="cov-gold-top"></div>
+
+  <div class="cov-head">
     {% if company and company.logo_path %}
     <img class="cov-logo" src="{{ base_url }}/static/{{ company.logo_path }}" />
     {% else %}
-    <span class="cov-logo-text">{{ company.company_name if company else 'B2B Sistem' }}</span>
+    <span class="cov-co-name">{{ company.company_name if company else 'B2B Sistem' }}</span>
     {% endif %}
-    <div class="cov-topright">
-      {% if company and company.company_name and company.logo_path %}
-      <div style="color:#0A1628;font-size:10pt;font-weight:700;margin-bottom:1.5mm;">{{ company.company_name }}</div>
+    <div class="cov-head-right">
+      {% if company and company.logo_path and company.company_name %}
+      <div class="cov-co-name" style="margin-bottom:1.5mm;">{{ company.company_name }}</div>
       {% endif %}
-      <div class="cov-cat">{{ category_name }}</div>
+      <div class="cov-cat-pill">{{ category_name }}</div>
       <div class="cov-date">{{ date_str }}</div>
     </div>
   </div>
 
-  <div class="cov-img-frame">
+  <div class="cov-img">
     {% if model.image_path %}
     <img src="{{ base_url }}/static/{{ model.image_path }}" />
     {% else %}
     <div class="cov-no-img">⚙</div>
     {% endif %}
-    <div class="cov-img-stripe"></div>
+    <div class="cov-img-fade"></div>
   </div>
 
-  <div class="cov-body">
+  <div class="cov-name-block">
     <div class="cov-name">{{ model_name }}</div>
-    <div class="cov-gold-bar"></div>
+    <div class="cov-bar"></div>
     {% if ai.headline %}
     <div class="cov-headline">{{ ai.headline }}</div>
     {% endif %}
   </div>
 
+  {% if specs %}
+  <div class="cov-spec-strip">
+    {% for s in specs[:3] %}
+    <div class="cov-spec-cell">
+      <div class="cov-spec-label">{{ s.title }}</div>
+      <div class="cov-spec-val">
+        {% set d = s.get('desc_'+lang) or s.get('desc') or '—' %}
+        {{ d[:40] }}{% if d|length > 40 %}…{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% if specs|length < 3 %}
+    {% for _ in range(3 - specs|length) %}
+    <div class="cov-spec-cell"></div>
+    {% endfor %}
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="cov-footer">
-    <div class="cov-footer-brand">{{ label_product_catalog }}</div>
+    <div class="cov-footer-label">{{ label_product_catalog }}</div>
     <div class="cov-footer-contact">
-      {% if company and company.phone %}<span>{{ label_phone }}</span>&nbsp;{{ company.phone }}<br/>{% endif %}
-      {% if company and company.email %}<span>{{ label_email }}</span>&nbsp;{{ company.email }}{% endif %}
+      {% if company and company.phone %}{{ company.phone }}{% endif %}
+      {% if company and company.email %}&nbsp; · &nbsp;{{ company.email }}{% endif %}
     </div>
   </div>
 </div>
 
-<!-- ════════════════════════════ OVERVIEW PAGE ════════════════════════════════ -->
+<!-- ═══════════════════════════════ OVERVIEW ═════════════════════════════════ -->
 <div class="page">
-  <div class="run-header">
-    <span class="run-sec">{{ label_overview }}</span>
-    <span class="run-name">{{ model_name }}</span>
+  <div class="rhdr">
+    <span class="rhdr-sec">{{ label_overview }}</span>
+    <span class="rhdr-name">{{ model_name }}</span>
   </div>
 
-  <div class="sec-title">{{ label_overview }}</div>
+  <div class="stitle">{{ label_overview }}</div>
 
   {% if ai.intro %}
   <p class="intro-p">{{ ai.intro }}</p>
@@ -339,8 +350,8 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1a1a2e; background
 
   {% if ai.highlights %}
   <div class="hl-box nb">
-    <div class="hl-label">{{ label_highlights }}</div>
-    <table class="hl-table">
+    <div class="hl-lbl">{{ label_highlights }}</div>
+    <table class="hl-tbl">
       {% set hl = ai.highlights %}
       {% for i in range(0, hl|length, 2) %}
       <tr>
@@ -354,84 +365,75 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1a1a2e; background
 
   {% if ai.option_benefits and options %}
   <div class="ob-box nb">
-    <div class="ob-label">{{ label_option_benefits }}</div>
+    <div class="ob-lbl">{{ label_option_benefits }}</div>
     {% for b in ai.option_benefits %}
-    <div class="ob-item">{{ b }}</div>
+    <div class="ob-row">{{ b }}</div>
     {% endfor %}
   </div>
   {% endif %}
 
-  <div class="pg-foot">
-    <span class="pg-co">{{ company.company_name if company else '' }}</span>
+  <div class="pgfoot">
+    <span class="pgfoot-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>
-    <span class="pg-num">02</span>
+    <span class="pgfoot-num">02</span>
   </div>
 </div>
 
-<!-- ════════════════════════════ SPECS PAGE ═══════════════════════════════════ -->
+<!-- ═══════════════════════════════ SPECS ════════════════════════════════════ -->
 {% if specs %}
 <div class="page">
-  <div class="run-header">
-    <span class="run-sec">{{ label_specs }}</span>
-    <span class="run-name">{{ model_name }}</span>
+  <div class="rhdr">
+    <span class="rhdr-sec">{{ label_specs }}</span>
+    <span class="rhdr-name">{{ model_name }}</span>
   </div>
-  <div class="sec-title">{{ label_specs }}</div>
+  <div class="stitle">{{ label_specs }}</div>
   {% if ai.specs_intro %}<p class="sp-intro">{{ ai.specs_intro }}</p>{% endif %}
   <table class="sp-tbl">
     <thead><tr><th>{{ label_spec_feature }}</th><th>{{ label_spec_detail }}</th></tr></thead>
     <tbody>
-    {% for s in specs[:16] %}
+    {% for s in specs %}
     <tr class="nb">
       <td>{{ s.title }}</td>
       <td>
         {% set d = s.get('desc_'+lang) or s.get('desc') or '' %}{{ d }}
-        {% if s.get('img') %}<br/><img class="sp-thumb" src="{{ base_url }}/static/{{ s.img }}" />{% endif %}
+        {% if s.get('img') %}<img class="sp-thumb" src="{{ base_url }}/static/{{ s.img }}" />{% endif %}
       </td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
-
-  {% if specs|length > 16 %}
-  <table class="sp-tbl" style="margin-top:3mm;">
-    <tbody>
-    {% for s in specs[16:] %}
-    <tr class="nb">
-      <td>{{ s.title }}</td>
-      <td>{% set d = s.get('desc_'+lang) or s.get('desc') or '' %}{{ d }}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-
-  <div class="pg-foot">
-    <span class="pg-co">{{ company.company_name if company else '' }}</span>
+  <div class="pgfoot">
+    <span class="pgfoot-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>
-    <span class="pg-num">03</span>
+    <span class="pgfoot-num">03</span>
   </div>
 </div>
 {% endif %}
 
-<!-- ════════════════════════════ OPTIONS PAGE ═════════════════════════════════ -->
+<!-- ═══════════════════════════════ OPTIONS ══════════════════════════════════ -->
 {% if options %}
+{% set opts_per_page = 6 %}
+{% for page_start in range(0, options|length, opts_per_page) %}
+{% set page_opts = options[page_start:page_start+opts_per_page] %}
+{% set pg_num = (4 if specs else 3) + loop.index0 %}
 <div class="page">
-  <div class="run-header">
-    <span class="run-sec">{{ label_options }}</span>
-    <span class="run-name">{{ model_name }}</span>
+  <div class="rhdr">
+    <span class="rhdr-sec">{{ label_options }}</span>
+    <span class="rhdr-name">{{ model_name }}</span>
   </div>
-  <div class="sec-title">{{ label_options }}</div>
+  <div class="stitle">{{ label_options }}</div>
 
-  <div class="opt-grid">
-    {% for i in range(0, options|length, 2) %}
-    <div class="opt-row">
+  <div class="opt-tbl">
+    {% for i in range(0, page_opts|length, 2) %}
+    <div class="opt-tr">
       {% for j in [i, i+1] %}
-      <div class="opt-cell">
-        {% if j < options|length %}
-        {% set o = options[j] %}
+      <div class="opt-td">
+        {% if j < page_opts|length %}
+        {% set o = page_opts[j] %}
         {% set oname = o.get('name_'+lang) or o.name %}
+        {% set ai_text = ai.option_texts.get(oname) or ai.option_texts.get(o.name) or (o.get('description_'+lang) or o.get('description') or '') %}
         <div class="opt-card nb">
-          <div class="opt-img-wrap">
+          <div class="opt-img-box">
             {% if o.get('image_path') %}
             <img src="{{ base_url }}/static/{{ o.image_path }}" />
             {% else %}
@@ -440,10 +442,7 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1a1a2e; background
           </div>
           <div class="opt-body">
             <div class="opt-name">{{ oname }}</div>
-            <div class="opt-text">
-              {% set ai_text = ai.option_texts.get(oname) or ai.option_texts.get(o.name) or (o.get('description_'+lang) or o.get('description') or '') %}
-              {{ ai_text }}
-            </div>
+            {% if ai_text %}<div class="opt-desc">{{ ai_text }}</div>{% endif %}
           </div>
         </div>
         {% endif %}
@@ -453,54 +452,41 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1a1a2e; background
     {% endfor %}
   </div>
 
-  <div class="pg-foot">
-    <span class="pg-co">{{ company.company_name if company else '' }}</span>
+  <div class="pgfoot">
+    <span class="pgfoot-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>
-    <span class="pg-num">{{ '04' if specs else '03' }}</span>
+    <span class="pgfoot-num">{{ '%02d'|format(pg_num) }}</span>
   </div>
 </div>
+{% endfor %}
 {% endif %}
 
-<!-- ════════════════════════════ BACK COVER ═══════════════════════════════════ -->
-<div class="back-cover">
-  <div class="bc-top"></div>
-  <div class="bc-body">
-    <div class="bc-contact-label">{{ label_contact_us }}</div>
-    <div class="bc-company">{{ company.company_name if company else '' }}</div>
-    <div class="bc-gold-bar"></div>
-    {% if ai.cta %}
-    <div class="bc-cta">{{ ai.cta }}</div>
-    {% endif %}
-    <div class="bc-info-tbl">
+<!-- ═══════════════════════════════ BACK COVER ═══════════════════════════════ -->
+<div class="back">
+  <div class="back-gold-top"></div>
+  <div class="back-body">
+    <div class="back-eyebrow">{{ label_contact_us }}</div>
+    <div class="back-co">{{ company.company_name if company else '' }}</div>
+    <div class="back-bar"></div>
+    {% if ai.cta %}<div class="back-cta">{{ ai.cta }}</div>{% endif %}
+    <div class="back-tbl">
       {% if company and company.phone %}
-      <div class="bc-info-row">
-        <div class="bc-info-label">{{ label_phone }}</div>
-        <div class="bc-info-val">{{ company.phone }}</div>
-      </div>
+      <div class="back-row"><div class="back-lbl">{{ label_phone }}</div><div class="back-val">{{ company.phone }}</div></div>
       {% endif %}
       {% if company and company.email %}
-      <div class="bc-info-row">
-        <div class="bc-info-label">{{ label_email }}</div>
-        <div class="bc-info-val">{{ company.email }}</div>
-      </div>
+      <div class="back-row"><div class="back-lbl">{{ label_email }}</div><div class="back-val">{{ company.email }}</div></div>
       {% endif %}
       {% if company and company.website %}
-      <div class="bc-info-row">
-        <div class="bc-info-label">{{ label_web }}</div>
-        <div class="bc-info-val">{{ company.website }}</div>
-      </div>
+      <div class="back-row"><div class="back-lbl">{{ label_web }}</div><div class="back-val">{{ company.website }}</div></div>
       {% endif %}
       {% if company and company.address %}
-      <div class="bc-info-row">
-        <div class="bc-info-label">{{ label_address }}</div>
-        <div class="bc-info-val">{{ company.address }}</div>
-      </div>
+      <div class="back-row"><div class="back-lbl">{{ label_address }}</div><div class="back-val">{{ company.address }}</div></div>
       {% endif %}
     </div>
   </div>
-  <div class="bc-footer">
-    <span class="bc-model">{{ model_name }}</span>
-    <span class="bc-date">{{ date_str }}</span>
+  <div class="back-foot">
+    <span class="back-foot-model">{{ model_name }}</span>
+    <span class="back-foot-date">{{ date_str }}</span>
   </div>
 </div>
 

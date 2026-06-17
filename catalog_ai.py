@@ -67,7 +67,11 @@ Write ALL text values in {lang_name}. Be persuasive, confident, and specific.
 
 def generate_catalog_content(model: dict, lang: str, specs: list, options: list) -> dict:
     """Call Claude to generate professional catalog text."""
+    import logging
+    log = logging.getLogger(__name__)
+
     if not ANTHROPIC_API_KEY:
+        log.warning("ANTHROPIC_API_KEY not set — using fallback catalog content")
         return _fallback(model, lang, specs, options)
     try:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -84,12 +88,12 @@ def generate_catalog_content(model: dict, lang: str, specs: list, options: list)
             if raw.startswith("json"):
                 raw = raw[4:]
         result = json.loads(raw.strip())
-        # Normalise option_benefits to a flat list of strings
         ob = result.get("option_benefits", [])
         if isinstance(ob, str):
             result["option_benefits"] = [ob]
         return result
-    except Exception:
+    except Exception as e:
+        log.error("Catalog AI generation failed: %s", e, exc_info=True)
         return _fallback(model, lang, specs, options)
 
 
