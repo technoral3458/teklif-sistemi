@@ -200,7 +200,8 @@ async def save_model(request: Request,
                      specs_zh: str = Form(""),
                      is_line: int = Form(0),
                      line_configs: str = Form("2,3,4"),
-                     manufacturer_id: int = Form(0)):
+                     manufacturer_id: int = Form(0),
+                     catalog_sort: int = Form(999)):
     user = auth.require_user(request)
 
     # Manufacturers must not set any pricing fields, and own their models
@@ -264,6 +265,7 @@ async def save_model(request: Request,
         is_line=is_line,
         line_configs=line_configs.strip(),
         manufacturer_id=manufacturer_id or None,
+        catalog_sort=catalog_sort if catalog_sort and catalog_sort != 999 else 999,
     )
     if image_path:
         kw["image_path"] = image_path
