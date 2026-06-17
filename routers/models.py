@@ -441,7 +441,10 @@ async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
     except Exception as e:
         return Response(f"PDF oluşturulamadı: {e}", status_code=500, media_type="text/plain")
 
-    safe_name = model_name.replace(" ", "_").replace("/", "-")[:40]
+    import unicodedata
+    normalized = unicodedata.normalize("NFKD", model_name)
+    safe_name = "".join(c for c in normalized if ord(c) < 128)
+    safe_name = safe_name.replace(" ", "_").replace("/", "-").strip("_")[:40] or "model"
     filename = f"katalog_{safe_name}_{lang}.pdf"
     return Response(
         pdf,
