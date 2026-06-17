@@ -177,6 +177,16 @@ def init():
         ]:
             _acol(cur, "offers", col, typ)
 
+        # SMTP config stored in company_profile
+        for col, typ in [
+            ("smtp_host", "TEXT DEFAULT ''"),
+            ("smtp_port", "INTEGER DEFAULT 587"),
+            ("smtp_user", "TEXT DEFAULT ''"),
+            ("smtp_pass", "TEXT DEFAULT ''"),
+            ("smtp_from", "TEXT DEFAULT ''"),
+        ]:
+            _acol(cur, "company_profile", col, typ)
+
         # Translation columns
         for col in ["name_en", "name_zh"]:
             _acol(cur, "categories", col, "TEXT DEFAULT ''")
@@ -355,15 +365,18 @@ def del_loan_rate(rid):
 def get_company():
     with _c() as c:
         r = c.execute(
-            "SELECT company_name,address,phone,website,tax_id,email,logo_path FROM company_profile WHERE id=1"
+            "SELECT company_name,address,phone,website,tax_id,email,logo_path,"
+            "smtp_host,smtp_port,smtp_user,smtp_pass,smtp_from FROM company_profile WHERE id=1"
         ).fetchone()
     if not r:
         return {}
-    return dict(zip(["company_name", "address", "phone", "website", "tax_id", "email", "logo_path"], r))
+    return dict(zip(["company_name","address","phone","website","tax_id","email","logo_path",
+                     "smtp_host","smtp_port","smtp_user","smtp_pass","smtp_from"], r))
 
 
 def save_company(**kw):
-    allowed = ["company_name", "address", "phone", "website", "tax_id", "email", "logo_path"]
+    allowed = ["company_name", "address", "phone", "website", "tax_id", "email", "logo_path",
+               "smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return

@@ -1,18 +1,40 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from config import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, APP_NAME, ADMIN_EMAIL
+from config import APP_NAME, ADMIN_EMAIL
+import config as _cfg
+
+
+def _get_smtp():
+    """Return effective SMTP config: DB values when env vars are empty."""
+    host = _cfg.SMTP_HOST
+    port = _cfg.SMTP_PORT
+    user = _cfg.SMTP_USER
+    pw   = _cfg.SMTP_PASS
+    frm  = _cfg.SMTP_FROM
+    if not host:
+        try:
+            import db.factory as fdb
+            c = fdb.get_company()
+            host = c.get("smtp_host") or ""
+            port = int(c.get("smtp_port") or 587)
+            user = c.get("smtp_user") or ""
+            pw   = c.get("smtp_pass") or ""
+            frm  = c.get("smtp_from") or ""
+        except Exception:
+            pass
+    return host, port, user, pw, frm
 
 
 def send_reset_email(to_email: str, reset_code: str, company_name: str = "") -> tuple[bool, str]:
-    """Send password reset code via email. Returns (success, error_message)."""
-    if not SMTP_HOST:
+    host, port, user, pw, frm = _get_smtp()
+    if not host:
         return False, "SMTP_HOST ayarlanmamış"
     try:
         title = company_name or APP_NAME
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"Şifre Sıfırlama Kodu — {title}"
-        msg["From"] = f"{title} <{SMTP_FROM}>"
+        msg["From"] = f"{title} <{frm}>"
         msg["To"] = to_email
 
         text = (
@@ -38,47 +60,38 @@ def send_reset_email(to_email: str, reset_code: str, company_name: str = "") -> 
 
         msg.attach(MIMEText(text, "plain", "utf-8"))
         msg.attach(MIMEText(html, "html", "utf-8"))
+        return _do_send(host, port, user, pw, frm, to_email, msg)
+    except Exception as e:
+        return False, str(e)
 
-        if SMTP_PORT == 465:
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as s:
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(SMTP_FROM, to_email, msg.as_string())
+
+def _do_send(host, port, user, pw, frm, to_email, msg) -> tuple[bool, str]:
+    try:
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, timeout=10) as s:
+                s.login(user, pw)
+                s.sendmail(frm, to_email, msg.as_string())
         else:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:
+            with smtplib.SMTP(host, port, timeout=10) as s:
                 s.ehlo()
-                if SMTP_PORT == 587:
+                if port == 587:
                     s.starttls()
-                if SMTP_USER and SMTP_PASS:
-                    s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(SMTP_FROM, to_email, msg.as_string())
+                if user and pw:
+                    s.login(user, pw)
+                s.sendmail(frm, to_email, msg.as_string())
         return True, ""
     except Exception as e:
         return False, str(e)
 
 
 def _smtp_send(to_email: str, msg) -> tuple[bool, str]:
-    """Low-level SMTP send helper."""
-    try:
-        if SMTP_PORT == 465:
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as s:
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(SMTP_FROM, to_email, msg.as_string())
-        else:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:
-                s.ehlo()
-                if SMTP_PORT == 587:
-                    s.starttls()
-                if SMTP_USER and SMTP_PASS:
-                    s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(SMTP_FROM, to_email, msg.as_string())
-        return True, ""
-    except Exception as e:
-        return False, str(e)
+    host, port, user, pw, frm = _get_smtp()
+    return _do_send(host, port, user, pw, frm, to_email, msg)
 
 
 def send_admin_notification(event_label: str, details: dict) -> tuple[bool, str]:
-    """Send order event notification to admin. Silent no-op if SMTP not configured."""
-    if not SMTP_HOST or not ADMIN_EMAIL:
+    host, port, user, pw, frm = _get_smtp()
+    if not host or not ADMIN_EMAIL:
         return False, "SMTP not configured"
     try:
         subject = f"[{APP_NAME}] {event_label}"
@@ -105,7 +118,7 @@ def send_admin_notification(event_label: str, details: dict) -> tuple[bool, str]
 </html>"""
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = f"{APP_NAME} <{SMTP_FROM}>"
+        msg["From"] = f"{APP_NAME} <{frm}>"
         msg["To"] = ADMIN_EMAIL
         msg.attach(MIMEText(html, "html", "utf-8"))
         return _smtp_send(ADMIN_EMAIL, msg)

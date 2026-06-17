@@ -176,6 +176,19 @@ async def delete_delivery_term(request: Request, id: int = Form(...)):
     return RedirectResponse("/admin/delivery-terms?msg=Silindi&msg_type=success", 303)
 
 
+@router.post("/smtp")
+async def save_smtp(request: Request,
+                    smtp_host: str = Form(""),
+                    smtp_port: int = Form(587),
+                    smtp_user: str = Form(""),
+                    smtp_pass: str = Form(""),
+                    smtp_from: str = Form("")):
+    auth.require_admin(request)
+    fdb.save_company(smtp_host=smtp_host, smtp_port=smtp_port,
+                     smtp_user=smtp_user, smtp_pass=smtp_pass, smtp_from=smtp_from)
+    return RedirectResponse("/admin?tab=system&msg=SMTP+ayarları+kaydedildi&msg_type=success", 303)
+
+
 @router.post("/backup/restore")
 async def backup_restore(request: Request, backup_file: UploadFile = File(...)):
     auth.require_admin(request)

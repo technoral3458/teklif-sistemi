@@ -98,8 +98,8 @@ async def do_logout():
 
 @router.post("/auth/forgot")
 async def do_forgot(request: Request, email: str = Form(...)):
-    from email_utils import send_reset_email
-    from config import SMTP_HOST, ADMIN_COMPANY
+    from email_utils import send_reset_email, _get_smtp
+    from config import ADMIN_COMPANY
 
     clean_email = email.strip().lower()
     tok = udb.reset_token(clean_email)
@@ -110,10 +110,11 @@ async def do_forgot(request: Request, email: str = Form(...)):
             "msg_type": "danger",
         })
 
-    if not SMTP_HOST:
+    smtp_host, *_ = _get_smtp()
+    if not smtp_host:
         return templates.TemplateResponse(request, "login.html", {
             **_admin_ctx(),
-            "msg": "E-posta servisi yapılandırılmamış. Lütfen yöneticiye başvurun.",
+            "msg": "E-posta servisi yapılandırılmamış. Yönetici panelinden SMTP ayarlarını yapınız.",
             "msg_type": "warning",
         })
 
