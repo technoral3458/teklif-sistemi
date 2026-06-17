@@ -327,6 +327,37 @@ async def delete_line_image(request: Request, id: int = Form(...), model_id: int
     return RedirectResponse(f"/models/{model_id}/edit", 303)
 
 
+@router.get("/{model_id}/catalog-ai-test")
+async def catalog_ai_test(request: Request, model_id: int, lang: str = "tr"):
+    """Debug endpoint — returns raw AI output as JSON."""
+    import asyncio
+    from catalog_ai import generate_catalog_content
+    from config import ANTHROPIC_API_KEY
+    user = auth.require_user(request)
+    if user.get("role") != "admin":
+        return JSONResponse({"error": "admin only"}, 403)
+    m = fdb.get_model(model_id)
+    if not m:
+        return JSONResponse({"error": "model not found"}, 404)
+    specs_raw = m.get("specs") or "[]"
+    try:
+        specs = json.loads(specs_raw) if isinstance(specs_raw, str) else specs_raw
+    except Exception:
+        specs = []
+    compatible_ids = []
+    try:
+        compatible_ids = json.loads(m.get("compatible_options") or "[]")
+    except Exception:
+        pass
+    options = [o for o in fdb.get_options() if o["id"] in compatible_ids]
+    ai = await asyncio.to_thread(generate_catalog_content, m, lang, specs, options)
+    return JSONResponse({
+        "api_key_set": bool(ANTHROPIC_API_KEY),
+        "api_key_prefix": ANTHROPIC_API_KEY[:12] + "..." if ANTHROPIC_API_KEY else "",
+        "ai_result": ai,
+    })
+
+
 @router.get("/{model_id}/catalog-pdf")
 async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
     import asyncio
