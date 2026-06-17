@@ -3,381 +3,475 @@
 <head>
 <meta charset="UTF-8"/>
 <style>
-  @page {
-    size: A4;
-    margin: 0;
+@page cover {
+  size: A4;
+  margin: 0;
+}
+@page content {
+  size: A4;
+  margin: 18mm 16mm 22mm 16mm;
+  @bottom-center {
+    content: "";
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1e293b; background: #fff; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1a1a2e; }
 
-  /* ── COVER PAGE ────────────────────────────────────────────────── */
-  .cover {
-    width: 210mm;
-    height: 297mm;
-    position: relative;
-    page-break-after: always;
-    overflow: hidden;
-    background: #0f172a;
-  }
-  .cover-header {
-    background: #1e3a5f;
-    padding: 18mm 14mm 12mm;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .cover-logo {
-    height: 18mm;
-    max-width: 55mm;
-    object-fit: contain;
-  }
-  .cover-logo-text {
-    color: #fff;
-    font-size: 22pt;
-    font-weight: 700;
-    letter-spacing: 1px;
-  }
-  .cover-category {
-    color: #93c5fd;
-    font-size: 10pt;
-    font-weight: 600;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-  }
-  .cover-image-wrap {
-    height: 115mm;
-    overflow: hidden;
-    position: relative;
-    background: #0a1628;
-  }
-  .cover-image-wrap img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    opacity: 0.85;
-  }
-  .cover-image-overlay {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 30mm;
-    background: linear-gradient(transparent, #0f172a);
-  }
-  .cover-body {
-    padding: 10mm 14mm 8mm;
-  }
-  .cover-name {
-    color: #fff;
-    font-size: 26pt;
-    font-weight: 700;
-    line-height: 1.15;
-    margin-bottom: 6mm;
-  }
-  .cover-headline {
-    color: #60a5fa;
-    font-size: 13pt;
-    font-style: italic;
-    line-height: 1.4;
-    margin-bottom: 8mm;
-    border-left: 3px solid #3b82f6;
-    padding-left: 5mm;
-  }
-  .cover-divider {
-    height: 1px;
-    background: #334155;
-    margin: 0 0 8mm;
-  }
-  .cover-meta {
-    display: flex;
-    gap: 8mm;
-    flex-wrap: wrap;
-  }
-  .cover-meta-item {
-    color: #94a3b8;
-    font-size: 9pt;
-  }
-  .cover-meta-item span {
-    color: #e2e8f0;
-    font-weight: 600;
-    display: block;
-    font-size: 10pt;
-  }
-  .cover-footer {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    background: #3b82f6;
-    padding: 5mm 14mm;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .cover-footer-text { color: #fff; font-size: 9pt; }
-  .cover-footer-cta  { color: #dbeafe; font-size: 9pt; font-style: italic; }
+/* ═══════════════════════════════════════════════════════
+   COVER
+═══════════════════════════════════════════════════════ */
+.cover {
+  page: cover;
+  width: 210mm;
+  height: 297mm;
+  background: #0A1628;
+  position: relative;
+  page-break-after: always;
+  overflow: hidden;
+}
 
-  /* ── CONTENT PAGES ─────────────────────────────────────────────── */
-  .page {
-    width: 210mm;
-    min-height: 297mm;
-    padding: 14mm 14mm 20mm;
-    page-break-after: always;
-    position: relative;
-  }
-  .page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8mm;
-    padding-bottom: 4mm;
-    border-bottom: 2px solid #3b82f6;
-  }
-  .page-header-title {
-    font-size: 9pt;
-    color: #64748b;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-  .page-header-name {
-    font-size: 9pt;
-    color: #3b82f6;
-    font-weight: 700;
-  }
-  .section-title {
-    font-size: 15pt;
-    font-weight: 700;
-    color: #1e3a5f;
-    margin-bottom: 5mm;
-    padding-bottom: 2mm;
-    border-bottom: 1px solid #e2e8f0;
-  }
+/* top bar */
+.cover-topbar {
+  background: #0D1E35;
+  height: 22mm;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14mm;
+  border-bottom: 0.6mm solid #D4A843;
+}
+.cover-company {
+  color: #fff;
+  font-size: 14pt;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.cover-logo-img {
+  height: 13mm;
+  max-width: 50mm;
+  object-fit: contain;
+}
+.cover-date {
+  color: #8BAEC8;
+  font-size: 8pt;
+  text-align: right;
+}
 
-  /* ── DESCRIPTION PAGE ──────────────────────────────────────────── */
-  .intro-text {
-    font-size: 10.5pt;
-    line-height: 1.7;
-    color: #334155;
-    margin-bottom: 7mm;
-    text-align: justify;
-  }
-  .highlights-box {
-    background: #f0f7ff;
-    border-left: 4px solid #3b82f6;
-    border-radius: 4px;
-    padding: 5mm 6mm;
-    margin-bottom: 7mm;
-  }
-  .highlights-title {
-    font-size: 10pt;
-    font-weight: 700;
-    color: #1e3a5f;
-    margin-bottom: 4mm;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  .highlights-list {
-    list-style: none;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2.5mm;
-  }
-  .highlights-list li {
-    font-size: 10pt;
-    color: #334155;
-    padding-left: 4mm;
-    position: relative;
-    line-height: 1.4;
-  }
-  .highlights-list li::before {
-    content: "✦";
-    position: absolute;
-    left: 0;
-    color: #3b82f6;
-    font-size: 7pt;
-    top: 2pt;
-  }
+/* category badge */
+.cover-badge {
+  margin: 6mm 14mm 4mm;
+  display: inline-block;
+}
+.cover-badge-inner {
+  background: #D4A843;
+  color: #0A1628;
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  padding: 2mm 5mm;
+  display: inline-block;
+}
 
-  /* ── SPECS TABLE ───────────────────────────────────────────────── */
-  .specs-intro {
-    font-size: 10pt;
-    color: #64748b;
-    margin-bottom: 5mm;
-    font-style: italic;
-  }
-  .specs-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 9.5pt;
-  }
-  .specs-table thead tr {
-    background: #1e3a5f;
-    color: #fff;
-  }
-  .specs-table thead th {
-    padding: 3mm 4mm;
-    text-align: left;
-    font-weight: 600;
-    font-size: 9pt;
-  }
-  .specs-table tbody tr:nth-child(even) { background: #f8fafc; }
-  .specs-table tbody tr:nth-child(odd)  { background: #fff; }
-  .specs-table tbody td {
-    padding: 2.5mm 4mm;
-    border-bottom: 1px solid #e2e8f0;
-    vertical-align: top;
-    line-height: 1.5;
-  }
-  .specs-table tbody td:first-child {
-    font-weight: 600;
-    color: #1e3a5f;
-    width: 40%;
-  }
+/* image */
+.cover-img-wrap {
+  margin: 0 14mm;
+  height: 100mm;
+  overflow: hidden;
+  position: relative;
+  background: #0D1E35;
+  border: 0.3mm solid #1E3A5F;
+}
+.cover-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cover-img-gradient {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 28mm;
+  background: linear-gradient(transparent, #0A1628);
+}
+.cover-no-img {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1E3A5F;
+  font-size: 60pt;
+}
 
-  /* ── SPEC IMAGE ────────────────────────────────────────────────── */
-  .spec-img {
-    max-width: 30mm;
-    max-height: 20mm;
-    object-fit: contain;
-    margin-top: 2mm;
-    border-radius: 3px;
-  }
+/* name block */
+.cover-name-block {
+  padding: 7mm 14mm 0;
+}
+.cover-name {
+  color: #fff;
+  font-size: 24pt;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+}
+.cover-accent-line {
+  width: 18mm;
+  height: 0.8mm;
+  background: #D4A843;
+  margin: 4mm 0;
+}
+.cover-headline {
+  color: #8BAEC8;
+  font-size: 10.5pt;
+  line-height: 1.55;
+  max-width: 145mm;
+}
 
-  /* ── OPTIONS PAGE ──────────────────────────────────────────────── */
-  .options-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4mm;
-    margin-top: 3mm;
-  }
-  .option-card {
-    border: 1px solid #e2e8f0;
-    border-radius: 5px;
-    padding: 3.5mm 4mm;
-    background: #fafafa;
-    break-inside: avoid;
-  }
-  .option-card-name {
-    font-size: 9.5pt;
-    font-weight: 700;
-    color: #1e3a5f;
-    margin-bottom: 1.5mm;
-  }
-  .option-card-desc {
-    font-size: 8.5pt;
-    color: #64748b;
-    line-height: 1.4;
-  }
-  .option-card-img {
-    width: 100%;
-    max-height: 20mm;
-    object-fit: contain;
-    margin-top: 2mm;
-    border-radius: 3px;
-  }
+/* bottom strip */
+.cover-bottom {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: #D4A843;
+  padding: 4.5mm 14mm;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cover-bottom-label {
+  color: #0A1628;
+  font-size: 8pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.cover-bottom-contact {
+  color: #0A1628;
+  font-size: 8pt;
+  text-align: right;
+  line-height: 1.5;
+}
 
-  /* ── PAGE FOOTER ───────────────────────────────────────────────── */
-  .page-footer {
-    position: absolute;
-    bottom: 6mm; left: 14mm; right: 14mm;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 8pt;
-    color: #94a3b8;
-    border-top: 1px solid #e2e8f0;
-    padding-top: 2.5mm;
-  }
-  .no-break { break-inside: avoid; }
+/* ═══════════════════════════════════════════════════════
+   CONTENT PAGES
+═══════════════════════════════════════════════════════ */
+.page {
+  page: content;
+  page-break-after: always;
+}
+
+/* running header */
+.run-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7mm;
+  padding-bottom: 3.5mm;
+  border-bottom: 0.4mm solid #0A1628;
+}
+.run-header-section {
+  font-size: 7.5pt;
+  font-weight: 700;
+  color: #8BAEC8;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.run-header-model {
+  font-size: 7.5pt;
+  font-weight: 700;
+  color: #D4A843;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* section heading */
+.sec-heading {
+  font-size: 13pt;
+  font-weight: 700;
+  color: #0A1628;
+  margin-bottom: 5mm;
+  padding-bottom: 2.5mm;
+  border-bottom: 0.3mm solid #E2E8F0;
+  position: relative;
+}
+.sec-heading::after {
+  content: "";
+  position: absolute;
+  bottom: -0.3mm;
+  left: 0;
+  width: 12mm;
+  height: 0.6mm;
+  background: #D4A843;
+}
+
+/* intro text */
+.intro-text {
+  font-size: 10pt;
+  line-height: 1.75;
+  color: #374151;
+  margin-bottom: 6mm;
+  text-align: justify;
+}
+
+/* highlights */
+.highlights-wrap {
+  background: #F8F9FB;
+  border: 0.3mm solid #E2E8F0;
+  border-left: 1.2mm solid #D4A843;
+  padding: 5mm 6mm;
+  margin-bottom: 7mm;
+}
+.highlights-label {
+  font-size: 7.5pt;
+  font-weight: 700;
+  color: #0A1628;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 4mm;
+}
+.hl-grid {
+  display: table;
+  width: 100%;
+}
+.hl-row {
+  display: table-row;
+}
+.hl-cell {
+  display: table-cell;
+  width: 50%;
+  padding: 1.5mm 0 1.5mm 5mm;
+  font-size: 9.5pt;
+  color: #1E3A5F;
+  line-height: 1.4;
+  vertical-align: top;
+  position: relative;
+}
+.hl-cell::before {
+  content: "◆";
+  position: absolute;
+  left: 0;
+  top: 1.5mm;
+  color: #D4A843;
+  font-size: 6pt;
+}
+
+/* specs table */
+.specs-intro {
+  font-size: 9pt;
+  color: #6B7280;
+  font-style: italic;
+  margin-bottom: 4mm;
+}
+.specs-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+.specs-tbl thead tr {
+  background: #0A1628;
+}
+.specs-tbl thead th {
+  color: #fff;
+  padding: 3mm 4.5mm;
+  text-align: left;
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.specs-tbl thead th:first-child { width: 40%; }
+.specs-tbl thead th:last-child  {
+  text-align: right;
+  color: #D4A843;
+  font-size: 7pt;
+  font-weight: 400;
+  font-style: italic;
+}
+.specs-tbl tbody tr { border-bottom: 0.2mm solid #E9ECF0; }
+.specs-tbl tbody tr:nth-child(even) { background: #F8F9FB; }
+.specs-tbl tbody tr:nth-child(odd)  { background: #fff; }
+.specs-tbl tbody td {
+  padding: 2.5mm 4.5mm;
+  vertical-align: top;
+  line-height: 1.5;
+}
+.specs-tbl tbody td:first-child {
+  font-weight: 700;
+  color: #0A1628;
+}
+.specs-tbl tbody td:last-child { color: #374151; }
+
+/* spec thumbnail */
+.spec-thumb {
+  max-width: 28mm;
+  max-height: 18mm;
+  object-fit: contain;
+  margin-top: 1.5mm;
+  border-radius: 2px;
+}
+
+/* options */
+.opt-grid {
+  display: table;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 3mm 3mm;
+}
+.opt-row { display: table-row; }
+.opt-cell {
+  display: table-cell;
+  width: 50%;
+  vertical-align: top;
+}
+.opt-card {
+  border: 0.3mm solid #E2E8F0;
+  border-top: 1mm solid #0A1628;
+  background: #fff;
+  padding: 3.5mm 4mm;
+}
+.opt-name {
+  font-size: 9.5pt;
+  font-weight: 700;
+  color: #0A1628;
+  margin-bottom: 1.5mm;
+}
+.opt-desc {
+  font-size: 8.5pt;
+  color: #6B7280;
+  line-height: 1.45;
+}
+.opt-img {
+  width: 100%;
+  max-height: 18mm;
+  object-fit: contain;
+  margin-top: 2mm;
+}
+
+/* page footer */
+.pg-footer {
+  position: fixed;
+  bottom: 8mm;
+  left: 16mm;
+  right: 16mm;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 7.5pt;
+  color: #9CA3AF;
+  border-top: 0.3mm solid #E2E8F0;
+  padding-top: 2.5mm;
+}
+.pg-footer-co { color: #D4A843; font-weight: 700; }
+.pg-num {
+  background: #0A1628;
+  color: #fff;
+  font-size: 7pt;
+  font-weight: 700;
+  padding: 1mm 2.5mm;
+  min-width: 6mm;
+  text-align: center;
+}
+
+.no-break { break-inside: avoid; }
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════ COVER PAGE ══════════════════════════════ -->
+<!-- ══════════════════════════════ COVER ══════════════════════════════════════ -->
 <div class="cover">
-  <div class="cover-header">
+
+  <div class="cover-topbar">
     {% if company and company.logo_path %}
-    <img class="cover-logo" src="{{ base_url }}/static/{{ company.logo_path }}" />
+    <img class="cover-logo-img" src="{{ base_url }}/static/{{ company.logo_path }}" />
     {% else %}
-    <span class="cover-logo-text">{{ company.company_name if company and company.company_name else 'B2B Sistem' }}</span>
+    <span class="cover-company">{{ company.company_name if company else 'B2B Sistem' }}</span>
     {% endif %}
-    <div style="text-align:right;">
-      <div class="cover-category">{{ category_name }}</div>
-      <div style="color:#93c5fd;font-size:8pt;margin-top:2mm;">{{ date_str }}</div>
+    <div class="cover-date">
+      {% if company and company.company_name and company.logo_path %}
+      <div style="color:#fff;font-size:9pt;font-weight:700;margin-bottom:1mm;">{{ company.company_name }}</div>
+      {% endif %}
+      <div>{{ date_str }}</div>
     </div>
+  </div>
+
+  <div class="cover-badge">
+    <div class="cover-badge-inner">{{ category_name }}</div>
   </div>
 
   {% if model.image_path %}
-  <div class="cover-image-wrap">
+  <div class="cover-img-wrap">
     <img src="{{ base_url }}/static/{{ model.image_path }}" />
-    <div class="cover-image-overlay"></div>
+    <div class="cover-img-gradient"></div>
   </div>
   {% else %}
-  <div class="cover-image-wrap" style="display:flex;align-items:center;justify-content:center;">
-    <div style="color:#334155;font-size:48pt;">⚙</div>
-  </div>
+  <div class="cover-img-wrap"><div class="cover-no-img">⚙</div></div>
   {% endif %}
 
-  <div class="cover-body">
+  <div class="cover-name-block">
     <div class="cover-name">{{ model_name }}</div>
+    <div class="cover-accent-line"></div>
     {% if ai.headline %}
     <div class="cover-headline">{{ ai.headline }}</div>
     {% endif %}
-    <div class="cover-divider"></div>
-    <div class="cover-meta">
-      {% if company and company.phone %}
-      <div class="cover-meta-item">{{ label_phone }}<span>{{ company.phone }}</span></div>
-      {% endif %}
-      {% if company and company.email %}
-      <div class="cover-meta-item">{{ label_email }}<span>{{ company.email }}</span></div>
-      {% endif %}
-      {% if company and company.website %}
-      <div class="cover-meta-item">{{ label_web }}<span>{{ company.website }}</span></div>
-      {% endif %}
+  </div>
+
+  <div class="cover-bottom">
+    <div class="cover-bottom-label">{{ label_product_catalog }}</div>
+    <div class="cover-bottom-contact">
+      {% if company and company.phone %}{{ company.phone }}{% endif %}
+      {% if company and company.email %} &nbsp;|&nbsp; {{ company.email }}{% endif %}
+      {% if company and company.website %} &nbsp;|&nbsp; {{ company.website }}{% endif %}
     </div>
   </div>
 
-  <div class="cover-footer">
-    <div class="cover-footer-text">{{ company.company_name if company and company.company_name else '' }}</div>
-    <div class="cover-footer-cta">{{ ai.cta }}</div>
-  </div>
 </div>
 
-<!-- ═══════════════════════════════ DESCRIPTION PAGE ═══════════════════════════ -->
+<!-- ══════════════════════════ OVERVIEW PAGE ══════════════════════════════════ -->
 <div class="page">
-  <div class="page-header">
-    <span class="page-header-title">{{ label_overview }}</span>
-    <span class="page-header-name">{{ model_name }}</span>
+
+  <div class="run-header">
+    <span class="run-header-section">{{ label_overview }}</span>
+    <span class="run-header-model">{{ model_name }}</span>
   </div>
 
-  <div class="section-title">{{ label_overview }}</div>
+  <div class="sec-heading">{{ label_overview }}</div>
 
   {% if ai.intro %}
   <p class="intro-text">{{ ai.intro }}</p>
   {% endif %}
 
   {% if ai.highlights %}
-  <div class="highlights-box">
-    <div class="highlights-title">{{ label_highlights }}</div>
-    <ul class="highlights-list">
-      {% for h in ai.highlights %}
-      <li>{{ h }}</li>
+  <div class="highlights-wrap no-break">
+    <div class="highlights-label">{{ label_highlights }}</div>
+    <div class="hl-grid">
+      {% set hl = ai.highlights %}
+      {% for i in range(0, hl|length, 2) %}
+      <div class="hl-row">
+        <div class="hl-cell">{{ hl[i] }}</div>
+        <div class="hl-cell">{% if i+1 < hl|length %}{{ hl[i+1] }}{% endif %}</div>
+      </div>
       {% endfor %}
-    </ul>
+    </div>
   </div>
   {% endif %}
 
   {% if specs %}
-  <div class="section-title" style="margin-top:6mm;">{{ label_specs }}</div>
+  <div class="sec-heading" style="margin-top:7mm;">{{ label_specs }}</div>
   {% if ai.specs_intro %}<p class="specs-intro">{{ ai.specs_intro }}</p>{% endif %}
-  <table class="specs-table">
-    <thead><tr><th>{{ label_spec_feature }}</th><th>{{ label_spec_detail }}</th></tr></thead>
+  <table class="specs-tbl">
+    <thead>
+      <tr>
+        <th>{{ label_spec_feature }}</th>
+        <th>{{ label_spec_detail }}<span style="float:right;"></span></th>
+      </tr>
+    </thead>
     <tbody>
-    {% for s in specs[:12] %}
+    {% for s in specs[:14] %}
     <tr class="no-break">
       <td>{{ s.title }}</td>
       <td>
-        {% set desc = s.get('desc_'+lang) or s.get('desc') or '' %}
-        {{ desc }}
+        {% set d = s.get('desc_'+lang) or s.get('desc') or '' %}
+        {{ d }}
         {% if s.get('img') %}
-        <br/><img class="spec-img" src="{{ base_url }}/static/{{ s.img }}" />
+        <br/><img class="spec-thumb" src="{{ base_url }}/static/{{ s.img }}" />
         {% endif %}
       </td>
     </tr>
@@ -386,77 +480,149 @@
   </table>
   {% endif %}
 
-  <div class="page-footer">
-    <span>{{ company.company_name if company and company.company_name else '' }}</span>
+  <div class="pg-footer">
+    <span class="pg-footer-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>
-    <span>2</span>
+    <span class="pg-num">02</span>
   </div>
 </div>
 
-<!-- ═══════════════════════════════ SPECS CONTINUATION ═══════════════════════ -->
-{% if specs|length > 12 %}
+<!-- ══════════════════════════ SPECS CONT. ════════════════════════════════════ -->
+{% if specs|length > 14 %}
 <div class="page">
-  <div class="page-header">
-    <span class="page-header-title">{{ label_specs }}</span>
-    <span class="page-header-name">{{ model_name }}</span>
+  <div class="run-header">
+    <span class="run-header-section">{{ label_specs }}</span>
+    <span class="run-header-model">{{ model_name }}</span>
   </div>
-  <table class="specs-table">
-    <thead><tr><th>{{ label_spec_feature }}</th><th>{{ label_spec_detail }}</th></tr></thead>
+  <div class="sec-heading">{{ label_specs }}</div>
+  <table class="specs-tbl">
+    <thead>
+      <tr><th>{{ label_spec_feature }}</th><th>{{ label_spec_detail }}</th></tr>
+    </thead>
     <tbody>
-    {% for s in specs[12:] %}
+    {% for s in specs[14:] %}
     <tr class="no-break">
       <td>{{ s.title }}</td>
       <td>
-        {% set desc = s.get('desc_'+lang) or s.get('desc') or '' %}
-        {{ desc }}
+        {% set d = s.get('desc_'+lang) or s.get('desc') or '' %}
+        {{ d }}
         {% if s.get('img') %}
-        <br/><img class="spec-img" src="{{ base_url }}/static/{{ s.img }}" />
+        <br/><img class="spec-thumb" src="{{ base_url }}/static/{{ s.img }}" />
         {% endif %}
       </td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
-  <div class="page-footer">
-    <span>{{ company.company_name if company and company.company_name else '' }}</span>
+  <div class="pg-footer">
+    <span class="pg-footer-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>
-    <span>3</span>
+    <span class="pg-num">03</span>
   </div>
 </div>
 {% endif %}
 
-<!-- ═══════════════════════════════ OPTIONS PAGE ════════════════════════════════ -->
+<!-- ══════════════════════════ OPTIONS PAGE ═══════════════════════════════════ -->
 {% if options %}
 <div class="page">
-  <div class="page-header">
-    <span class="page-header-title">{{ label_options }}</span>
-    <span class="page-header-name">{{ model_name }}</span>
+  <div class="run-header">
+    <span class="run-header-section">{{ label_options }}</span>
+    <span class="run-header-model">{{ model_name }}</span>
   </div>
-  <div class="section-title">{{ label_options }}</div>
+  <div class="sec-heading">{{ label_options }}</div>
 
-  <div class="options-grid">
-    {% for o in options %}
-    <div class="option-card no-break">
-      <div class="option-card-name">
-        {{ o.get('name_'+lang) or o.name }}
+  <div class="opt-grid">
+    {% for i in range(0, options|length, 2) %}
+    <div class="opt-row">
+      <div class="opt-cell">
+        <div class="opt-card">
+          <div class="opt-name">{{ options[i].get('name_'+lang) or options[i].name }}</div>
+          <div class="opt-desc">{{ options[i].get('description_'+lang) or options[i].get('description') or '' }}</div>
+          {% if options[i].get('image_path') %}
+          <img class="opt-img" src="{{ base_url }}/static/{{ options[i].image_path }}" />
+          {% endif %}
+        </div>
       </div>
-      <div class="option-card-desc">
-        {{ o.get('description_'+lang) or o.get('description') or '' }}
+      <div class="opt-cell">
+        {% if i+1 < options|length %}
+        <div class="opt-card">
+          <div class="opt-name">{{ options[i+1].get('name_'+lang) or options[i+1].name }}</div>
+          <div class="opt-desc">{{ options[i+1].get('description_'+lang) or options[i+1].get('description') or '' }}</div>
+          {% if options[i+1].get('image_path') %}
+          <img class="opt-img" src="{{ base_url }}/static/{{ options[i+1].image_path }}" />
+          {% endif %}
+        </div>
+        {% endif %}
       </div>
-      {% if o.get('image_path') %}
-      <img class="option-card-img" src="{{ base_url }}/static/{{ o.image_path }}" />
-      {% endif %}
     </div>
     {% endfor %}
   </div>
 
-  <div class="page-footer">
-    <span>{{ company.company_name if company and company.company_name else '' }}</span>
+  <div class="pg-footer">
+    <span class="pg-footer-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>
-    <span>{{ (3 if specs|length <= 12 else 4) }}</span>
+    <span class="pg-num">{{ '03' if specs|length <= 14 else '04' }}</span>
   </div>
 </div>
 {% endif %}
+
+<!-- ══════════════════════════ BACK COVER ═════════════════════════════════════ -->
+<div class="cover" style="page-break-before:always;">
+  <div class="cover-topbar">
+    {% if company and company.logo_path %}
+    <img class="cover-logo-img" src="{{ base_url }}/static/{{ company.logo_path }}" />
+    {% else %}
+    <span class="cover-company">{{ company.company_name if company else '' }}</span>
+    {% endif %}
+  </div>
+
+  <div style="padding: 28mm 18mm; text-align:center;">
+    <div style="color:#D4A843;font-size:8pt;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:6mm;">
+      {{ label_contact_us }}
+    </div>
+    <div style="color:#fff;font-size:22pt;font-weight:700;margin-bottom:8mm;line-height:1.2;">
+      {{ company.company_name if company else '' }}
+    </div>
+    <div style="width:14mm;height:0.8mm;background:#D4A843;margin:0 auto 8mm;"></div>
+    {% if ai.cta %}
+    <div style="color:#8BAEC8;font-size:11pt;line-height:1.6;margin-bottom:14mm;max-width:120mm;margin-left:auto;margin-right:auto;">
+      {{ ai.cta }}
+    </div>
+    {% endif %}
+
+    <div style="display:table;margin:0 auto;border-spacing:0 2.5mm;">
+      {% if company and company.phone %}
+      <div style="display:table-row;">
+        <div style="display:table-cell;color:#D4A843;font-size:9pt;font-weight:700;padding:2mm 4mm 2mm 0;text-align:right;">{{ label_phone }}</div>
+        <div style="display:table-cell;color:#fff;font-size:9pt;padding:2mm 0;">{{ company.phone }}</div>
+      </div>
+      {% endif %}
+      {% if company and company.email %}
+      <div style="display:table-row;">
+        <div style="display:table-cell;color:#D4A843;font-size:9pt;font-weight:700;padding:2mm 4mm 2mm 0;text-align:right;">{{ label_email }}</div>
+        <div style="display:table-cell;color:#fff;font-size:9pt;padding:2mm 0;">{{ company.email }}</div>
+      </div>
+      {% endif %}
+      {% if company and company.website %}
+      <div style="display:table-row;">
+        <div style="display:table-cell;color:#D4A843;font-size:9pt;font-weight:700;padding:2mm 4mm 2mm 0;text-align:right;">{{ label_web }}</div>
+        <div style="display:table-cell;color:#fff;font-size:9pt;padding:2mm 0;">{{ company.website }}</div>
+      </div>
+      {% endif %}
+      {% if company and company.address %}
+      <div style="display:table-row;">
+        <div style="display:table-cell;color:#D4A843;font-size:9pt;font-weight:700;padding:2mm 4mm 2mm 0;text-align:right;vertical-align:top;">{{ label_address }}</div>
+        <div style="display:table-cell;color:#8BAEC8;font-size:9pt;padding:2mm 0;line-height:1.5;">{{ company.address }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="cover-bottom">
+    <div class="cover-bottom-label">{{ model_name }}</div>
+    <div class="cover-bottom-contact">{{ date_str }}</div>
+  </div>
+</div>
 
 </body>
 </html>
