@@ -245,6 +245,7 @@
 
 {% block scripts %}
 <script>
+var _SPEC_TITLE_PH = {% if user.lang == 'zh' %}'规格标题'{% elif user.lang == 'en' %}'Feature title'{% else %}'Özellik başlığı'{% endif %};
 function calcTotalCost() {
   const pp = parseFloat(document.getElementById('purchase_price').value) || 0;
   const sc = parseFloat(document.getElementById('shipping_cost').value) || 0;
@@ -291,7 +292,7 @@ function addSpecRow(title, desc, imgPath, descEn, descZh) {
       <input type="hidden" class="spec-img-path" value="${_escQ(imgPath)}" />
     </div>
     <div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;">
-      <input type="text" class="spec-title form-control" placeholder="{{ T.spec_title_placeholder }}" value="${_escQ(title)}" style="font-size:13px;font-weight:600;" />
+      <input type="text" class="spec-title form-control" placeholder="${_SPEC_TITLE_PH}" value="${_escQ(title)}" style="font-size:13px;font-weight:600;" />
       <textarea class="spec-desc    form-control" rows="1" placeholder="🇹🇷 Açıklama (TR)" style="font-size:12px;">${_esc(desc)}</textarea>
       <textarea class="spec-desc-en form-control" rows="1" placeholder="🇬🇧 Description (EN)" style="font-size:12px;">${_esc(descEn)}</textarea>
       <textarea class="spec-desc-zh form-control" rows="1" placeholder="🇨🇳 说明 (ZH)" style="font-size:12px;">${_esc(descZh)}</textarea>
