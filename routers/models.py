@@ -385,6 +385,7 @@ async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
             "product_catalog": "Ürün Kataloğu",
             "contact_us": "İletişim",
             "address": "Adres",
+            "option_benefits": "Seçili Opsiyonların Sağladığı Faydalar",
         },
         "en": {
             "overview": "Product Overview",
@@ -399,6 +400,7 @@ async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
             "product_catalog": "Product Catalog",
             "contact_us": "Contact Us",
             "address": "Address",
+            "option_benefits": "Benefits of Selected Options",
         },
         "zh": {
             "overview": "产品概览",
@@ -413,6 +415,7 @@ async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
             "product_catalog": "产品目录",
             "contact_us": "联系我们",
             "address": "地址",
+            "option_benefits": "所选选项的优势",
         },
     }
     lbl = _L.get(lang, _L["tr"])
@@ -439,12 +442,13 @@ async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
         "label_spec_feature": lbl["spec_feature"],
         "label_spec_detail":  lbl["spec_detail"],
         "label_options":      lbl["options"],
-        "label_phone":          lbl["phone"],
-        "label_email":          lbl["email"],
-        "label_web":            lbl["web"],
+        "label_phone":           lbl["phone"],
+        "label_email":           lbl["email"],
+        "label_web":             lbl["web"],
         "label_product_catalog": lbl["product_catalog"],
-        "label_contact_us":     lbl["contact_us"],
-        "label_address":        lbl["address"],
+        "label_contact_us":      lbl["contact_us"],
+        "label_address":         lbl["address"],
+        "label_option_benefits": lbl["option_benefits"],
     })
 
     try:

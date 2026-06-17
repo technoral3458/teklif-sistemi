@@ -3,624 +3,504 @@
 <head>
 <meta charset="UTF-8"/>
 <style>
-@page cover {
-  size: A4;
-  margin: 0;
-}
-@page content {
-  size: A4;
-  margin: 18mm 16mm 22mm 16mm;
-  @bottom-center {
-    content: "";
-  }
-}
+@page { size: A4; margin: 0; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1a1a2e; }
+body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1a1a2e; background: #fff; }
 
-/* ═══════════════════════════════════════════════════════
-   COVER
-═══════════════════════════════════════════════════════ */
+/* ═══════════ COVER — WHITE THEME ═══════════ */
 .cover {
-  page: cover;
   width: 210mm;
   height: 297mm;
-  background: #0A1628;
+  background: #fff;
   position: relative;
   page-break-after: always;
   overflow: hidden;
 }
-
-/* top bar */
-.cover-topbar {
-  background: #0D1E35;
-  height: 22mm;
+.cov-topbar {
+  background: #fff;
+  padding: 8mm 12mm 6mm;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 14mm;
-  border-bottom: 0.6mm solid #D4A843;
+  border-bottom: 0.5mm solid #E8E8E8;
 }
-.cover-company {
-  color: #fff;
-  font-size: 14pt;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-.cover-logo-img {
-  height: 13mm;
-  max-width: 50mm;
-  object-fit: contain;
-}
-.cover-date {
-  color: #8BAEC8;
-  font-size: 8pt;
-  text-align: right;
-}
-
-/* category badge */
-.cover-badge {
-  margin: 6mm 14mm 4mm;
+.cov-logo { height: 14mm; max-width: 50mm; object-fit: contain; }
+.cov-logo-text { color: #0A1628; font-size: 15pt; font-weight: 700; }
+.cov-topright { text-align: right; }
+.cov-cat {
   display: inline-block;
-}
-.cover-badge-inner {
   background: #D4A843;
-  color: #0A1628;
-  font-size: 7.5pt;
+  color: #fff;
+  font-size: 7pt;
   font-weight: 700;
-  letter-spacing: 2.5px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  padding: 2mm 5mm;
-  display: inline-block;
+  padding: 1.5mm 4mm;
+  margin-bottom: 1.5mm;
 }
+.cov-date { color: #9CA3AF; font-size: 7.5pt; }
 
-/* image */
-.cover-img-wrap {
-  margin: 0 14mm;
-  height: 100mm;
+/* image frame */
+.cov-img-frame {
+  margin: 5mm 12mm;
+  height: 108mm;
   overflow: hidden;
   position: relative;
-  background: #0D1E35;
-  border: 0.3mm solid #1E3A5F;
+  background: #F5F6F8;
+  border: 0.3mm solid #E2E8F0;
 }
-.cover-img-wrap img {
+.cov-img-frame img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.cover-img-gradient {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 28mm;
-  background: linear-gradient(transparent, #0A1628);
-}
-.cover-no-img {
+.cov-no-img {
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #1E3A5F;
-  font-size: 60pt;
+  color: #CBD5E1;
+  font-size: 55pt;
 }
-
-/* name block */
-.cover-name-block {
-  padding: 7mm 14mm 0;
-}
-.cover-name {
-  color: #fff;
-  font-size: 24pt;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.3px;
-}
-.cover-accent-line {
-  width: 18mm;
-  height: 0.8mm;
-  background: #D4A843;
-  margin: 4mm 0;
-}
-.cover-headline {
-  color: #8BAEC8;
-  font-size: 10.5pt;
-  line-height: 1.55;
-  max-width: 145mm;
-}
-
-/* bottom strip */
-.cover-bottom {
+/* bottom-left gold stripe on image */
+.cov-img-stripe {
   position: absolute;
   bottom: 0; left: 0; right: 0;
+  height: 1.2mm;
   background: #D4A843;
-  padding: 4.5mm 14mm;
+}
+
+/* name + headline */
+.cov-body {
+  padding: 6mm 12mm 4mm;
+}
+.cov-name {
+  font-size: 23pt;
+  font-weight: 700;
+  color: #0A1628;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+.cov-gold-bar {
+  width: 14mm;
+  height: 1mm;
+  background: #D4A843;
+  margin: 3.5mm 0;
+}
+.cov-headline {
+  font-size: 11pt;
+  color: #4B5563;
+  line-height: 1.55;
+  max-width: 148mm;
+  font-style: italic;
+}
+
+/* bottom footer bar */
+.cov-footer {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: #0A1628;
+  padding: 5mm 12mm;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.cover-bottom-label {
-  color: #0A1628;
-  font-size: 8pt;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-.cover-bottom-contact {
-  color: #0A1628;
-  font-size: 8pt;
-  text-align: right;
-  line-height: 1.5;
-}
+.cov-footer-brand { color: #fff; font-size: 9pt; font-weight: 700; }
+.cov-footer-contact { color: #8BAEC8; font-size: 8pt; text-align: right; line-height: 1.6; }
+.cov-footer-contact span { color: #D4A843; }
 
-/* ═══════════════════════════════════════════════════════
-   CONTENT PAGES
-═══════════════════════════════════════════════════════ */
+/* ═══════════ CONTENT PAGES ═══════════ */
 .page {
-  page: content;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 13mm 14mm 24mm;
   page-break-after: always;
+  position: relative;
 }
-
-/* running header */
 .run-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 7mm;
-  padding-bottom: 3.5mm;
+  margin-bottom: 6mm;
+  padding-bottom: 3mm;
   border-bottom: 0.4mm solid #0A1628;
 }
-.run-header-section {
-  font-size: 7.5pt;
-  font-weight: 700;
-  color: #8BAEC8;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-}
-.run-header-model {
-  font-size: 7.5pt;
-  font-weight: 700;
-  color: #D4A843;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
+.run-sec  { font-size: 7pt; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1.5px; }
+.run-name { font-size: 7pt; font-weight: 700; color: #D4A843; text-transform: uppercase; letter-spacing: 1px; }
 
-/* section heading */
-.sec-heading {
+.sec-title {
   font-size: 13pt;
   font-weight: 700;
   color: #0A1628;
-  margin-bottom: 5mm;
+  margin-bottom: 4.5mm;
   padding-bottom: 2.5mm;
-  border-bottom: 0.3mm solid #E2E8F0;
+  border-bottom: 0.25mm solid #E9ECF0;
   position: relative;
 }
-.sec-heading::after {
+.sec-title::after {
   content: "";
   position: absolute;
-  bottom: -0.3mm;
-  left: 0;
-  width: 12mm;
-  height: 0.6mm;
+  bottom: -0.25mm; left: 0;
+  width: 11mm; height: 0.7mm;
   background: #D4A843;
 }
 
-/* intro text */
-.intro-text {
+/* intro */
+.intro-p {
   font-size: 10pt;
-  line-height: 1.75;
+  line-height: 1.78;
   color: #374151;
-  margin-bottom: 6mm;
+  margin-bottom: 5.5mm;
   text-align: justify;
 }
 
-/* highlights */
-.highlights-wrap {
-  background: #F8F9FB;
-  border: 0.3mm solid #E2E8F0;
+/* highlights box */
+.hl-box {
+  background: #FAFBFC;
+  border: 0.25mm solid #E2E8F0;
   border-left: 1.2mm solid #D4A843;
-  padding: 5mm 6mm;
-  margin-bottom: 7mm;
+  padding: 4.5mm 6mm;
+  margin-bottom: 5mm;
 }
-.highlights-label {
-  font-size: 7.5pt;
-  font-weight: 700;
-  color: #0A1628;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-bottom: 4mm;
+.hl-label {
+  font-size: 7pt; font-weight: 700; color: #0A1628;
+  text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3.5mm;
 }
-.hl-grid {
-  display: table;
-  width: 100%;
+.hl-table { width: 100%; border-collapse: collapse; }
+.hl-td {
+  width: 50%; padding: 1.5mm 0 1.5mm 5mm;
+  font-size: 9.5pt; color: #1E3A5F; line-height: 1.4;
+  vertical-align: top; position: relative;
 }
-.hl-row {
-  display: table-row;
+.hl-td::before { content: "◆"; position: absolute; left: 0; top: 2mm; color: #D4A843; font-size: 5.5pt; }
+
+/* option benefits box */
+.ob-box {
+  background: #F0F7FF;
+  border: 0.25mm solid #BFDBFE;
+  border-left: 1.2mm solid #3B82F6;
+  padding: 4.5mm 6mm;
+  margin-bottom: 5mm;
 }
-.hl-cell {
-  display: table-cell;
-  width: 50%;
-  padding: 1.5mm 0 1.5mm 5mm;
-  font-size: 9.5pt;
-  color: #1E3A5F;
-  line-height: 1.4;
-  vertical-align: top;
-  position: relative;
+.ob-label {
+  font-size: 7pt; font-weight: 700; color: #1D4ED8;
+  text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3mm;
 }
-.hl-cell::before {
-  content: "◆";
-  position: absolute;
-  left: 0;
-  top: 1.5mm;
-  color: #D4A843;
-  font-size: 6pt;
+.ob-item {
+  font-size: 9.5pt; color: #1E3A5F; line-height: 1.55;
+  padding: 1.2mm 0 1.2mm 5mm; position: relative;
 }
+.ob-item::before { content: "✓"; position: absolute; left: 0; top: 1.5mm; color: #3B82F6; font-weight: 700; font-size: 8.5pt; }
 
 /* specs table */
-.specs-intro {
-  font-size: 9pt;
-  color: #6B7280;
-  font-style: italic;
-  margin-bottom: 4mm;
-}
-.specs-tbl {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 9pt;
-}
-.specs-tbl thead tr {
-  background: #0A1628;
-}
-.specs-tbl thead th {
-  color: #fff;
-  padding: 3mm 4.5mm;
-  text-align: left;
-  font-size: 8.5pt;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-.specs-tbl thead th:first-child { width: 40%; }
-.specs-tbl thead th:last-child  {
-  text-align: right;
-  color: #D4A843;
-  font-size: 7pt;
-  font-weight: 400;
-  font-style: italic;
-}
-.specs-tbl tbody tr { border-bottom: 0.2mm solid #E9ECF0; }
-.specs-tbl tbody tr:nth-child(even) { background: #F8F9FB; }
-.specs-tbl tbody tr:nth-child(odd)  { background: #fff; }
-.specs-tbl tbody td {
-  padding: 2.5mm 4.5mm;
-  vertical-align: top;
-  line-height: 1.5;
-}
-.specs-tbl tbody td:first-child {
-  font-weight: 700;
-  color: #0A1628;
-}
-.specs-tbl tbody td:last-child { color: #374151; }
+.sp-intro { font-size: 8.5pt; color: #6B7280; font-style: italic; margin-bottom: 3.5mm; }
+.sp-tbl { width: 100%; border-collapse: collapse; font-size: 9pt; }
+.sp-tbl thead tr { background: #0A1628; }
+.sp-tbl thead th { color: #fff; padding: 2.5mm 4mm; text-align: left; font-size: 8.5pt; font-weight: 700; }
+.sp-tbl thead th:first-child { width: 38%; }
+.sp-tbl tbody tr { border-bottom: 0.2mm solid #E9ECF0; }
+.sp-tbl tbody tr:nth-child(even) { background: #F8F9FB; }
+.sp-tbl tbody td { padding: 2.2mm 4mm; vertical-align: top; line-height: 1.5; }
+.sp-tbl tbody td:first-child { font-weight: 700; color: #0A1628; }
+.sp-tbl tbody td:last-child  { color: #374151; }
+.sp-thumb { max-width: 26mm; max-height: 16mm; object-fit: contain; margin-top: 1.5mm; }
 
-/* spec thumbnail */
-.spec-thumb {
-  max-width: 28mm;
-  max-height: 18mm;
-  object-fit: contain;
-  margin-top: 1.5mm;
-  border-radius: 2px;
-}
-
-/* options */
-.opt-grid {
-  display: table;
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 3mm 3mm;
-}
-.opt-row { display: table-row; }
-.opt-cell {
-  display: table-cell;
-  width: 50%;
-  vertical-align: top;
-}
+/* ═══════════ OPTIONS PAGE ═══════════ */
+.opt-grid { width: 100%; border-collapse: separate; border-spacing: 0 4mm; display: table; }
+.opt-row  { display: table-row; }
+.opt-cell { display: table-cell; width: 50%; vertical-align: top; padding: 0 2mm; }
 .opt-card {
-  border: 0.3mm solid #E2E8F0;
-  border-top: 1mm solid #0A1628;
+  border: 0.25mm solid #E2E8F0;
+  border-top: 1.2mm solid #0A1628;
   background: #fff;
-  padding: 3.5mm 4mm;
+  overflow: hidden;
 }
-.opt-name {
-  font-size: 9.5pt;
-  font-weight: 700;
-  color: #0A1628;
-  margin-bottom: 1.5mm;
+.opt-img-wrap {
+  height: 36mm;
+  background: #F5F6F8;
+  overflow: hidden;
+  position: relative;
 }
-.opt-desc {
-  font-size: 8.5pt;
-  color: #6B7280;
-  line-height: 1.45;
+.opt-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+.opt-no-img {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  color: #CBD5E1; font-size: 24pt;
 }
-.opt-img {
-  width: 100%;
-  max-height: 18mm;
-  object-fit: contain;
-  margin-top: 2mm;
-}
+.opt-body { padding: 3mm 3.5mm 3.5mm; }
+.opt-name { font-size: 9.5pt; font-weight: 700; color: #0A1628; margin-bottom: 2mm; }
+.opt-text { font-size: 8.5pt; color: #4B5563; line-height: 1.5; }
 
 /* page footer */
-.pg-footer {
-  position: fixed;
-  bottom: 8mm;
-  left: 16mm;
-  right: 16mm;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 7.5pt;
-  color: #9CA3AF;
-  border-top: 0.3mm solid #E2E8F0;
-  padding-top: 2.5mm;
+.pg-foot {
+  position: absolute;
+  bottom: 7mm; left: 14mm; right: 14mm;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 7pt; color: #9CA3AF;
+  border-top: 0.25mm solid #E2E8F0; padding-top: 2.5mm;
 }
-.pg-footer-co { color: #D4A843; font-weight: 700; }
+.pg-co  { color: #D4A843; font-weight: 700; }
 .pg-num {
-  background: #0A1628;
-  color: #fff;
-  font-size: 7pt;
-  font-weight: 700;
-  padding: 1mm 2.5mm;
-  min-width: 6mm;
-  text-align: center;
+  background: #0A1628; color: #fff;
+  font-size: 7pt; font-weight: 700;
+  padding: 1mm 2.5mm; min-width: 5mm; text-align: center;
 }
 
-.no-break { break-inside: avoid; }
+/* ═══════════ BACK COVER ═══════════ */
+.back-cover {
+  width: 210mm; height: 297mm;
+  background: #0A1628;
+  position: relative; overflow: hidden;
+  page-break-before: always;
+}
+.bc-top { height: 2mm; background: #D4A843; }
+.bc-body { padding: 30mm 18mm; text-align: center; }
+.bc-contact-label {
+  color: #D4A843; font-size: 7.5pt; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase; margin-bottom: 5mm;
+}
+.bc-company { color: #fff; font-size: 22pt; font-weight: 700; margin-bottom: 3mm; line-height: 1.15; }
+.bc-gold-bar { width: 12mm; height: 0.8mm; background: #D4A843; margin: 0 auto 7mm; }
+.bc-cta { color: #8BAEC8; font-size: 10.5pt; line-height: 1.65; max-width: 130mm; margin: 0 auto 14mm; }
+.bc-info-tbl { display: table; margin: 0 auto; border-spacing: 0 2.5mm; }
+.bc-info-row { display: table-row; }
+.bc-info-label { display: table-cell; color: #D4A843; font-size: 8.5pt; font-weight: 700; padding: 1.5mm 5mm 1.5mm 0; text-align: right; vertical-align: top; }
+.bc-info-val   { display: table-cell; color: #E2E8F0; font-size: 8.5pt; padding: 1.5mm 0; line-height: 1.5; }
+.bc-footer {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  border-top: 0.5mm solid #1E3A5F;
+  padding: 4mm 18mm;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.bc-model { color: #D4A843; font-size: 8pt; font-weight: 700; }
+.bc-date  { color: #4B5563; font-size: 8pt; }
+
+.nb { break-inside: avoid; }
 </style>
 </head>
 <body>
 
-<!-- ══════════════════════════════ COVER ══════════════════════════════════════ -->
+<!-- ════════════════════════════ COVER ════════════════════════════════════════ -->
 <div class="cover">
-
-  <div class="cover-topbar">
+  <div class="cov-topbar">
     {% if company and company.logo_path %}
-    <img class="cover-logo-img" src="{{ base_url }}/static/{{ company.logo_path }}" />
+    <img class="cov-logo" src="{{ base_url }}/static/{{ company.logo_path }}" />
     {% else %}
-    <span class="cover-company">{{ company.company_name if company else 'B2B Sistem' }}</span>
+    <span class="cov-logo-text">{{ company.company_name if company else 'B2B Sistem' }}</span>
     {% endif %}
-    <div class="cover-date">
+    <div class="cov-topright">
       {% if company and company.company_name and company.logo_path %}
-      <div style="color:#fff;font-size:9pt;font-weight:700;margin-bottom:1mm;">{{ company.company_name }}</div>
+      <div style="color:#0A1628;font-size:10pt;font-weight:700;margin-bottom:1.5mm;">{{ company.company_name }}</div>
       {% endif %}
-      <div>{{ date_str }}</div>
+      <div class="cov-cat">{{ category_name }}</div>
+      <div class="cov-date">{{ date_str }}</div>
     </div>
   </div>
 
-  <div class="cover-badge">
-    <div class="cover-badge-inner">{{ category_name }}</div>
-  </div>
-
-  {% if model.image_path %}
-  <div class="cover-img-wrap">
+  <div class="cov-img-frame">
+    {% if model.image_path %}
     <img src="{{ base_url }}/static/{{ model.image_path }}" />
-    <div class="cover-img-gradient"></div>
+    {% else %}
+    <div class="cov-no-img">⚙</div>
+    {% endif %}
+    <div class="cov-img-stripe"></div>
   </div>
-  {% else %}
-  <div class="cover-img-wrap"><div class="cover-no-img">⚙</div></div>
-  {% endif %}
 
-  <div class="cover-name-block">
-    <div class="cover-name">{{ model_name }}</div>
-    <div class="cover-accent-line"></div>
+  <div class="cov-body">
+    <div class="cov-name">{{ model_name }}</div>
+    <div class="cov-gold-bar"></div>
     {% if ai.headline %}
-    <div class="cover-headline">{{ ai.headline }}</div>
+    <div class="cov-headline">{{ ai.headline }}</div>
     {% endif %}
   </div>
 
-  <div class="cover-bottom">
-    <div class="cover-bottom-label">{{ label_product_catalog }}</div>
-    <div class="cover-bottom-contact">
-      {% if company and company.phone %}{{ company.phone }}{% endif %}
-      {% if company and company.email %} &nbsp;|&nbsp; {{ company.email }}{% endif %}
-      {% if company and company.website %} &nbsp;|&nbsp; {{ company.website }}{% endif %}
+  <div class="cov-footer">
+    <div class="cov-footer-brand">{{ label_product_catalog }}</div>
+    <div class="cov-footer-contact">
+      {% if company and company.phone %}<span>{{ label_phone }}</span>&nbsp;{{ company.phone }}<br/>{% endif %}
+      {% if company and company.email %}<span>{{ label_email }}</span>&nbsp;{{ company.email }}{% endif %}
     </div>
   </div>
-
 </div>
 
-<!-- ══════════════════════════ OVERVIEW PAGE ══════════════════════════════════ -->
+<!-- ════════════════════════════ OVERVIEW PAGE ════════════════════════════════ -->
 <div class="page">
-
   <div class="run-header">
-    <span class="run-header-section">{{ label_overview }}</span>
-    <span class="run-header-model">{{ model_name }}</span>
+    <span class="run-sec">{{ label_overview }}</span>
+    <span class="run-name">{{ model_name }}</span>
   </div>
 
-  <div class="sec-heading">{{ label_overview }}</div>
+  <div class="sec-title">{{ label_overview }}</div>
 
   {% if ai.intro %}
-  <p class="intro-text">{{ ai.intro }}</p>
+  <p class="intro-p">{{ ai.intro }}</p>
   {% endif %}
 
   {% if ai.highlights %}
-  <div class="highlights-wrap no-break">
-    <div class="highlights-label">{{ label_highlights }}</div>
-    <div class="hl-grid">
+  <div class="hl-box nb">
+    <div class="hl-label">{{ label_highlights }}</div>
+    <table class="hl-table">
       {% set hl = ai.highlights %}
       {% for i in range(0, hl|length, 2) %}
-      <div class="hl-row">
-        <div class="hl-cell">{{ hl[i] }}</div>
-        <div class="hl-cell">{% if i+1 < hl|length %}{{ hl[i+1] }}{% endif %}</div>
-      </div>
+      <tr>
+        <td class="hl-td">{{ hl[i] }}</td>
+        <td class="hl-td">{% if i+1 < hl|length %}{{ hl[i+1] }}{% endif %}</td>
+      </tr>
       {% endfor %}
-    </div>
+    </table>
   </div>
   {% endif %}
 
-  {% if specs %}
-  <div class="sec-heading" style="margin-top:7mm;">{{ label_specs }}</div>
-  {% if ai.specs_intro %}<p class="specs-intro">{{ ai.specs_intro }}</p>{% endif %}
-  <table class="specs-tbl">
-    <thead>
-      <tr>
-        <th>{{ label_spec_feature }}</th>
-        <th>{{ label_spec_detail }}<span style="float:right;"></span></th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for s in specs[:14] %}
-    <tr class="no-break">
-      <td>{{ s.title }}</td>
-      <td>
-        {% set d = s.get('desc_'+lang) or s.get('desc') or '' %}
-        {{ d }}
-        {% if s.get('img') %}
-        <br/><img class="spec-thumb" src="{{ base_url }}/static/{{ s.img }}" />
-        {% endif %}
-      </td>
-    </tr>
+  {% if ai.option_benefits and options %}
+  <div class="ob-box nb">
+    <div class="ob-label">{{ label_option_benefits }}</div>
+    {% for b in ai.option_benefits %}
+    <div class="ob-item">{{ b }}</div>
     {% endfor %}
-    </tbody>
-  </table>
+  </div>
   {% endif %}
 
-  <div class="pg-footer">
-    <span class="pg-footer-co">{{ company.company_name if company else '' }}</span>
+  <div class="pg-foot">
+    <span class="pg-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>
     <span class="pg-num">02</span>
   </div>
 </div>
 
-<!-- ══════════════════════════ SPECS CONT. ════════════════════════════════════ -->
-{% if specs|length > 14 %}
+<!-- ════════════════════════════ SPECS PAGE ═══════════════════════════════════ -->
+{% if specs %}
 <div class="page">
   <div class="run-header">
-    <span class="run-header-section">{{ label_specs }}</span>
-    <span class="run-header-model">{{ model_name }}</span>
+    <span class="run-sec">{{ label_specs }}</span>
+    <span class="run-name">{{ model_name }}</span>
   </div>
-  <div class="sec-heading">{{ label_specs }}</div>
-  <table class="specs-tbl">
-    <thead>
-      <tr><th>{{ label_spec_feature }}</th><th>{{ label_spec_detail }}</th></tr>
-    </thead>
+  <div class="sec-title">{{ label_specs }}</div>
+  {% if ai.specs_intro %}<p class="sp-intro">{{ ai.specs_intro }}</p>{% endif %}
+  <table class="sp-tbl">
+    <thead><tr><th>{{ label_spec_feature }}</th><th>{{ label_spec_detail }}</th></tr></thead>
     <tbody>
-    {% for s in specs[14:] %}
-    <tr class="no-break">
+    {% for s in specs[:16] %}
+    <tr class="nb">
       <td>{{ s.title }}</td>
       <td>
-        {% set d = s.get('desc_'+lang) or s.get('desc') or '' %}
-        {{ d }}
-        {% if s.get('img') %}
-        <br/><img class="spec-thumb" src="{{ base_url }}/static/{{ s.img }}" />
-        {% endif %}
+        {% set d = s.get('desc_'+lang) or s.get('desc') or '' %}{{ d }}
+        {% if s.get('img') %}<br/><img class="sp-thumb" src="{{ base_url }}/static/{{ s.img }}" />{% endif %}
       </td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
-  <div class="pg-footer">
-    <span class="pg-footer-co">{{ company.company_name if company else '' }}</span>
+
+  {% if specs|length > 16 %}
+  <table class="sp-tbl" style="margin-top:3mm;">
+    <tbody>
+    {% for s in specs[16:] %}
+    <tr class="nb">
+      <td>{{ s.title }}</td>
+      <td>{% set d = s.get('desc_'+lang) or s.get('desc') or '' %}{{ d }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="pg-foot">
+    <span class="pg-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>
     <span class="pg-num">03</span>
   </div>
 </div>
 {% endif %}
 
-<!-- ══════════════════════════ OPTIONS PAGE ═══════════════════════════════════ -->
+<!-- ════════════════════════════ OPTIONS PAGE ═════════════════════════════════ -->
 {% if options %}
 <div class="page">
   <div class="run-header">
-    <span class="run-header-section">{{ label_options }}</span>
-    <span class="run-header-model">{{ model_name }}</span>
+    <span class="run-sec">{{ label_options }}</span>
+    <span class="run-name">{{ model_name }}</span>
   </div>
-  <div class="sec-heading">{{ label_options }}</div>
+  <div class="sec-title">{{ label_options }}</div>
 
   <div class="opt-grid">
     {% for i in range(0, options|length, 2) %}
     <div class="opt-row">
+      {% for j in [i, i+1] %}
       <div class="opt-cell">
-        <div class="opt-card">
-          <div class="opt-name">{{ options[i].get('name_'+lang) or options[i].name }}</div>
-          <div class="opt-desc">{{ options[i].get('description_'+lang) or options[i].get('description') or '' }}</div>
-          {% if options[i].get('image_path') %}
-          <img class="opt-img" src="{{ base_url }}/static/{{ options[i].image_path }}" />
-          {% endif %}
-        </div>
-      </div>
-      <div class="opt-cell">
-        {% if i+1 < options|length %}
-        <div class="opt-card">
-          <div class="opt-name">{{ options[i+1].get('name_'+lang) or options[i+1].name }}</div>
-          <div class="opt-desc">{{ options[i+1].get('description_'+lang) or options[i+1].get('description') or '' }}</div>
-          {% if options[i+1].get('image_path') %}
-          <img class="opt-img" src="{{ base_url }}/static/{{ options[i+1].image_path }}" />
-          {% endif %}
+        {% if j < options|length %}
+        {% set o = options[j] %}
+        {% set oname = o.get('name_'+lang) or o.name %}
+        <div class="opt-card nb">
+          <div class="opt-img-wrap">
+            {% if o.get('image_path') %}
+            <img src="{{ base_url }}/static/{{ o.image_path }}" />
+            {% else %}
+            <div class="opt-no-img">⚙</div>
+            {% endif %}
+          </div>
+          <div class="opt-body">
+            <div class="opt-name">{{ oname }}</div>
+            <div class="opt-text">
+              {% set ai_text = ai.option_texts.get(oname) or ai.option_texts.get(o.name) or (o.get('description_'+lang) or o.get('description') or '') %}
+              {{ ai_text }}
+            </div>
+          </div>
         </div>
         {% endif %}
       </div>
+      {% endfor %}
     </div>
     {% endfor %}
   </div>
 
-  <div class="pg-footer">
-    <span class="pg-footer-co">{{ company.company_name if company else '' }}</span>
+  <div class="pg-foot">
+    <span class="pg-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>
-    <span class="pg-num">{{ '03' if specs|length <= 14 else '04' }}</span>
+    <span class="pg-num">{{ '04' if specs else '03' }}</span>
   </div>
 </div>
 {% endif %}
 
-<!-- ══════════════════════════ BACK COVER ═════════════════════════════════════ -->
-<div class="cover" style="page-break-before:always;">
-  <div class="cover-topbar">
-    {% if company and company.logo_path %}
-    <img class="cover-logo-img" src="{{ base_url }}/static/{{ company.logo_path }}" />
-    {% else %}
-    <span class="cover-company">{{ company.company_name if company else '' }}</span>
-    {% endif %}
-  </div>
-
-  <div style="padding: 28mm 18mm; text-align:center;">
-    <div style="color:#D4A843;font-size:8pt;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:6mm;">
-      {{ label_contact_us }}
-    </div>
-    <div style="color:#fff;font-size:22pt;font-weight:700;margin-bottom:8mm;line-height:1.2;">
-      {{ company.company_name if company else '' }}
-    </div>
-    <div style="width:14mm;height:0.8mm;background:#D4A843;margin:0 auto 8mm;"></div>
+<!-- ════════════════════════════ BACK COVER ═══════════════════════════════════ -->
+<div class="back-cover">
+  <div class="bc-top"></div>
+  <div class="bc-body">
+    <div class="bc-contact-label">{{ label_contact_us }}</div>
+    <div class="bc-company">{{ company.company_name if company else '' }}</div>
+    <div class="bc-gold-bar"></div>
     {% if ai.cta %}
-    <div style="color:#8BAEC8;font-size:11pt;line-height:1.6;margin-bottom:14mm;max-width:120mm;margin-left:auto;margin-right:auto;">
-      {{ ai.cta }}
-    </div>
+    <div class="bc-cta">{{ ai.cta }}</div>
     {% endif %}
-
-    <div style="display:table;margin:0 auto;border-spacing:0 2.5mm;">
+    <div class="bc-info-tbl">
       {% if company and company.phone %}
-      <div style="display:table-row;">
-        <div style="display:table-cell;color:#D4A843;font-size:9pt;font-weight:700;padding:2mm 4mm 2mm 0;text-align:right;">{{ label_phone }}</div>
-        <div style="display:table-cell;color:#fff;font-size:9pt;padding:2mm 0;">{{ company.phone }}</div>
+      <div class="bc-info-row">
+        <div class="bc-info-label">{{ label_phone }}</div>
+        <div class="bc-info-val">{{ company.phone }}</div>
       </div>
       {% endif %}
       {% if company and company.email %}
-      <div style="display:table-row;">
-        <div style="display:table-cell;color:#D4A843;font-size:9pt;font-weight:700;padding:2mm 4mm 2mm 0;text-align:right;">{{ label_email }}</div>
-        <div style="display:table-cell;color:#fff;font-size:9pt;padding:2mm 0;">{{ company.email }}</div>
+      <div class="bc-info-row">
+        <div class="bc-info-label">{{ label_email }}</div>
+        <div class="bc-info-val">{{ company.email }}</div>
       </div>
       {% endif %}
       {% if company and company.website %}
-      <div style="display:table-row;">
-        <div style="display:table-cell;color:#D4A843;font-size:9pt;font-weight:700;padding:2mm 4mm 2mm 0;text-align:right;">{{ label_web }}</div>
-        <div style="display:table-cell;color:#fff;font-size:9pt;padding:2mm 0;">{{ company.website }}</div>
+      <div class="bc-info-row">
+        <div class="bc-info-label">{{ label_web }}</div>
+        <div class="bc-info-val">{{ company.website }}</div>
       </div>
       {% endif %}
       {% if company and company.address %}
-      <div style="display:table-row;">
-        <div style="display:table-cell;color:#D4A843;font-size:9pt;font-weight:700;padding:2mm 4mm 2mm 0;text-align:right;vertical-align:top;">{{ label_address }}</div>
-        <div style="display:table-cell;color:#8BAEC8;font-size:9pt;padding:2mm 0;line-height:1.5;">{{ company.address }}</div>
+      <div class="bc-info-row">
+        <div class="bc-info-label">{{ label_address }}</div>
+        <div class="bc-info-val">{{ company.address }}</div>
       </div>
       {% endif %}
     </div>
   </div>
-
-  <div class="cover-bottom">
-    <div class="cover-bottom-label">{{ model_name }}</div>
-    <div class="cover-bottom-contact">{{ date_str }}</div>
+  <div class="bc-footer">
+    <span class="bc-model">{{ model_name }}</span>
+    <span class="bc-date">{{ date_str }}</span>
   </div>
 </div>
 
