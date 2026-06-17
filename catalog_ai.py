@@ -103,7 +103,7 @@ def generate_catalog_content(model: dict, lang: str, specs: list, options: list)
 
 
 def generate_general_catalog_content(models: list, lang: str, company_name: str) -> dict:
-    """Generate company-level catalog intro + one tagline per model."""
+    """Generate company-level catalog intro + tagline per model + spec descriptions."""
     import logging
     log = logging.getLogger(__name__)
 
@@ -111,31 +111,57 @@ def generate_general_catalog_content(models: list, lang: str, company_name: str)
     if not ANTHROPIC_API_KEY:
         return _general_fallback(models, lang)
     try:
-        model_lines = "\n".join(
-            f'- "{m.get(f"name_{lang}") or m.get("name","")}" (category: {m.get("_cat_name","")}, desc: {(m.get(f"description_{lang}") or m.get("description",""))[:80]})'
-            for m in models
-        )
-        prompt = f"""
-You are writing a premium B2B industrial machinery company catalog for "{company_name}".
+        model_entries = []
+        for m in models[:12]:
+            name = m.get(f"name_{lang}") or m.get("name", "")
+            cat = m.get("_cat_name", "")
+            desc = (m.get(f"description_{lang}") or m.get("description", ""))[:80]
+            specs = m.get("_specs", [])[:8]
+            spec_parts = "; ".join(
+                f'{s["title"]}: {(s.get(f"desc_{lang}") or s.get("desc",""))[:50]}'
+                for s in specs if s.get("title")
+            )
+            model_entries.append(
+                f'- "{name}" [{cat}]: {desc}. Specs: {spec_parts or "none"}'
+            )
+        model_lines = "\n".join(model_entries)
 
-Product list:
+        # Build example spec structure for the prompt
+        spec_example_model = ""
+        spec_example_keys = ""
+        for m in models[:1]:
+            spec_example_model = m.get(f"name_{lang}") or m.get("name", "")
+            specs = m.get("_specs", [])[:2]
+            spec_example_keys = ", ".join(f'"{s["title"]}"' for s in specs if s.get("title"))
+
+        prompt = f"""You are writing a premium B2B industrial machinery catalog for "{company_name}".
+
+Models with specs:
 {model_lines}
 
 Return a single JSON object:
 {{
   "catalog_intro": "2 sentences (max 50 words) introducing the company catalog. Focus on quality, range, and business value.",
   "model_taglines": {{
-    "EXACT_MODEL_NAME": "One punchy tagline (max 12 words) for this specific machine.",
+    "EXACT_MODEL_NAME": "One punchy tagline (max 12 words) for this machine.",
+    ...
+  }},
+  "model_spec_texts": {{
+    "EXACT_MODEL_NAME": {{
+      "EXACT_SPEC_TITLE": "One concise sentence (max 15 words) on the business value of this spec for the customer.",
+      ...
+    }},
     ...
   }}
 }}
 
-Use EXACT model names as keys. Write everything in {lang_name}. Be confident and specific.
+Use EXACT model names and spec titles as keys. Write everything in {lang_name}. Be confident and specific.
 """.strip()
+
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         msg = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
+            max_tokens=4096,
             system=_SYSTEM,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -157,7 +183,7 @@ def _general_fallback(models: list, lang: str) -> dict:
         name = m.get(f"name_{lang}") or m.get("name") or ""
         desc = m.get(f"description_{lang}") or m.get("description") or ""
         taglines[name] = desc[:80] if desc else name
-    return {"catalog_intro": "", "model_taglines": taglines}
+    return {"catalog_intro": "", "model_taglines": taglines, "model_spec_texts": {}}
 
 
 def _fallback(model: dict, lang: str, specs: list, options: list) -> dict:

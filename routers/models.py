@@ -358,10 +358,17 @@ async def general_catalog_pdf(request: Request, lang: str = "", category_id: int
 
     co_name = (company.get("company_name") or "") if company else ""
 
-    # AI taglines for all models — run in thread
+    # AI taglines + spec texts for all models — run in thread
     ai = await asyncio.to_thread(generate_general_catalog_content, enriched, lang, co_name)
-    ai_intro  = ai.get("catalog_intro", "")
-    taglines  = ai.get("model_taglines", {})
+    ai_intro        = ai.get("catalog_intro", "")
+    taglines        = ai.get("model_taglines", {})
+    model_spec_texts = ai.get("model_spec_texts", {})
+
+    # Attach AI-generated spec texts to each model
+    for m in enriched:
+        mname = m.get(f"name_{lang}") or m.get("name", "")
+        ai_st = model_spec_texts.get(mname) or model_spec_texts.get(m.get("name", "")) or {}
+        m["_ai_spec_texts"] = ai_st
 
     _L = {
         "tr": {"product_catalog": "Ürün Kataloğu", "products": "Ürün",
