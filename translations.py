@@ -258,6 +258,8 @@ TRANSLATIONS = {
         'profile_appearance': 'Görünüm Tercihleri',
         'profile_lang': 'Dil',
         'profile_theme': 'Tema',
+        'theme_dark': 'Karanlık',
+        'theme_light': 'Aydınlık',
         'profile_save_prefs': 'Tercihleri Kaydet',
         # Admin
         'admin_title': 'Sistem Yönetimi',
@@ -677,6 +679,8 @@ TRANSLATIONS = {
         'profile_appearance': 'Appearance Preferences',
         'profile_lang': 'Language',
         'profile_theme': 'Theme',
+        'theme_dark': 'Dark',
+        'theme_light': 'Light',
         'profile_save_prefs': 'Save Preferences',
         # Admin
         'admin_title': 'System Management',
@@ -1092,6 +1096,8 @@ TRANSLATIONS = {
         'profile_appearance': '外观偏好',
         'profile_lang': '语言',
         'profile_theme': '主题',
+        'theme_dark': '深色',
+        'theme_light': '浅色',
         'profile_save_prefs': '保存偏好',
         # Admin
         'admin_title': '系统管理',

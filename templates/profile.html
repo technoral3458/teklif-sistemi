@@ -114,8 +114,8 @@
         <div class="form-group">
           <label class="form-label">{{ T.profile_theme }}</label>
           <select name="theme" class="form-control">
-            <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>🌙 Karanlık</option>
-            <option value="light" {% if user.theme == 'light' %}selected{% endif %}>☀️ Aydınlık</option>
+            <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>🌙 {{ T.theme_dark }}</option>
+            <option value="light" {% if user.theme == 'light' %}selected{% endif %}>☀️ {{ T.theme_light }}</option>
           </select>
         </div>
         <button type="submit" class="btn btn-primary">{{ T.profile_save_prefs }}</button>
