@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+import datetime
 from io import BytesIO
 from typing import Optional
 
@@ -324,6 +325,129 @@ async def delete_line_image(request: Request, id: int = Form(...), model_id: int
     auth.require_user(request)
     fdb.del_model_line_image(id)
     return RedirectResponse(f"/models/{model_id}/edit", 303)
+
+
+@router.get("/{model_id}/catalog-pdf")
+async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
+    user = auth.require_user(request)
+    m = fdb.get_model(model_id)
+    if not m:
+        return RedirectResponse("/models", 303)
+
+    if not lang:
+        lang = user.get("lang") or "tr"
+
+    # Parse specs
+    specs_key = "specs" if lang == "tr" else f"specs_{lang}"
+    raw = m.get(specs_key) or m.get("specs") or "[]"
+    try:
+        specs = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        specs = []
+
+    # Compatible options
+    compatible_ids = []
+    try:
+        compatible_ids = json.loads(m.get("compatible_options") or "[]")
+    except Exception:
+        pass
+    all_opts = fdb.get_options()
+    options = [o for o in all_opts if o["id"] in compatible_ids]
+
+    # Category name
+    cats = fdb.get_cats()
+    cat_map = {c["id"]: c for c in cats}
+    cat = cat_map.get(m.get("category_id"), {})
+    category_name = cat.get(f"name_{lang}") or cat.get("name") or ""
+
+    # Company info
+    company = fdb.get_company()
+
+    # Model display name
+    model_name = m.get(f"name_{lang}") or m.get("name") or ""
+
+    # AI content
+    from catalog_ai import generate_catalog_content
+    ai = generate_catalog_content(m, lang, specs, options)
+
+    # Labels by language
+    _L = {
+        "tr": {
+            "overview": "Ürün Genel Bakış",
+            "highlights": "Temel Özellikler",
+            "specs": "Teknik Özellikler",
+            "spec_feature": "Özellik",
+            "spec_detail": "Detay",
+            "options": "Opsiyonlar & Aksesuarlar",
+            "phone": "Telefon",
+            "email": "E-posta",
+            "web": "Web",
+        },
+        "en": {
+            "overview": "Product Overview",
+            "highlights": "Key Features",
+            "specs": "Technical Specifications",
+            "spec_feature": "Feature",
+            "spec_detail": "Detail",
+            "options": "Options & Accessories",
+            "phone": "Phone",
+            "email": "Email",
+            "web": "Website",
+        },
+        "zh": {
+            "overview": "产品概览",
+            "highlights": "核心特点",
+            "specs": "技术规格",
+            "spec_feature": "特性",
+            "spec_detail": "详情",
+            "options": "选项与配件",
+            "phone": "电话",
+            "email": "邮箱",
+            "web": "网站",
+        },
+    }
+    lbl = _L.get(lang, _L["tr"])
+
+    # Base URL for images
+    base_url = str(request.base_url).rstrip("/")
+    date_str = datetime.date.today().strftime("%Y-%m-%d")
+
+    from tmpl import templates
+    html_str = templates.env.get_template("catalog_pdf.html").render({
+        "model": m,
+        "model_name": model_name,
+        "specs": specs,
+        "options": options,
+        "category_name": category_name,
+        "company": company,
+        "ai": ai,
+        "lang": lang,
+        "base_url": base_url,
+        "date_str": date_str,
+        "label_overview":     lbl["overview"],
+        "label_highlights":   lbl["highlights"],
+        "label_specs":        lbl["specs"],
+        "label_spec_feature": lbl["spec_feature"],
+        "label_spec_detail":  lbl["spec_detail"],
+        "label_options":      lbl["options"],
+        "label_phone":        lbl["phone"],
+        "label_email":        lbl["email"],
+        "label_web":          lbl["web"],
+    })
+
+    try:
+        from weasyprint import HTML, CSS
+        pdf = HTML(string=html_str, base_url=base_url).write_pdf()
+    except Exception as e:
+        return Response(f"PDF oluşturulamadı: {e}", status_code=500, media_type="text/plain")
+
+    safe_name = model_name.replace(" ", "_").replace("/", "-")[:40]
+    filename = f"katalog_{safe_name}_{lang}.pdf"
+    return Response(
+        pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/delete")
