@@ -145,20 +145,19 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
 .sp-tbl tbody tr:nth-child(even) { background: #F8F9FB; }
 .sp-tbl tbody td { padding: 2.5mm 4mm; vertical-align: top; line-height: 1.5; }
 .sp-tbl tbody td:first-child { font-weight: 700; color: #0A1628; }
-.sp-thumb { max-width: 20mm; max-height: 13mm; object-fit: contain; margin-top: 1.5mm; display: block; }
+.sp-thumb { max-width: 38mm; max-height: 26mm; object-fit: contain; margin-top: 2mm; display: block; }
 
 /* ══════════════════ OPTIONS ══════════════════ */
-.opt-tbl  { width: 100%; border-collapse: separate; border-spacing: 3mm 3.5mm; display: table; }
-.opt-tr   { display: table-row; }
-.opt-td   { display: table-cell; width: 50%; vertical-align: top; }
-.opt-card { border: 0.3mm solid #E5E7EB; background: #fff; overflow: hidden; break-inside: avoid; }
+.opt-outer { width: 100%; border-collapse: separate; border-spacing: 3.5mm 4mm; }
+.opt-outer td { width: 50%; vertical-align: top; padding: 0; }
+.opt-card { border: 0.3mm solid #E5E7EB; background: #fff; break-inside: avoid; }
 .opt-img-box {
-  height: 40mm; background: #F3F4F6; overflow: hidden;
-  border-bottom: 0.8mm solid #C9961A; position: relative;
+  width: 100%; height: 44mm; overflow: hidden;
+  background: #F3F4F6; border-bottom: 0.9mm solid #C9961A;
 }
 .opt-img-box img { width: 100%; height: 100%; object-fit: cover; }
-.opt-no-img { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #D1D5DB; font-size: 26pt; }
-.opt-body { padding: 3mm 3.5mm 3.5mm; }
+.opt-no-img { width: 100%; height: 100%; text-align: center; padding-top: 15mm; color: #D1D5DB; font-size: 26pt; }
+.opt-body { padding: 3mm 3.5mm 4mm; }
 .opt-name { font-size: 9.5pt; font-weight: 700; color: #0A1628; margin-bottom: 2mm; }
 .opt-desc { font-size: 8.5pt; color: #4B5563; line-height: 1.5; }
 
@@ -329,8 +328,8 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
 
 <!-- ══════════════════════════ OPTIONS ══════════════════════════════════ -->
 {% if options %}
-{% for page_start in range(0, options|length, 6) %}
-{% set page_opts = options[page_start:page_start+6] %}
+{% for page_start in range(0, options|length, 4) %}
+{% set page_opts = options[page_start:page_start+4] %}
 {% set pg_num = (4 if specs else 3) + loop.index0 %}
 <div class="page">
   <div class="rhdr">
@@ -338,11 +337,11 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
     <span class="rhdr-name">{{ model_name }}</span>
   </div>
   <div class="stitle">{{ label_options }}</div>
-  <div class="opt-tbl">
+  <table class="opt-outer">
     {% for i in range(0, page_opts|length, 2) %}
-    <div class="opt-tr">
+    <tr>
       {% for j in [i, i+1] %}
-      <div class="opt-td">
+      <td>
         {% if j < page_opts|length %}
         {% set o = page_opts[j] %}
         {% set oname = o.get('name_'+lang) or o.get('name','') %}
@@ -358,11 +357,11 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
           </div>
         </div>
         {% endif %}
-      </div>
+      </td>
       {% endfor %}
-    </div>
+    </tr>
     {% endfor %}
-  </div>
+  </table>
   <div class="pgfoot">
     <span class="pgfoot-co">{{ company.company_name if company else '' }}</span>
     <span>{{ model_name }}</span>

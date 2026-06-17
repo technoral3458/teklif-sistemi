@@ -22,13 +22,13 @@ def _build_prompt(model: dict, lang: str, specs: list, options: list) -> str:
         f"- {s['title']}: {s.get('desc', '')}" for s in specs[:12] if s.get("title")
     )
     opt_entries = []
-    for o in options[:12]:
+    for o in options:
         oname = o.get(f"name_{lang}") or o.get("name") or ""
         odesc = o.get(f"description_{lang}") or o.get("description") or ""
         if oname:
             opt_entries.append(f'  "{oname}": "{odesc}"')
     opt_block = "{\n" + ",\n".join(opt_entries) + "\n}" if opt_entries else "{}"
-    opt_names_list = [o.get(f"name_{lang}") or o.get("name") or "" for o in options[:12] if o.get("name")]
+    opt_names_list = [o.get(f"name_{lang}") or o.get("name") or "" for o in options if o.get("name")]
 
     return f"""
 Generate premium {lang_name} catalog content for this industrial machine:
@@ -54,8 +54,8 @@ Return a single JSON object with EXACTLY these keys:
     "3-5 sentences about the combined VALUE of having these specific options together. Focus on real business impact: time saved, quality gained, flexibility added. Write as a paragraph or separate list items."
   ],
   "option_texts": {{
-    "OPTION_NAME_1": "2 sentences: first — what this option does, second — why it matters to the client's business.",
-    "OPTION_NAME_2": "2 sentences: first — what this option does, second — why it matters."
+    "OPTION_NAME_1": "One punchy sentence: what it does AND why it matters to production.",
+    "OPTION_NAME_2": "One punchy sentence: what it does AND why it matters to production."
   }}
 }}
 
