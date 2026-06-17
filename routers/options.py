@@ -110,14 +110,16 @@ async def save_option(request: Request,
     except Exception as e:
         return RedirectResponse(f"/options?msg=Resim+kaydedilemedi:+{e}&msg_type=error", 303)
 
-    # Manufacturers automatically own their options; can set purchase_price on first creation only
+    # Manufacturers automatically own their options; can only change purchase_price if currently 0
     if auth.is_mfr(user):
         price = 0.0
         manufacturer_id = udb.effective_mfr_id(user)
-        if id:  # editing existing → block purchase_price changes (must use request)
+        if id:  # editing existing — only allow price change if price not yet set
             existing = fdb.get_option(id)
-            purchase_price = float(existing.get("purchase_price") or 0) if existing else 0.0
-            purchase_currency = existing.get("purchase_currency", "USD") if existing else "USD"
+            existing_price = float(existing.get("purchase_price") or 0) if existing else 0.0
+            if existing_price > 0:
+                purchase_price = existing_price
+                purchase_currency = existing.get("purchase_currency", "USD") if existing else "USD"
 
     kw = dict(
         name=name, description=description, price=price, currency=currency,
