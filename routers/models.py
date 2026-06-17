@@ -16,9 +16,9 @@ router = APIRouter(prefix="/models")
 from tmpl import templates
 
 
-def _options_for_category(category_id):
-    """Return options that match the given category, plus uncategorized (universal) options."""
-    all_opts = fdb.get_options()
+def _options_for_category(category_id, mfr_filter=None):
+    """Return options matching the given category (and optionally manufacturer)."""
+    all_opts = fdb.get_options(manufacturer_filter=mfr_filter)
     if not category_id:
         return all_opts
     cid = str(category_id)
@@ -78,7 +78,8 @@ async def models_list(request: Request, category_id: int = 0):
 async def model_new(request: Request):
     user = auth.require_user(request)
     cats = fdb.get_cats()
-    options = fdb.get_options()  # no category yet — show all
+    _mfr = udb.get_manufacturer_group_ids(user) if user["role"] == "manufacturer" else None
+    options = fdb.get_options(manufacturer_filter=_mfr)
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     return templates.TemplateResponse(request, "model_form.html", {
         "user": user,
@@ -100,7 +101,8 @@ async def model_copy(request: Request, model_id: int):
     if not m:
         return RedirectResponse("/models", 303)
     cats = fdb.get_cats()
-    options = _options_for_category(m.get("category_id"))
+    _mfr = udb.get_manufacturer_group_ids(user) if user["role"] == "manufacturer" else None
+    options = _options_for_category(m.get("category_id"), mfr_filter=_mfr)
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     compatible = []
     if m.get("compatible_options"):
@@ -136,7 +138,8 @@ async def model_edit(request: Request, model_id: int):
         if model_id not in allowed_ids and m.get("manufacturer_id") not in group_ids:
             return RedirectResponse("/models", 303)
     cats = fdb.get_cats()
-    options = _options_for_category(m.get("category_id"))
+    _mfr = udb.get_manufacturer_group_ids(user) if user["role"] == "manufacturer" else None
+    options = _options_for_category(m.get("category_id"), mfr_filter=_mfr)
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     compatible = []
     if m.get("compatible_options"):

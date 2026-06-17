@@ -188,27 +188,27 @@
           <img id="imgPreview" style="display:none;max-width:100%;border-radius:8px;margin-bottom:12px;" />
           {% endif %}
           <input type="file" name="image" class="form-control" accept="image/*" data-preview="imgPreview" />
-          <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Max 800×800px, JPEG/PNG</p>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">{{ T.model_image_hint }}</p>
         </div>
       </div>
 
       <!-- Hat Makinesi -->
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-header"><h3 class="card-title">🔗 Hat Makinesi</h3></div>
+        <div class="card-header"><h3 class="card-title">🔗 {{ T.model_line_section }}</h3></div>
         <div class="card-body">
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:14px;">
             <input type="checkbox" name="is_line" id="isLineCb" value="1"
               onchange="toggleLineSection(this.checked)"
               {% if model.is_line %}checked{% endif %} style="width:18px;height:18px;" />
-            <span style="font-weight:600;">Bu model hat makinesidir</span>
+            <span style="font-weight:600;">{{ T.model_line_is_line }}</span>
           </label>
           <div id="lineSectionBody" style="{% if not model.is_line %}display:none;{% endif %}">
             <div class="form-group" style="margin-bottom:14px;">
-              <label class="form-label">Hat Konfigürasyonları (virgülle ayırın)</label>
+              <label class="form-label">{{ T.model_line_configs_label }}</label>
               <input type="text" name="line_configs" id="lineConfigs" class="form-control"
                 value="{{ model.line_configs or '2,3,4' }}" placeholder="2,3,4"
                 oninput="renderLineImageInputs()" />
-              <small style="color:var(--text-muted);">Örnek: 2,3,4 → 2li, 3lü, 4lü hat seçenekleri oluşturur</small>
+              <small style="color:var(--text-muted);">{{ T.model_line_configs_hint }}</small>
             </div>
             <div id="lineImagesArea"></div>
           </div>
