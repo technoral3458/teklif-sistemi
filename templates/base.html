@@ -245,6 +245,50 @@
     document.body.appendChild(f);
     f.submit();
   }
+
+  /* ── Custom file input: hide native, show translated button ── */
+  (function() {
+    var _labels = {
+      tr: { btn: 'Dosya Seç', none: 'Dosya seçilmedi' },
+      en: { btn: 'Choose File', none: 'No file selected' },
+      zh: { btn: '选择文件',   none: '未选择文件' }
+    };
+    function _initFileInput(inp) {
+      if (inp.dataset.cfDone) return;
+      inp.dataset.cfDone = '1';
+      inp.style.cssText = 'position:absolute;opacity:0;width:0;height:0;overflow:hidden;';
+      var lang = document.documentElement.lang || '{{ user.lang if user else "tr" }}';
+      var L = _labels[lang] || _labels['tr'];
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = L.btn;
+      btn.className = 'btn btn-outline btn-sm';
+      btn.style.flexShrink = '0';
+      var lbl = document.createElement('span');
+      lbl.textContent = inp.value ? inp.value.split('\\').pop() : L.none;
+      lbl.style.cssText = 'font-size:13px;color:var(--text-muted);word-break:break-all;';
+      btn.addEventListener('click', function(){ inp.click(); });
+      inp.addEventListener('change', function(){
+        lbl.textContent = inp.files && inp.files[0] ? inp.files[0].name : L.none;
+        lbl.style.color = inp.files && inp.files[0] ? 'var(--text)' : 'var(--text-muted)';
+      });
+      inp.parentNode.insertBefore(wrap, inp.nextSibling);
+      wrap.appendChild(inp);
+      wrap.appendChild(btn);
+      wrap.appendChild(lbl);
+    }
+    function _initAll() {
+      document.querySelectorAll('input[type="file"]:not([data-cf-done]):not([style*="display:none"])').forEach(_initFileInput);
+    }
+    document.addEventListener('DOMContentLoaded', _initAll);
+    /* also handle dynamically added inputs (e.g. line images) */
+    var _ob = new MutationObserver(function(){ _initAll(); });
+    document.addEventListener('DOMContentLoaded', function(){
+      _ob.observe(document.body, { childList: true, subtree: true });
+    });
+  })();
   </script>
   {% block scripts %}{% endblock %}
 </body>
