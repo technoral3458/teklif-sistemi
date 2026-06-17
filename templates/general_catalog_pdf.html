@@ -156,13 +156,13 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #0F172A; background
   border: 0.3mm solid #DBEAFE;
   background: #fff; overflow: hidden;
 }
-/* Image area */
+/* Image area — background-size:cover avoids WeasyPrint object-fit issues */
 .m-card-img {
   width: 100%; height: 26mm; overflow: hidden;
-  background: #EFF6FF; position: relative;
+  background: #EFF6FF no-repeat center center;
+  background-size: cover;
   border-bottom: 0.6mm solid #3B82F6;
 }
-.m-card-img img { width: 100%; height: 100%; object-fit: cover; }
 /* No-image: blue gradient with icon */
 .m-card-noimg {
   width: 100%; height: 26mm;
@@ -334,7 +334,7 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #0F172A; background
           {% set s = m._specs[idx] %}
           <div class="m-card">
             {% if s.get('img') %}
-            <div class="m-card-img"><img src="{{ base_url }}/static/{{ s.img }}" /></div>
+            <div class="m-card-img" style="background-image: url('{{ base_url }}/static/{{ s.img }}');"></div>
             {% else %}
             <div class="m-card-noimg">◈</div>
             {% endif %}
