@@ -30,6 +30,17 @@ def _options_for_category(category_id, mfr_filter=None):
     return result
 
 
+def _cats_for_user(user):
+    """Return categories filtered by user's allowed_categories (manufacturer isolation)."""
+    cats = fdb.get_cats()
+    if user["role"] != "manufacturer":
+        return cats
+    allowed_names = set(x.strip() for x in (user.get("allowed_categories") or "").split(",") if x.strip())
+    if not allowed_names:
+        return cats
+    return [c for c in cats if c["name"] in allowed_names]
+
+
 def _calc_cost(purchase_price, shipping_cost, customs_pct, extra_tax_pct,
                port_cost, document_cost, installation_cost, other_cost):
     return (
@@ -77,7 +88,7 @@ async def models_list(request: Request, category_id: int = 0):
 @router.get("/new")
 async def model_new(request: Request):
     user = auth.require_user(request)
-    cats = fdb.get_cats()
+    cats = _cats_for_user(user)
     _mfr = udb.get_manufacturer_group_ids(user) if user["role"] == "manufacturer" else None
     options = fdb.get_options(manufacturer_filter=_mfr)
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
@@ -100,7 +111,7 @@ async def model_copy(request: Request, model_id: int):
     m = fdb.get_model(model_id)
     if not m:
         return RedirectResponse("/models", 303)
-    cats = fdb.get_cats()
+    cats = _cats_for_user(user)
     _mfr = udb.get_manufacturer_group_ids(user) if user["role"] == "manufacturer" else None
     options = _options_for_category(m.get("category_id"), mfr_filter=_mfr)
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
@@ -137,7 +148,7 @@ async def model_edit(request: Request, model_id: int):
         group_ids = udb.get_manufacturer_group_ids(user)
         if model_id not in allowed_ids and m.get("manufacturer_id") not in group_ids:
             return RedirectResponse("/models", 303)
-    cats = fdb.get_cats()
+    cats = _cats_for_user(user)
     _mfr = udb.get_manufacturer_group_ids(user) if user["role"] == "manufacturer" else None
     options = _options_for_category(m.get("category_id"), mfr_filter=_mfr)
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
