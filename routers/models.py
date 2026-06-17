@@ -329,6 +329,11 @@ async def delete_line_image(request: Request, id: int = Form(...), model_id: int
 
 @router.get("/{model_id}/catalog-pdf")
 async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
+    import asyncio
+    import unicodedata
+    from catalog_ai import generate_catalog_content
+    from tmpl import templates
+
     user = auth.require_user(request)
     m = fdb.get_model(model_id)
     if not m:
@@ -354,23 +359,16 @@ async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
     all_opts = fdb.get_options()
     options = [o for o in all_opts if o["id"] in compatible_ids]
 
-    # Category name
+    # Category / company / name
     cats = fdb.get_cats()
-    cat_map = {c["id"]: c for c in cats}
-    cat = cat_map.get(m.get("category_id"), {})
+    cat = {c["id"]: c for c in cats}.get(m.get("category_id"), {})
     category_name = cat.get(f"name_{lang}") or cat.get("name") or ""
-
-    # Company info
     company = fdb.get_company()
-
-    # Model display name
     model_name = m.get(f"name_{lang}") or m.get("name") or ""
 
-    # AI content
-    from catalog_ai import generate_catalog_content
-    ai = generate_catalog_content(m, lang, specs, options)
+    # AI — run in thread so it doesn't block the event loop
+    ai = await asyncio.to_thread(generate_catalog_content, m, lang, specs, options)
 
-    # Labels by language
     _L = {
         "tr": {
             "overview": "Ürün Genel Bakış",
@@ -420,11 +418,9 @@ async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
     }
     lbl = _L.get(lang, _L["tr"])
 
-    # Base URL for images
     base_url = str(request.base_url).rstrip("/")
     date_str = datetime.date.today().strftime("%Y-%m-%d")
 
-    from tmpl import templates
     html_str = templates.env.get_template("catalog_pdf.html").render({
         "model": m,
         "model_name": model_name,
@@ -436,12 +432,12 @@ async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
         "lang": lang,
         "base_url": base_url,
         "date_str": date_str,
-        "label_overview":     lbl["overview"],
-        "label_highlights":   lbl["highlights"],
-        "label_specs":        lbl["specs"],
-        "label_spec_feature": lbl["spec_feature"],
-        "label_spec_detail":  lbl["spec_detail"],
-        "label_options":      lbl["options"],
+        "label_overview":        lbl["overview"],
+        "label_highlights":      lbl["highlights"],
+        "label_specs":           lbl["specs"],
+        "label_spec_feature":    lbl["spec_feature"],
+        "label_spec_detail":     lbl["spec_detail"],
+        "label_options":         lbl["options"],
         "label_phone":           lbl["phone"],
         "label_email":           lbl["email"],
         "label_web":             lbl["web"],
@@ -451,13 +447,16 @@ async def catalog_pdf(request: Request, model_id: int, lang: str = ""):
         "label_option_benefits": lbl["option_benefits"],
     })
 
+    # WeasyPrint — also blocking, run in thread
+    def _render_pdf():
+        from weasyprint import HTML
+        return HTML(string=html_str, base_url=base_url).write_pdf()
+
     try:
-        from weasyprint import HTML, CSS
-        pdf = HTML(string=html_str, base_url=base_url).write_pdf()
+        pdf = await asyncio.to_thread(_render_pdf)
     except Exception as e:
         return Response(f"PDF oluşturulamadı: {e}", status_code=500, media_type="text/plain")
 
-    import unicodedata
     normalized = unicodedata.normalize("NFKD", model_name)
     safe_name = "".join(c for c in normalized if ord(c) < 128)
     safe_name = safe_name.replace(" ", "_").replace("/", "-").strip("_")[:40] or "model"
