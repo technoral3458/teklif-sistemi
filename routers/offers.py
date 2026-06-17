@@ -451,6 +451,122 @@ async def offer_pdf(request: Request, offer_id: int, dl: int = 0):
                     headers={"Content-Disposition": f'{disposition}; filename="{fname}"'})
 
 
+@router.get("/{offer_id}/catalog-pdf")
+async def offer_catalog_pdf(request: Request, offer_id: int):
+    """Generate an individual catalog PDF for the model in this offer, using only the selected options."""
+    import asyncio
+    import unicodedata
+    from catalog_ai import generate_catalog_content
+
+    user = auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+
+    lang = user.get("lang") or "tr"
+
+    model_id = offer.get("model_id")
+    if not model_id:
+        return Response("Bu teklifte makine tanımlı değil.", status_code=400, media_type="text/plain")
+
+    m = fdb.get_model(model_id)
+    if not m:
+        return Response("Model bulunamadı.", status_code=404, media_type="text/plain")
+
+    # Parse specs (language-specific)
+    specs_key = "specs" if lang == "tr" else f"specs_{lang}"
+    raw = m.get(specs_key) or m.get("specs") or "[]"
+    try:
+        specs = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        specs = []
+
+    # Only include options selected in this offer
+    items = fdb.get_offer_items(offer_id)
+    option_ids = {item["option_id"] for item in items if item.get("option_id")}
+    all_opts = {o["id"]: o for o in fdb.get_options()}
+    options = [all_opts[oid] for oid in option_ids if oid in all_opts]
+
+    # Category / company
+    cats = fdb.get_cats()
+    cat = {c["id"]: c for c in cats}.get(m.get("category_id"), {})
+    category_name = cat.get(f"name_{lang}") or cat.get("name") or ""
+    company = fdb.get_company()
+    model_name = m.get(f"name_{lang}") or m.get("name") or ""
+
+    # AI content (blocking — run in thread)
+    ai = await asyncio.to_thread(generate_catalog_content, m, lang, specs, options)
+
+    _L = {
+        "tr": {
+            "overview": "Ürün Genel Bakış", "highlights": "Temel Özellikler",
+            "specs": "Teknik Özellikler", "spec_feature": "Özellik", "spec_detail": "Detay",
+            "options": "Opsiyonlar & Aksesuarlar", "phone": "Telefon", "email": "E-posta",
+            "web": "Web", "product_catalog": "Ürün Kataloğu", "contact_us": "İletişim",
+            "address": "Adres", "option_benefits": "Seçili Opsiyonların Sağladığı Faydalar",
+        },
+        "en": {
+            "overview": "Product Overview", "highlights": "Key Features",
+            "specs": "Technical Specifications", "spec_feature": "Feature", "spec_detail": "Detail",
+            "options": "Options & Accessories", "phone": "Phone", "email": "Email",
+            "web": "Website", "product_catalog": "Product Catalog", "contact_us": "Contact Us",
+            "address": "Address", "option_benefits": "Benefits of Selected Options",
+        },
+        "zh": {
+            "overview": "产品概览", "highlights": "核心特点",
+            "specs": "技术规格", "spec_feature": "特性", "spec_detail": "详情",
+            "options": "选项与配件", "phone": "电话", "email": "邮箱",
+            "web": "网站", "product_catalog": "产品目录", "contact_us": "联系我们",
+            "address": "地址", "option_benefits": "所选选项的优势",
+        },
+    }
+    lbl = _L.get(lang, _L["tr"])
+
+    base_url = str(request.base_url).rstrip("/")
+    date_str = datetime.date.today().strftime("%Y-%m-%d")
+
+    html_str = templates.get_template("catalog_pdf.html").render({
+        "model": m,
+        "model_name": model_name,
+        "specs": specs,
+        "options": options,
+        "category_name": category_name,
+        "company": company,
+        "ai": ai,
+        "lang": lang,
+        "base_url": base_url,
+        "date_str": date_str,
+        "label_overview":        lbl["overview"],
+        "label_highlights":      lbl["highlights"],
+        "label_specs":           lbl["specs"],
+        "label_spec_feature":    lbl["spec_feature"],
+        "label_spec_detail":     lbl["spec_detail"],
+        "label_options":         lbl["options"],
+        "label_phone":           lbl["phone"],
+        "label_email":           lbl["email"],
+        "label_web":             lbl["web"],
+        "label_product_catalog": lbl["product_catalog"],
+        "label_contact_us":      lbl["contact_us"],
+        "label_address":         lbl["address"],
+        "label_option_benefits": lbl["option_benefits"],
+    })
+
+    def _render():
+        from weasyprint import HTML
+        return HTML(string=html_str, base_url=base_url).write_pdf()
+
+    try:
+        pdf = await asyncio.to_thread(_render)
+    except Exception as e:
+        return Response(f"PDF oluşturulamadı: {e}", status_code=500, media_type="text/plain")
+
+    safe = unicodedata.normalize("NFKD", model_name)
+    safe = "".join(c for c in safe if ord(c) < 128).replace(" ", "_")[:30] or "katalog"
+    fname = f"Katalog_{safe}_{lang}.pdf"
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
 @router.post("/{offer_id}/status")
 async def update_status(request: Request,
                         offer_id: int,
