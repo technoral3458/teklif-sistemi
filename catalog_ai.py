@@ -79,7 +79,7 @@ def generate_catalog_content(model: dict, lang: str, specs: list, options: list)
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         msg = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
+            max_tokens=4096,
             system=_SYSTEM,
             messages=[{"role": "user", "content": _build_prompt(model, lang, specs, options)}],
         )
