@@ -148,14 +148,14 @@ Return a single JSON object:
   }},
   "model_spec_texts": {{
     "EXACT_MODEL_NAME": {{
-      "EXACT_SPEC_TITLE": "One concise sentence (max 15 words) on the business value of this spec for the customer.",
+      "EXACT_SPEC_TITLE": "EXACTLY one sentence, MAXIMUM 8 words. Never more.",
       ...
     }},
     ...
   }}
 }}
 
-Use EXACT model names and spec titles as keys. Write everything in {lang_name}. Be confident and specific.
+Use EXACT model names and spec titles as keys. Write everything in {lang_name}. Be confident and specific. STRICT RULE: every spec text must be ONE sentence and NO MORE THAN 8 WORDS.
 """.strip()
 
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)

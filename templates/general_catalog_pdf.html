@@ -150,11 +150,13 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #0F172A; background
   border-spacing: 2mm 2mm;
   padding: 0 11mm;
 }
+.m-cards-tbl tr { break-inside: avoid; page-break-inside: avoid; }
 .m-cards-tbl td { width: 25%; vertical-align: top; }
 
 .m-card {
   border: 0.3mm solid #DBEAFE;
   background: #fff; overflow: hidden;
+  break-inside: avoid; page-break-inside: avoid;
 }
 /* Image area — background-size:cover avoids WeasyPrint object-fit issues */
 .m-card-img {
@@ -342,7 +344,7 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #0F172A; background
               <div class="m-card-title">{{ s.title }}</div>
               {% set ai_d = m._ai_spec_texts.get(s.title) if m._ai_spec_texts else '' %}
               {% set d = ai_d or s.get('desc_'+lang) or s.get('desc') or '' %}
-              <div class="m-card-val">{{ d }}</div>
+              <div class="m-card-val">{{ d[:95] }}{% if d|length > 95 %}…{% endif %}</div>
             </div>
           </div>
           {% endif %}
