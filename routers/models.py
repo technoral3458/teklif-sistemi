@@ -303,7 +303,7 @@ async def save_model(request: Request,
                     if ei["line_count"] == lc:
                         fdb.save_model_line_image(model_id, lc, ei["image_path"], prio)
 
-    return RedirectResponse("/models", 303)
+    return RedirectResponse(f"/models/{model_id}/edit", 303)
 
 
 @router.post("/spec-image")
