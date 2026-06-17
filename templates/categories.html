@@ -18,6 +18,7 @@
           <th>#</th>
           <th>{{ T.category_name }}</th>
           <th>{{ T.category_desc }}</th>
+          <th>🔗 Hat</th>
           <th></th>
         </tr>
       </thead>
@@ -27,9 +28,10 @@
           <td>{{ c.id }}</td>
           <td><strong>{% if user.lang != 'tr' and c.get('name_'+user.lang) %}{{ c['name_'+user.lang] }}{% else %}{{ c.name }}{% endif %}</strong></td>
           <td>{{ c.description or '-' }}</td>
+          <td style="text-align:center;">{% if c.is_line_capable %}✅{% else %}—{% endif %}</td>
           <td>
             <div style="display:flex;gap:6px;">
-              <button class="btn btn-ghost btn-sm" onclick='editCat({{ c.id }}, {{ c.name|tojson }}, {{ (c.description or '')|tojson }}, {{ (c.name_en or '')|tojson }}, {{ (c.name_zh or '')|tojson }})'>{{ T.btn_edit }}</button>
+              <button class="btn btn-ghost btn-sm" onclick='editCat({{ c.id }}, {{ c.name|tojson }}, {{ (c.description or '')|tojson }}, {{ (c.name_en or '')|tojson }}, {{ (c.name_zh or '')|tojson }}, {{ c.is_line_capable or 0 }})'>{{ T.btn_edit }}</button>
               <form method="post" action="/categories/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ c.name }}'?">
                 <input type="hidden" name="id" value="{{ c.id }}" />
                 <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
@@ -73,6 +75,12 @@
               <input type="text" name="name_zh" id="cname_zh" class="form-control" />
             </div>
           </div>
+        <div style="margin-top:12px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="is_line_capable" id="catIsLine" value="1" style="width:16px;height:16px;" />
+            <span style="font-size:13px;">🔗 Bu kategoride hat makinesi seçeneği gösterilsin</span>
+          </label>
+        </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
           <button type="button" class="btn btn-ghost" onclick="closeModal('catModal')">{{ T.btn_cancel }}</button>
           <button type="submit" class="btn btn-primary">{{ T.btn_save }}</button>
@@ -85,13 +93,14 @@
 
 {% block scripts %}
 <script>
-function editCat(id, name, desc, nameEn, nameZh) {
+function editCat(id, name, desc, nameEn, nameZh, isLine) {
   document.getElementById('catModalTitle').textContent = '{{ T.btn_edit }} {{ T.categories_title }}';
   document.getElementById('catId').value = id;
   document.getElementById('catName').value = name;
   document.getElementById('catDesc').value = desc;
   document.getElementById('cname_en').value = nameEn || '';
   document.getElementById('cname_zh').value = nameZh || '';
+  document.getElementById('catIsLine').checked = !!isLine;
   openModal('catModal');
 }
 </script>

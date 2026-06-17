@@ -180,6 +180,7 @@ def init():
         # Translation columns
         for col in ["name_en", "name_zh"]:
             _acol(cur, "categories", col, "TEXT DEFAULT ''")
+        _acol(cur, "categories", "is_line_capable", "INTEGER DEFAULT 0")
         for col in ["name_en", "description_en", "name_zh", "description_zh"]:
             _acol(cur, "options", col, "TEXT DEFAULT ''")
         for col in ["name_en", "description_en", "name_zh", "description_zh", "specs_en", "specs_zh"]:
@@ -375,18 +376,18 @@ def save_company(**kw):
 
 def get_cats():
     with _c() as c:
-        rows = c.execute("SELECT id,name,description,name_en,name_zh FROM categories ORDER BY name").fetchall()
-    return [dict(zip(["id","name","description","name_en","name_zh"], r)) for r in rows]
+        rows = c.execute("SELECT id,name,description,name_en,name_zh,is_line_capable FROM categories ORDER BY name").fetchall()
+    return [dict(zip(["id","name","description","name_en","name_zh","is_line_capable"], r)) for r in rows]
 
 
-def add_cat(name, description="", name_en="", name_zh=""):
+def add_cat(name, description="", name_en="", name_zh="", is_line_capable=0):
     with _c() as c:
-        c.execute("INSERT OR IGNORE INTO categories(name,description,name_en,name_zh) VALUES(?,?,?,?)", (name, description, name_en, name_zh))
+        c.execute("INSERT OR IGNORE INTO categories(name,description,name_en,name_zh,is_line_capable) VALUES(?,?,?,?,?)", (name, description, name_en, name_zh, is_line_capable))
 
 
-def upd_cat(cid, name, description="", name_en="", name_zh=""):
+def upd_cat(cid, name, description="", name_en="", name_zh="", is_line_capable=0):
     with _c() as c:
-        c.execute("UPDATE categories SET name=?,description=?,name_en=?,name_zh=? WHERE id=?", (name, description, name_en, name_zh, cid))
+        c.execute("UPDATE categories SET name=?,description=?,name_en=?,name_zh=?,is_line_capable=? WHERE id=?", (name, description, name_en, name_zh, is_line_capable, cid))
 
 
 def del_cat(cid):
