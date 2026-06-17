@@ -106,6 +106,9 @@
             <span class="badge badge-{{ 'red' if u.role=='admin' else ('amber' if u.role=='manufacturer' else 'blue') }}">
               {{ role_labels.get(u.role, u.role) }}
             </span>
+            {% if u.is_manufacturer and u.role != 'manufacturer' %}
+            <span class="badge badge-amber" style="font-size:10px;">🏭</span>
+            {% endif %}
           </td>
           <td>
             {% if u.is_approved and u.is_active %}
@@ -124,7 +127,7 @@
                 onclick="openUserModal({{ u.id }}, '{{ u.email|e }}', '{{ u.company_name|e }}', '{{ u.role }}',
                   {{ u.is_approved }}, {{ u.is_active }}, {{ u.can_view_costs }},
                   '{{ u.allowed_menus or '' }}', '{{ u.allowed_categories or '' }}', {{ u.parent_id or 0 }},
-                  '{{ u.allowed_actions or '' }}')">
+                  '{{ u.allowed_actions or '' }}', {{ u.is_manufacturer or 0 }})">
                 ✏️ {{ T.btn_edit }}
               </button>
               <form method="post" action="/admin/impersonate/{{ u.id }}" style="margin:0;">
@@ -304,6 +307,11 @@
               <span style="font-size:13px;">💰 {{ T.costs_title }}</span>
             </label>
             <input type="hidden" name="can_view_costs" id="uModalCostsHidden" value="0" />
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="is_manufacturer_chk" id="uModalIsMfr" onchange="document.getElementById('uModalIsMfrHidden').value=this.checked?1:0" />
+              <span style="font-size:13px;">🏭 Aynı zamanda üretici</span>
+            </label>
+            <input type="hidden" name="is_manufacturer" id="uModalIsMfrHidden" value="0" />
           </div>
         </div>
 
@@ -371,7 +379,7 @@
 
 {% block scripts %}
 <script>
-function openUserModal(uid, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions) {
+function openUserModal(uid, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions, isMfr) {
   document.getElementById('uModalUid').value = uid;
   document.getElementById('uModalEmail').textContent = email + (company ? ' — ' + company : '');
   document.getElementById('uModalRole').value = role;
@@ -382,6 +390,10 @@ function openUserModal(uid, email, company, role, approved, active, costs, allow
   costsChk.checked = !!costs;
   document.getElementById('uModalCostsHidden').value = costs ? 1 : 0;
   costsChk.onchange = () => document.getElementById('uModalCostsHidden').value = costsChk.checked ? 1 : 0;
+  const mfrChk = document.getElementById('uModalIsMfr');
+  mfrChk.checked = !!isMfr;
+  document.getElementById('uModalIsMfrHidden').value = isMfr ? 1 : 0;
+  mfrChk.onchange = () => document.getElementById('uModalIsMfrHidden').value = mfrChk.checked ? 1 : 0;
 
   // Menus
   const menuList = allowedMenus ? allowedMenus.split(',') : [];

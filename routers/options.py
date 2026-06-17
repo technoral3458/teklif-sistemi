@@ -18,7 +18,7 @@ from tmpl import templates
 @router.get("")
 async def options_list(request: Request, category_id: int = 0):
     user = auth.require_user(request)
-    is_mfr = user["role"] == "manufacturer"
+    is_mfr = auth.is_mfr(user)
     mfr_filter = udb.get_manufacturer_group_ids(user) if is_mfr else None
     options = fdb.get_options(
         category_id=category_id if category_id else None,
@@ -109,7 +109,7 @@ async def save_option(request: Request,
         return RedirectResponse(f"/options?msg=Resim+kaydedilemedi:+{e}&msg_type=error", 303)
 
     # Manufacturers cannot set prices and automatically own their options
-    if user["role"] == "manufacturer":
+    if auth.is_mfr(user):
         price = 0.0
         manufacturer_id = udb.effective_mfr_id(user)
 
@@ -127,7 +127,7 @@ async def save_option(request: Request,
     try:
         if id:
             # manufacturers can only edit their own options
-            if user["role"] == "manufacturer":
+            if auth.is_mfr(user):
                 existing = fdb.get_option(id)
                 if not existing or existing.get("created_by") != user["id"]:
                     return RedirectResponse("/options?msg=Yetkisiz+işlem&msg_type=error", 303)

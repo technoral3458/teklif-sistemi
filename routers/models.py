@@ -33,7 +33,7 @@ def _options_for_category(category_id, mfr_filter=None):
 def _cats_for_user(user):
     """Return categories filtered by user's allowed_categories (manufacturer isolation)."""
     cats = fdb.get_cats()
-    if user["role"] != "manufacturer":
+    if not auth.is_mfr(user):
         return cats
     allowed_names = set(x.strip() for x in (user.get("allowed_categories") or "").split(",") if x.strip())
     if not allowed_names:
@@ -56,7 +56,7 @@ async def models_list(request: Request, category_id: int = 0):
     user = auth.require_user(request)
     cats = fdb.get_cats()
     models = fdb.get_models(category_id if category_id else None)
-    if user["role"] == "manufacturer":
+    if auth.is_mfr(user):
         allowed_ids = set(int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit())
         group_ids = udb.get_manufacturer_group_ids(user)
         # allowed_categories stored as names (e.g. "CNC İşleme,PVC Kenar Bantlama")
@@ -89,7 +89,7 @@ async def models_list(request: Request, category_id: int = 0):
 async def model_new(request: Request):
     user = auth.require_user(request)
     cats = _cats_for_user(user)
-    _mfr = udb.get_manufacturer_group_ids(user) if user["role"] == "manufacturer" else None
+    _mfr = udb.get_manufacturer_group_ids(user) if auth.is_mfr(user) else None
     options = fdb.get_options(manufacturer_filter=_mfr)
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     return templates.TemplateResponse(request, "model_form.html", {
@@ -112,7 +112,7 @@ async def model_copy(request: Request, model_id: int):
     if not m:
         return RedirectResponse("/models", 303)
     cats = _cats_for_user(user)
-    _mfr = udb.get_manufacturer_group_ids(user) if user["role"] == "manufacturer" else None
+    _mfr = udb.get_manufacturer_group_ids(user) if auth.is_mfr(user) else None
     options = _options_for_category(m.get("category_id"), mfr_filter=_mfr)
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     compatible = []
@@ -143,13 +143,13 @@ async def model_edit(request: Request, model_id: int):
     m = fdb.get_model(model_id)
     if not m:
         return RedirectResponse("/models", 303)
-    if user["role"] == "manufacturer":
+    if auth.is_mfr(user):
         allowed_ids = set(int(x) for x in (user.get("allowed_models") or "").split(",") if x.strip().isdigit())
         group_ids = udb.get_manufacturer_group_ids(user)
         if model_id not in allowed_ids and m.get("manufacturer_id") not in group_ids:
             return RedirectResponse("/models", 303)
     cats = _cats_for_user(user)
-    _mfr = udb.get_manufacturer_group_ids(user) if user["role"] == "manufacturer" else None
+    _mfr = udb.get_manufacturer_group_ids(user) if auth.is_mfr(user) else None
     options = _options_for_category(m.get("category_id"), mfr_filter=_mfr)
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     compatible = []
@@ -203,7 +203,7 @@ async def save_model(request: Request,
     user = auth.require_user(request)
 
     # Manufacturers must not set any pricing fields, and own their models
-    if user["role"] == "manufacturer":
+    if auth.is_mfr(user):
         base_price = 0.0
         purchase_price = shipping_cost = customs_pct = extra_tax_pct = 0.0
         port_cost = document_cost = installation_cost = other_cost = 0.0

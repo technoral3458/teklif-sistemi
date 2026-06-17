@@ -38,6 +38,11 @@ def require_admin(request: Request):
         raise HTTPException(status_code=403, detail="Yetkisiz erişim")
     return u
 
+def is_mfr(user) -> bool:
+    """True if user has manufacturer capabilities (role=manufacturer OR is_manufacturer flag)."""
+    return user.get("role") == "manufacturer" or bool(user.get("is_manufacturer"))
+
+
 def get_impersonator(request: Request):
     """Returns the admin user if currently impersonating someone, else None."""
     token = request.cookies.get("admin_session")

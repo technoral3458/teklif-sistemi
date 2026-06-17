@@ -72,6 +72,7 @@ async def update_user(request: Request,
                       is_approved: int = Form(0),
                       is_active: int = Form(0),
                       can_view_costs: int = Form(0),
+                      is_manufacturer: int = Form(0),
                       parent_id: int = Form(0)):
     auth.require_admin(request)
     form = await request.form()
@@ -83,6 +84,7 @@ async def update_user(request: Request,
         is_approved=is_approved,
         is_active=is_active,
         can_view_costs=can_view_costs,
+        is_manufacturer=is_manufacturer,
         allowed_menus=allowed_menus,
         allowed_categories=allowed_categories,
         parent_id=parent_id if parent_id else None,

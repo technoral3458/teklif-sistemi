@@ -62,14 +62,14 @@
       </a>
       {% endif %}
 
-      {% if not _menus or 'models' in _menus %}
+      {% if not _menus or 'models' in _menus or (user and user.is_manufacturer) %}
       <a href="/models" class="nav-link {% if active_page == 'models' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>
         <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_models }}</span>
       </a>
       {% endif %}
 
-      {% if not _menus or 'options' in _menus %}
+      {% if not _menus or 'options' in _menus or (user and user.is_manufacturer) %}
       <a href="/options" class="nav-link {% if active_page == 'options' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#10b981,#34d399);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg></span>
         <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_options }}</span>
@@ -157,7 +157,7 @@
         <div class="sidebar-user-info">
           <span class="sidebar-user-name">{{ user.company_name if user else 'Kullanıcı' }}</span>
           <span class="sidebar-user-role badge badge-{{ user.role if user else 'dealer' }}">
-            {% if user %}{% set _rt = {'admin':'Admin','manufacturer':'Üretici','dealer':'Bayi'} %}{{ _rt.get(user.role, user.role) }}{% endif %}
+            {% if user %}{% set _rt = {'admin':'Admin','manufacturer':'Üretici','dealer':'Bayi'} %}{{ _rt.get(user.role, user.role) }}{% if user.is_manufacturer and user.role != 'manufacturer' %} + Üretici{% endif %}{% endif %}
           </span>
         </div>
       </a>
