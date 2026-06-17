@@ -62,7 +62,7 @@
               </select>
             </div>
           </div>
-          {% if user.role != 'manufacturer' %}
+          {% if not is_mfr %}
           <div class="form-group">
             <label class="form-label" style="display:flex;align-items:center;gap:6px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
@@ -88,14 +88,14 @@
             </select>
           </div>
           {% endif %}
-          {% if user.role != 'manufacturer' and not user.is_manufacturer %}
+          {% if not is_mfr %}
           <div class="form-group">
             <label class="form-label">{{ T.model_sale_price }}</label>
             <input type="number" name="base_price" class="form-control" step="0.01" min="0" value="{{ model.base_price|default(0) }}" />
           </div>
           {% endif %}
 
-          {% if user.role == 'manufacturer' or user.is_manufacturer %}
+          {% if is_mfr %}
           {% set cur_pp = model.purchase_price|default(0)|float %}
           <div class="form-group">
             <label class="form-label" style="font-weight:600;">💰 Satış Fiyatınız (Alış Fiyatı)</label>
@@ -293,7 +293,7 @@
               <input type="checkbox" name="compatible_options" value="{{ opt.id }}"
                 {% if compatible_options_selected and opt.id in compatible_options_selected %}checked{% endif %} />
               <span style="font-size:13px;">{{ (opt.get('name_'+user.lang) or opt.name) if user.lang and user.lang != 'tr' else opt.name }}</span>
-              {% if user.role != 'manufacturer' %}<span style="font-size:11px;color:var(--text-muted);margin-left:auto;">{{ "%.0f"|format(opt.price|default(0)|float) }} {{ opt.currency }}</span>{% endif %}
+              {% if not is_mfr %}<span style="font-size:11px;color:var(--text-muted);margin-left:auto;">{{ "%.0f"|format(opt.price|default(0)|float) }} {{ opt.currency }}</span>{% endif %}
             </label>
             {% endfor %}
           </div>

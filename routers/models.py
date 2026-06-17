@@ -95,6 +95,7 @@ async def model_new(request: Request):
     manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
     return templates.TemplateResponse(request, "model_form.html", {
         "user": user,
+        "is_mfr": auth.is_mfr(user),
         "model": {},
         "categories": cats,
         "options": options,
@@ -127,6 +128,7 @@ async def model_copy(request: Request, model_id: int):
     m_copy["name"] = m["name"] + " (Kopya)"
     return templates.TemplateResponse(request, "model_form.html", {
         "user": user,
+        "is_mfr": auth.is_mfr(user),
         "model": m_copy,
         "categories": cats,
         "options": options,
@@ -162,6 +164,7 @@ async def model_edit(request: Request, model_id: int):
     line_images = fdb.get_model_line_images(model_id)
     return templates.TemplateResponse(request, "model_form.html", {
         "user": user,
+        "is_mfr": auth.is_mfr(user),
         "model": m,
         "categories": cats,
         "options": options,
