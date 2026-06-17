@@ -327,6 +327,92 @@ async def delete_line_image(request: Request, id: int = Form(...), model_id: int
     return RedirectResponse(f"/models/{model_id}/edit", 303)
 
 
+@router.get("/general-catalog-pdf")
+async def general_catalog_pdf(request: Request, lang: str = "", category_id: int = 0):
+    import asyncio
+    import unicodedata
+    from catalog_ai import generate_general_catalog_content
+    from tmpl import templates
+
+    user = auth.require_user(request)
+    if not lang:
+        lang = user.get("lang") or "tr"
+
+    all_models = fdb.get_models(category_id=category_id or None)
+    cats = fdb.get_cats()
+    cat_map = {c["id"]: c for c in cats}
+    company = fdb.get_company()
+
+    # Attach category name + parsed specs to each model
+    enriched = []
+    for m in all_models:
+        cat = cat_map.get(m.get("category_id"), {})
+        m = dict(m)
+        m["_cat_name"] = cat.get(f"name_{lang}") or cat.get("name") or ""
+        specs_raw = m.get("specs") or "[]"
+        try:
+            m["_specs"] = json.loads(specs_raw) if isinstance(specs_raw, str) else specs_raw
+        except Exception:
+            m["_specs"] = []
+        enriched.append(m)
+
+    co_name = (company.get("company_name") or "") if company else ""
+
+    # AI taglines for all models — run in thread
+    ai = await asyncio.to_thread(generate_general_catalog_content, enriched, lang, co_name)
+    ai_intro  = ai.get("catalog_intro", "")
+    taglines  = ai.get("model_taglines", {})
+
+    _L = {
+        "tr": {"product_catalog": "Ürün Kataloğu", "products": "Ürün",
+               "contact_us": "İletişim", "phone": "Telefon",
+               "email": "E-posta", "web": "Web", "address": "Adres"},
+        "en": {"product_catalog": "Product Catalog", "products": "Products",
+               "contact_us": "Contact Us", "phone": "Phone",
+               "email": "Email", "web": "Website", "address": "Address"},
+        "zh": {"product_catalog": "产品目录", "products": "产品",
+               "contact_us": "联系我们", "phone": "电话",
+               "email": "邮箱", "web": "网站", "address": "地址"},
+    }
+    lbl = _L.get(lang, _L["tr"])
+
+    base_url = str(request.base_url).rstrip("/")
+    date_str = datetime.date.today().strftime("%Y-%m-%d")
+
+    html_str = templates.env.get_template("general_catalog_pdf.html").render({
+        "models": enriched,
+        "company": company,
+        "ai_intro": ai_intro,
+        "taglines": taglines,
+        "lang": lang,
+        "base_url": base_url,
+        "date_str": date_str,
+        "label_product_catalog": lbl["product_catalog"],
+        "label_products":        lbl["products"],
+        "label_contact_us":      lbl["contact_us"],
+        "label_phone":           lbl["phone"],
+        "label_email":           lbl["email"],
+        "label_web":             lbl["web"],
+        "label_address":         lbl["address"],
+    })
+
+    def _render():
+        from weasyprint import HTML
+        return HTML(string=html_str, base_url=base_url).write_pdf()
+
+    try:
+        pdf = await asyncio.to_thread(_render)
+    except Exception as e:
+        return Response(f"PDF oluşturulamadı: {e}", status_code=500, media_type="text/plain")
+
+    import unicodedata
+    safe_co = unicodedata.normalize("NFKD", co_name)
+    safe_co = "".join(c for c in safe_co if ord(c) < 128).replace(" ", "_")[:30] or "katalog"
+    filename = f"genel_katalog_{safe_co}_{lang}.pdf"
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
 @router.get("/{model_id}/catalog-ai-test")
 async def catalog_ai_test(request: Request, model_id: int, lang: str = "tr"):
     """Debug endpoint — returns raw AI output as JSON."""

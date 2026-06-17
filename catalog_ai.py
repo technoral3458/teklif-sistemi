@@ -102,6 +102,64 @@ def generate_catalog_content(model: dict, lang: str, specs: list, options: list)
         return fb
 
 
+def generate_general_catalog_content(models: list, lang: str, company_name: str) -> dict:
+    """Generate company-level catalog intro + one tagline per model."""
+    import logging
+    log = logging.getLogger(__name__)
+
+    lang_name = _LANG_NAMES.get(lang, "Turkish")
+    if not ANTHROPIC_API_KEY:
+        return _general_fallback(models, lang)
+    try:
+        model_lines = "\n".join(
+            f'- "{m.get(f"name_{lang}") or m.get("name","")}" (category: {m.get("_cat_name","")}, desc: {(m.get(f"description_{lang}") or m.get("description",""))[:80]})'
+            for m in models
+        )
+        prompt = f"""
+You are writing a premium B2B industrial machinery company catalog for "{company_name}".
+
+Product list:
+{model_lines}
+
+Return a single JSON object:
+{{
+  "catalog_intro": "2 sentences (max 50 words) introducing the company catalog. Focus on quality, range, and business value.",
+  "model_taglines": {{
+    "EXACT_MODEL_NAME": "One punchy tagline (max 12 words) for this specific machine.",
+    ...
+  }}
+}}
+
+Use EXACT model names as keys. Write everything in {lang_name}. Be confident and specific.
+""".strip()
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2048,
+            system=_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = msg.content[0].text.strip()
+        if raw.startswith("```"):
+            parts = raw.split("```")
+            raw = parts[1] if len(parts) > 1 else raw
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw.strip())
+    except Exception as e:
+        log.error("General catalog AI failed: %s", e, exc_info=True)
+        return _general_fallback(models, lang)
+
+
+def _general_fallback(models: list, lang: str) -> dict:
+    taglines = {}
+    for m in models:
+        name = m.get(f"name_{lang}") or m.get("name") or ""
+        desc = m.get(f"description_{lang}") or m.get("description") or ""
+        taglines[name] = desc[:80] if desc else name
+    return {"catalog_intro": "", "model_taglines": taglines}
+
+
 def _fallback(model: dict, lang: str, specs: list, options: list) -> dict:
     name = model.get(f"name_{lang}") or model.get("name") or ""
     desc = model.get(f"description_{lang}") or model.get("description") or ""
