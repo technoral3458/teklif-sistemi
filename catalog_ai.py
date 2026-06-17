@@ -72,7 +72,9 @@ def generate_catalog_content(model: dict, lang: str, specs: list, options: list)
 
     if not ANTHROPIC_API_KEY:
         log.warning("ANTHROPIC_API_KEY not set — using fallback catalog content")
-        return _fallback(model, lang, specs, options)
+        fb = _fallback(model, lang, specs, options)
+        fb["_debug"] = "no_api_key"
+        return fb
     try:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         msg = client.messages.create(
@@ -91,10 +93,13 @@ def generate_catalog_content(model: dict, lang: str, specs: list, options: list)
         ob = result.get("option_benefits", [])
         if isinstance(ob, str):
             result["option_benefits"] = [ob]
+        result["_debug"] = "ai_ok"
         return result
     except Exception as e:
         log.error("Catalog AI generation failed: %s", e, exc_info=True)
-        return _fallback(model, lang, specs, options)
+        fb = _fallback(model, lang, specs, options)
+        fb["_debug"] = f"error: {type(e).__name__}: {e}"
+        return fb
 
 
 def _fallback(model: dict, lang: str, specs: list, options: list) -> dict:
