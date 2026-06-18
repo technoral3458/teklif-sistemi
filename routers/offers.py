@@ -1,12 +1,16 @@
 import json
+import os
+import uuid
 import datetime
+import threading
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import RedirectResponse, Response
+from typing import Optional
 
 import db.factory as fdb
 import auth
-from config import OFFER_STATUSES, CURRENCIES, BASE_DIR
+from config import OFFER_STATUSES, CURRENCIES, BASE_DIR, CONTRACTS_DIR
 
 router = APIRouter(prefix="/offers")
 from tmpl import templates
@@ -353,6 +357,12 @@ async def offer_detail(request: Request, offer_id: int):
     display_image = _best_display_image(model, offer, items, opts)
     specs = _filter_specs(_parse_specs(model, lang), items, opts)
     delivery_term = fdb.get_delivery_term(offer["delivery_term_id"]) if offer.get("delivery_term_id") else None
+    change_requests = fdb.get_change_requests(offer_id=offer_id)
+    # Admin sees all statuses; dealers cannot select "Sipariş Verildi" directly
+    if user["role"] == "admin":
+        statuses = OFFER_STATUSES
+    else:
+        statuses = [s for s in OFFER_STATUSES if s != "Sipariş Verildi"]
     return templates.TemplateResponse(request, "offer_detail.html", {
         "user": user,
         "offer": offer,
@@ -362,7 +372,8 @@ async def offer_detail(request: Request, offer_id: int):
         "specs": specs,
         "delivery_term": delivery_term,
         "display_image": display_image,
-        "statuses": OFFER_STATUSES,
+        "statuses": statuses,
+        "change_requests": change_requests,
         "active_page": "offers",
     })
 
@@ -565,6 +576,94 @@ async def offer_catalog_pdf(request: Request, offer_id: int):
     fname = f"Katalog_{safe}_{lang}.pdf"
     return Response(pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@router.post("/{offer_id}/cancel-offer")
+async def cancel_offer(request: Request,
+                       offer_id: int,
+                       cancel_reason: str = Form("")):
+    user = auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+    if user["role"] != "admin" and offer.get("dealer_id") != user["id"]:
+        return RedirectResponse(f"/offers/{offer_id}", 303)
+    fdb.cancel_offer(offer_id, cancel_reason)
+    return RedirectResponse(f"/offers/{offer_id}", 303)
+
+
+@router.post("/{offer_id}/dealer-approve")
+async def dealer_approve(request: Request,
+                         offer_id: int,
+                         contract_notes: str = Form(""),
+                         contract_photo: Optional[UploadFile] = File(None)):
+    user = auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+    if user["role"] != "admin" and offer.get("dealer_id") != user["id"]:
+        return RedirectResponse(f"/offers/{offer_id}", 303)
+
+    photo_path = ""
+    if contract_photo and contract_photo.filename:
+        ext = os.path.splitext(contract_photo.filename)[1].lower() or ".jpg"
+        fname = f"contract_{offer_id}_{uuid.uuid4().hex[:8]}{ext}"
+        content = await contract_photo.read()
+        with open(os.path.join(CONTRACTS_DIR, fname), "wb") as f:
+            f.write(content)
+        photo_path = f"contracts/{fname}"
+
+    fdb.dealer_approve_offer(offer_id, contract_notes, photo_path)
+
+    def _send():
+        try:
+            from email_utils import send_admin_notification
+            send_admin_notification("Bayi Siparişi Onayladı", {
+                "Teklif No": f"#{offer_id}",
+                "Bayi": user.get("company_name", "-"),
+                "Not": contract_notes or "-",
+            })
+        except Exception:
+            pass
+    threading.Thread(target=_send, daemon=True).start()
+
+    return RedirectResponse(f"/offers/{offer_id}", 303)
+
+
+@router.post("/{offer_id}/change-request")
+async def send_change_request(request: Request,
+                              offer_id: int,
+                              description: str = Form(...)):
+    user = auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+    fdb.save_change_request(offer_id, user["id"], description)
+
+    def _send():
+        try:
+            from email_utils import send_admin_notification
+            send_admin_notification("Değişiklik Talebi", {
+                "Teklif No": f"#{offer_id}",
+                "Bayi": user.get("company_name", "-"),
+                "Talep": description,
+            })
+        except Exception:
+            pass
+    threading.Thread(target=_send, daemon=True).start()
+
+    return RedirectResponse(f"/offers/{offer_id}", 303)
+
+
+@router.post("/{offer_id}/change-request/resolve")
+async def resolve_change_request(request: Request,
+                                  offer_id: int,
+                                  req_id: int = Form(...),
+                                  action: str = Form(...),
+                                  admin_notes: str = Form("")):
+    auth.require_admin(request)
+    fdb.resolve_change_request(req_id, action, admin_notes)
+    return RedirectResponse(f"/offers/{offer_id}", 303)
 
 
 @router.post("/{offer_id}/status")

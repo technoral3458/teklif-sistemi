@@ -304,6 +304,22 @@ def init():
         # Add mfr_status_date to offers
         _acol(cur, "offers", "mfr_status_date", "TEXT DEFAULT ''")
 
+        # Dealer order workflow columns
+        _acol(cur, "offers", "cancel_reason",   "TEXT DEFAULT ''")
+        _acol(cur, "offers", "contract_notes",  "TEXT DEFAULT ''")
+        _acol(cur, "offers", "contract_photo",  "TEXT DEFAULT ''")
+
+        # Dealer change requests
+        cur.execute("""CREATE TABLE IF NOT EXISTS change_requests(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            offer_id INTEGER NOT NULL,
+            dealer_id INTEGER NOT NULL,
+            description TEXT DEFAULT '',
+            status TEXT DEFAULT 'pending',
+            admin_notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT(datetime('now'))
+        )""")
+
         # Purchase price tracking for options (set by manufacturers)
         _acol(cur, "options", "purchase_price",    "REAL DEFAULT 0")
         _acol(cur, "options", "purchase_currency", "TEXT DEFAULT 'USD'")
@@ -697,13 +713,15 @@ _OFCOLS = ("id,offer_no,customer_id,model_id,machine_count,currency,"
            "notes,validity_date,dealer_id,manufacturer_id,admin_status,"
            "admin_notes,termin_date,mfr_status,mfr_notes,mfr_status_date,"
            "delivery_method,delivery_time,logistics,payment_notes,created_at,"
-           "delivery_term_id,delivery_term_discount")
+           "delivery_term_id,delivery_term_discount,"
+           "cancel_reason,contract_notes,contract_photo")
 _OFKEYS = ["id","offer_no","customer_id","model_id","machine_count","currency",
            "base_price","options_total","discount_pct","total_price","status",
            "notes","validity_date","dealer_id","manufacturer_id","admin_status",
            "admin_notes","termin_date","mfr_status","mfr_notes","mfr_status_date",
            "delivery_method","delivery_time","logistics","payment_notes","created_at",
-           "delivery_term_id","delivery_term_discount"]
+           "delivery_term_id","delivery_term_discount",
+           "cancel_reason","contract_notes","contract_photo"]
 
 
 def _rof(r):
@@ -803,6 +821,52 @@ def create_offer(**kw):
 def upd_offer_status(oid, status):
     with _c() as c:
         c.execute("UPDATE offers SET status=? WHERE id=?", (status, oid))
+
+
+def cancel_offer(oid, reason):
+    with _c() as c:
+        c.execute("UPDATE offers SET status='İptal', cancel_reason=? WHERE id=?", (reason, oid))
+
+
+def dealer_approve_offer(oid, notes="", photo=""):
+    with _c() as c:
+        c.execute(
+            "UPDATE offers SET status='Sipariş Verildi', contract_notes=?, contract_photo=? WHERE id=?",
+            (notes, photo, oid)
+        )
+
+
+def save_change_request(offer_id, dealer_id, description):
+    with _c() as c:
+        c.execute(
+            "INSERT INTO change_requests(offer_id, dealer_id, description) VALUES(?,?,?)",
+            (offer_id, dealer_id, description)
+        )
+        return c.lastrowid
+
+
+def get_change_requests(offer_id=None, status=None):
+    with _c() as c:
+        q = "SELECT id, offer_id, dealer_id, description, status, admin_notes, created_at FROM change_requests WHERE 1=1"
+        p = []
+        if offer_id:
+            q += " AND offer_id=?"
+            p.append(offer_id)
+        if status:
+            q += " AND status=?"
+            p.append(status)
+        q += " ORDER BY id DESC"
+        rows = c.execute(q, p).fetchall()
+    keys = ["id", "offer_id", "dealer_id", "description", "status", "admin_notes", "created_at"]
+    return [dict(zip(keys, r)) for r in rows]
+
+
+def resolve_change_request(req_id, status, admin_notes=""):
+    with _c() as c:
+        c.execute(
+            "UPDATE change_requests SET status=?, admin_notes=? WHERE id=?",
+            (status, admin_notes, req_id)
+        )
 
 
 def upd_offer(oid, **kw):

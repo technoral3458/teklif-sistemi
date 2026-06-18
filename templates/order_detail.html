@@ -310,6 +310,36 @@
   </div>
   {% endif %}
 
+  <!-- Dealer: production progress card -->
+  {% if user.role == 'dealer' %}
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ T.ord_step_production }}</h3></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+      {% set ns2 = namespace(found=false) %}
+      {% for s in production_steps %}
+      {% set active = s.code == (offer.mfr_status or '') %}
+      {% set passed = s.sort_order < ns.current_sort %}
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:{% if active %}rgba(59,130,246,0.12){% elif passed %}rgba(16,185,129,0.08){% else %}var(--surface-2){% endif %};">
+        <div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:{% if active %}var(--primary){% elif passed %}var(--success){% else %}var(--border){% endif %};">
+          {% if passed %}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          {% elif active %}<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="5 3 19 12 5 21 5 3"/></svg>
+          {% else %}<span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);display:block;"></span>{% endif %}
+        </div>
+        <span style="font-size:13px;font-weight:{% if active %}600{% else %}400{% endif %};color:{% if active %}var(--primary){% elif passed %}var(--success){% else %}var(--text-muted){% endif %};">
+          {{ s.label_zh if user.lang == 'zh' else (s.label_en if user.lang == 'en' else s.label_tr) }}
+        </span>
+        {% if active and offer.mfr_status_date %}
+        <span style="margin-left:auto;font-size:11px;color:var(--text-muted);">{{ offer.mfr_status_date }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% if not mfr_confirmed %}
+      <div style="text-align:center;font-size:12px;color:var(--text-muted);padding:8px;">⏳ {{ T.ord_status_waiting }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Dealer info (admin only) -->
   {% if user.role == 'admin' %}
   <div class="card">
