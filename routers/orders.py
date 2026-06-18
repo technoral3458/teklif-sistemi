@@ -26,7 +26,7 @@ def _notify(event_label: str, details: dict):
 def _enrich(orders):
     customers = {c["id"]: c for c in fdb.get_customers()}
     models    = {m["id"]: m for m in fdb.get_models()}
-    mfr_users = {u["id"]: u for u in udb.all_users() if u["role"] == "manufacturer"}
+    mfr_users = {u["id"]: u for u in udb.all_manufacturers()}
     dealer_users = {u["id"]: u for u in udb.all_users() if u["role"] == "dealer"}
     for o in orders:
         c = customers.get(o["customer_id"]) or {}
@@ -48,7 +48,7 @@ async def orders_list(request: Request):
         orders = fdb.get_offers(status="Sipariş Verildi")
         for s in ["Admin Onaylı", "Üretimde", "Tamamlandı", "Teslim Edildi"]:
             orders += fdb.get_offers(status=s)
-    elif role == "manufacturer":
+    elif auth.is_mfr(user):
         mfr_id = udb.effective_mfr_id(user)
         orders = [o for o in fdb.get_offers() if o.get("manufacturer_id") == mfr_id and o.get("status") not in ("Beklemede",)]
     elif role == "dealer":
@@ -57,7 +57,7 @@ async def orders_list(request: Request):
     else:
         orders = []
     orders = _enrich(orders)
-    manufacturers = [u for u in udb.all_users() if u["role"] == "manufacturer"]
+    manufacturers = udb.all_manufacturers()
     return templates.TemplateResponse(request, "orders.html", {
         "user": user,
         "orders": orders,
@@ -80,7 +80,7 @@ async def order_detail(request: Request, oid: int):
     stages = fdb.get_order_stages(oid)
     customers = {c["id"]: c for c in fdb.get_customers()}
     models    = {m["id"]: m for m in fdb.get_models()}
-    mfr_users = {u["id"]: u for u in udb.all_users() if u["role"] == "manufacturer"}
+    mfr_users = {u["id"]: u for u in udb.all_manufacturers()}
     dealer_users = {u["id"]: u for u in udb.all_users() if u["role"] in ("dealer","admin")}
     customer = customers.get(offer["customer_id"]) or {}
     model    = models.get(offer["model_id"]) or {}
