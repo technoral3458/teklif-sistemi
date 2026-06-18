@@ -12,7 +12,7 @@ async def dashboard(request: Request):
     user = auth.require_user(request)
     role = user["role"]
 
-    if role == "manufacturer":
+    if auth.is_mfr(user):
         mfr_id = udb.effective_mfr_id(user)
         stats = fdb.get_stats(manufacturer_id=mfr_id)
         recent_offers = fdb.get_recent_offers(10, manufacturer_id=mfr_id)

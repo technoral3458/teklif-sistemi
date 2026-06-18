@@ -11,7 +11,8 @@ from tmpl import templates
 @router.get("")
 async def manufacturers_list(request: Request):
     user = auth.require_admin(request)
-    manufacturers = [u for u in udb.all_users() if u["role"] == "manufacturer"]
+    all_users = udb.all_users()
+    manufacturers = [u for u in all_users if u["role"] == "manufacturer" or u.get("is_manufacturer")]
     cats = fdb.get_cats()
     models = fdb.get_models()
     return templates.TemplateResponse(request, "manufacturers.html", {

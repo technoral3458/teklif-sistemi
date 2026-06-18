@@ -114,10 +114,14 @@ async def order_detail(request: Request, oid: int):
 
 @router.post("/{oid}/approve")
 async def approve_order(request: Request, oid: int,
-                        manufacturer_id: int = Form(...),
+                        manufacturer_id: int = Form(0),
                         admin_notes: str = Form("")):
     auth.require_admin(request)
-    fdb.approve_order(oid, manufacturer_id, admin_notes)
+    if not manufacturer_id:
+        offer = fdb.get_offer(oid)
+        model = fdb.get_model(offer["model_id"]) if offer else None
+        manufacturer_id = (model or {}).get("manufacturer_id") or 0
+    fdb.approve_order(oid, manufacturer_id or None, admin_notes)
     offer = fdb.get_offer(oid)
     _notify("Admin Siparişi Onayladı", {
         "Sipariş No": f"#{oid}",

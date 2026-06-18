@@ -90,7 +90,7 @@
       </a>
       {% endif %}
 
-      {% if not _menus or 'orders' in _menus %}
+      {% if not _menus or 'orders' in _menus or (user and (user.role == 'manufacturer' or user.is_manufacturer)) %}
       <a href="/orders" class="nav-link {% if active_page == 'orders' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#f97316,#fb923c);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
         <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_orders }}</span>
@@ -123,7 +123,7 @@
         <span class="nav-label">{{ _T(user.lang if user else 'tr').profile_title }}</span>
       </a>
 
-      {% if user and user.role == 'manufacturer' %}
+      {% if user and (user.role == 'manufacturer' or user.is_manufacturer) %}
       <a href="/price-requests/mine" class="nav-link {% if active_page == 'price_requests' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#C9961A,#f0b429);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
         <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_price_requests_mine }}</span>
