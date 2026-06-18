@@ -932,6 +932,10 @@ def approve_order(oid, manufacturer_id, admin_notes=""):
             (manufacturer_id, admin_notes, oid)
         )
 
+def reassign_order_manufacturer(oid, manufacturer_id):
+    with _c() as c:
+        c.execute("UPDATE offers SET manufacturer_id=? WHERE id=?", (manufacturer_id, oid))
+
 def reject_order(oid, admin_notes=""):
     with _c() as c:
         c.execute(

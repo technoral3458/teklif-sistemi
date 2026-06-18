@@ -131,6 +131,15 @@ async def approve_order(request: Request, oid: int,
     return RedirectResponse(f"/orders/{oid}", 303)
 
 
+@router.post("/{oid}/reassign")
+async def reassign_manufacturer(request: Request, oid: int,
+                                manufacturer_id: int = Form(0)):
+    auth.require_admin(request)
+    if manufacturer_id:
+        fdb.reassign_order_manufacturer(oid, manufacturer_id)
+    return RedirectResponse(f"/orders/{oid}", 303)
+
+
 @router.post("/{oid}/reject")
 async def reject_order(request: Request, oid: int,
                        admin_notes: str = Form("")):

@@ -99,6 +99,18 @@
               <button type="submit" class="btn btn-danger btn-sm">Reddet</button>
             </form>
             {% endif %}
+
+            {% if user.role == 'admin' and admin_done %}
+            <form method="post" action="/orders/{{ offer.id }}/reassign" style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <select name="manufacturer_id" class="form-control" style="max-width:200px;font-size:13px;">
+                <option value="">-- Üretici Seç --</option>
+                {% for m in manufacturers %}
+                <option value="{{ m.id }}" {% if m.id == offer.manufacturer_id %}selected{% endif %}>{{ m.company_name or m.email }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-outline btn-sm">Üretici Değiştir</button>
+            </form>
+            {% endif %}
           </div>
         </div>
 
