@@ -191,6 +191,40 @@ async def save_smtp(request: Request,
     return RedirectResponse("/admin?tab=system&msg=SMTP+ayarları+kaydedildi&msg_type=success", 303)
 
 
+@router.get("/production-steps")
+async def production_steps_page(request: Request):
+    user = auth.require_admin(request)
+    steps = fdb.get_production_steps(active_only=False)
+    return templates.TemplateResponse(request, "production_steps.html", {
+        "user": user,
+        "steps": steps,
+        "active_page": "admin",
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
+    })
+
+
+@router.post("/production-steps/save")
+async def save_production_step(request: Request,
+                                id: int = Form(0),
+                                code: str = Form(...),
+                                label_tr: str = Form(...),
+                                label_en: str = Form(""),
+                                label_zh: str = Form(""),
+                                sort_order: int = Form(0),
+                                is_active: int = Form(1)):
+    auth.require_admin(request)
+    fdb.save_production_step(id, code, label_tr, label_en, label_zh, sort_order, is_active)
+    return RedirectResponse("/admin/production-steps?msg=Kaydedildi&msg_type=success", 303)
+
+
+@router.post("/production-steps/delete")
+async def delete_production_step(request: Request, id: int = Form(...)):
+    auth.require_admin(request)
+    fdb.del_production_step(id)
+    return RedirectResponse("/admin/production-steps?msg=Silindi&msg_type=success", 303)
+
+
 @router.post("/backup/restore")
 async def backup_restore(request: Request, backup_file: UploadFile = File(...)):
     auth.require_admin(request)

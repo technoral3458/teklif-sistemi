@@ -19,6 +19,16 @@
   'delivered': T.ord_status_delivered
 } %}
 
+{# Compute current production step info for no-going-back and label display #}
+{% set ns = namespace(current_sort=0, step_label='') %}
+{% for s in production_steps %}
+  {% if s.code == (offer.mfr_status or '') %}
+    {% set ns.current_sort = s.sort_order %}
+    {% set ns.step_label = s.label_zh if user.lang == 'zh' else (s.label_en if user.lang == 'en' else s.label_tr) %}
+  {% endif %}
+{% endfor %}
+{% set mfr_in_prod = ns.current_sort > 0 %}
+
 {% block content %}
 <div style="display:flex;gap:8px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
   <a href="/orders" class="btn btn-ghost btn-sm">{{ T.ord_back }}</a>
@@ -54,55 +64,79 @@
 <div style="display:flex;flex-direction:column;gap:16px;">
 
   <!-- Workflow status -->
+  {% set admin_done = offer.admin_status == 'approved' %}
+  {% set admin_rejected = offer.admin_status == 'rejected' %}
+  {% set mfr_confirmed = offer.mfr_status == 'confirmed' or mfr_in_prod %}
+  {% set in_prod = mfr_in_prod %}
+  {% set max_step = namespace(val=0) %}
+  {% for s in production_steps %}{% if s.sort_order > max_step.val %}{% set max_step.val = s.sort_order %}{% endif %}{% endfor %}
+  {% set all_done = in_prod and ns.current_sort == max_step.val %}
+
   <div class="card">
-    <div class="card-header"><h3 class="card-title">{{ T.ord_workflow }}</h3></div>
-    <div class="card-body">
-      <div style="display:flex;flex-direction:column;gap:0;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <h3 class="card-title">{{ T.ord_workflow }}</h3>
+      <span class="badge badge-{{ 'green' if all_done else ('amber' if in_prod else ('blue' if mfr_confirmed else ('green' if admin_done else ('red' if admin_rejected else 'blue')))) }}" style="font-size:12px;">
+        {% if all_done %}{{ ns.step_label or T.ord_status_delivered }}
+        {% elif in_prod %}{{ ns.step_label or T.ord_status_in_production }}
+        {% elif mfr_confirmed %}{{ T.ord_status_confirmed }}
+        {% elif admin_done %}{{ T.ord_approved }}
+        {% elif admin_rejected %}{{ T.ord_rejected }}
+        {% else %}{{ T.ord_step_order }}{% endif %}
+      </span>
+    </div>
+    <div class="card-body" style="padding:20px 24px;">
+      <div style="position:relative;padding-left:42px;">
+        <!-- Vertical timeline line -->
+        <div style="position:absolute;left:13px;top:14px;bottom:14px;width:2px;background:var(--border);z-index:0;"></div>
 
         <!-- Step 1: Order received -->
-        <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
-          <div style="width:28px;height:28px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        <div style="position:relative;margin-bottom:28px;">
+          <div style="position:absolute;left:-42px;top:0;width:28px;height:28px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;z-index:1;box-shadow:0 0 0 3px var(--surface);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
-          <div>
-            <div style="font-weight:600;font-size:13px;">{{ T.ord_step_order }}</div>
-            <div style="font-size:12px;color:var(--text-muted);">{{ T.ord_dealer }}: {{ offer.dealer_name }} · {{ offer.created_at[:10] }}</div>
+          <div style="padding-top:4px;">
+            <div style="font-weight:600;font-size:13px;line-height:1.3;">{{ T.ord_step_order }}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_dealer }}: <strong>{{ offer.dealer_name }}</strong> · {{ offer.created_at[:10] }}</div>
           </div>
         </div>
 
         <!-- Step 2: Admin approval -->
-        {% set admin_done = offer.admin_status == 'approved' %}
-        {% set admin_rejected = offer.admin_status == 'rejected' %}
-        <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
-          <div style="width:28px;height:28px;border-radius:50%;background:{% if admin_rejected %}var(--danger){% elif admin_done %}var(--success){% else %}var(--surface-2){% endif %};border:2px solid {% if admin_done or admin_rejected %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            {% if admin_done %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-            {% elif admin_rejected %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            {% else %}<span style="font-size:11px;color:var(--text-muted);">2</span>{% endif %}
+        <div style="position:relative;margin-bottom:28px;">
+          <div style="position:absolute;left:-42px;top:0;width:28px;height:28px;border-radius:50%;background:{% if admin_rejected %}var(--danger){% elif admin_done %}var(--success){% else %}var(--surface-2){% endif %};border:2px solid {% if admin_done or admin_rejected %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;z-index:1;box-shadow:0 0 0 3px var(--surface);">
+            {% if admin_done %}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            {% elif admin_rejected %}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            {% else %}<span style="font-size:11px;font-weight:600;color:var(--text-muted);">2</span>{% endif %}
           </div>
-          <div style="flex:1;">
-            <div style="font-weight:600;font-size:13px;">{{ T.ord_step_admin }}{% if admin_rejected %} — {{ T.ord_rejected }}{% elif admin_done %} — {{ T.ord_approved }}{% endif %}</div>
-            {% if offer.admin_notes %}<div style="font-size:12px;color:var(--text-muted);">{{ T.ord_note }}: {{ offer.admin_notes }}</div>{% endif %}
-            {% if admin_done %}<div style="font-size:12px;color:var(--text-muted);">{{ T.ord_mfr_label }}: {{ offer.manufacturer_name }}</div>{% endif %}
+          <div style="padding-top:4px;flex:1;">
+            <div style="font-weight:600;font-size:13px;line-height:1.3;">
+              {{ T.ord_step_admin }}
+              {% if admin_rejected %}<span style="color:var(--danger);font-weight:400;"> — {{ T.ord_rejected }}</span>
+              {% elif admin_done %}<span style="color:var(--success);font-weight:400;"> — {{ T.ord_approved }}</span>{% endif %}
+            </div>
+            {% if offer.admin_notes %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_note }}: {{ offer.admin_notes }}</div>{% endif %}
+            {% if admin_done %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_mfr_label }}: <strong>{{ offer.manufacturer_name }}</strong></div>{% endif %}
 
             {% if user.role == 'admin' and not offer.admin_status %}
-            <form method="post" action="/orders/{{ offer.id }}/approve" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-              <select name="manufacturer_id" class="form-control" style="max-width:200px;font-size:13px;" required>
-                <option value="">{{ T.ord_select_mfr }}</option>
-                {% for m in manufacturers %}
-                <option value="{{ m.id }}" {% if m.id == default_mfr_id %}selected{% endif %}>{{ m.company_name or m.email }}</option>
-                {% endfor %}
-              </select>
-              <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="max-width:180px;font-size:13px;" />
-              <button type="submit" class="btn btn-success btn-sm">{{ T.ord_approve_btn }}</button>
-            </form>
-            <form method="post" action="/orders/{{ offer.id }}/reject" style="margin-top:6px;display:flex;gap:8px;">
-              <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_reject_reason }}" style="max-width:260px;font-size:13px;" />
-              <button type="submit" class="btn btn-danger btn-sm">{{ T.ord_reject_btn }}</button>
-            </form>
+            <div style="margin-top:10px;padding:12px;background:var(--surface-2);border-radius:8px;display:flex;flex-direction:column;gap:8px;">
+              <form method="post" action="/orders/{{ offer.id }}/approve" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <select name="manufacturer_id" class="form-control" style="flex:1;min-width:160px;font-size:13px;" required>
+                  <option value="">{{ T.ord_select_mfr }}</option>
+                  {% for m in manufacturers %}
+                  <option value="{{ m.id }}" {% if m.id == default_mfr_id %}selected{% endif %}>{{ m.company_name or m.email }}</option>
+                  {% endfor %}
+                </select>
+                <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="flex:1;min-width:140px;font-size:13px;" />
+                <button type="submit" class="btn btn-success btn-sm">{{ T.ord_approve_btn }}</button>
+              </form>
+              <form method="post" action="/orders/{{ offer.id }}/reject" style="display:flex;gap:8px;align-items:center;">
+                <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_reject_reason }}" style="flex:1;font-size:13px;" />
+                <button type="submit" class="btn btn-danger btn-sm">{{ T.ord_reject_btn }}</button>
+              </form>
+            </div>
             {% endif %}
 
             {% if user.role == 'admin' and admin_done %}
-            <form method="post" action="/orders/{{ offer.id }}/reassign" style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <form method="post" action="/orders/{{ offer.id }}/reassign" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
               <select name="manufacturer_id" class="form-control" style="max-width:200px;font-size:13px;">
                 <option value="">{{ T.ord_select_mfr }}</option>
                 {% for m in manufacturers %}
@@ -116,51 +150,70 @@
         </div>
 
         <!-- Step 3: Manufacturer confirm -->
-        {% set mfr_confirmed = offer.mfr_status in ('confirmed','in_production','completed','delivered') %}
-        <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
-          <div style="width:28px;height:28px;border-radius:50%;background:{% if mfr_confirmed %}var(--success){% else %}var(--surface-2){% endif %};border:2px solid {% if mfr_confirmed %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            {% if mfr_confirmed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-            {% else %}<span style="font-size:11px;color:var(--text-muted);">3</span>{% endif %}
+        <div style="position:relative;margin-bottom:28px;">
+          <div style="position:absolute;left:-42px;top:0;width:28px;height:28px;border-radius:50%;background:{% if mfr_confirmed %}var(--success){% else %}var(--surface-2){% endif %};border:2px solid {% if mfr_confirmed %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;z-index:1;box-shadow:0 0 0 3px var(--surface);">
+            {% if mfr_confirmed %}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            {% else %}<span style="font-size:11px;font-weight:600;color:var(--text-muted);">3</span>{% endif %}
           </div>
-          <div style="flex:1;">
-            <div style="font-weight:600;font-size:13px;">{{ T.ord_step_mfr }}{% if mfr_confirmed %} — {{ T.ord_approved }}{% endif %}</div>
-            {% if offer.termin_date %}<div style="font-size:12px;color:var(--text-muted);">{{ T.ord_deadline }}: <strong>{{ offer.termin_date }}</strong></div>{% endif %}
-            {% if offer.mfr_notes %}<div style="font-size:12px;color:var(--text-muted);">{{ T.ord_note }}: {{ offer.mfr_notes }}</div>{% endif %}
+          <div style="padding-top:4px;flex:1;">
+            <div style="font-weight:600;font-size:13px;line-height:1.3;">
+              {{ T.ord_step_mfr }}
+              {% if mfr_confirmed %}<span style="color:var(--success);font-weight:400;"> — {{ T.ord_approved }}</span>{% endif %}
+            </div>
+            {% if offer.termin_date %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_deadline }}: <strong>{{ offer.termin_date }}</strong></div>{% endif %}
+            {% if offer.mfr_notes %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_note }}: {{ offer.mfr_notes }}</div>{% endif %}
 
             {% if (user.role == 'manufacturer' or user.is_manufacturer) and admin_done and not mfr_confirmed and can_confirm %}
-            <form method="post" action="/orders/{{ offer.id }}/confirm" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-              <input type="date" name="termin_date" class="form-control" style="max-width:160px;font-size:13px;" required />
-              <input type="text" name="mfr_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="max-width:200px;font-size:13px;" />
-              <button type="submit" class="btn btn-success btn-sm">{{ T.ord_approve_deadline }}</button>
-            </form>
+            <div style="margin-top:10px;padding:12px;background:var(--surface-2);border-radius:8px;">
+              <form method="post" action="/orders/{{ offer.id }}/confirm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input type="date" name="termin_date" class="form-control" style="max-width:160px;font-size:13px;" required />
+                <input type="text" name="mfr_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="flex:1;min-width:140px;font-size:13px;" />
+                <button type="submit" class="btn btn-success btn-sm">{{ T.ord_approve_deadline }}</button>
+              </form>
+            </div>
             {% endif %}
           </div>
         </div>
 
         <!-- Step 4: Production status -->
-        {% set in_prod = offer.mfr_status in ('in_production','completed','delivered') %}
-        {% set delivered = offer.mfr_status == 'delivered' %}
-        <div style="display:flex;gap:12px;padding:10px 0;">
-          <div style="width:28px;height:28px;border-radius:50%;background:{% if delivered %}var(--success){% elif in_prod %}#f59e0b{% else %}var(--surface-2){% endif %};border:2px solid {% if in_prod %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            {% if delivered %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-            {% elif in_prod %}<span style="font-size:11px;color:white;">4</span>
-            {% else %}<span style="font-size:11px;color:var(--text-muted);">4</span>{% endif %}
+        <div style="position:relative;">
+          <div style="position:absolute;left:-42px;top:0;width:28px;height:28px;border-radius:50%;background:{% if all_done %}var(--success){% elif in_prod %}#f59e0b{% else %}var(--surface-2){% endif %};border:2px solid {% if in_prod %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;z-index:1;box-shadow:0 0 0 3px var(--surface);">
+            {% if all_done %}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            {% elif in_prod %}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="5 3 19 12 5 21 5 3"/></svg>
+            {% else %}<span style="font-size:11px;font-weight:600;color:var(--text-muted);">4</span>{% endif %}
           </div>
-          <div style="flex:1;">
-            <div style="font-weight:600;font-size:13px;">{{ T.ord_step_production }} — {{ MFR_STATUS_LABEL.get(offer.mfr_status or '', T.ord_status_waiting) }}</div>
-            {% if (((user.role == 'manufacturer' or user.is_manufacturer) and offer.manufacturer_id == effective_mfr_id and can_status) or user.role == 'admin') %}
-            {% if mfr_confirmed %}
-            <div style="margin-top:8px;">
-              <form method="post" action="/orders/{{ offer.id }}/status" style="display:flex;gap:8px;">
-                <select name="mfr_status" class="form-control" style="max-width:200px;font-size:13px;">
-                  <option value="in_production" {% if offer.mfr_status=='in_production' %}selected{% endif %}>{{ T.ord_status_in_production }}</option>
-                  <option value="completed" {% if offer.mfr_status=='completed' %}selected{% endif %}>{{ T.ord_status_completed }}</option>
-                  <option value="delivered" {% if offer.mfr_status=='delivered' %}selected{% endif %}>{{ T.ord_status_delivered }}</option>
-                </select>
-                <button type="submit" class="btn btn-primary btn-sm">{{ T.ord_update_btn }}</button>
+          <div style="padding-top:4px;flex:1;">
+            <div style="font-weight:600;font-size:13px;line-height:1.3;">
+              {{ T.ord_step_production }}
+              {% if offer.mfr_status == 'confirmed' %}<span style="color:var(--text-muted);font-weight:400;"> — {{ T.ord_status_confirmed }}</span>
+              {% elif ns.step_label %}<span style="color:{% if all_done %}var(--success){% else %}#f59e0b{% endif %};font-weight:400;"> — {{ ns.step_label }}</span>
+              {% else %}<span style="color:var(--text-muted);font-weight:400;"> — {{ T.ord_status_waiting }}</span>{% endif %}
+            </div>
+            {% if offer.mfr_status_date %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">📅 {{ offer.mfr_status_date }}</div>{% endif %}
+
+            {% if (((user.role == 'manufacturer' or user.is_manufacturer) and offer.manufacturer_id == effective_mfr_id and can_status) or user.role == 'admin') and mfr_confirmed %}
+            <div style="margin-top:10px;padding:12px;background:var(--surface-2);border-radius:8px;">
+              <form method="post" action="/orders/{{ offer.id }}/status" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+                <div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:500;">{{ T.ord_step_production }}</div>
+                  <select name="mfr_status" class="form-control" style="min-width:180px;font-size:13px;">
+                    {% for s in production_steps %}
+                    {% if s.sort_order >= ns.current_sort %}
+                    <option value="{{ s.code }}" {% if offer.mfr_status == s.code %}selected{% endif %}>
+                      {{ s.label_zh if user.lang == 'zh' else (s.label_en if user.lang == 'en' else s.label_tr) }}
+                    </option>
+                    {% endif %}
+                    {% endfor %}
+                  </select>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:500;">{{ T.ord_stage_date }}</div>
+                  <input type="date" name="mfr_status_date" class="form-control" style="max-width:160px;font-size:13px;" value="{{ offer.mfr_status_date or '' }}" />
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;">{{ T.ord_update_btn }}</button>
               </form>
             </div>
-            {% endif %}
             {% endif %}
           </div>
         </div>

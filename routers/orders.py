@@ -94,6 +94,7 @@ async def order_detail(request: Request, oid: int):
     mfr_id = udb.effective_mfr_id(user)
     # default manufacturer comes from model if not yet assigned
     default_mfr_id = model.get("manufacturer_id") or 0
+    steps = fdb.get_production_steps()
     return templates.TemplateResponse(request, "order_detail.html", {
         "user": user,
         "offer": offer,
@@ -109,6 +110,7 @@ async def order_detail(request: Request, oid: int):
         "can_status":  udb.has_action(user, "order_status"),
         "can_stage":   udb.has_action(user, "order_stage"),
         "show_prices": user["role"] != "manufacturer",
+        "production_steps": steps,
     })
 
 
@@ -170,23 +172,22 @@ async def confirm_order(request: Request, oid: int,
 
 @router.post("/{oid}/status")
 async def update_status(request: Request, oid: int,
-                        mfr_status: str = Form(...)):
+                        mfr_status: str = Form(...),
+                        mfr_status_date: str = Form("")):
     user = auth.require_user(request)
     if not udb.has_action(user, "order_status") and user["role"] != "admin":
         return RedirectResponse(f"/orders/{oid}", 303)
     offer = fdb.get_offer(oid)
     mfr_id = udb.effective_mfr_id(user)
     if offer and (offer.get("manufacturer_id") == mfr_id or user["role"] == "admin"):
-        fdb.update_mfr_status(oid, mfr_status)
-        status_labels = {
-            "in_production": "Üretimde",
-            "completed": "Tamamlandı",
-            "delivered": "Teslim Edildi",
-        }
+        fdb.update_mfr_status(oid, mfr_status, mfr_status_date)
+        steps = fdb.get_production_steps(active_only=False)
+        step = next((s for s in steps if s["code"] == mfr_status), None)
+        status_label = step["label_tr"] if step else mfr_status
         _notify("Sipariş Durumu Güncellendi", {
             "Sipariş No": f"#{oid}",
             "Üretici": user.get("company_name", "-"),
-            "Yeni Durum": status_labels.get(mfr_status, mfr_status),
+            "Yeni Durum": status_label,
         })
     return RedirectResponse(f"/orders/{oid}", 303)
 

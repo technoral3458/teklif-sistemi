@@ -280,6 +280,30 @@ def init():
         _acol(cur, "offers", "delivery_term_id",       "INTEGER DEFAULT NULL")
         _acol(cur, "offers", "delivery_term_discount",  "REAL DEFAULT 0")
 
+        # Production steps table
+        cur.execute("""CREATE TABLE IF NOT EXISTS production_steps(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL UNIQUE,
+            label_tr TEXT DEFAULT '',
+            label_en TEXT DEFAULT '',
+            label_zh TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1
+        )""")
+        # Pre-populate only if empty
+        existing = cur.execute("SELECT COUNT(*) FROM production_steps").fetchone()[0]
+        if existing == 0:
+            cur.executemany(
+                "INSERT INTO production_steps(code,label_tr,label_en,label_zh,sort_order) VALUES(?,?,?,?,?)",
+                [
+                    ('in_production', 'Üretimde', 'In Production', '生产中', 1),
+                    ('completed', 'Tamamlandı', 'Completed', '已完成', 2),
+                    ('delivered', 'Teslim Edildi', 'Delivered', '已交付', 3),
+                ]
+            )
+        # Add mfr_status_date to offers
+        _acol(cur, "offers", "mfr_status_date", "TEXT DEFAULT ''")
+
         # Purchase price tracking for options (set by manufacturers)
         _acol(cur, "options", "purchase_price",    "REAL DEFAULT 0")
         _acol(cur, "options", "purchase_currency", "TEXT DEFAULT 'USD'")
@@ -671,13 +695,13 @@ def del_customer(cid):
 _OFCOLS = ("id,offer_no,customer_id,model_id,machine_count,currency,"
            "base_price,options_total,discount_pct,total_price,status,"
            "notes,validity_date,dealer_id,manufacturer_id,admin_status,"
-           "admin_notes,termin_date,mfr_status,mfr_notes,"
+           "admin_notes,termin_date,mfr_status,mfr_notes,mfr_status_date,"
            "delivery_method,delivery_time,logistics,payment_notes,created_at,"
            "delivery_term_id,delivery_term_discount")
 _OFKEYS = ["id","offer_no","customer_id","model_id","machine_count","currency",
            "base_price","options_total","discount_pct","total_price","status",
            "notes","validity_date","dealer_id","manufacturer_id","admin_status",
-           "admin_notes","termin_date","mfr_status","mfr_notes",
+           "admin_notes","termin_date","mfr_status","mfr_notes","mfr_status_date",
            "delivery_method","delivery_time","logistics","payment_notes","created_at",
            "delivery_term_id","delivery_term_discount"]
 
@@ -950,17 +974,43 @@ def mfr_confirm_order(oid, termin_date, mfr_notes=""):
             (termin_date, mfr_notes, oid)
         )
 
-def update_mfr_status(oid, mfr_status):
-    status_map = {
-        "in_production": "Üretimde",
-        "completed":     "Tamamlandı",
-        "delivered":     "Teslim Edildi",
-    }
+def update_mfr_status(oid, mfr_status, mfr_status_date=""):
+    steps = get_production_steps(active_only=False)
+    step = next((s for s in steps if s["code"] == mfr_status), None)
+    status_tr = step["label_tr"] if step else mfr_status
     with _c() as c:
         c.execute(
-            "UPDATE offers SET mfr_status=?, status=? WHERE id=?",
-            (mfr_status, status_map.get(mfr_status, "Üretimde"), oid)
+            "UPDATE offers SET mfr_status=?, status=?, mfr_status_date=? WHERE id=?",
+            (mfr_status, status_tr, mfr_status_date, oid)
         )
+
+
+def get_production_steps(active_only=True):
+    q = "SELECT id,code,label_tr,label_en,label_zh,sort_order,is_active FROM production_steps"
+    if active_only:
+        q += " WHERE is_active=1"
+    q += " ORDER BY sort_order,id"
+    with _c() as c:
+        rows = c.execute(q).fetchall()
+    keys = ["id","code","label_tr","label_en","label_zh","sort_order","is_active"]
+    return [dict(zip(keys,r)) for r in rows]
+
+def save_production_step(id, code, label_tr, label_en, label_zh, sort_order, is_active=1):
+    with _c() as c:
+        if id:
+            c.execute(
+                "UPDATE production_steps SET code=?,label_tr=?,label_en=?,label_zh=?,sort_order=?,is_active=? WHERE id=?",
+                (code, label_tr, label_en, label_zh, sort_order, is_active, id)
+            )
+        else:
+            c.execute(
+                "INSERT INTO production_steps(code,label_tr,label_en,label_zh,sort_order,is_active) VALUES(?,?,?,?,?,?)",
+                (code, label_tr, label_en, label_zh, sort_order, is_active)
+            )
+
+def del_production_step(id):
+    with _c() as c:
+        c.execute("DELETE FROM production_steps WHERE id=?", (id,))
 
 
 # ── Order Stages ─────────────────────────────────────────────────────────────
