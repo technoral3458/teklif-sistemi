@@ -114,7 +114,7 @@
       {% if not _menus or 'loan' in _menus %}
       <a href="/loan-calc" class="nav-link {% if active_page == 'loan' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#22c55e,#4ade80);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/><line x1="14" y1="15" x2="18" y2="15"/></svg></span>
-        <span class="nav-label">Kredi Hesaplama</span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_loan }}</span>
       </a>
       {% endif %}
 
@@ -126,7 +126,7 @@
       {% if user and user.role == 'manufacturer' %}
       <a href="/price-requests/mine" class="nav-link {% if active_page == 'price_requests' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#C9961A,#f0b429);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
-        <span class="nav-label">Fiyat Taleplerim</span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_price_requests_mine }}</span>
       </a>
       {% endif %}
 
@@ -141,15 +141,15 @@
       {% set _preq = _pending_requests_count() %}
       <a href="/admin/requests" class="nav-link {% if active_page == 'admin_requests' %}active{% endif %}" style="position:relative;">
         <span class="nav-icon" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
-        <span class="nav-label">Talepler{% if _preq > 0 %} <span style="background:#ef4444;color:#fff;border-radius:999px;padding:1px 6px;font-size:11px;font-weight:700;margin-left:4px;">{{ _preq }}</span>{% endif %}</span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_requests }}{% if _preq > 0 %} <span style="background:#ef4444;color:#fff;border-radius:999px;padding:1px 6px;font-size:11px;font-weight:700;margin-left:4px;">{{ _preq }}</span>{% endif %}</span>
       </a>
       <a href="/price-requests" class="nav-link {% if active_page == 'price_requests' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#C9961A,#f0b429);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
-        <span class="nav-label">Fiyat Talepleri</span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_price_requests }}</span>
       </a>
       <a href="/admin/delivery-terms" class="nav-link {% if active_page == 'delivery_terms' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#0891b2,#06b6d4);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
-        <span class="nav-label">Teslim Şekilleri</span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_delivery_terms }}</span>
       </a>
       <a href="/admin" class="nav-link {% if active_page == 'admin' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#ef4444,#f87171);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
