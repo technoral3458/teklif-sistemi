@@ -149,7 +149,7 @@
       </a>
       <a href="/admin/production-steps" class="nav-link {% if active_page == 'production_steps' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#0f766e,#14b8a6);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
-        <span class="nav-label">Üretim Aşamaları</span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_production_steps }}</span>
       </a>
       <a href="/admin/delivery-terms" class="nav-link {% if active_page == 'delivery_terms' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#0891b2,#06b6d4);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
