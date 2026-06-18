@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block page_title %}{{ _T(user.lang if user else 'tr').nav_membrane }}{% endblock %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ T.nav_membrane }}{% endblock %}
 
 {% block content %}
-{% set T = _T(user.lang if user else 'tr') %}
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
 
