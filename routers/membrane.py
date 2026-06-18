@@ -830,16 +830,18 @@ def _parse_dxf_file(data: bytes):
     """Parse DXF bytes → contours with moves + bounding box."""
     try:
         import ezdxf
-        import io as _bio
+        import tempfile as _tmp, os as _os
     except ImportError:
         return {"error": "ezdxf kütüphanesi yüklü değil (pip install ezdxf)."}
 
     try:
+        with _tmp.NamedTemporaryFile(suffix='.dxf', delete=False) as f:
+            f.write(data)
+            tmp_path = f.name
         try:
-            text = data.decode('utf-8')
-        except UnicodeDecodeError:
-            text = data.decode('latin-1')
-        doc = ezdxf.read(_bio.StringIO(text))
+            doc = ezdxf.readfile(tmp_path)
+        finally:
+            _os.unlink(tmp_path)
     except Exception as e:
         return {"error": f"DXF okuma hatası: {e}"}
 
