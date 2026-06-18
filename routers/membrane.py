@@ -835,7 +835,11 @@ def _parse_dxf_file(data: bytes):
         return {"error": "ezdxf kütüphanesi yüklü değil (pip install ezdxf)."}
 
     try:
-        doc = ezdxf.read(_bio.BytesIO(data))
+        try:
+            text = data.decode('utf-8')
+        except UnicodeDecodeError:
+            text = data.decode('latin-1')
+        doc = ezdxf.read(_bio.StringIO(text))
     except Exception as e:
         return {"error": f"DXF okuma hatası: {e}"}
 
