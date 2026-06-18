@@ -37,14 +37,35 @@
       </thead>
       <tbody>
         {% for o in offers %}
-        {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray'} %}
+        {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','Admin Onaylı':'green','Üretimde':'blue','Tamamlandı':'green','Teslim Edildi':'green','İptal':'gray'} %}
+        {% if user.role == 'dealer' %}
+          {% if o.status == 'Sipariş Verildi' or o.status == 'Onaylandı' %}
+            {% set disp_status = T.offer_status_waiting_admin %}
+            {% set disp_color = 'blue' %}
+          {% elif o.status == 'Admin Onaylı' %}
+            {% set disp_status = T.offer_status_waiting_mfr %}
+            {% set disp_color = 'amber' %}
+          {% elif o.status == 'İptal' %}
+            {% set disp_status = T.offer_status_cancelled_lbl %}
+            {% set disp_color = 'gray' %}
+          {% elif o.status == 'Reddedildi' %}
+            {% set disp_status = T.offer_status_rejected_lbl %}
+            {% set disp_color = 'red' %}
+          {% else %}
+            {% set disp_status = o.status %}
+            {% set disp_color = sc.get(o.status, 'gray') %}
+          {% endif %}
+        {% else %}
+          {% set disp_status = o.status %}
+          {% set disp_color = sc.get(o.status, 'gray') %}
+        {% endif %}
         <tr>
           <td><code>{{ o.offer_no }}</code></td>
           <td>{{ o.customer_name }}</td>
           <td>{{ o.model_name }}</td>
           <td>{{ o.machine_count }}</td>
           <td><strong>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</strong></td>
-          <td><span class="badge badge-{{ sc.get(o.status, 'gray') }}">{{ o.status }}</span></td>
+          <td><span class="badge badge-{{ disp_color }}">{{ disp_status }}</span></td>
           <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap;">

@@ -358,6 +358,9 @@ async def offer_detail(request: Request, offer_id: int):
     specs = _filter_specs(_parse_specs(model, lang), items, opts)
     delivery_term = fdb.get_delivery_term(offer["delivery_term_id"]) if offer.get("delivery_term_id") else None
     change_requests = fdb.get_change_requests(offer_id=offer_id)
+    import db.users as udb
+    manufacturers = udb.all_manufacturers() if user["role"] == "admin" else []
+    default_mfr_id = (fdb.get_model(offer["model_id"]) or {}).get("manufacturer_id") or 0 if offer.get("model_id") else 0
     # Admin sees all statuses; dealers cannot select "Sipariş Verildi" directly
     if user["role"] == "admin":
         statuses = OFFER_STATUSES
@@ -374,6 +377,8 @@ async def offer_detail(request: Request, offer_id: int):
         "display_image": display_image,
         "statuses": statuses,
         "change_requests": change_requests,
+        "manufacturers": manufacturers,
+        "default_mfr_id": default_mfr_id,
         "active_page": "offers",
     })
 

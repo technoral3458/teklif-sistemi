@@ -141,6 +141,37 @@
     </div>
     {% endif %}
     {% if user.role == 'admin' %}
+    <!-- ADMIN: approve order if awaiting approval -->
+    {% if offer.status == 'Sipariş Verildi' and not offer.admin_status %}
+    <div class="card" style="margin-bottom:16px;border-left:3px solid var(--primary);">
+      <div class="card-header" style="background:rgba(59,130,246,0.06);">
+        <h3 class="card-title" style="color:var(--primary);">⏳ {{ T.offer_status_waiting_admin }}</h3>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+        {% if offer.contract_notes or offer.contract_photo %}
+        <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:12px;color:var(--text-muted);">
+          {{ T.offer_contract_section }}:
+          {% if offer.contract_notes %}<span>{{ offer.contract_notes }}</span>{% endif %}
+          {% if offer.contract_photo %}<a href="/static/{{ offer.contract_photo }}" target="_blank" style="margin-left:6px;">📎 {{ T.offer_view_contract }}</a>{% endif %}
+        </div>
+        {% endif %}
+        <form method="post" action="/orders/{{ offer.id }}/approve" style="display:flex;flex-direction:column;gap:8px;">
+          <select name="manufacturer_id" class="form-control" style="font-size:13px;">
+            <option value="">{{ T.ord_select_mfr }}</option>
+            {% for m in manufacturers %}
+            <option value="{{ m.id }}" {% if m.id == default_mfr_id %}selected{% endif %}>{{ m.company_name or m.email }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="font-size:13px;" />
+          <button type="submit" class="btn btn-success">✓ {{ T.ord_approve_btn }}</button>
+        </form>
+        <form method="post" action="/orders/{{ offer.id }}/reject" style="display:flex;gap:8px;">
+          <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_reject_reason }}" style="flex:1;font-size:13px;" />
+          <button type="submit" class="btn btn-danger">{{ T.ord_reject_btn }}</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
     <!-- ADMIN: full status dropdown -->
     <div class="card" style="margin-bottom:16px;">
       <div class="card-header"><h3 class="card-title">{{ T.offer_status_update }}</h3></div>
