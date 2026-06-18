@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block page_title %}Membran Kapak Maliyet{% endblock %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').nav_membrane }}{% endblock %}
 
 {% block content %}
 {% set T = _T(user.lang if user else 'tr') %}
@@ -9,9 +9,9 @@
   <!-- ── Döviz Kurları ── -->
   <div class="card">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-      <h3 class="card-title">💱 Döviz Kurları (1 birim → TRY)</h3>
+      <h3 class="card-title">💱 {{ T.mb_exchange_rates }}</h3>
       <form method="post" action="/membrane/rates/fetch" style="margin:0;">
-        <button type="submit" class="btn btn-outline btn-sm">🔄 Güncel Kur Al</button>
+        <button type="submit" class="btn btn-outline btn-sm">{{ T.mb_fetch_rates }}</button>
       </form>
     </div>
     <div class="card-body">
@@ -29,17 +29,17 @@
           </div>
           {% endfor %}
         </div>
-        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Kurları Kaydet</button>
+        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">{{ T.mb_save_rates }}</button>
       </form>
     </div>
   </div>
 
   <!-- ── Özet ── -->
   <div class="card">
-    <div class="card-header"><h3 class="card-title">📊 Maliyet Özeti</h3></div>
+    <div class="card-header"><h3 class="card-title">📊 {{ T.mb_cost_summary }}</h3></div>
     <div class="card-body">
       <div style="margin-bottom:12px;">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">TOPLAM MALİYET / m²</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">{{ T.mb_total_cost_m2 }}</div>
         <div style="font-size:32px;font-weight:800;color:var(--accent);">{{ "%.2f"|format(total_cost_per_m2) }} ₺</div>
       </div>
       <div style="border-top:1px solid var(--border);padding-top:12px;">
@@ -50,7 +50,7 @@
         </div>
         {% endfor %}
         {% if not materials %}
-        <div style="color:var(--text-muted);font-size:13px;text-align:center;">Henüz malzeme eklenmedi</div>
+        <div style="color:var(--text-muted);font-size:13px;text-align:center;">{{ T.mb_no_material }}</div>
         {% endif %}
       </div>
     </div>
@@ -61,21 +61,21 @@
 <!-- ── Malzemeler ── -->
 <div class="card" style="margin-bottom:20px;">
   <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-    <h3 class="card-title">🧱 Malzemeler</h3>
-    <button class="btn btn-primary btn-sm" onclick="openMatModal()">+ Malzeme Ekle</button>
+    <h3 class="card-title">🧱 {{ T.mb_materials }}</h3>
+    <button class="btn btn-primary btn-sm" onclick="openMatModal()">{{ T.mb_add_material }}</button>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Malzeme Adı</th>
-          <th>Tür</th>
-          <th style="text-align:right">Fiyat</th>
-          <th>Birim</th>
-          <th>Plaka Boyutu</th>
-          <th>Kullanım/m²</th>
-          <th style="text-align:right">Maliyet/m²</th>
-          <th style="text-align:center">İşlem</th>
+          <th>{{ T.mb_col_mat_name }}</th>
+          <th>{{ T.mb_col_type }}</th>
+          <th style="text-align:right">{{ T.mb_col_price }}</th>
+          <th>{{ T.mb_col_unit }}</th>
+          <th>{{ T.mb_col_sheet_size }}</th>
+          <th>{{ T.mb_col_usage }}</th>
+          <th style="text-align:right">{{ T.mb_col_cost_m2 }}</th>
+          <th style="text-align:center">{{ T.order_action }}</th>
         </tr>
       </thead>
       <tbody>
@@ -84,7 +84,7 @@
           <td><strong>{{ mat.name }}</strong>{% if mat.notes %}<br><small style="color:var(--text-muted)">{{ mat.notes }}</small>{% endif %}</td>
           <td>
             <span class="badge badge-{% if mat.material_type=='mdf' %}blue{% elif mat.material_type=='foil' %}green{% elif mat.material_type=='adhesive' %}amber{% else %}gray{% endif %}">
-              {% if mat.material_type=='mdf' %}MDF Plaka{% elif mat.material_type=='foil' %}Membran Folyo{% elif mat.material_type=='adhesive' %}Yapıştırıcı{% else %}Diğer{% endif %}
+              {% if mat.material_type=='mdf' %}{{ T.mb_type_mdf }}{% elif mat.material_type=='foil' %}{{ T.mb_type_foil }}{% elif mat.material_type=='adhesive' %}{{ T.mb_type_adhesive }}{% else %}{{ T.mb_type_other }}{% endif %}
             </span>
           </td>
           <td style="text-align:right">{{ "%.2f"|format(mat.price|float) }} {{ mat.currency }}</td>
@@ -101,13 +101,13 @@
             <button class="btn btn-ghost btn-sm" onclick='editMat({{ mat|tojson }})'>✏️</button>
             <form method="post" action="/membrane/material/delete" style="display:inline;">
               <input type="hidden" name="id" value="{{ mat.id }}" />
-              <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('Malzemeyi sil?')" style="color:var(--danger)">🗑️</button>
+              <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('{{ T.mb_confirm_del_mat }}')" style="color:var(--danger)">🗑️</button>
             </form>
           </td>
         </tr>
         {% endfor %}
         {% if not materials %}
-        <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Henüz malzeme eklenmedi. "Malzeme Ekle" butonuna tıklayın.</td></tr>
+        <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">{{ T.mb_no_material_hint }}</td></tr>
         {% endif %}
       </tbody>
     </table>
@@ -117,11 +117,11 @@
 <!-- ── Listeler ── -->
 <div class="card">
   <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-    <h3 class="card-title">📋 Kapak Listeleri</h3>
+    <h3 class="card-title">📋 {{ T.mb_door_lists }}</h3>
     <div style="display:flex;gap:6px;">
-      <a href="/membrane/caps" class="btn btn-outline btn-sm">🔧 Makrolar</a>
-      <a href="/membrane/jobs" class="btn btn-outline btn-sm">📋 İş Listesi</a>
-      <button class="btn btn-primary btn-sm" onclick="openListModal()">+ Yeni Liste</button>
+      <a href="/membrane/caps" class="btn btn-outline btn-sm">{{ T.mb_macros }}</a>
+      <a href="/membrane/jobs" class="btn btn-outline btn-sm">{{ T.mb_job_list }}</a>
+      <button class="btn btn-primary btn-sm" onclick="openListModal()">{{ T.mb_new_list_btn }}</button>
     </div>
   </div>
   <div class="table-wrap">
@@ -129,12 +129,12 @@
       <thead>
         <tr>
           <th>#</th>
-          <th>Liste Adı</th>
-          <th>Tarih</th>
-          <th style="text-align:center">Kapak</th>
-          <th style="text-align:center">Toplam Adet</th>
-          <th style="text-align:right">Toplam Maliyet</th>
-          <th style="text-align:center">İşlem</th>
+          <th>{{ T.mb_col_list_name }}</th>
+          <th>{{ T.mb_col_date }}</th>
+          <th style="text-align:center">{{ T.mb_col_door }}</th>
+          <th style="text-align:center">{{ T.mb_col_total_qty }}</th>
+          <th style="text-align:right">{{ T.mb_col_total_cost }}</th>
+          <th style="text-align:center">{{ T.order_action }}</th>
         </tr>
       </thead>
       <tbody>
@@ -153,13 +153,13 @@
             <a href="/membrane/list/{{ lst.id }}/print" target="_blank" class="btn btn-ghost btn-sm">🖨️</a>
             <form method="post" action="/membrane/list/delete" style="display:inline;">
               <input type="hidden" name="id" value="{{ lst.id }}" />
-              <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('Listeyi ve tüm kapakları sil?')" style="color:var(--danger)">🗑️</button>
+              <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('{{ T.mb_confirm_del_list }}')" style="color:var(--danger)">🗑️</button>
             </form>
           </td>
         </tr>
         {% endfor %}
         {% if not lists %}
-        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">Henüz liste oluşturulmadı. "Yeni Liste" butonuna tıklayın.</td></tr>
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">{{ T.mb_no_list_hint }}</td></tr>
         {% endif %}
       </tbody>
     </table>
@@ -170,7 +170,7 @@
 <div id="matModal" class="modal-overlay">
   <div class="modal-box" style="max-width:560px;">
     <div class="modal-header">
-      <h3 class="modal-title" id="matModalTitle">Malzeme Ekle</h3>
+      <h3 class="modal-title" id="matModalTitle">{{ T.mb_add_mat_title }}</h3>
       <button class="modal-close" onclick="closeModal('matModal')">&times;</button>
     </div>
     <div class="modal-body">
@@ -178,34 +178,34 @@
         <input type="hidden" name="id" id="mat_id" value="0" />
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group" style="grid-column:span 2;">
-            <label class="form-label">Malzeme Adı *</label>
+            <label class="form-label">{{ T.mb_mat_name_label }}</label>
             <input type="text" name="name" id="mat_name" class="form-control" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Tür</label>
+            <label class="form-label">{{ T.mb_type_label }}</label>
             <select name="material_type" id="mat_type" class="form-control" onchange="togglePlaka()">
-              <option value="mdf">MDF Plaka</option>
-              <option value="foil">Membran Folyo</option>
-              <option value="adhesive">Yapıştırıcı</option>
-              <option value="other">Diğer</option>
+              <option value="mdf">{{ T.mb_type_mdf }}</option>
+              <option value="foil">{{ T.mb_type_foil }}</option>
+              <option value="adhesive">{{ T.mb_type_adhesive }}</option>
+              <option value="other">{{ T.mb_type_other }}</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Birim</label>
+            <label class="form-label">{{ T.mb_unit_label }}</label>
             <select name="unit" id="mat_unit" class="form-control" onchange="togglePlaka()">
-              <option value="plaka">Plaka (boyuta göre m² hesapla)</option>
-              <option value="m2">m² (direkt m² fiyatı)</option>
-              <option value="kg">kg</option>
-              <option value="lt">litre</option>
-              <option value="adet">adet</option>
+              <option value="plaka">{{ T.mb_unit_sheet }}</option>
+              <option value="m2">{{ T.mb_unit_m2 }}</option>
+              <option value="kg">{{ T.mb_unit_kg }}</option>
+              <option value="lt">{{ T.mb_unit_lt }}</option>
+              <option value="adet">{{ T.mb_unit_pcs }}</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Fiyat *</label>
+            <label class="form-label">{{ T.mb_price_label }}</label>
             <input type="number" name="price" id="mat_price" class="form-control" step="0.01" min="0" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Para Birimi</label>
+            <label class="form-label">{{ T.mb_currency_label }}</label>
             <select name="currency" id="mat_currency" class="form-control">
               <option value="TRY">TRY ₺</option>
               <option value="USD">USD $</option>
@@ -215,26 +215,26 @@
           </div>
           <div id="plakaFields" style="grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-group">
-              <label class="form-label">Plaka Eni <span style="color:var(--accent);font-size:11px;">cm</span></label>
+              <label class="form-label">{{ T.mb_sheet_w_label }} <span style="color:var(--accent);font-size:11px;">cm</span></label>
               <input type="number" name="sheet_width" id="mat_width" class="form-control" step="0.1" min="0" placeholder="ör: 244" />
-              <small style="color:var(--text-muted)">Standart MDF: 244 cm</small>
+              <small style="color:var(--text-muted)">{{ T.mb_std_mdf_w }}</small>
             </div>
             <div class="form-group">
-              <label class="form-label">Plaka Boyu <span style="color:var(--accent);font-size:11px;">cm</span></label>
+              <label class="form-label">{{ T.mb_sheet_h_label }} <span style="color:var(--accent);font-size:11px;">cm</span></label>
               <input type="number" name="sheet_height" id="mat_height" class="form-control" step="0.1" min="0" placeholder="ör: 122" />
-              <small style="color:var(--text-muted)">Standart MDF: 122 cm</small>
+              <small style="color:var(--text-muted)">{{ T.mb_std_mdf_h }}</small>
             </div>
           </div>
           <div id="usageField" class="form-group" style="display:none;">
-            <label class="form-label">Kullanım Katsayısı (birim/m²)</label>
+            <label class="form-label">{{ T.mb_usage_coef }}</label>
             <input type="number" name="usage_per_m2" id="mat_usage" class="form-control" step="0.001" min="0" value="1" />
           </div>
           <div class="form-group" style="grid-column:span 2;">
-            <label class="form-label">Notlar</label>
+            <label class="form-label">{{ T.mb_notes_label }}</label>
             <input type="text" name="notes" id="mat_notes" class="form-control" placeholder="ör: 18mm, E1 kalite..." />
           </div>
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Kaydet</button>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">{{ T.mb_save_btn }}</button>
       </form>
     </div>
   </div>
@@ -244,21 +244,21 @@
 <div id="listModal" class="modal-overlay">
   <div class="modal-box" style="max-width:440px;">
     <div class="modal-header">
-      <h3 class="modal-title">Yeni Liste Oluştur</h3>
+      <h3 class="modal-title">{{ T.mb_new_list_title }}</h3>
       <button class="modal-close" onclick="closeModal('listModal')">&times;</button>
     </div>
     <div class="modal-body">
       <form method="post" action="/membrane/list/save">
         <input type="hidden" name="id" value="0" />
         <div class="form-group">
-          <label class="form-label">Liste Adı / Müşteri Adı *</label>
+          <label class="form-label">{{ T.mb_list_name_label }}</label>
           <input type="text" name="name" class="form-control" required placeholder="ör: Ahmet Bey Mutfak, Villa Projesi..." autofocus />
         </div>
         <div class="form-group">
-          <label class="form-label">Notlar</label>
-          <input type="text" name="notes" class="form-control" placeholder="ör: Model V-431, STN Mercan..." />
+          <label class="form-label">{{ T.mb_notes_label }}</label>
+          <input type="text" name="notes" class="form-control" placeholder="{{ T.mb_list_notes_ph }}" />
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Oluştur ve Listeye Git →</button>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">{{ T.mb_create_list_btn }}</button>
       </form>
     </div>
   </div>
@@ -268,6 +268,9 @@
 
 {% block scripts %}
 <script>
+var STR_ADD_MAT  = {{ T.mb_add_mat_title|tojson }};
+var STR_EDIT_MAT = {{ T.mb_edit_mat_title|tojson }};
+
 function togglePlaka() {
   var unit = document.getElementById('mat_unit').value;
   document.getElementById('plakaFields').style.display = (unit === 'plaka') ? 'grid' : 'none';
@@ -275,7 +278,7 @@ function togglePlaka() {
 }
 
 function openMatModal() {
-  document.getElementById('matModalTitle').textContent = 'Malzeme Ekle';
+  document.getElementById('matModalTitle').textContent = STR_ADD_MAT;
   document.getElementById('mat_id').value = '0';
   document.getElementById('mat_name').value = '';
   document.getElementById('mat_type').value = 'mdf';
@@ -291,7 +294,7 @@ function openMatModal() {
 }
 
 function editMat(mat) {
-  document.getElementById('matModalTitle').textContent = 'Malzeme Düzenle';
+  document.getElementById('matModalTitle').textContent = STR_EDIT_MAT;
   document.getElementById('mat_id').value = mat.id;
   document.getElementById('mat_name').value = mat.name;
   document.getElementById('mat_type').value = mat.material_type;
