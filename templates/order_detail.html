@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block page_title %}Sipariş #{{ offer.offer_no or offer.id }}{% endblock %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ T.nav_orders }} #{{ offer.offer_no or offer.id }}{% endblock %}
 
 {% set STATUS_COLOR = {
   'Sipariş Verildi': 'blue',
@@ -10,17 +11,17 @@
   'İptal': 'red'
 } %}
 
-{% set MFR_STATUS_TR = {
-  '': 'Bekleniyor',
-  'confirmed': 'Termin Onaylandı',
-  'in_production': 'Üretimde',
-  'completed': 'Tamamlandı',
-  'delivered': 'Teslim Edildi'
+{% set MFR_STATUS_LABEL = {
+  '': T.ord_status_waiting,
+  'confirmed': T.ord_status_confirmed,
+  'in_production': T.ord_status_in_production,
+  'completed': T.ord_status_completed,
+  'delivered': T.ord_status_delivered
 } %}
 
 {% block content %}
 <div style="display:flex;gap:8px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
-  <a href="/orders" class="btn btn-ghost btn-sm">← Siparişler</a>
+  <a href="/orders" class="btn btn-ghost btn-sm">{{ T.ord_back }}</a>
   <span class="badge badge-{{ STATUS_COLOR.get(offer.status, 'blue') }}" style="font-size:13px;">{{ offer.status }}</span>
 </div>
 
@@ -28,20 +29,20 @@
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
   <div class="card">
     <div class="card-body" style="padding:16px;">
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">MÜŞTERİ</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">{{ T.ord_customer }}</div>
       <div style="font-weight:600;">{{ offer.customer_name }}</div>
     </div>
   </div>
   <div class="card">
     <div class="card-body" style="padding:16px;">
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">MODEL</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">{{ T.ord_model }}</div>
       <div style="font-weight:600;">{{ offer.model_name }}</div>
-      {% if show_prices %}<div style="font-size:12px;color:var(--text-muted);">{{ offer.machine_count }} adet × {{ "%.0f"|format(offer.base_price) }} {{ offer.currency }}</div>{% endif %}
+      {% if show_prices %}<div style="font-size:12px;color:var(--text-muted);">{{ offer.machine_count }} {{ T.ord_qty_unit }} × {{ "%.0f"|format(offer.base_price) }} {{ offer.currency }}</div>{% endif %}
     </div>
   </div>
   <div class="card">
     <div class="card-body" style="padding:16px;">
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">TOPLAM</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">{{ T.ord_total }}</div>
       {% if show_prices %}<div style="font-weight:700;font-size:18px;">{{ "%.2f"|format(offer.total_price) }} {{ offer.currency }}</div>{% else %}<div style="font-weight:700;font-size:18px;">—</div>{% endif %}
     </div>
   </div>
@@ -54,22 +55,22 @@
 
   <!-- Workflow status -->
   <div class="card">
-    <div class="card-header"><h3 class="card-title">İş Akışı</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.ord_workflow }}</h3></div>
     <div class="card-body">
       <div style="display:flex;flex-direction:column;gap:0;">
 
-        <!-- Step 1: Sipariş -->
+        <!-- Step 1: Order received -->
         <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
           <div style="width:28px;height:28px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
           <div>
-            <div style="font-weight:600;font-size:13px;">Sipariş Alındı</div>
-            <div style="font-size:12px;color:var(--text-muted);">Bayi: {{ offer.dealer_name }} · {{ offer.created_at[:10] }}</div>
+            <div style="font-weight:600;font-size:13px;">{{ T.ord_step_order }}</div>
+            <div style="font-size:12px;color:var(--text-muted);">{{ T.ord_dealer }}: {{ offer.dealer_name }} · {{ offer.created_at[:10] }}</div>
           </div>
         </div>
 
-        <!-- Step 2: Admin -->
+        <!-- Step 2: Admin approval -->
         {% set admin_done = offer.admin_status == 'approved' %}
         {% set admin_rejected = offer.admin_status == 'rejected' %}
         <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
@@ -79,36 +80,36 @@
             {% else %}<span style="font-size:11px;color:var(--text-muted);">2</span>{% endif %}
           </div>
           <div style="flex:1;">
-            <div style="font-weight:600;font-size:13px;">Admin Onayı{% if admin_rejected %} — Reddedildi{% elif admin_done %} — Onaylandı{% endif %}</div>
-            {% if offer.admin_notes %}<div style="font-size:12px;color:var(--text-muted);">Not: {{ offer.admin_notes }}</div>{% endif %}
-            {% if admin_done %}<div style="font-size:12px;color:var(--text-muted);">Üretici: {{ offer.manufacturer_name }}</div>{% endif %}
+            <div style="font-weight:600;font-size:13px;">{{ T.ord_step_admin }}{% if admin_rejected %} — {{ T.ord_rejected }}{% elif admin_done %} — {{ T.ord_approved }}{% endif %}</div>
+            {% if offer.admin_notes %}<div style="font-size:12px;color:var(--text-muted);">{{ T.ord_note }}: {{ offer.admin_notes }}</div>{% endif %}
+            {% if admin_done %}<div style="font-size:12px;color:var(--text-muted);">{{ T.ord_mfr_label }}: {{ offer.manufacturer_name }}</div>{% endif %}
 
             {% if user.role == 'admin' and not offer.admin_status %}
             <form method="post" action="/orders/{{ offer.id }}/approve" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
               <select name="manufacturer_id" class="form-control" style="max-width:200px;font-size:13px;" required>
-                <option value="">-- Üretici Seç --</option>
+                <option value="">{{ T.ord_select_mfr }}</option>
                 {% for m in manufacturers %}
                 <option value="{{ m.id }}" {% if m.id == default_mfr_id %}selected{% endif %}>{{ m.company_name or m.email }}</option>
                 {% endfor %}
               </select>
-              <input type="text" name="admin_notes" class="form-control" placeholder="Not (opsiyonel)" style="max-width:180px;font-size:13px;" />
-              <button type="submit" class="btn btn-success btn-sm">Onayla</button>
+              <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="max-width:180px;font-size:13px;" />
+              <button type="submit" class="btn btn-success btn-sm">{{ T.ord_approve_btn }}</button>
             </form>
             <form method="post" action="/orders/{{ offer.id }}/reject" style="margin-top:6px;display:flex;gap:8px;">
-              <input type="text" name="admin_notes" class="form-control" placeholder="Red gerekçesi" style="max-width:260px;font-size:13px;" />
-              <button type="submit" class="btn btn-danger btn-sm">Reddet</button>
+              <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_reject_reason }}" style="max-width:260px;font-size:13px;" />
+              <button type="submit" class="btn btn-danger btn-sm">{{ T.ord_reject_btn }}</button>
             </form>
             {% endif %}
 
             {% if user.role == 'admin' and admin_done %}
             <form method="post" action="/orders/{{ offer.id }}/reassign" style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
               <select name="manufacturer_id" class="form-control" style="max-width:200px;font-size:13px;">
-                <option value="">-- Üretici Seç --</option>
+                <option value="">{{ T.ord_select_mfr }}</option>
                 {% for m in manufacturers %}
                 <option value="{{ m.id }}" {% if m.id == offer.manufacturer_id %}selected{% endif %}>{{ m.company_name or m.email }}</option>
                 {% endfor %}
               </select>
-              <button type="submit" class="btn btn-outline btn-sm">Üretici Değiştir</button>
+              <button type="submit" class="btn btn-outline btn-sm">{{ T.ord_change_mfr }}</button>
             </form>
             {% endif %}
           </div>
@@ -122,15 +123,15 @@
             {% else %}<span style="font-size:11px;color:var(--text-muted);">3</span>{% endif %}
           </div>
           <div style="flex:1;">
-            <div style="font-weight:600;font-size:13px;">Üretici Onayı{% if mfr_confirmed %} — Onaylandı{% endif %}</div>
-            {% if offer.termin_date %}<div style="font-size:12px;color:var(--text-muted);">Termin: <strong>{{ offer.termin_date }}</strong></div>{% endif %}
-            {% if offer.mfr_notes %}<div style="font-size:12px;color:var(--text-muted);">Not: {{ offer.mfr_notes }}</div>{% endif %}
+            <div style="font-weight:600;font-size:13px;">{{ T.ord_step_mfr }}{% if mfr_confirmed %} — {{ T.ord_approved }}{% endif %}</div>
+            {% if offer.termin_date %}<div style="font-size:12px;color:var(--text-muted);">{{ T.ord_deadline }}: <strong>{{ offer.termin_date }}</strong></div>{% endif %}
+            {% if offer.mfr_notes %}<div style="font-size:12px;color:var(--text-muted);">{{ T.ord_note }}: {{ offer.mfr_notes }}</div>{% endif %}
 
             {% if (user.role == 'manufacturer' or user.is_manufacturer) and admin_done and not mfr_confirmed and can_confirm %}
             <form method="post" action="/orders/{{ offer.id }}/confirm" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
               <input type="date" name="termin_date" class="form-control" style="max-width:160px;font-size:13px;" required />
-              <input type="text" name="mfr_notes" class="form-control" placeholder="Not (opsiyonel)" style="max-width:200px;font-size:13px;" />
-              <button type="submit" class="btn btn-success btn-sm">Onayla + Termin Belirle</button>
+              <input type="text" name="mfr_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="max-width:200px;font-size:13px;" />
+              <button type="submit" class="btn btn-success btn-sm">{{ T.ord_approve_deadline }}</button>
             </form>
             {% endif %}
           </div>
@@ -138,7 +139,6 @@
 
         <!-- Step 4: Production status -->
         {% set in_prod = offer.mfr_status in ('in_production','completed','delivered') %}
-        {% set completed = offer.mfr_status in ('completed','delivered') %}
         {% set delivered = offer.mfr_status == 'delivered' %}
         <div style="display:flex;gap:12px;padding:10px 0;">
           <div style="width:28px;height:28px;border-radius:50%;background:{% if delivered %}var(--success){% elif in_prod %}#f59e0b{% else %}var(--surface-2){% endif %};border:2px solid {% if in_prod %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -147,17 +147,17 @@
             {% else %}<span style="font-size:11px;color:var(--text-muted);">4</span>{% endif %}
           </div>
           <div style="flex:1;">
-            <div style="font-weight:600;font-size:13px;">Üretim — {{ MFR_STATUS_TR.get(offer.mfr_status or '', 'Bekleniyor') }}</div>
+            <div style="font-weight:600;font-size:13px;">{{ T.ord_step_production }} — {{ MFR_STATUS_LABEL.get(offer.mfr_status or '', T.ord_status_waiting) }}</div>
             {% if (((user.role == 'manufacturer' or user.is_manufacturer) and offer.manufacturer_id == effective_mfr_id and can_status) or user.role == 'admin') %}
             {% if mfr_confirmed %}
             <div style="margin-top:8px;">
               <form method="post" action="/orders/{{ offer.id }}/status" style="display:flex;gap:8px;">
                 <select name="mfr_status" class="form-control" style="max-width:200px;font-size:13px;">
-                  <option value="in_production" {% if offer.mfr_status=='in_production' %}selected{% endif %}>Üretimde</option>
-                  <option value="completed" {% if offer.mfr_status=='completed' %}selected{% endif %}>Tamamlandı</option>
-                  <option value="delivered" {% if offer.mfr_status=='delivered' %}selected{% endif %}>Teslim Edildi</option>
+                  <option value="in_production" {% if offer.mfr_status=='in_production' %}selected{% endif %}>{{ T.ord_status_in_production }}</option>
+                  <option value="completed" {% if offer.mfr_status=='completed' %}selected{% endif %}>{{ T.ord_status_completed }}</option>
+                  <option value="delivered" {% if offer.mfr_status=='delivered' %}selected{% endif %}>{{ T.ord_status_delivered }}</option>
                 </select>
-                <button type="submit" class="btn btn-primary btn-sm">Güncelle</button>
+                <button type="submit" class="btn btn-primary btn-sm">{{ T.ord_update_btn }}</button>
               </form>
             </div>
             {% endif %}
@@ -172,9 +172,9 @@
   <!-- Production stages log -->
   <div class="card">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
-      <h3 class="card-title">Üretim Aşamaları</h3>
+      <h3 class="card-title">{{ T.ord_stages_title }}</h3>
       {% if (((user.role == 'manufacturer' or user.is_manufacturer) and can_stage) or user.role == 'admin') and mfr_confirmed %}
-      <button class="btn btn-outline btn-sm" onclick="openModal('stageModal')">+ Aşama Ekle</button>
+      <button class="btn btn-outline btn-sm" onclick="openModal('stageModal')">{{ T.ord_add_stage_btn }}</button>
       {% endif %}
     </div>
     <div class="card-body" style="padding:0;">
@@ -201,7 +201,7 @@
         {% endfor %}
       </div>
       {% else %}
-      <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">Henüz aşama eklenmedi</div>
+      <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">{{ T.ord_no_stages }}</div>
       {% endif %}
     </div>
   </div>
@@ -213,14 +213,14 @@
 
   <!-- Order items -->
   <div class="card">
-    <div class="card-header"><h3 class="card-title">Kalemler</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ T.ord_items_title }}</h3></div>
     <div class="card-body" style="padding:0;">
       <table style="width:100%;font-size:13px;">
         <thead>
           <tr style="border-bottom:1px solid var(--border);">
-            <th style="padding:8px 16px;text-align:left;">Opsiyon</th>
-            <th style="padding:8px 8px;text-align:right;">Adet</th>
-            {% if show_prices %}<th style="padding:8px 16px;text-align:right;">Tutar</th>{% endif %}
+            <th style="padding:8px 16px;text-align:left;">{{ T.ord_option_col }}</th>
+            <th style="padding:8px 8px;text-align:right;">{{ T.ord_qty_col }}</th>
+            {% if show_prices %}<th style="padding:8px 16px;text-align:right;">{{ T.ord_amount_col }}</th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -231,11 +231,11 @@
             {% if show_prices %}<td style="padding:8px 16px;text-align:right;">{{ "%.0f"|format(it.line_total) }}</td>{% endif %}
           </tr>
           {% else %}
-          <tr><td colspan="{{ 3 if show_prices else 2 }}" style="padding:16px;text-align:center;color:var(--text-muted);">Ek opsiyon yok</td></tr>
+          <tr><td colspan="{{ 3 if show_prices else 2 }}" style="padding:16px;text-align:center;color:var(--text-muted);">{{ T.ord_no_options }}</td></tr>
           {% endfor %}
           {% if show_prices %}
           <tr style="background:var(--surface-2);font-weight:600;">
-            <td colspan="2" style="padding:8px 16px;">Toplam</td>
+            <td colspan="2" style="padding:8px 16px;">{{ T.ord_total_row }}</td>
             <td style="padding:8px 16px;text-align:right;">{{ "%.2f"|format(offer.total_price) }} {{ offer.currency }}</td>
           </tr>
           {% endif %}
@@ -244,15 +244,15 @@
     </div>
   </div>
 
-  <!-- Manufacturer hakediş (admin only) -->
+  <!-- Manufacturer payment (admin only) -->
   {% if user.role == 'admin' and admin_done %}
   <div class="card">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
-      <h3 class="card-title">Üretici Hakediş</h3>
-      <a href="/ledger/manufacturers/{{ offer.manufacturer_name }}" class="btn btn-ghost btn-sm">Cari →</a>
+      <h3 class="card-title">{{ T.ord_mfr_payment }}</h3>
+      <a href="/ledger/manufacturers/{{ offer.manufacturer_name }}" class="btn btn-ghost btn-sm">{{ T.ord_ledger_link }}</a>
     </div>
     <div class="card-body">
-      <p style="font-size:13px;color:var(--text-muted);">Üretici ödemelerini cari hesap üzerinden yönetin.</p>
+      <p style="font-size:13px;color:var(--text-muted);">{{ T.ord_mfr_payment_desc }}</p>
     </div>
   </div>
   {% endif %}
@@ -261,9 +261,9 @@
   {% if user.role == 'admin' %}
   <div class="card">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
-      <h3 class="card-title">Bayi Bilgisi</h3>
+      <h3 class="card-title">{{ T.ord_dealer_info }}</h3>
       {% if offer.dealer_id %}
-      <a href="/ledger/dealers/{{ offer.dealer_id }}" class="btn btn-ghost btn-sm">Cari →</a>
+      <a href="/ledger/dealers/{{ offer.dealer_id }}" class="btn btn-ghost btn-sm">{{ T.ord_ledger_link }}</a>
       {% endif %}
     </div>
     <div class="card-body">
@@ -279,27 +279,27 @@
 <div id="stageModal" class="modal-overlay">
   <div class="modal-box" style="max-width:440px;">
     <div class="modal-header">
-      <h3 class="modal-title">Aşama Ekle</h3>
+      <h3 class="modal-title">{{ T.ord_stage_modal_title }}</h3>
       <button class="modal-close" onclick="closeModal('stageModal')">&times;</button>
     </div>
     <form method="post" action="/orders/{{ offer.id }}/stage">
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
         <div class="form-group">
-          <label class="form-label">Aşama Adı *</label>
-          <input type="text" name="stage_name" class="form-control" required placeholder="örn: Malzeme Temini, Kaynak, Test..." />
+          <label class="form-label">{{ T.ord_stage_name }} *</label>
+          <input type="text" name="stage_name" class="form-control" required placeholder="{{ T.ord_stage_name_ph }}" />
         </div>
         <div class="form-group">
-          <label class="form-label">Tarih</label>
+          <label class="form-label">{{ T.ord_stage_date }}</label>
           <input type="date" name="stage_date" class="form-control" />
         </div>
         <div class="form-group">
-          <label class="form-label">Not</label>
-          <textarea name="notes" class="form-control" rows="3" placeholder="Detay..."></textarea>
+          <label class="form-label">{{ T.ord_stage_note }}</label>
+          <textarea name="notes" class="form-control" rows="3" placeholder="{{ T.ord_stage_note_ph }}"></textarea>
         </div>
       </div>
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('stageModal')">İptal</button>
-        <button type="submit" class="btn btn-primary">Ekle</button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('stageModal')">{{ T.ord_cancel_btn }}</button>
+        <button type="submit" class="btn btn-primary">{{ T.ord_add_btn }}</button>
       </div>
     </form>
   </div>
