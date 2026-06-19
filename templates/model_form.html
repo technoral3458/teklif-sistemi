@@ -627,6 +627,14 @@ async function autoTranslateModel() {
   if (nameMap[srcLang]) texts['name'] = nameMap[srcLang];
   if (descMap[srcLang]) texts['description'] = descMap[srcLang];
 
+  // Spec row descriptions
+  const specRows = Array.from(document.querySelectorAll('.spec-row'));
+  const srcDescClass = {tr: '.spec-desc', en: '.spec-desc-en', zh: '.spec-desc-zh'}[srcLang];
+  specRows.forEach((row, i) => {
+    const val = (row.querySelector(srcDescClass)?.value || '').trim();
+    if (val) texts[`spec_${i}_desc`] = val;
+  });
+
   if (!Object.keys(texts).length) {
     status.style.display = 'block';
     status.textContent = '⚠ Çevrilecek metin bulunamadı.';
@@ -653,6 +661,7 @@ async function autoTranslateModel() {
     const nameInputTR = document.querySelector('[name="name"]');
     const descTA_TR   = document.querySelector('[name="description"]');
 
+    const specDescClass = {tr: '.spec-desc', en: '.spec-desc-en', zh: '.spec-desc-zh'};
     for (const [lang, vals] of Object.entries(data.translations)) {
       if (lang === 'tr') {
         if (vals.name        && nameInputTR) nameInputTR.value = vals.name;
@@ -663,6 +672,17 @@ async function autoTranslateModel() {
       } else if (lang === 'zh') {
         setField('mname_zh', vals.name);
         setTA('mdesc_zh', vals.description);
+      }
+      // Fill spec descriptions for this language
+      const cls = specDescClass[lang];
+      if (cls) {
+        specRows.forEach((row, i) => {
+          const translated = vals[`spec_${i}_desc`];
+          if (translated) {
+            const el = row.querySelector(cls);
+            if (el) el.value = translated;
+          }
+        });
       }
     }
     status.style.color = 'var(--success, #22c55e)';
