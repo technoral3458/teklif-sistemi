@@ -98,30 +98,30 @@
           {% if is_mfr %}
           {% set cur_pp = model.purchase_price|default(0)|float %}
           <div class="form-group">
-            <label class="form-label" style="font-weight:600;">💰 Satış Fiyatınız (Alış Fiyatı)</label>
+            <label class="form-label" style="font-weight:600;">💰 {{ T.opt_purchase_price }}</label>
             {% if model.id and cur_pp > 0 %}
               <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);margin-bottom:10px;">
                 <span style="font-size:18px;font-weight:700;color:var(--primary);">{{ "%.2f"|format(cur_pp) }} {{ model.purchase_currency or 'USD' }}</span>
-                <span style="font-size:12px;color:var(--text-muted);">— değiştirmek için aşağıdaki formu kullanın</span>
+                <span style="font-size:12px;color:var(--text-muted);">{{ T.mfr_price_change_hint }}</span>
               </div>
               <div style="background:var(--surface-2);border-radius:8px;padding:12px;border:1px solid var(--border);">
-                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">📋 Fiyat Değişikliği Talebi</div>
+                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">📋 {{ T.mfr_price_change_req }}</div>
                 <form method="post" action="/price-requests/submit" style="display:grid;grid-template-columns:1fr 110px auto;gap:8px;align-items:end;">
                   <input type="hidden" name="entity_type" value="model" />
                   <input type="hidden" name="entity_id" value="{{ model.id }}" />
                   <div>
-                    <label class="form-label" style="font-size:11px;">Yeni Fiyat</label>
+                    <label class="form-label" style="font-size:11px;">{{ T.mfr_new_price }}</label>
                     <input type="number" name="new_price" class="form-control" step="0.01" min="0" placeholder="0.00" required />
                   </div>
                   <div>
-                    <label class="form-label" style="font-size:11px;">Döviz</label>
+                    <label class="form-label" style="font-size:11px;">{{ T.offer_currency }}</label>
                     <select name="currency" class="form-control">
                       {% for cur in currencies %}<option value="{{ cur }}" {% if model.purchase_currency == cur %}selected{% endif %}>{{ cur }}</option>{% endfor %}
                     </select>
                   </div>
                   <div>
                     <label class="form-label" style="font-size:11px;">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Gönder</button>
+                    <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">{{ T.offer_send_btn }}</button>
                   </div>
                 </form>
               </div>
@@ -133,7 +133,7 @@
                   {% for cur in currencies %}<option value="{{ cur }}" {% if model.purchase_currency == cur %}selected{% endif %}>{{ cur }}</option>{% endfor %}
                 </select>
               </div>
-              {% if model.id %}<small style="color:var(--text-muted);font-size:11px;">Henüz fiyat girilmemiş. Kaydet ile fiyatı belirleyin.</small>{% endif %}
+              {% if model.id %}<small style="color:var(--text-muted);font-size:11px;">{{ T.mfr_no_price_hint }}</small>{% endif %}
             {% endif %}
           </div>
           {% endif %}

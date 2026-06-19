@@ -603,6 +603,10 @@ TRANSLATIONS = {
         'opt_del_request_btn': 'Silme Talebi Gönder',
         'opt_del_request_confirm': 'için silme talebi yöneticiye gönderilsin mi?',
         'opt_excel_import_confirm': "Excel dosyasındaki opsiyonlar sisteme eklenecek. Devam edilsin mi?",
+        'mfr_price_change_hint': '— değiştirmek için aşağıdaki formu kullanın',
+        'mfr_price_change_req': 'Fiyat Değişikliği Talebi',
+        'mfr_new_price': 'Yeni Fiyat',
+        'mfr_no_price_hint': 'Henüz fiyat girilmemiş. Kaydet ile fiyatı belirleyin.',
         # Dealer order workflow
         'offer_actions_title': 'Sipariş İşlemleri',
         'offer_btn_approve_order': 'Siparişi Onayla',
@@ -1229,6 +1233,10 @@ TRANSLATIONS = {
         'opt_del_request_btn': 'Send Deletion Request',
         'opt_del_request_confirm': 'send deletion request to admin?',
         'opt_excel_import_confirm': 'Options from the Excel file will be added to the system. Continue?',
+        'mfr_price_change_hint': '— use the form below to change',
+        'mfr_price_change_req': 'Price Change Request',
+        'mfr_new_price': 'New Price',
+        'mfr_no_price_hint': 'No price set yet. Click Save to set the price.',
         # Dealer order workflow
         'offer_actions_title': 'Order Actions',
         'offer_btn_approve_order': 'Approve Order',
@@ -1855,6 +1863,10 @@ TRANSLATIONS = {
         'opt_del_request_btn': '发送删除申请',
         'opt_del_request_confirm': '发送删除申请给管理员？',
         'opt_excel_import_confirm': 'Excel文件中的配置项将添加到系统。是否继续？',
+        'mfr_price_change_hint': '— 使用下面的表格进行修改',
+        'mfr_price_change_req': '价格变更申请',
+        'mfr_new_price': '新价格',
+        'mfr_no_price_hint': '尚未设置价格。点击保存以设置价格。',
         # Dealer order workflow
         'offer_actions_title': '订单操作',
         'offer_btn_approve_order': '确认订单',
