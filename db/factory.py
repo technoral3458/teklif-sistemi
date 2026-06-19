@@ -344,6 +344,30 @@ def init():
             resolved_at TEXT DEFAULT NULL
         )""")
 
+        # Serial number on offers
+        _acol(cur, "offers", "serial_number", "TEXT DEFAULT ''")
+
+        # Proforma invoices per order
+        cur.execute("""CREATE TABLE IF NOT EXISTS order_proformas(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            file_path TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            uploaded_by INTEGER DEFAULT NULL,
+            uploaded_at TEXT DEFAULT(datetime('now'))
+        )""")
+
+        # Machine documents per order
+        cur.execute("""CREATE TABLE IF NOT EXISTS order_documents(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            file_path TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            doc_type TEXT DEFAULT '',
+            uploaded_by INTEGER DEFAULT NULL,
+            uploaded_at TEXT DEFAULT(datetime('now'))
+        )""")
+
         c.commit()
 
 
@@ -1034,11 +1058,11 @@ def reject_order(oid, admin_notes=""):
             (admin_notes, oid)
         )
 
-def mfr_confirm_order(oid, termin_date, mfr_notes=""):
+def mfr_confirm_order(oid, termin_date, mfr_notes="", serial_number=""):
     with _c() as c:
         c.execute(
-            "UPDATE offers SET mfr_status='confirmed', termin_date=?, mfr_notes=?, status='Üretimde' WHERE id=?",
-            (termin_date, mfr_notes, oid)
+            "UPDATE offers SET mfr_status='confirmed', termin_date=?, mfr_notes=?, serial_number=?, status='Üretimde' WHERE id=?",
+            (termin_date, mfr_notes, serial_number, oid)
         )
 
 def update_mfr_status(oid, mfr_status, mfr_status_date=""):
@@ -1820,3 +1844,48 @@ def pending_price_requests_count():
             return c.execute("SELECT COUNT(*) FROM price_requests WHERE status='pending'").fetchone()[0]
     except Exception:
         return 0
+
+
+# ── Order Proformas & Documents ───────────────────────────────────────────────
+
+def get_order_proformas(order_id):
+    with _c() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT * FROM order_proformas WHERE order_id=? ORDER BY uploaded_at DESC", (order_id,)
+        )]
+
+def add_order_proforma(order_id, file_path, filename, uploaded_by=None):
+    with _c() as c:
+        c.execute(
+            "INSERT INTO order_proformas(order_id,file_path,filename,uploaded_by) VALUES(?,?,?,?)",
+            (order_id, file_path, filename, uploaded_by)
+        )
+
+def del_order_proforma(pid):
+    with _c() as c:
+        row = c.execute("SELECT file_path FROM order_proformas WHERE id=?", (pid,)).fetchone()
+        c.execute("DELETE FROM order_proformas WHERE id=?", (pid,))
+        return dict(row)["file_path"] if row else None
+
+def get_order_documents(order_id):
+    with _c() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT * FROM order_documents WHERE order_id=? ORDER BY uploaded_at DESC", (order_id,)
+        )]
+
+def add_order_document(order_id, file_path, filename, doc_type="", uploaded_by=None):
+    with _c() as c:
+        c.execute(
+            "INSERT INTO order_documents(order_id,file_path,filename,doc_type,uploaded_by) VALUES(?,?,?,?,?)",
+            (order_id, file_path, filename, doc_type, uploaded_by)
+        )
+
+def del_order_document(did):
+    with _c() as c:
+        row = c.execute("SELECT file_path FROM order_documents WHERE id=?", (did,)).fetchone()
+        c.execute("DELETE FROM order_documents WHERE id=?", (did,))
+        return dict(row)["file_path"] if row else None
+
+def set_order_serial(order_id, serial_number):
+    with _c() as c:
+        c.execute("UPDATE offers SET serial_number=? WHERE id=?", (serial_number, order_id))

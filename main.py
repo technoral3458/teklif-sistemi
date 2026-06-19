@@ -15,6 +15,7 @@ from config import BASE_DIR
 async def lifespan(app: FastAPI):
     os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
     os.makedirs(os.path.join(BASE_DIR, "static", "img", "uploads"), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, "static", "docs"), exist_ok=True)
     udb.init()
     fdb.init()
     yield

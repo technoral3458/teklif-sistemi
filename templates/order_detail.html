@@ -172,6 +172,7 @@
               <form method="post" action="/orders/{{ offer.id }}/confirm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                 <input type="date" name="termin_date" class="form-control" style="max-width:160px;font-size:13px;" required />
                 <input type="text" name="mfr_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="flex:1;min-width:140px;font-size:13px;" />
+                <input type="text" name="serial_number" class="form-control" placeholder="{{ T.ord_serial_no_ph }}" value="{{ offer.serial_number or '' }}" style="flex:1;min-width:140px;font-size:13px;font-family:monospace;" />
                 <button type="submit" class="btn btn-success btn-sm">{{ T.ord_approve_deadline }}</button>
               </form>
             </div>
@@ -356,6 +357,86 @@
     </div>
     <div class="card-body">
       <div style="font-size:13px;">{{ offer.dealer_name }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Serial Number -->
+  {% if user.role == 'admin' or (user.role == 'manufacturer' or user.is_manufacturer) %}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header"><h3 class="card-title">🔢 {{ T.ord_serial_no }}</h3></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+      {% if offer.serial_number %}
+      <div style="font-family:monospace;font-size:14px;font-weight:600;color:var(--primary);padding:8px 10px;background:var(--surface-2);border-radius:6px;">{{ offer.serial_number }}</div>
+      {% endif %}
+      <form method="post" action="/orders/{{ offer.id }}/serial" style="display:flex;gap:8px;">
+        <input type="text" name="serial_number" class="form-control" placeholder="{{ T.ord_serial_no_ph }}" value="{{ offer.serial_number or '' }}" style="flex:1;font-size:13px;font-family:monospace;" />
+        <button type="submit" class="btn btn-outline btn-sm">{{ T.btn_save }}</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Proforma Invoices -->
+  {% if user.role == 'admin' or (user.role == 'manufacturer' or user.is_manufacturer) %}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header"><h3 class="card-title">📄 {{ T.ord_proforma }}</h3></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+      {% if proformas %}
+      {% for pf in proformas %}
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface-2);border-radius:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <a href="/static/{{ pf.file_path }}" target="_blank" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--primary);">{{ pf.filename }}</a>
+        <span style="font-size:11px;color:var(--text-muted);">{{ pf.uploaded_at[:10] }}</span>
+        <form method="post" action="/orders/proforma/delete" style="margin:0;">
+          <input type="hidden" name="id" value="{{ pf.id }}" />
+          <input type="hidden" name="order_id" value="{{ offer.id }}" />
+          <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px;" onclick="return confirm('Sil?')">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="font-size:12px;color:var(--text-muted);">{{ T.ord_no_proformas }}</div>
+      {% endif %}
+      <form method="post" action="/orders/{{ offer.id }}/proforma" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+        <input type="file" name="proforma_file" accept=".pdf,.PDF" required style="flex:1;font-size:12px;" />
+        <button type="submit" class="btn btn-primary btn-sm">{{ T.ord_proforma_upload }}</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Machine Documents -->
+  {% if user.role == 'admin' or (user.role == 'manufacturer' or user.is_manufacturer) %}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header"><h3 class="card-title">📁 {{ T.ord_documents }}</h3></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+      {% if documents %}
+      {% for doc in documents %}
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface-2);border-radius:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div style="flex:1;min-width:0;">
+          <a href="/static/{{ doc.file_path }}" target="_blank" style="font-size:13px;color:var(--primary);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ doc.filename }}</a>
+          {% if doc.doc_type %}<div style="font-size:11px;color:var(--text-muted);">{{ doc.doc_type }}</div>{% endif %}
+        </div>
+        <span style="font-size:11px;color:var(--text-muted);">{{ doc.uploaded_at[:10] }}</span>
+        <form method="post" action="/orders/document/delete" style="margin:0;">
+          <input type="hidden" name="id" value="{{ doc.id }}" />
+          <input type="hidden" name="order_id" value="{{ offer.id }}" />
+          <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px;" onclick="return confirm('Sil?')">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="font-size:12px;color:var(--text-muted);">{{ T.ord_no_documents }}</div>
+      {% endif %}
+      <form method="post" action="/orders/{{ offer.id }}/document" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+        <input type="text" name="doc_type" class="form-control" placeholder="{{ T.ord_doc_type_ph }}" style="font-size:12px;" />
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="file" name="doc_file" accept=".pdf,.PDF,.doc,.docx,.xls,.xlsx,.zip" required style="flex:1;font-size:12px;" />
+          <button type="submit" class="btn btn-primary btn-sm">{{ T.ord_document_upload }}</button>
+        </div>
+      </form>
     </div>
   </div>
   {% endif %}

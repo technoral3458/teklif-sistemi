@@ -8,10 +8,12 @@ BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR    = os.path.join(BASE_DIR, "data")
 IMAGES_DIR    = os.path.join(BASE_DIR, "static", "img", "uploads")
 CONTRACTS_DIR = os.path.join(BASE_DIR, "static", "contracts")
+DOCS_DIR = os.path.join(BASE_DIR, "static", "docs")
 
 os.makedirs(DATA_DIR,      exist_ok=True)
 os.makedirs(IMAGES_DIR,    exist_ok=True)
 os.makedirs(CONTRACTS_DIR, exist_ok=True)
+os.makedirs(DOCS_DIR, exist_ok=True)
 
 FACTORY_DB = os.path.join(DATA_DIR, "factory.db")
 USERS_DB   = os.path.join(DATA_DIR, "users.db")
