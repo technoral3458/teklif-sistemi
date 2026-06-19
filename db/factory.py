@@ -741,14 +741,14 @@ _OFCOLS = ("id,offer_no,customer_id,model_id,machine_count,currency,"
            "admin_notes,termin_date,mfr_status,mfr_notes,mfr_status_date,"
            "delivery_method,delivery_time,logistics,payment_notes,created_at,"
            "delivery_term_id,delivery_term_discount,"
-           "cancel_reason,contract_notes,contract_photo")
+           "cancel_reason,contract_notes,contract_photo,serial_number")
 _OFKEYS = ["id","offer_no","customer_id","model_id","machine_count","currency",
            "base_price","options_total","discount_pct","total_price","status",
            "notes","validity_date","dealer_id","manufacturer_id","admin_status",
            "admin_notes","termin_date","mfr_status","mfr_notes","mfr_status_date",
            "delivery_method","delivery_time","logistics","payment_notes","created_at",
            "delivery_term_id","delivery_term_discount",
-           "cancel_reason","contract_notes","contract_photo"]
+           "cancel_reason","contract_notes","contract_photo","serial_number"]
 
 
 def _rof(r):
@@ -1081,10 +1081,13 @@ def get_production_steps(active_only=True):
     if active_only:
         q += " WHERE is_active=1"
     q += " ORDER BY sort_order,id"
-    with _c() as c:
-        rows = c.execute(q).fetchall()
-    keys = ["id","code","label_tr","label_en","label_zh","sort_order","is_active"]
-    return [dict(zip(keys,r)) for r in rows]
+    try:
+        with _c() as c:
+            rows = c.execute(q).fetchall()
+        keys = ["id","code","label_tr","label_en","label_zh","sort_order","is_active"]
+        return [dict(zip(keys,r)) for r in rows]
+    except Exception:
+        return []
 
 def save_production_step(id, code, label_tr, label_en, label_zh, sort_order, is_active=1):
     with _c() as c:
@@ -1849,10 +1852,13 @@ def pending_price_requests_count():
 # ── Order Proformas & Documents ───────────────────────────────────────────────
 
 def get_order_proformas(order_id):
-    with _c() as c:
-        return [dict(r) for r in c.execute(
-            "SELECT * FROM order_proformas WHERE order_id=? ORDER BY uploaded_at DESC", (order_id,)
-        )]
+    try:
+        with _c() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT * FROM order_proformas WHERE order_id=? ORDER BY uploaded_at DESC", (order_id,)
+            )]
+    except Exception:
+        return []
 
 def add_order_proforma(order_id, file_path, filename, uploaded_by=None):
     with _c() as c:
@@ -1868,10 +1874,13 @@ def del_order_proforma(pid):
         return dict(row)["file_path"] if row else None
 
 def get_order_documents(order_id):
-    with _c() as c:
-        return [dict(r) for r in c.execute(
-            "SELECT * FROM order_documents WHERE order_id=? ORDER BY uploaded_at DESC", (order_id,)
-        )]
+    try:
+        with _c() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT * FROM order_documents WHERE order_id=? ORDER BY uploaded_at DESC", (order_id,)
+            )]
+    except Exception:
+        return []
 
 def add_order_document(order_id, file_path, filename, doc_type="", uploaded_by=None):
     with _c() as c:
