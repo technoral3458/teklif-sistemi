@@ -106,24 +106,24 @@
               </div>
               <div style="background:var(--surface-2);border-radius:8px;padding:12px;border:1px solid var(--border);">
                 <div style="font-size:12px;font-weight:600;margin-bottom:8px;">📋 {{ T.mfr_price_change_req }}</div>
-                <form method="post" action="/price-requests/submit" style="display:grid;grid-template-columns:1fr 110px auto;gap:8px;align-items:end;">
-                  <input type="hidden" name="entity_type" value="model" />
-                  <input type="hidden" name="entity_id" value="{{ model.id }}" />
+                <div style="display:grid;grid-template-columns:1fr 110px auto;gap:8px;align-items:end;" id="priceReqForm">
                   <div>
                     <label class="form-label" style="font-size:11px;">{{ T.mfr_new_price }}</label>
-                    <input type="number" name="new_price" class="form-control" step="0.01" min="0" placeholder="0.00" required />
+                    <input type="number" id="priceReqNewPrice" class="form-control" step="0.01" min="0" placeholder="0.00" />
                   </div>
                   <div>
                     <label class="form-label" style="font-size:11px;">{{ T.offer_currency }}</label>
-                    <select name="currency" class="form-control">
+                    <select id="priceReqCurrency" class="form-control">
                       {% for cur in currencies %}<option value="{{ cur }}" {% if model.purchase_currency == cur %}selected{% endif %}>{{ cur }}</option>{% endfor %}
                     </select>
                   </div>
                   <div>
                     <label class="form-label" style="font-size:11px;">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">{{ T.offer_send_btn }}</button>
+                    <button type="button" class="btn btn-primary btn-sm" style="width:100%;"
+                      onclick="submitPriceReq('model', {{ model.id }})">{{ T.offer_send_btn }}</button>
                   </div>
-                </form>
+                </div>
+                <div id="priceReqMsg" style="margin-top:6px;font-size:12px;display:none;"></div>
               </div>
             {% else %}
               <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;">
@@ -673,6 +673,29 @@ async function autoTranslateModel() {
   } finally {
     btn.disabled = false;
     btn.textContent = document.getElementById('autoTranslateModelBtn')?.dataset.label || '🌐 Otomatik Çevir';
+  }
+}
+
+async function submitPriceReq(entityType, entityId) {
+  const newPrice = parseFloat(document.getElementById('priceReqNewPrice').value);
+  const currency = document.getElementById('priceReqCurrency').value;
+  const msgEl = document.getElementById('priceReqMsg');
+  if (!newPrice || newPrice <= 0) {
+    msgEl.style.display = 'block';
+    msgEl.style.color = 'var(--danger)';
+    msgEl.textContent = '{{ T.mfr_new_price }}: 0';
+    return;
+  }
+  const body = new URLSearchParams({entity_type: entityType, entity_id: entityId, new_price: newPrice, currency: currency});
+  const resp = await fetch('/price-requests/submit', {method: 'POST', body});
+  msgEl.style.display = 'block';
+  if (resp.ok || resp.redirected) {
+    msgEl.style.color = 'var(--success, #22c55e)';
+    msgEl.textContent = '✓ {{ T.mfr_price_change_req }} {{ T.offer_send_btn|lower }}';
+    document.getElementById('priceReqNewPrice').value = '';
+  } else {
+    msgEl.style.color = 'var(--danger)';
+    msgEl.textContent = '✗ Hata';
   }
 }
 </script>

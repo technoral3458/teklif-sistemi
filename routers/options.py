@@ -110,14 +110,30 @@ async def save_option(request: Request,
     except Exception as e:
         return RedirectResponse(f"/options?msg=Resim+kaydedilemedi:+{e}&msg_type=error", 303)
 
-    # Manufacturers automatically own their options; can only change purchase_price if currently 0
+    # Manufacturers automatically own their options; price changes on existing go via request
+    price_request_created = False
     if auth.is_mfr(user):
         price = 0.0
         manufacturer_id = udb.effective_mfr_id(user)
-        if id:  # editing existing — only allow price change if price not yet set
+        if id:  # editing existing — create a price change request if purchase_price already set
             existing = fdb.get_option(id)
             existing_price = float(existing.get("purchase_price") or 0) if existing else 0.0
-            if existing_price > 0:
+            if existing_price > 0 and purchase_price != existing_price:
+                # Submit a price change request and keep the old price
+                try:
+                    mfr_id = udb.effective_mfr_id(user)
+                    fdb.add_price_request(
+                        entity_type="option",
+                        entity_id=id,
+                        entity_name=existing.get("name", ""),
+                        manufacturer_id=mfr_id,
+                        current_price=existing_price,
+                        new_price=purchase_price,
+                        currency=purchase_currency,
+                    )
+                    price_request_created = True
+                except Exception:
+                    pass
                 purchase_price = existing_price
                 purchase_currency = existing.get("purchase_currency", "USD") if existing else "USD"
 
@@ -148,6 +164,8 @@ async def save_option(request: Request,
             fdb.add_option(**kw)
     except Exception as e:
         return RedirectResponse(f"/options?msg=Kayıt+hatası:+{e}&msg_type=error", 303)
+    if price_request_created:
+        return RedirectResponse("/options?msg=Fiyat+talebi+gönderildi&msg_type=success", 303)
     return RedirectResponse("/options?msg=Kaydedildi&msg_type=success", 303)
 
 
