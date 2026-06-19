@@ -16,7 +16,8 @@
   {% endif %}
 </div>
 
-{% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray'} %}
+{% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray','Admin Onaylı':'amber','Üretimde':'blue','Tamamlandı':'green','Teslim Edildi':'green'} %}
+{% set sl = {'Beklemede':T.status_pending,'Onaylandı':T.status_approved,'Reddedildi':T.status_rejected,'Sipariş Verildi':T.status_ordered,'İptal':T.status_cancelled,'Admin Onaylı':T.status_admin_approved,'Üretimde':T.status_in_production,'Tamamlandı':T.status_completed,'Teslim Edildi':T.status_delivered} %}
 
 <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;">
   <div>
@@ -26,7 +27,7 @@
           <h3 class="card-title">{{ offer.offer_no }}</h3>
           <div style="font-size:13px;color:var(--text-muted);">{{ offer.created_at[:10] if offer.created_at else '' }}</div>
         </div>
-        <span class="badge badge-{{ sc.get(offer.status, 'gray') }}" style="font-size:14px;padding:6px 12px;">{{ offer.status }}</span>
+        <span class="badge badge-{{ sc.get(offer.status, 'gray') }}" style="font-size:14px;padding:6px 12px;">{{ sl.get(offer.status, offer.status) }}</span>
       </div>
       <div class="card-body">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
@@ -141,13 +142,13 @@
     </div>
     {% endif %}
     {% if user.role == 'admin' %}
-    <!-- ADMIN: approve order if awaiting approval -->
-    {% if offer.status == 'Sipariş Verildi' and not offer.admin_status %}
-    <div class="card" style="margin-bottom:16px;border-left:3px solid var(--primary);">
-      <div class="card-header" style="background:rgba(59,130,246,0.06);">
-        <h3 class="card-title" style="color:var(--primary);">⏳ {{ T.offer_status_waiting_admin }}</h3>
+    <!-- ADMIN: send to manufacturer (always visible until sent) -->
+    {% if not offer.admin_status %}
+    <div class="card" style="margin-bottom:16px;border-left:3px solid var(--success);">
+      <div class="card-header" style="background:rgba(16,185,129,0.06);">
+        <h3 class="card-title" style="color:var(--success);">🏭 {{ T.ord_send_to_mfr }}</h3>
       </div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
         {% if offer.contract_notes or offer.contract_photo %}
         <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:12px;color:var(--text-muted);">
           {{ T.offer_contract_section }}:
@@ -163,7 +164,7 @@
             {% endfor %}
           </select>
           <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="font-size:13px;" />
-          <button type="submit" class="btn btn-success">✓ {{ T.ord_approve_btn }}</button>
+          <button type="submit" class="btn btn-success">✓ {{ T.ord_send_to_mfr_btn }}</button>
         </form>
         <form method="post" action="/orders/{{ offer.id }}/reject" style="display:flex;gap:8px;">
           <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_reject_reason }}" style="flex:1;font-size:13px;" />
