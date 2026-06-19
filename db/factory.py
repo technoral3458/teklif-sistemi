@@ -304,6 +304,9 @@ def init():
         # Add mfr_status_date to offers
         _acol(cur, "offers", "mfr_status_date", "TEXT DEFAULT ''")
 
+        # Stage photo
+        _acol(cur, "order_stages", "photo", "TEXT DEFAULT ''")
+
         # Dealer order workflow columns
         _acol(cur, "offers", "cancel_reason",   "TEXT DEFAULT ''")
         _acol(cur, "offers", "contract_notes",  "TEXT DEFAULT ''")
@@ -1079,20 +1082,20 @@ def del_production_step(id):
 
 # ── Order Stages ─────────────────────────────────────────────────────────────
 
-def add_order_stage(order_id, stage_name, notes, stage_date):
+def add_order_stage(order_id, stage_name, notes, stage_date, photo=""):
     with _c() as c:
         c.execute(
-            "INSERT INTO order_stages(order_id,stage_name,notes,stage_date) VALUES(?,?,?,?)",
-            (order_id, stage_name, notes, stage_date)
+            "INSERT INTO order_stages(order_id,stage_name,notes,stage_date,photo) VALUES(?,?,?,?,?)",
+            (order_id, stage_name, notes, stage_date, photo)
         )
 
 def get_order_stages(order_id):
     with _c() as c:
         rows = c.execute(
-            "SELECT id,order_id,stage_name,notes,stage_date,created_at FROM order_stages WHERE order_id=? ORDER BY stage_date DESC,id DESC",
+            "SELECT id,order_id,stage_name,notes,stage_date,created_at,photo FROM order_stages WHERE order_id=? ORDER BY stage_date DESC,id DESC",
             (order_id,)
         ).fetchall()
-    return [{"id":r[0],"order_id":r[1],"stage_name":r[2],"notes":r[3],"stage_date":r[4],"created_at":r[5]} for r in rows]
+    return [{"id":r[0],"order_id":r[1],"stage_name":r[2],"notes":r[3],"stage_date":r[4],"created_at":r[5],"photo":r[6] or ""} for r in rows]
 
 def del_order_stage(sid):
     with _c() as c:

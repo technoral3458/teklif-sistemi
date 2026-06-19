@@ -1,12 +1,15 @@
 import datetime
+import os
+import uuid
 import threading
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import RedirectResponse
+from typing import Optional
 
 import db.factory as fdb
 import db.users as udb
 import auth
-from config import CURRENCIES, PAYMENT_METHODS
+from config import CURRENCIES, PAYMENT_METHODS, IMAGES_DIR
 
 router = APIRouter(prefix="/orders")
 from tmpl import templates
@@ -198,7 +201,8 @@ async def update_status(request: Request, oid: int,
 async def add_stage(request: Request, oid: int,
                     stage_name: str = Form(""),
                     notes: str = Form(""),
-                    stage_date: str = Form("")):
+                    stage_date: str = Form(""),
+                    photo: Optional[UploadFile] = File(None)):
     user = auth.require_user(request)
     if not udb.has_action(user, "order_stage") and user["role"] != "admin":
         return RedirectResponse(f"/orders/{oid}", 303)
@@ -207,7 +211,16 @@ async def add_stage(request: Request, oid: int,
     if offer and (offer.get("manufacturer_id") == mfr_id or user["role"] == "admin"):
         if not stage_date:
             stage_date = datetime.date.today().isoformat()
-        fdb.add_order_stage(oid, stage_name, notes, stage_date)
+        photo_path = ""
+        if photo and photo.filename:
+            ext = os.path.splitext(photo.filename)[1].lower() or ".jpg"
+            fname = f"stage_{oid}_{uuid.uuid4().hex[:8]}{ext}"
+            os.makedirs(IMAGES_DIR, exist_ok=True)
+            content = await photo.read()
+            with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
+                f.write(content)
+            photo_path = f"img/uploads/{fname}"
+        fdb.add_order_stage(oid, stage_name, notes, stage_date, photo_path)
         _notify("Üretim Aşaması Eklendi", {
             "Sipariş No": f"#{oid}",
             "Üretici": user.get("company_name", "-"),
