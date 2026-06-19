@@ -21,7 +21,7 @@
           {% if not (user.role == 'manufacturer' or user.is_manufacturer) %}<th>{{ T.order_customer }}</th>{% endif %}
           <th>{{ T.order_model }}</th>
           <th>{{ T.order_qty }}</th>
-          <th>{{ T.order_amount }}</th>
+          {% if not (user.role == 'manufacturer' or user.is_manufacturer) %}<th>{{ T.order_amount }}</th>{% endif %}
           {% if user.role == 'admin' %}<th>{{ T.order_dealer }}</th>{% endif %}
           {% if user.role in ('admin','dealer') %}<th>{{ T.order_manufacturer }}</th>{% endif %}
           <th>{{ T.order_status }}</th>
@@ -36,7 +36,7 @@
           {% if not (user.role == 'manufacturer' or user.is_manufacturer) %}<td>{{ o.customer_name }}</td>{% endif %}
           <td>{{ o.model_name }}</td>
           <td>{{ o.machine_count }}</td>
-          <td>{{ "%.0f"|format(o.total_price) }} {{ o.currency }}</td>
+          {% if not (user.role == 'manufacturer' or user.is_manufacturer) %}<td>{{ "%.0f"|format(o.total_price) }} {{ o.currency }}</td>{% endif %}
           {% if user.role == 'admin' %}<td>{{ o.dealer_name }}</td>{% endif %}
           {% if user.role in ('admin','dealer') %}<td>{{ o.manufacturer_name }}</td>{% endif %}
           {% set STATUS_LABEL = {'Sipariş Verildi':T.status_ordered,'Admin Onaylı':T.status_admin_approved,'Üretimde':T.status_in_production,'Tamamlandı':T.status_completed,'Teslim Edildi':T.status_delivered,'İptal':T.status_cancelled,'Beklemede':T.status_pending,'Onaylandı':T.status_approved,'Reddedildi':T.status_rejected} %}
@@ -45,7 +45,7 @@
           <td><a href="/orders/{{ o.id }}" class="btn btn-outline btn-sm">{{ T.order_detail }}</a></td>
         </tr>
         {% else %}
-        <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.order_no_records }}</td></tr>
+        <tr><td colspan="{{ 7 if (user.role == 'manufacturer' or user.is_manufacturer) else 9 }}" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.order_no_records }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
