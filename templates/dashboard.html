@@ -75,7 +75,7 @@
       <thead>
         <tr>
           <th>{{ T.dash_offer_no }}</th>
-          <th>{{ T.offer_customer }}</th>
+          {% if not is_mfr %}<th>{{ T.offer_customer }}</th>{% endif %}
           <th>{{ T.dash_model }}</th>
           {% if not is_mfr %}<th>{{ T.dash_amount }}</th>{% endif %}
           <th>{{ T.offer_status }}</th>
@@ -87,7 +87,7 @@
         {% for o in recent_offers %}
         <tr>
           <td><code>{{ o.offer_no }}</code></td>
-          <td>{{ o.customer_name }}</td>
+          {% if not is_mfr %}<td>{{ o.customer_name }}</td>{% endif %}
           <td>{{ o.model_name }}</td>
           {% if not is_mfr %}<td>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</td>{% endif %}
           <td>
