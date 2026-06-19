@@ -1004,22 +1004,6 @@ async def caps_list(request: Request):
     })
 
 
-@router.get("/caps/{mid}")
-async def caps_edit(request: Request, mid: int):
-    user = auth.require_user(request)
-    model = fdb.get_cap_model(mid)
-    if not model:
-        return RedirectResponse("/membrane/caps", 303)
-    paths = fdb.get_cap_paths(mid)
-    models = fdb.get_cap_models()
-    return templates.TemplateResponse(request, "membrane_caps.html", {
-        "user": user, "models": models, "edit_model": model, "paths": paths,
-        "active_page": "membrane",
-        "msg": request.query_params.get("msg", ""),
-        "msg_type": request.query_params.get("msg_type", "info"),
-    })
-
-
 @router.post("/caps/save")
 async def caps_save(request: Request,
                     id: int = Form(0),
@@ -1125,6 +1109,22 @@ async def caps_dxf_create(request: Request):
                 seq=seq_i,
             )
     return JSONResponse({'ok': True, 'model_id': mid})
+
+
+@router.get("/caps/{mid}")
+async def caps_edit(request: Request, mid: int):
+    user = auth.require_user(request)
+    model = fdb.get_cap_model(mid)
+    if not model:
+        return RedirectResponse("/membrane/caps", 303)
+    paths = fdb.get_cap_paths(mid)
+    models = fdb.get_cap_models()
+    return templates.TemplateResponse(request, "membrane_caps.html", {
+        "user": user, "models": models, "edit_model": model, "paths": paths,
+        "active_page": "membrane",
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
+    })
 
 
 @router.post("/caps/{mid}/path/save")
