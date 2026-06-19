@@ -28,7 +28,7 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       {{ T.btn_excel_import }}
       <input type="file" name="excel_file" accept=".xlsx,.xls" style="display:none;"
-             onchange="if(this.files[0]){if(confirm('Excel dosyasındaki opsiyonlar sisteme eklenecek. Devam edilsin mi?'))this.closest('form').submit();else this.value='';}" />
+             onchange="if(this.files[0]){if(confirm({{ T.opt_excel_import_confirm|tojson }}))this.closest('form').submit();else this.value='';}" />
     </label>
   </form>
   {% endif %}
@@ -54,9 +54,9 @@
           <td>
             <div style="display:flex;gap:4px;align-items:center;">
               {% if o.image_path %}
-              <img src="/static/{{ o.image_path }}" title="Opsiyon resmi" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);" />
+              <img src="/static/{{ o.image_path }}" title="{{ T.opt_image_label }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);" />
               {% else %}
-              <div title="Opsiyon resmi yok" style="width:36px;height:36px;background:var(--surface-2);border-radius:4px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;">
+              <div title="{{ T.opt_image_label }}" style="width:36px;height:36px;background:var(--surface-2);border-radius:4px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
               </div>
               {% endif %}
@@ -99,7 +99,9 @@
                 {{ (o.name_zh or "")|tojson }},
                 {{ (o.description_zh or "")|tojson }},
                 {{ o.manufacturer_id or 0 }},
-                {{ (o.requires_option_ids or "")|tojson }}
+                {{ (o.requires_option_ids or "")|tojson }},
+                {{ o.purchase_price|float if o.purchase_price != none else 0 }},
+                {{ (o.purchase_currency or "USD")|tojson }}
               )' title="{{ T.btn_edit }}" style="padding:6px 8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
               {% if user.role == 'admin' %}
               <button class="btn btn-outline btn-sm" title="Kopyala" style="padding:6px 8px;" onclick='editOpt(
@@ -128,9 +130,9 @@
               </form>
               {% elif user.role == 'manufacturer' %}
               <form method="post" action="/options/request-delete"
-                    onsubmit="return confirm('{{ o.name }} için silme talebi yöneticiye gönderilsin mi?')" style="margin:0;">
+                    onsubmit="return confirm('{{ o.name|e }} - {{ T.opt_del_request_confirm }}')" style="margin:0;">
                 <input type="hidden" name="id" value="{{ o.id }}" />
-                <button type="submit" class="btn btn-outline btn-sm" title="Silme Talebi Gönder" style="padding:6px 8px;color:var(--danger);">
+                <button type="submit" class="btn btn-outline btn-sm" title="{{ T.opt_del_request_btn }}" style="padding:6px 8px;color:var(--danger);">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button>
               </form>
@@ -214,10 +216,9 @@
           </div>
           {% endif %}
 
-          {% if user.role == 'manufacturer' %}
-          {# Manufacturer sets their purchase price on new option; change requests for existing #}
-          <div class="form-group" id="mfr-price-new">
-            <label class="form-label">💰 Satış Fiyatınız (Alış Fiyatı)</label>
+          {# Purchase price: admin sees it alongside sale price; manufacturer sets it instead of sale price #}
+          <div class="form-group" id="mfr-price-new" style="grid-column:1/-1;">
+            <label class="form-label">💰 {{ T.opt_purchase_price }}</label>
             <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;">
               <input type="number" name="purchase_price" id="opurchase_price" class="form-control" step="0.01" min="0" value="0" />
               <select name="purchase_currency" id="opurchase_currency" class="form-control">
@@ -225,7 +226,6 @@
               </select>
             </div>
           </div>
-          {% endif %}
 
           <div class="form-group">
             <label class="form-label">{{ T.opt_qty_type }}</label>
@@ -256,8 +256,8 @@
           {% if user.role == 'admin' %}
           <div class="form-group" style="grid-column:1/-1;">
             <label class="form-label" style="display:flex;align-items:center;gap:6px;">
-              🔗 Zorunlu Opsiyonlar
-              <span style="font-size:11px;color:var(--text-muted);">(Bu opsiyon seçildiğinde otomatik eklenir)</span>
+              🔗 {{ T.opt_required_opts }}
+              <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_required_opts_hint }})</span>
             </label>
             <div id="oreqChecks" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:160px;overflow-y:auto;padding:8px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
               {% for opt in options %}
@@ -390,9 +390,10 @@ function newOpt() {
   document.getElementById('odesc').value = '';
   const _p0 = document.getElementById('oprice'); if (_p0) _p0.value = '0';
   const _c0 = document.getElementById('ocurrency'); if (_c0) _c0.value = 'USD';
+  const _pp0 = document.getElementById('opurchase_price'); if (_pp0) _pp0.value = '0';
+  const _pc0 = document.getElementById('opurchase_currency'); if (_pc0) _pc0.value = 'USD';
   document.getElementById('oqty_type').value = 'MANUAL';
   _setCatChecks('');
-  document.getElementById('oqty_type').value = 'MANUAL';
   document.getElementById('oconflict').value = '';
   document.getElementById('oimage_priority').value = '0';
   clearImg('oimage', 'ocurrent_image', 'oImgPreview', 'oClearImg');
@@ -408,13 +409,15 @@ function newOpt() {
   openModal('optModal');
 }
 
-function editOpt(id, name, desc, price, currency, catIds, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh, manufacturerId, requiresOptionIds) {
+function editOpt(id, name, desc, price, currency, catIds, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh, manufacturerId, requiresOptionIds, purchasePrice, purchaseCurrency) {
   document.getElementById('optModalTitle').textContent = '{{ T.btn_edit }} {{ T.options_title }}';
   document.getElementById('oid').value = id;
   document.getElementById('oname').value = name;
   document.getElementById('odesc').value = desc;
   const _pe = document.getElementById('oprice'); if (_pe) _pe.value = price;
   const _ce = document.getElementById('ocurrency'); if (_ce) _ce.value = currency;
+  const _pp = document.getElementById('opurchase_price'); if (_pp) _pp.value = purchasePrice || 0;
+  const _pc = document.getElementById('opurchase_currency'); if (_pc) _pc.value = purchaseCurrency || 'USD';
   _setCatChecks(catIds);
   document.getElementById('oqty_type').value = qtyType;
   document.getElementById('oconflict').value = conflict;
