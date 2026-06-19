@@ -119,6 +119,105 @@ async def order_detail(request: Request, oid: int):
     })
 
 
+@router.get("/{oid}/production-pdf")
+async def production_pdf(request: Request, oid: int, dl: int = 0):
+    user = auth.require_user(request)
+    offer = fdb.get_offer(oid)
+    if not offer:
+        return RedirectResponse("/orders", 303)
+    mfr_id = udb.effective_mfr_id(user)
+    if user["role"] != "admin" and offer.get("manufacturer_id") != mfr_id:
+        return RedirectResponse("/orders", 303)
+
+    lang = user.get("lang", "tr")
+    items = fdb.get_offer_items(oid)
+    opts = {o["id"]: o for o in fdb.get_options()}
+
+    for item in items:
+        opt = opts.get(item.get("option_id"), {})
+        item["option_name"] = (opt.get(f"name_{lang}") or opt.get("name", "-")) if lang != "tr" else opt.get("name", "-")
+        item["description"] = (opt.get(f"description_{lang}") or opt.get("description", "")) if lang != "tr" else opt.get("description", "")
+        item["image_path"] = opt.get("variation_image_path") or opt.get("image_path", "") or ""
+
+    model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
+    model_name = (model.get(f"name_{lang}") or model.get("name") or "") if lang != "tr" else (model.get("name") or "")
+
+    from routers.offers import _best_display_image, _parse_specs, _filter_specs
+    display_image = _best_display_image(model, offer, items, opts)
+    specs = _filter_specs(_parse_specs(model, lang), items, opts)
+
+    company = fdb.get_company() or {}
+    mfr_map = {u["id"]: u for u in udb.all_manufacturers()}
+    mfr = mfr_map.get(offer.get("manufacturer_id"))
+    offer["manufacturer_name"] = mfr["company_name"] if mfr else "-"
+
+    _L = {
+        "tr": {
+            "title": "ÜRETİM EMRİ",
+            "order_no": "Sipariş No", "date": "Tarih",
+            "manufacturer": "Üretici", "model": "Model",
+            "qty": "Adet", "deadline": "Termin",
+            "machine_specs": "MAKİNE STANDART ÖZELLİKLERİ",
+            "std_features": "Standart Özellikler",
+            "selected_options": "SEÇİLEN OPSİYONLAR VE DONANIM",
+            "option_img": "Görsel", "option_desc": "Donanım Açıklaması",
+            "option_qty": "Adet", "notes": "Notlar",
+            "summary_title": "ÜRETİM EMRİ ÖZETİ",
+            "included_options": "Dahil Opsiyonlar / Donanımlar",
+            "pcs": "adet",
+            "footer": "Bu üretim emri üretici onayı için düzenlenmiştir.",
+            "customer": "Müşteri",
+        },
+        "en": {
+            "title": "PRODUCTION ORDER",
+            "order_no": "Order No", "date": "Date",
+            "manufacturer": "Manufacturer", "model": "Model",
+            "qty": "Quantity", "deadline": "Deadline",
+            "machine_specs": "STANDARD MACHINE SPECIFICATIONS",
+            "std_features": "Standard Features",
+            "selected_options": "SELECTED OPTIONS & EQUIPMENT",
+            "option_img": "Image", "option_desc": "Equipment Description",
+            "option_qty": "Qty", "notes": "Notes",
+            "summary_title": "PRODUCTION ORDER SUMMARY",
+            "included_options": "Included Options / Equipment",
+            "pcs": "pcs",
+            "footer": "This production order has been prepared for manufacturer approval.",
+            "customer": "Customer",
+        },
+        "zh": {
+            "title": "生产工单",
+            "order_no": "订单编号", "date": "日期",
+            "manufacturer": "制造商", "model": "型号",
+            "qty": "数量", "deadline": "交货期",
+            "machine_specs": "机器标准规格",
+            "std_features": "标准特性",
+            "selected_options": "已选配件与设备",
+            "option_img": "图片", "option_desc": "设备描述",
+            "option_qty": "数量", "notes": "备注",
+            "summary_title": "生产工单摘要",
+            "included_options": "包含配件/设备",
+            "pcs": "件",
+            "footer": "本生产工单已准备好等待制造商确认。",
+            "customer": "客户",
+        },
+    }
+    lbl = _L.get(lang, _L["tr"])
+
+    from fastapi.responses import Response as _R
+    html_str = templates.get_template("production_order_pdf.html").render({
+        "offer": offer, "items": items, "model": model,
+        "model_name": model_name, "specs": specs,
+        "display_image": display_image, "company": company,
+        "lang": lang, "lbl": lbl,
+    })
+    from weasyprint import HTML as WH
+    pdf_bytes = WH(string=html_str, base_url="http://127.0.0.1:8501/").write_pdf()
+    fname = f"UretimEmri_{offer['offer_no']}.pdf"
+    disposition = "attachment" if dl else "inline"
+    return _R(pdf_bytes, media_type="application/pdf",
+              headers={"Content-Disposition": f'{disposition}; filename="{fname}"'})
+
+
 @router.post("/{oid}/approve")
 async def approve_order(request: Request, oid: int,
                         manufacturer_id: int = Form(0),
