@@ -91,8 +91,9 @@
           <td>{{ o.model_name }}</td>
           {% if not is_mfr %}<td>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</td>{% endif %}
           <td>
-            {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray'} %}
-            <span class="badge badge-{{ sc.get(o.status, 'gray') }}">{{ o.status }}</span>
+            {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray','Admin Onaylı':'amber','Üretimde':'blue','Tamamlandı':'green','Teslim Edildi':'green'} %}
+            {% set sl = {'Beklemede':T.status_pending,'Onaylandı':T.status_approved,'Reddedildi':T.status_rejected,'Sipariş Verildi':T.status_ordered,'İptal':T.status_cancelled,'Admin Onaylı':T.status_admin_approved,'Üretimde':T.status_in_production,'Tamamlandı':T.status_completed,'Teslim Edildi':T.status_delivered} %}
+            <span class="badge badge-{{ sc.get(o.status, 'gray') }}">{{ sl.get(o.status, o.status) }}</span>
           </td>
           <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
           <td><a href="{% if is_mfr %}/orders/{{ o.id }}{% else %}/offers/{{ o.id }}{% endif %}" class="btn btn-ghost btn-sm">{{ T.dash_view }}</a></td>

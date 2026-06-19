@@ -39,7 +39,8 @@
           <td>{{ "%.0f"|format(o.total_price) }} {{ o.currency }}</td>
           {% if user.role == 'admin' %}<td>{{ o.dealer_name }}</td>{% endif %}
           {% if user.role in ('admin','dealer') %}<td>{{ o.manufacturer_name }}</td>{% endif %}
-          <td><span class="badge badge-{{ STATUS_COLOR.get(o.status, 'blue') }}">{{ o.status }}</span></td>
+          {% set STATUS_LABEL = {'Sipariş Verildi':T.status_ordered,'Admin Onaylı':T.status_admin_approved,'Üretimde':T.status_in_production,'Tamamlandı':T.status_completed,'Teslim Edildi':T.status_delivered,'İptal':T.status_cancelled,'Beklemede':T.status_pending,'Onaylandı':T.status_approved,'Reddedildi':T.status_rejected} %}
+          <td><span class="badge badge-{{ STATUS_COLOR.get(o.status, 'blue') }}">{{ STATUS_LABEL.get(o.status, o.status) }}</span></td>
           <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
           <td><a href="/orders/{{ o.id }}" class="btn btn-outline btn-sm">{{ T.order_detail }}</a></td>
         </tr>

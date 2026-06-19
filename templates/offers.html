@@ -56,7 +56,8 @@
             {% set disp_color = sc.get(o.status, 'gray') %}
           {% endif %}
         {% else %}
-          {% set disp_status = o.status %}
+          {% set sl = {'Beklemede':T.status_pending,'Onaylandı':T.status_approved,'Reddedildi':T.status_rejected,'Sipariş Verildi':T.status_ordered,'İptal':T.status_cancelled,'Admin Onaylı':T.status_admin_approved,'Üretimde':T.status_in_production,'Tamamlandı':T.status_completed,'Teslim Edildi':T.status_delivered} %}
+          {% set disp_status = sl.get(o.status, o.status) %}
           {% set disp_color = sc.get(o.status, 'gray') %}
         {% endif %}
         <tr>
