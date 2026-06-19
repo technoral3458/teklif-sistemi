@@ -142,10 +142,10 @@ def show_orders(user_id, is_admin=False):
     offers = []
     if u_role == 'manufacturer':
         my_models = get_factory("SELECT id FROM models WHERE user_id=?", (user_id,))
-        my_model_ids = [str(m[0]) for m in my_models]
+        my_model_ids = [m[0] for m in my_models]
         if my_model_ids:
-            placeholders = ",".join(my_model_ids)
-            offers = get_sales(f"SELECT id, customer_id, model_id, total_price, offer_date, order_date, status, conditions, user_id FROM offers WHERE status IN ('Onaylandı', 'Siparişe Çevir', 'Sipariş') AND model_id IN ({placeholders}) ORDER BY id DESC")
+            placeholders = ",".join(["?"] * len(my_model_ids))
+            offers = get_sales(f"SELECT id, customer_id, model_id, total_price, offer_date, order_date, status, conditions, user_id FROM offers WHERE status IN ('Onaylandı', 'Siparişe Çevir', 'Sipariş') AND model_id IN ({placeholders}) ORDER BY id DESC", tuple(my_model_ids))
     elif u_role == 'admin':
         offers = get_sales("SELECT id, customer_id, model_id, total_price, offer_date, order_date, status, conditions, user_id FROM offers WHERE status IN ('Onaylandı', 'Siparişe Çevir', 'Sipariş') ORDER BY id DESC")
     else:

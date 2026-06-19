@@ -3,6 +3,16 @@ import streamlit.components.v1 as components
 import customer_pages, model_management, offer_wizard, dealer_management, proforma_invoice, orders_page, offer_management, profile_settings
 import profit_management
 import sqlite3, pandas as pd, hashlib, random, smtplib, uuid, os, base64, datetime
+try:
+    import backup_management
+    _HAS_BACKUP = True
+except ImportError:
+    _HAS_BACKUP = False
+try:
+    import credit_calculator
+    _HAS_CREDIT = True
+except ImportError:
+    _HAS_CREDIT = False
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import ntpath, posixpath
@@ -52,6 +62,7 @@ DICTIONARY = {
         "m_past": "📋 Geçmiş Tekliflerim", "m_order": "📦 Siparişler", "m_prof": "⚙️ Profil Ayarlarım",
         "m_deal": "🏢 Bayi Yönetimi", "m_model": "📦 Tüm Modelleri Yönet",
         "m_profit": "💰 Maliyet / Kârlılık",
+        "m_backup": "🗄️ Yedekleme", "m_leads": "📨 Teklif Talepleri", "m_credit": "💳 Kredi Hesapla",
         "logout": "🚪 Sistemi Kapat", "lang_sel": "Sistem Dili / Language",
         "role_admin": "Sistem Yöneticisi", "role_dealer": "Satıcı Bayi", "role_manuf": "Üretici"
     },
@@ -70,6 +81,7 @@ DICTIONARY = {
         "m_past": "📋 Past Offers", "m_order": "📦 Orders", "m_prof": "⚙️ Profile Settings",
         "m_deal": "🏢 Dealer Management", "m_model": "📦 Manage Models",
         "m_profit": "💰 Cost / Profit",
+        "m_backup": "🗄️ Backup", "m_leads": "📨 Offer Requests", "m_credit": "💳 Credit Calc",
         "logout": "🚪 Logout", "lang_sel": "System Language",
         "role_admin": "System Admin", "role_dealer": "Dealer", "role_manuf": "Manufacturer"
     },
@@ -88,6 +100,7 @@ DICTIONARY = {
         "m_past": "📋 历史报价", "m_order": "📦 订单", "m_prof": "⚙️ 个人资料设置",
         "m_deal": "🏢 经销商管理", "m_model": "📦 管理所有型号",
         "m_profit": "💰 成本 / 利润",
+        "m_backup": "🗄️ 备份管理", "m_leads": "📨 询价请求", "m_credit": "💳 贷款计算",
         "logout": "🚪 退出系统", "lang_sel": "系统语言 (Language)",
         "role_admin": "系统管理员", "role_dealer": "经销商", "role_manuf": "制造商"
     }
@@ -563,41 +576,37 @@ header[data-testid="stHeader"] { background: transparent; }
 
 @media (max-width:768px) {
     .block-container {
-        padding-left: 14px !important;
-        padding-right: 14px !important;
-        padding-top: 18px !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+        padding-top: 10px !important;
         padding-bottom: 28px !important;
     }
-    .mobile-topbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 18px;
-        padding: 12px 14px;
-        margin-bottom: 16px;
-    }
-    .mobile-topbar-title { font-size: 16px; font-weight: 900; color: #0f172a; }
-    .mobile-topbar-sub { font-size: 11px; color: #64748b; font-weight: 700; }
-    section[data-testid="stSidebar"] {
-        width: 88vw !important;
-        min-width: 88vw !important;
-        max-width: 88vw !important;
-    }
-    div[data-testid="column"] {
-        width: 100% !important;
-        flex: 1 1 100% !important;
-        min-width: 100% !important;
-    }
-    button {
-        min-height: 48px !important;
-        border-radius: 14px !important;
-        font-weight: 900 !important;
-    }
+    [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+    button { min-height: 46px !important; border-radius: 13px !important; font-weight: 900 !important; }
     input, textarea { font-size: 16px !important; }
     .dash-card { text-align: center; margin-bottom: 10px; }
 }
+.mob-topbar-wrap {
+    display: flex; align-items: center; gap: 0;
+    background: #fff; border: 1px solid #e2e8f0;
+    border-radius: 16px; padding: 6px 10px 6px 6px;
+    margin-bottom: 10px;
+}
+.mob-page-title {
+    font-size: 14px; font-weight: 900; color: #0f172a;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+}
+.mob-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    color: white; font-size: 13px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.mob-menu-item-active {
+    background: #2563eb; color: white; padding: 14px 18px;
+    border-radius: 13px; font-size: 15px; font-weight: 900;
+    margin-bottom: 6px; text-align: left;
+}
+.mob-menu-sep { height: 1px; background: #e2e8f0; margin: 10px 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -808,132 +817,179 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# MOBİL ÜST MENÜ
+# MENÜ ÖĞELERİ HESAPLA
+# =====================================================================
+_pending_txt = ""
+if st.session_state.user_role == "admin":
+    try:
+        _cp = sqlite3.connect("sales_data.db")
+        _pc = _cp.execute("SELECT COUNT(*) FROM offers WHERE status='Onay Bekliyor'").fetchone()[0]
+        _cp.close()
+        if _pc > 0:
+            _pending_txt = f" ({_pc})"
+    except:
+        pass
+
+if st.session_state.user_role == "admin":
+    _all_menu = [
+        _("m_dash"), _("m_new"), _("m_cust"),
+        _("m_past") + _pending_txt,
+        _("m_order"), _("m_prof"), _("m_deal"),
+        _("m_model"), _("m_profit"),
+        _("m_backup"), _("m_leads"), _("m_credit"),
+    ]
+else:
+    _allowed_keys = st.session_state.allowed_menus.split(",") if st.session_state.allowed_menus else ["m_dash","m_new","m_cust","m_past","m_order","m_prof"]
+    _valid_keys = ["m_dash","m_new","m_cust","m_past","m_order","m_prof","m_deal","m_model","m_profit","m_backup","m_leads","m_credit"]
+    _all_menu = [_(k.strip()) for k in _allowed_keys if k.strip() in _valid_keys]
+
+if not _all_menu:
+    _all_menu = [_("m_dash")]
+
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = _all_menu[0]
+
+def _logout():
+    _lc = sqlite3.connect("users.db")
+    _lc.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
+    _lc.commit()
+    _lc.close()
+    st.query_params.clear()
+    st.session_state.clear()
+    st.rerun()
+
+# =====================================================================
+# MOBİL MENÜ (Sidebar yok — inline render)
 # =====================================================================
 if IS_MOBILE:
-    top_left, top_right = st.columns([1, 5], vertical_alignment="center")
-    with top_left:
-        if st.button("☰", key="mobile_hamburger_btn", use_container_width=True):
-            st.session_state.mobile_menu_open = not st.session_state.mobile_menu_open
-            st.rerun()
-    with top_right:
-        st.markdown(f"""
-        <div class="mobile-topbar">
-            <div>
-                <div class="mobile-topbar-title">Ersan Makine B2B</div>
-                <div class="mobile-topbar-sub">{st.session_state.user_email}</div>
-            </div>
-            <div style="font-size:22px;">⚙️</div>
-        </div>
-        """, unsafe_allow_html=True)
+    _rc = {"admin": "#dc2626", "manufacturer": "#d97706"}.get(st.session_state.user_role, "#2563eb")
+    _ui = (st.session_state.user_email or "U")[0].upper()
+    _open = bool(st.session_state.mobile_menu_open)
+    _page_lbl = "― Menü" if _open else st.session_state.get("active_tab", "")
+
+    # Top bar: hamburger | sayfa adı | avatar
+    _hcol, _tcol = st.columns([1, 7])
+    with _hcol:
+        if st.button("✕" if _open else "☰", key="mob_ham", use_container_width=True):
+            st.session_state.mobile_menu_open = not _open
+    with _tcol:
+        st.markdown(
+            f"<div style='display:flex;align-items:center;gap:8px;padding:6px 0 4px 4px;'>"
+            f"<span style='font-size:13px;font-weight:900;color:#0f172a;overflow:hidden;"
+            f"text-overflow:ellipsis;white-space:nowrap;flex:1;'>{_page_lbl}</span>"
+            f"<div style='width:32px;height:32px;border-radius:50%;background:{_rc};"
+            f"color:white;font-size:13px;font-weight:900;display:flex;align-items:center;"
+            f"justify-content:center;flex-shrink:0;'>{_ui}</div></div>",
+            unsafe_allow_html=True
+        )
+    st.markdown("<hr style='margin:2px 0 8px 0;border:none;border-top:2px solid #e2e8f0;'>", unsafe_allow_html=True)
+
+    if _open:
+        # Kullanıcı kartı
+        _r_lbl = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
+        st.markdown(
+            f"<div style='display:flex;align-items:center;gap:10px;background:#f8fafc;"
+            f"border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin-bottom:12px;'>"
+            f"<div style='background:{_rc};color:white;border-radius:50%;min-width:36px;height:36px;"
+            f"display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;'>{_ui}</div>"
+            f"<div style='overflow:hidden;flex:1;'>"
+            f"<div style='font-size:12px;font-weight:800;color:#0f172a;white-space:nowrap;"
+            f"overflow:hidden;text-overflow:ellipsis;'>{st.session_state.user_email}</div>"
+            f"<span style='background:{_rc}22;color:{_rc};padding:1px 7px;border-radius:5px;"
+            f"font-size:10px;font-weight:800;'>{_r_lbl}</span></div></div>",
+            unsafe_allow_html=True
+        )
+
+        # Menü butonları
+        _act = st.session_state.get("active_tab", "")
+        for _mi in _all_menu:
+            _is_act = (_act in _mi) or (_mi in _act)
+            if _is_act:
+                st.markdown(
+                    f"<div style='background:#2563eb;color:white;padding:14px 18px;"
+                    f"border-radius:13px;font-size:15px;font-weight:900;margin-bottom:6px;'>{_mi}</div>",
+                    unsafe_allow_html=True
+                )
+            else:
+                if st.button(_mi, key=f"mob_nav_{_mi}", use_container_width=True):
+                    st.session_state.active_tab = _mi
+                    st.session_state.mobile_menu_open = False
+                    st.rerun()
+
+        st.markdown("<hr style='margin:10px 0;border:none;border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
+
+        # Dil seçimi
+        _ml1, _ml2, _ml3 = st.columns(3)
+        for _mc, (_lk, _lv) in zip([_ml1, _ml2, _ml3], [("tr","🇹🇷 TR"),("en","🇬🇧 EN"),("zh","🇨🇳 ZH")]):
+            with _mc:
+                if st.button(_lv, key=f"mob_lang_{_lk}", use_container_width=True,
+                             type="primary" if st.session_state.lang == _lk else "secondary"):
+                    st.session_state.lang = _lk
+                    st.rerun()
+
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+        if st.button(_("logout"), key="mob_logout", use_container_width=True):
+            _logout()
+
+        st.stop()
 
 # =====================================================================
-# SIDEBAR
+# DESKTOP SIDEBAR
 # =====================================================================
-show_sidebar = not (IS_MOBILE and not st.session_state.mobile_menu_open)
-
-if show_sidebar:
+if not IS_MOBILE:
     with st.sidebar:
-        if IS_MOBILE:
-            st.markdown("<div class='mobile-menu-note'>Menüden sayfa seçince bu panel otomatik kapanır.</div>", unsafe_allow_html=True)
+        _su = sqlite3.connect("users.db")
+        _ud = _su.execute("SELECT logo_path, company_name FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
+        _su.close()
 
-        c_user = sqlite3.connect("users.db")
-        user_data = c_user.execute("SELECT logo_path, company_name FROM users WHERE id=?", (st.session_state.user_id,)).fetchone()
-        c_user.close()
+        _sb_logo = ""
+        _sb_text = _ud[1] if _ud and _ud[1] else "B2B Portal"
+        if _ud and _ud[0]:
+            _sb_logo = get_base64_image(_ud[0])
+        if not _sb_logo:
+            _sb_logo = get_system_logo()
 
-        sidebar_logo = ""
-        sidebar_text = user_data[1] if user_data and user_data[1] else "B2B Portal"
-        if user_data and user_data[0]:
-            sidebar_logo = get_base64_image(user_data[0])
-        if not sidebar_logo:
-            sidebar_logo = get_system_logo()
-
-        if sidebar_logo and sidebar_logo.startswith("data:image"):
-            st.markdown(f"<div style='text-align:center; margin-bottom:15px; padding:10px 0;'><img src='{sidebar_logo}' style='max-width:90%; max-height:55px; object-fit:contain;'></div>", unsafe_allow_html=True)
+        if _sb_logo and _sb_logo.startswith("data:image"):
+            st.markdown(f"<div style='text-align:center;margin-bottom:12px;padding:8px 0;'><img src='{_sb_logo}' style='max-width:90%;max-height:52px;object-fit:contain;'></div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div style='text-align:center; margin-bottom:15px; padding:10px 0; font-weight:900; font-size:18px; color:#1e293b;'>{sidebar_text}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center;margin-bottom:12px;padding:8px 0;font-weight:900;font-size:17px;color:#1e293b;'>{_sb_text}</div>", unsafe_allow_html=True)
 
-        r_text = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
+        _sb_rc = {"admin": "#dc2626", "manufacturer": "#d97706"}.get(st.session_state.user_role, "#2563eb")
+        _sb_ui = (st.session_state.user_email or "U")[0].upper()
+        _sb_rt = _("role_admin" if st.session_state.user_role == "admin" else ("role_manuf" if st.session_state.user_role == "manufacturer" else "role_dealer"))
         st.markdown(f"""
-        <div style='background-color:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; margin-bottom:20px; display:flex; align-items:center; gap:10px;'>
-            <div style='background:#2563eb; color:white; border-radius:50%; min-width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-weight:bold;'>
-                {st.session_state.user_email[0].upper()}
+        <div style='background:#f8fafc;padding:12px;border-radius:14px;border:1px solid #e2e8f0;margin-bottom:18px;display:flex;align-items:center;gap:10px;'>
+            <div style='background:{_sb_rc};color:white;border-radius:50%;min-width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;flex-shrink:0;'>{_sb_ui}</div>
+            <div style='overflow:hidden;flex:1;'>
+                <div style='font-size:12px;font-weight:800;color:#0f172a;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;'>{st.session_state.user_email}</div>
+                <div style='margin-top:3px;'><span style='background:{_sb_rc}22;color:{_sb_rc};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:800;'>{_sb_rt}</span></div>
             </div>
-            <div style='overflow:hidden; width:100%;'>
-                <div style='font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;'>{st.session_state.user_email}</div>
-                <div style='font-size:11px; color:#64748b; font-weight:700;'>{r_text}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
 
-        pending_count_txt = ""
-        if st.session_state.user_role == "admin":
-            try:
-                conn_p = sqlite3.connect("sales_data.db")
-                p_count = conn_p.execute("SELECT COUNT(*) FROM offers WHERE status='Onay Bekliyor'").fetchone()[0]
-                conn_p.close()
-                if p_count > 0:
-                    pending_count_txt = f" ({p_count})"
-            except:
-                pass
-
-        if st.session_state.user_role == "admin":
-            menu_items_labels = [
-                _("m_dash"),
-                _("m_new"),
-                _("m_cust"),
-                _("m_past") + pending_count_txt,
-                _("m_order"),
-                _("m_prof"),
-                _("m_deal"),
-                _("m_model"),
-                _("m_profit"),
-            ]
-        else:
-            allowed = st.session_state.allowed_menus.split(",") if st.session_state.allowed_menus else ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof"]
-            v_keys = ["m_dash", "m_new", "m_cust", "m_past", "m_order", "m_prof", "m_deal", "m_model", "m_profit"]
-            menu_items_labels = [_(k.strip()) for k in allowed if k.strip() in v_keys]
-
-        if not menu_items_labels:
-            menu_items_labels = [_("m_dash")]
-
-        if "active_tab" not in st.session_state:
-            st.session_state.active_tab = menu_items_labels[0]
-
-        current_idx = 0
-        for idx, label in enumerate(menu_items_labels):
-            if st.session_state.active_tab in label or label in st.session_state.active_tab:
-                current_idx = idx
+        _cur_idx = 0
+        for _i, _lbl in enumerate(_all_menu):
+            if st.session_state.active_tab in _lbl or _lbl in st.session_state.active_tab:
+                _cur_idx = _i
                 break
 
         def on_menu_change():
             st.session_state.active_tab = st.session_state.m_radio
-            if IS_MOBILE:
-                st.session_state.mobile_menu_open = False
 
-        st.radio("MENÜ", menu_items_labels, index=current_idx, key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
+        st.radio("MENÜ", _all_menu, index=_cur_idx, key="m_radio", on_change=on_menu_change, label_visibility="collapsed")
 
-        st.markdown("<hr style='margin:15px 0; border:none; border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin:14px 0;border:none;border-top:1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
-        lang_opts = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English", "zh": "🇨🇳 中文"}
-        sel = st.selectbox("🌐 " + _("lang_sel"), list(lang_opts.keys()), format_func=lambda x: lang_opts[x],
-                           index=list(lang_opts.keys()).index(st.session_state.lang), key="sb_lang")
+        _dc1, _dc2, _dc3 = st.columns(3)
+        for _col, (_lk, _lv) in zip([_dc1, _dc2, _dc3], [("tr","🇹🇷 TR"),("en","🇬🇧 EN"),("zh","🇨🇳 ZH")]):
+            with _col:
+                if st.button(_lv, key=f"sb_lang_{_lk}", use_container_width=True,
+                             type="primary" if st.session_state.lang == _lk else "secondary"):
+                    st.session_state.lang = _lk
+                    st.rerun()
 
-        if sel != st.session_state.lang:
-            st.session_state.lang = sel
-            st.rerun()
-
-        if st.button(_("logout"), use_container_width=True):
-            c = sqlite3.connect("users.db")
-            c.execute("UPDATE users SET session_token=NULL WHERE id=?", (st.session_state.user_id,))
-            c.commit()
-            c.close()
-            st.query_params.clear()
-            st.session_state.clear()
-            st.rerun()
-else:
-    if "active_tab" not in st.session_state:
-        st.session_state.active_tab = _("m_dash")
+        st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+        if st.button(_("logout"), key="sb_logout", use_container_width=True):
+            _logout()
 
 # =====================================================================
 # SAYFA YÖNLENDİRME
@@ -963,6 +1019,23 @@ elif _("m_prof") in act_tab:
 
 elif _("m_profit") in act_tab:
     profit_management.show_profit_management(st.session_state.user_role)
+
+elif _("m_backup") in act_tab:
+    if _HAS_BACKUP:
+        backup_management.show_backup_management()
+    else:
+        st.info("Yedekleme modülü yükleniyor...")
+
+elif _("m_leads") in act_tab:
+    st.markdown("## 📨 Teklif Talepleri")
+    st.info("Teklif talepleri modülü yükleniyor...")
+
+elif _("m_credit") in act_tab:
+    if _HAS_CREDIT:
+        credit_calculator.show_credit_calculator()
+    else:
+        st.markdown("## 💳 Kredi Hesaplama")
+        st.info("Kredi hesaplama modülü yükleniyor...")
 
 elif _("m_dash") in act_tab:
     conn_s = sqlite3.connect("sales_data.db")
