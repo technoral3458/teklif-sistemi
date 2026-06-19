@@ -5,7 +5,7 @@
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 @page { size:A4; margin:26mm 18mm 18mm; }
-body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a; line-height:1.4; }
+body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size:10pt; color:#1a1a1a; line-height:1.4; }
 
 /* ── Fixed header (repeats every page) ── */
 #page-header {
@@ -149,7 +149,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
 {% if specs %}
 <!-- ════════════ SPECS ════════════ -->
 <div class="page-break">
-  <div class="sec-hdr">&#9881; {{ lbl.machine_specs }}</div>
+  <div class="sec-hdr">:: {{ lbl.machine_specs }}</div>
   {% for spec in specs %}
   {% if spec.title or spec.desc %}
   <div class="spec-row">
@@ -173,7 +173,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
 {% if items %}
 <!-- ════════════ OPTIONS ════════════ -->
 <div style="margin-top:{% if specs %}18px{% else %}0{% endif %};">
-  <div class="sec-hdr">&#11042; {{ lbl.selected_options }}</div>
+  <div class="sec-hdr">+ {{ lbl.selected_options }}</div>
   <table class="opt-tbl">
     <thead>
       <tr>
@@ -209,7 +209,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
 
 <!-- ════════════ SUMMARY ════════════ -->
 <div class="summary-box" style="margin-top:{% if items or specs %}22px{% else %}0{% endif %};">
-  <div class="summary-box-hdr">&#128203; {{ lbl.summary_title }}</div>
+  <div class="summary-box-hdr">= {{ lbl.summary_title }}</div>
   <div style="padding:14px;display:table;width:100%;border-collapse:collapse;">
 
     <div style="display:table-row;">
