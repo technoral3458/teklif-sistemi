@@ -403,10 +403,12 @@ function wizardLoadOptions() {
   document.querySelectorAll('.option-row').forEach(row => {
     const optId = parseInt(row.dataset.optId);
     const catIds = (row.dataset.cats || '').split(',').map(s => s.trim()).filter(Boolean);
-    const catMatch = catIds.length === 0 || catIds.includes(modelCatId);
-    // Global options (no category restriction) always show regardless of compat whitelist
-    const compatMatch = catIds.length === 0 || compat.length === 0 || compat.includes(optId);
-    row.style.display = (catMatch && compatMatch) ? '' : 'none';
+    // If model has a compat whitelist, only those options show.
+    // If no whitelist, fall back to category matching (global options always pass).
+    const show = compat.length > 0
+      ? compat.includes(optId)
+      : (catIds.length === 0 || catIds.includes(modelCatId));
+    row.style.display = show ? '' : 'none';
     // PER_MACHINE etiketini güncelle
     const pmLabel = row.querySelector('.per-machine-qty');
     if (pmLabel) pmLabel.textContent = machineQty + ' adet';
