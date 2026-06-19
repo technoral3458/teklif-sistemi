@@ -74,9 +74,11 @@ async def order_detail(request: Request, oid: int):
         return RedirectResponse("/orders", 303)
     items = fdb.get_offer_items(oid)
     options = {o["id"]: o for o in fdb.get_options()}
+    lang = user.get("lang", "tr")
     for it in items:
         opt = options.get(it["option_id"]) or {}
-        it["option_name"] = opt.get("name", "-")
+        name_key = f"name_{lang}" if lang != "tr" else "name"
+        it["option_name"] = opt.get(name_key) or opt.get("name", "-")
     stages = fdb.get_order_stages(oid)
     customers = {c["id"]: c for c in fdb.get_customers()}
     models    = {m["id"]: m for m in fdb.get_models()}
