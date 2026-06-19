@@ -136,10 +136,12 @@ async def save_option(request: Request,
     )
     try:
         if id:
-            # manufacturers can only edit their own options
+            # manufacturers can edit options they created or options assigned to them
             if auth.is_mfr(user):
+                import db.users as udb
                 existing = fdb.get_option(id)
-                if not existing or existing.get("created_by") != user["id"]:
+                mfr_id = udb.effective_mfr_id(user)
+                if not existing or (existing.get("created_by") != user["id"] and existing.get("manufacturer_id") != mfr_id):
                     return RedirectResponse("/options?msg=Yetkisiz+işlem&msg_type=error", 303)
             fdb.upd_option(id, **kw)
         else:
