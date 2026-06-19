@@ -40,7 +40,7 @@
   <div class="card">
     <div class="card-body" style="padding:16px;">
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">{{ T.ord_customer }}</div>
-      <div style="font-weight:600;">{{ offer.customer_name }}</div>
+      <div style="font-weight:600;">{% if user.role == 'manufacturer' or user.is_manufacturer %}—{% else %}{{ offer.customer_name }}{% endif %}</div>
     </div>
   </div>
   <div class="card">

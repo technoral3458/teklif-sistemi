@@ -18,7 +18,7 @@
       <thead>
         <tr>
           <th>{{ T.order_no }}</th>
-          <th>{{ T.order_customer }}</th>
+          {% if not (user.role == 'manufacturer' or user.is_manufacturer) %}<th>{{ T.order_customer }}</th>{% endif %}
           <th>{{ T.order_model }}</th>
           <th>{{ T.order_qty }}</th>
           <th>{{ T.order_amount }}</th>
@@ -33,7 +33,7 @@
         {% for o in orders %}
         <tr>
           <td><a href="/orders/{{ o.id }}" style="color:var(--primary)">{{ o.offer_no or o.id }}</a></td>
-          <td>{{ o.customer_name }}</td>
+          {% if not (user.role == 'manufacturer' or user.is_manufacturer) %}<td>{{ o.customer_name }}</td>{% endif %}
           <td>{{ o.model_name }}</td>
           <td>{{ o.machine_count }}</td>
           <td>{{ "%.0f"|format(o.total_price) }} {{ o.currency }}</td>
