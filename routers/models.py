@@ -389,9 +389,9 @@ async def upload_spec_image(request: Request, image: UploadFile = File(...)):
 
 
 @router.post("/line-image/delete")
-async def delete_line_image(request: Request, id: int = Form(...), model_id: int = Form(...)):
+async def delete_line_image(request: Request, img_id: int = Form(...), model_id: int = Form(...)):
     auth.require_user(request)
-    fdb.del_model_line_image(id)
+    fdb.del_model_line_image(img_id)
     return RedirectResponse(f"/models/{model_id}/edit", 303)
 
 

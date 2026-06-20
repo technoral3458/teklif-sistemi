@@ -580,7 +580,7 @@ function renderLineImageInputs() {
           </div>
         </div>
         ${ex.id ? `<form method="post" action="/models/line-image/delete" onsubmit="return confirm('Resmi sil?')">
-          <input type="hidden" name="id" value="${ex.id}" />
+          <input type="hidden" name="img_id" value="${ex.id}" />
           <input type="hidden" name="model_id" value="{{ model.id|default(0) }}" />
           <button type="submit" class="btn btn-danger btn-sm">🗑</button>
         </form>` : ''}
