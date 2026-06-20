@@ -174,7 +174,8 @@ async def create_offer(request: Request,
                        delivery_time: str = Form(""),
                        logistics: str = Form(""),
                        payment_notes: str = Form(""),
-                       options_json: str = Form("[]")):
+                       options_json: str = Form("[]"),
+                       final_price: float = Form(0.0)):
     user = auth.require_user(request)
 
     if not customer_id and new_customer_name.strip():
@@ -200,7 +201,8 @@ async def create_offer(request: Request,
 
     term = fdb.get_delivery_term(delivery_term_id) if delivery_term_id else None
     delivery_term_discount = float(term["discount_pct"]) if term else 0.0
-    total_price = subtotal * (1 - delivery_term_discount / 100) * (1 - discount_pct / 100)
+    calculated_price = subtotal * (1 - delivery_term_discount / 100) * (1 - discount_pct / 100)
+    total_price = final_price if final_price > 0 else calculated_price
 
     offer_no = f"TKL-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
 
@@ -214,6 +216,7 @@ async def create_offer(request: Request,
         options_total=options_total,
         discount_pct=discount_pct,
         total_price=total_price,
+        final_price=final_price,
         status="Beklemede",
         notes=notes,
         validity_date=validity_date,
@@ -295,7 +298,8 @@ async def update_offer(request: Request,
                        delivery_time: str = Form(""),
                        logistics: str = Form(""),
                        payment_notes: str = Form(""),
-                       options_json: str = Form("[]")):
+                       options_json: str = Form("[]"),
+                       final_price: float = Form(0.0)):
     auth.require_user(request)
 
     model = fdb.get_model(model_id)
@@ -312,7 +316,8 @@ async def update_offer(request: Request,
 
     term = fdb.get_delivery_term(delivery_term_id) if delivery_term_id else None
     delivery_term_discount = float(term["discount_pct"]) if term else 0.0
-    total_price = subtotal * (1 - delivery_term_discount / 100) * (1 - discount_pct / 100)
+    calculated_price = subtotal * (1 - delivery_term_discount / 100) * (1 - discount_pct / 100)
+    total_price = final_price if final_price > 0 else calculated_price
 
     fdb.upd_offer(offer_id,
         customer_id=customer_id or None,
@@ -323,6 +328,7 @@ async def update_offer(request: Request,
         options_total=options_total,
         discount_pct=discount_pct,
         total_price=total_price,
+        final_price=final_price,
         notes=notes,
         validity_date=validity_date,
         delivery_method=delivery_method,

@@ -347,6 +347,7 @@ def init():
 
         # Serial number on offers
         _acol(cur, "offers", "serial_number", "TEXT DEFAULT ''")
+        _acol(cur, "offers", "final_price",   "REAL DEFAULT 0")
 
         # Proforma invoices per order
         cur.execute("""CREATE TABLE IF NOT EXISTS order_proformas(
