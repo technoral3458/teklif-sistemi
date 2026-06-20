@@ -127,6 +127,7 @@ function closeModal(id) {
 
 function initModalOverlay() {
   document.querySelectorAll(".modal-overlay").forEach(function (overlay) {
+    if (overlay.dataset.static === "true") return;
     overlay.addEventListener("click", function (e) {
       if (e.target === overlay) {
         overlay.classList.remove("active");
