@@ -108,6 +108,8 @@ async def model_new(request: Request):
         "manufacturers": manufacturers,
         "active_page": "models",
         "line_images": {},
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
     })
 
 
@@ -177,6 +179,8 @@ async def model_edit(request: Request, model_id: int):
         "manufacturers": manufacturers,
         "active_page": "models",
         "line_images": {img["line_count"]: img for img in line_images},
+        "msg": request.query_params.get("msg", ""),
+        "msg_type": request.query_params.get("msg_type", "info"),
     })
 
 
@@ -237,26 +241,33 @@ async def save_model(request: Request,
 
     image_path = ""
     if image and image.filename:
-        os.makedirs(IMAGES_DIR, exist_ok=True)
-        content = await image.read()
-        fname = f"{uuid.uuid4().hex}.jpg"
-        fpath = os.path.join(IMAGES_DIR, fname)
         try:
-            from PIL import Image as PILImage
-            import io as _io
-            img = PILImage.open(_io.BytesIO(content))
-            if img.mode in ("RGBA", "P", "LA"):
-                img = img.convert("RGB")
-            img.thumbnail((800, 800))
-            img.save(fpath, "JPEG", quality=85)
-        except Exception:
-            # PIL failed – save raw bytes with original extension
-            orig_ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
-            fname = f"{uuid.uuid4().hex}{orig_ext}"
+            os.makedirs(IMAGES_DIR, exist_ok=True)
+            content = await image.read()
+            if not content:
+                raise ValueError(f"Dosya içeriği boş geldi (filename={image.filename})")
+            fname = f"{uuid.uuid4().hex}.jpg"
             fpath = os.path.join(IMAGES_DIR, fname)
-            with open(fpath, "wb") as f:
-                f.write(content)
-        image_path = f"img/uploads/{fname}"
+            try:
+                from PIL import Image as PILImage
+                import io as _io
+                img = PILImage.open(_io.BytesIO(content))
+                if img.mode in ("RGBA", "P", "LA"):
+                    img = img.convert("RGB")
+                img.thumbnail((800, 800))
+                img.save(fpath, "JPEG", quality=85)
+            except Exception as pil_err:
+                orig_ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
+                fname = f"{uuid.uuid4().hex}{orig_ext}"
+                fpath = os.path.join(IMAGES_DIR, fname)
+                with open(fpath, "wb") as f:
+                    f.write(content)
+            image_path = f"img/uploads/{fname}"
+        except Exception as img_err:
+            import urllib.parse
+            err_msg = urllib.parse.quote(f"Resim kaydedilemedi: {img_err}")
+            dest = f"/models/{id}/edit" if id else "/models/new"
+            return RedirectResponse(f"{dest}?msg={err_msg}&msg_type=error", 303)
 
     kw = dict(
         name=name,
