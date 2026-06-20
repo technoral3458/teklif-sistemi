@@ -212,7 +212,15 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
 <!-- ════════════════ FİYAT + KOŞULLAR ════════════ -->
 <div class="page-break">
 
-
+  {% if items %}
+  <!-- Opsiyonlar - sayfanın en üstü -->
+  <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #1e2b4a;">
+    <div style="font-size:8.5pt;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Dahil Opsiyonlar / Donanımlar</div>
+    {% for item in items %}
+    <div style="font-size:9pt;padding:2px 0;">✓ {{ item.option_name }}{% if item.qty > 1 %} <span style="color:#888;">({{ item.qty }} adet)</span>{% endif %}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% set _has_terms = delivery_term or offer.delivery_method or offer.delivery_time or offer.logistics or offer.payment_notes %}
   {% if _has_terms %}
   <div class="sec-hdr" style="margin-top:4px;">&#10022; SATIŞ VE TESLİMAT ŞARTLARI</div>
@@ -306,15 +314,6 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
         </table>
       </div>
 
-      {% if items %}
-      <!-- Opsiyonlar -->
-      <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #ddd;">
-        <div style="font-size:8.5pt;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Dahil Opsiyonlar / Donanımlar</div>
-        {% for item in items %}
-        <div style="font-size:9pt;padding:2px 0;">✓ {{ item.option_name }}{% if item.qty > 1 %} <span style="color:#888;">({{ item.qty }} adet)</span>{% endif %}</div>
-        {% endfor %}
-      </div>
-      {% endif %}
 
 
       {% if offer.notes %}
