@@ -238,17 +238,22 @@ async def save_model(request: Request,
     image_path = ""
     if image and image.filename:
         os.makedirs(IMAGES_DIR, exist_ok=True)
-        ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
-        fname = f"{uuid.uuid4().hex}{ext}"
-        fpath = os.path.join(IMAGES_DIR, fname)
         content = await image.read()
+        fname = f"{uuid.uuid4().hex}.jpg"
+        fpath = os.path.join(IMAGES_DIR, fname)
         try:
             from PIL import Image as PILImage
             import io as _io
             img = PILImage.open(_io.BytesIO(content))
+            if img.mode in ("RGBA", "P", "LA"):
+                img = img.convert("RGB")
             img.thumbnail((800, 800))
             img.save(fpath, "JPEG", quality=85)
         except Exception:
+            # PIL failed – save raw bytes with original extension
+            orig_ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
+            fname = f"{uuid.uuid4().hex}{orig_ext}"
+            fpath = os.path.join(IMAGES_DIR, fname)
             with open(fpath, "wb") as f:
                 f.write(content)
         image_path = f"img/uploads/{fname}"
@@ -329,11 +334,23 @@ async def upload_spec_image(request: Request, image: UploadFile = File(...)):
     if not image or not image.filename:
         return JSONResponse({"error": "No file"}, status_code=400)
     os.makedirs(IMAGES_DIR, exist_ok=True)
-    ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
-    fname = f"spec_{uuid.uuid4().hex[:10]}{ext}"
     content = await image.read()
-    with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
-        f.write(content)
+    fname = f"spec_{uuid.uuid4().hex[:10]}.jpg"
+    fpath = os.path.join(IMAGES_DIR, fname)
+    try:
+        from PIL import Image as PILImage
+        import io as _io
+        img = PILImage.open(_io.BytesIO(content))
+        if img.mode in ("RGBA", "P", "LA"):
+            img = img.convert("RGB")
+        img.thumbnail((800, 800))
+        img.save(fpath, "JPEG", quality=85)
+    except Exception:
+        orig_ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
+        fname = f"spec_{uuid.uuid4().hex[:10]}{orig_ext}"
+        fpath = os.path.join(IMAGES_DIR, fname)
+        with open(fpath, "wb") as f:
+            f.write(content)
     return JSONResponse({"path": f"img/uploads/{fname}"})
 
 

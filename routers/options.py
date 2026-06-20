@@ -98,11 +98,23 @@ async def save_option(request: Request,
         if not (upload and upload.filename):
             return None
         os.makedirs(IMAGES_DIR, exist_ok=True)
-        ext = os.path.splitext(upload.filename)[1].lower() or ".jpg"
-        fname = f"{prefix}_{uuid.uuid4().hex[:10]}{ext}"
         content = await upload.read()
-        with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
-            f.write(content)
+        fname = f"{prefix}_{uuid.uuid4().hex[:10]}.jpg"
+        fpath = os.path.join(IMAGES_DIR, fname)
+        try:
+            from PIL import Image as PILImage
+            import io as _io
+            img = PILImage.open(_io.BytesIO(content))
+            if img.mode in ("RGBA", "P", "LA"):
+                img = img.convert("RGB")
+            img.thumbnail((800, 800))
+            img.save(fpath, "JPEG", quality=85)
+        except Exception:
+            orig_ext = os.path.splitext(upload.filename)[1].lower() or ".jpg"
+            fname = f"{prefix}_{uuid.uuid4().hex[:10]}{orig_ext}"
+            fpath = os.path.join(IMAGES_DIR, fname)
+            with open(fpath, "wb") as f:
+                f.write(content)
         return f"img/uploads/{fname}"
 
     try:
