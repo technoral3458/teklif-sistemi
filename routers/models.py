@@ -239,11 +239,15 @@ async def save_model(request: Request,
     compatible_ids = form_data.getlist("compatible_options")
     compatible_json = json.dumps([int(x) for x in compatible_ids if x])
 
+    import sys
+    print(f"[MODEL_SAVE] id={id} image={getattr(image,'filename',None)}", file=sys.stderr, flush=True)
+
     image_path = ""
     if image and image.filename:
         try:
             os.makedirs(IMAGES_DIR, exist_ok=True)
             content = await image.read()
+            print(f"[MODEL_SAVE] content_len={len(content)} IMAGES_DIR={IMAGES_DIR}", file=sys.stderr, flush=True)
             if not content:
                 raise ValueError(f"Dosya içeriği boş geldi (filename={image.filename})")
             fname = f"{uuid.uuid4().hex}.jpg"
@@ -256,18 +260,26 @@ async def save_model(request: Request,
                     img = img.convert("RGB")
                 img.thumbnail((800, 800))
                 img.save(fpath, "JPEG", quality=85)
+                print(f"[MODEL_SAVE] PIL saved → {fpath}", file=sys.stderr, flush=True)
             except Exception as pil_err:
+                print(f"[MODEL_SAVE] PIL error: {pil_err}", file=sys.stderr, flush=True)
                 orig_ext = os.path.splitext(image.filename)[1].lower() or ".jpg"
                 fname = f"{uuid.uuid4().hex}{orig_ext}"
                 fpath = os.path.join(IMAGES_DIR, fname)
                 with open(fpath, "wb") as f:
                     f.write(content)
+                print(f"[MODEL_SAVE] raw saved → {fpath}", file=sys.stderr, flush=True)
             image_path = f"img/uploads/{fname}"
         except Exception as img_err:
+            print(f"[MODEL_SAVE] img_err: {img_err}", file=sys.stderr, flush=True)
             import urllib.parse
             err_msg = urllib.parse.quote(f"Resim kaydedilemedi: {img_err}")
             dest = f"/models/{id}/edit" if id else "/models/new"
             return RedirectResponse(f"{dest}?msg={err_msg}&msg_type=error", 303)
+    else:
+        print(f"[MODEL_SAVE] no image uploaded (image={image} filename={getattr(image,'filename',None)})", file=sys.stderr, flush=True)
+
+    print(f"[MODEL_SAVE] image_path={image_path!r}", file=sys.stderr, flush=True)
 
     kw = dict(
         name=name,
@@ -302,10 +314,13 @@ async def save_model(request: Request,
         kw["image_path"] = image_path
 
     if id:
+        print(f"[MODEL_SAVE] calling upd_model id={id} image_path_in_kw={'image_path' in kw}", file=sys.stderr, flush=True)
         fdb.upd_model(id, **kw)
+        print(f"[MODEL_SAVE] upd_model done", file=sys.stderr, flush=True)
         model_id = id
     else:
         model_id = fdb.add_model(**kw)
+        print(f"[MODEL_SAVE] add_model done new_id={model_id}", file=sys.stderr, flush=True)
 
     # Save line images
     form_data = await request.form()
