@@ -316,7 +316,8 @@ async def save_model(request: Request,
     if id:
         print(f"[MODEL_SAVE] calling upd_model id={id} image_path_in_kw={'image_path' in kw}", file=sys.stderr, flush=True)
         fdb.upd_model(id, **kw)
-        print(f"[MODEL_SAVE] upd_model done", file=sys.stderr, flush=True)
+        _verify = fdb.get_model(id)
+        print(f"[MODEL_SAVE] upd_model done — DB now has image_path={_verify.get('image_path') if _verify else 'MODEL_NOT_FOUND'}", file=sys.stderr, flush=True)
         model_id = id
     else:
         model_id = fdb.add_model(**kw)
