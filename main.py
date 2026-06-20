@@ -10,6 +10,10 @@ import db.factory as fdb
 import auth
 from config import BASE_DIR
 
+# Raise Starlette's default 1 MB per-part limit to 20 MB so large image uploads work
+from starlette.requests import Request as _SR
+_SR.form.__kwdefaults__["max_part_size"] = 20 * 1024 * 1024
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
