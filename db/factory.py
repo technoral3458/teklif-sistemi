@@ -155,6 +155,7 @@ def init():
         """)
 
         # Hat (line) machine support
+        _acol(cur, "models", "image_path",      "TEXT DEFAULT ''")
         _acol(cur, "models", "is_line",         "INTEGER DEFAULT 0")
         _acol(cur, "models", "line_configs",    "TEXT DEFAULT '2,3,4'")
         _acol(cur, "models", "manufacturer_id", "INTEGER DEFAULT NULL")
