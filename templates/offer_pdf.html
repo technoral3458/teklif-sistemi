@@ -297,6 +297,21 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
       &#128203; TEKLİF &amp; SÖZLEŞME ÖZETİ
     </div>
     <div style="padding:14px;display:table;width:100%;border-collapse:collapse;">
+
+      {% if items %}
+      <!-- Opsiyonlar -->
+      <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #eee;">
+        <div style="font-size:8.5pt;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Dahil Opsiyonlar / Donanımlar</div>
+        <div>
+          {% for item in items %}
+          <span style="display:inline-block;background:#f3f4f6;border:1px solid #e0e0e0;border-radius:4px;padding:3px 9px;font-size:8.5pt;margin:2px 3px 2px 0;">
+            ✓ {{ item.option_name }}{% if item.qty > 1 %} ({{ item.qty }} adet){% endif %}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
       <!-- 3 columns -->
       <div style="display:table-row;">
 
@@ -312,15 +327,6 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
               <td style="color:#666;padding:3px 0;vertical-align:top;">Adet</td>
               <td style="font-weight:700;padding:3px 0;">{{ offer.machine_count }}</td>
             </tr>
-            {% if specs %}
-            <tr><td colspan="2" style="padding:6px 0 3px;font-size:8pt;color:#888;font-weight:600;border-top:1px solid #eee;">Standart Özellikler:</td></tr>
-            {% for spec in specs %}{% if spec.title or spec.desc %}
-            <tr>
-              <td style="color:#666;font-size:8.5pt;padding:2px 0;vertical-align:top;">{{ spec.title }}</td>
-              <td style="font-size:8.5pt;padding:2px 0;">{{ spec.desc }}</td>
-            </tr>
-            {% endif %}{% endfor %}
-            {% endif %}
           </table>
         </div>
 
@@ -418,20 +424,6 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
         </div>
 
       </div><!-- table-row -->
-
-      {% if items %}
-      <!-- Opsiyonlar satırı -->
-      <div style="border-top:1px solid #eee;margin-top:12px;padding-top:10px;">
-        <div style="font-size:8.5pt;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Dahil Opsiyonlar / Donanımlar</div>
-        <div>
-          {% for item in items %}
-          <span style="display:inline-block;background:#f3f4f6;border:1px solid #e0e0e0;border-radius:4px;padding:3px 9px;font-size:8.5pt;margin:2px 3px 2px 0;">
-            ✓ {{ item.option_name }}{% if item.qty > 1 %} ({{ item.qty }} adet){% endif %}
-          </span>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
 
       {% if offer.notes %}
       <div style="border-top:1px solid #eee;margin-top:10px;padding-top:8px;font-size:8.5pt;">
