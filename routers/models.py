@@ -315,6 +315,13 @@ async def save_model(request: Request,
 
     if id:
         print(f"[MODEL_SAVE] calling upd_model id={id} image_path_in_kw={'image_path' in kw}", file=sys.stderr, flush=True)
+        # Quick DB sanity check before update
+        import sqlite3 as _sq
+        from config import FACTORY_DB as _FDBPATH
+        with _sq.connect(_FDBPATH) as _dc:
+            _all_ids = [r[0] for r in _dc.execute("SELECT id FROM models ORDER BY id").fetchall()]
+            _row = _dc.execute("SELECT id, image_path FROM models WHERE id=?", (id,)).fetchone()
+        print(f"[MODEL_SAVE] FACTORY_DB={_FDBPATH} all_model_ids={_all_ids} model_{id}_row={_row}", file=sys.stderr, flush=True)
         fdb.upd_model(id, **kw)
         _verify = fdb.get_model(id)
         print(f"[MODEL_SAVE] upd_model done — DB now has image_path={_verify.get('image_path') if _verify else 'MODEL_NOT_FOUND'}", file=sys.stderr, flush=True)
