@@ -73,7 +73,11 @@ async def models_list(request: Request, category_id: int = 0):
             if (m["id"] in allowed_ids or m.get("manufacturer_id") in group_ids)
             and (not allowed_cat_ids or m.get("category_id") in allowed_cat_ids)
         ]
-    cat_map = {c["id"]: c["name"] for c in cats}
+    cat_map = {
+        c["id"]: (c.get(f"name_{user.get('lang','tr')}") or c["name"])
+        if user.get("lang") and user.get("lang") != "tr" else c["name"]
+        for c in cats
+    }
     for m in models:
         m["category_name"] = cat_map.get(m.get("category_id"), "-")
     return templates.TemplateResponse(request, "models.html", {

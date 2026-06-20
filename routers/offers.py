@@ -131,7 +131,8 @@ async def offer_new(request: Request):
     cats = fdb.get_cats()
     models = fdb.get_models()
     options = fdb.get_options()
-    cat_map = {c["id"]: c["name"] for c in cats}
+    _ulang = user.get("lang") or "tr"
+    cat_map = {c["id"]: (c.get(f"name_{_ulang}") or c["name"]) if _ulang != "tr" else c["name"] for c in cats}
     for m in models:
         m["category_name"] = cat_map.get(m.get("category_id"), "-")
         compat = []
@@ -252,7 +253,8 @@ async def offer_edit(request: Request, offer_id: int):
     cats = fdb.get_cats()
     models = fdb.get_models()
     options = fdb.get_options()
-    cat_map = {c["id"]: c["name"] for c in cats}
+    _ulang = user.get("lang") or "tr"
+    cat_map = {c["id"]: (c.get(f"name_{_ulang}") or c["name"]) if _ulang != "tr" else c["name"] for c in cats}
     for m in models:
         m["category_name"] = cat_map.get(m.get("category_id"), "-")
         compat = []

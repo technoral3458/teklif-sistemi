@@ -43,7 +43,8 @@ async def options_list(request: Request, category_id: int = 0):
                 )
             ]
 
-    cat_map = {c["id"]: c["name"] for c in cats}
+    _ulang = user.get("lang") or "tr"
+    cat_map = {c["id"]: (c.get(f"name_{_ulang}") or c["name"]) if _ulang != "tr" else c["name"] for c in cats}
     for o in options:
         cids = [int(x) for x in (o.get("category_ids") or "").split(",") if x.strip().isdigit()]
         o["category_names"] = ", ".join(cat_map[c] for c in cids if c in cat_map) or "Genel"
