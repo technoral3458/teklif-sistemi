@@ -12,7 +12,8 @@ def _pending_requests_count():
         import db.factory as fdb
         del_count = sum(1 for r in fdb.get_deletion_requests(status="pending") if True)
         price_count = fdb.pending_price_requests_count()
-        return del_count + price_count
+        rollback_count = sum(1 for r in fdb.get_stage_rollback_requests(status="pending") if True)
+        return del_count + price_count + rollback_count
     except Exception:
         return 0
 

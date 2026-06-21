@@ -17,10 +17,24 @@ async def requests_list(request: Request):
     for r in reqs:
         r["requester"] = user_map.get(r["requested_by"], {})
     pending_count = sum(1 for r in reqs if r["status"] == "pending")
+
+    rollback_reqs = fdb.get_stage_rollback_requests()
+    offers_map = {o["id"]: o for o in fdb.get_offers()}
+    for r in rollback_reqs:
+        r["requester"] = user_map.get(r["requested_by"], {})
+        offer = offers_map.get(r["order_id"]) or {}
+        r["offer_no"] = offer.get("offer_no", f"#{r['order_id']}")
+    steps = fdb.get_production_steps(active_only=False)
+    step_labels = {s["code"]: s["label_tr"] for s in steps}
+    rollback_pending = sum(1 for r in rollback_reqs if r["status"] == "pending")
+
     return templates.TemplateResponse(request, "admin_requests.html", {
         "user": user,
         "requests": reqs,
         "pending_count": pending_count,
+        "rollback_requests": rollback_reqs,
+        "rollback_pending": rollback_pending,
+        "step_labels": step_labels,
         "active_page": "admin_requests",
     })
 
