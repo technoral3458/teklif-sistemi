@@ -236,7 +236,7 @@
           <label class="form-label" style="color:var(--accent);font-weight:700;">💰 Nihai Tutar (Manuel Override)</label>
           <div style="display:flex;align-items:center;gap:8px;">
             <input type="number" name="final_price" id="wFinalPrice" class="form-control" style="max-width:200px;"
-              value="{{ edit_offer.final_price if edit_offer and edit_offer.final_price else '' }}"
+              value="{{ edit_offer.final_price if edit_offer and edit_offer.final_price is not none and edit_offer.final_price != 0 else '' }}"
               min="0" step="0.01" placeholder="Otomatik hesaplanır"
               oninput="wizardBuildSummary()" />
             <span style="font-size:12px;color:var(--text-muted);">Girilirse hesaplanan fiyatın üzerine yazar. Boş bırakılırsa otomatik hesaplanır.</span>
