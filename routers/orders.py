@@ -48,7 +48,7 @@ async def orders_list(request: Request):
     user = auth.require_user(request)
     role = user["role"]
     if role == "admin":
-        orders = fdb.get_offers()
+        orders = [o for o in fdb.get_offers() if o.get("status") != "Beklemede"]
     elif auth.is_mfr(user):
         mfr_id = udb.effective_mfr_id(user)
         orders = [o for o in fdb.get_offers() if o.get("manufacturer_id") == mfr_id and o.get("status") not in ("Beklemede",)]
