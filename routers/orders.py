@@ -141,7 +141,7 @@ async def production_pdf(request: Request, oid: int, dl: int = 0):
         opt = opts.get(item.get("option_id"), {})
         item["option_name"] = (opt.get(f"name_{lang}") or opt.get("name", "-")) if lang != "tr" else opt.get("name", "-")
         item["description"] = (opt.get(f"description_{lang}") or opt.get("description", "")) if lang != "tr" else opt.get("description", "")
-        item["image_path"] = opt.get("variation_image_path") or opt.get("image_path", "") or ""
+        item["image_path"] = opt.get("image_path", "") or ""
 
     model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
     model = model or {}
@@ -155,6 +155,8 @@ async def production_pdf(request: Request, oid: int, dl: int = 0):
     mfr_map = {u["id"]: u for u in udb.all_manufacturers()}
     mfr = mfr_map.get(offer.get("manufacturer_id"))
     offer["manufacturer_name"] = mfr["company_name"] if mfr else "-"
+    customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
+    offer["customer_name"] = (customer or {}).get("name", "-")
 
     _L = {
         "tr": {

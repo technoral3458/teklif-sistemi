@@ -108,7 +108,9 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
   {% endif %}
 
   <div class="cover-title">{{ lbl.title }}</div>
-  <div class="cover-subtitle">{{ model_name }}</div>
+  {% if model_name %}
+  <div style="text-align:center;margin-bottom:6mm;padding:8px 18px;background:#1a5c3a;color:#fff;font-size:15pt;font-weight:bold;letter-spacing:.5px;border-radius:4px;">{{ model_name }}</div>
+  {% endif %}
 
   <table class="info-tbl">
     <tr>
@@ -120,12 +122,16 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
       <td>{{ offer.created_at[:10] if offer.created_at else '-' }}</td>
     </tr>
     <tr>
-      <td>{{ lbl.manufacturer }}</td>
-      <td><strong>{{ offer.manufacturer_name }}</strong></td>
+      <td>{{ lbl.customer }}</td>
+      <td><strong>{{ offer.customer_name }}</strong></td>
     </tr>
     <tr>
       <td>{{ lbl.model }}</td>
-      <td><strong>{{ model_name }}</strong></td>
+      <td><strong style="color:#1a5c3a;">{{ model_name }}</strong></td>
+    </tr>
+    <tr>
+      <td>{{ lbl.manufacturer }}</td>
+      <td><strong>{{ offer.manufacturer_name }}</strong></td>
     </tr>
     <tr>
       <td>{{ lbl.qty }}</td>
