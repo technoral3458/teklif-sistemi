@@ -148,33 +148,10 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
   </table>
 </div>
 
-{% if specs %}
-<!-- ════════════ SPECS ════════════ -->
-<div class="page-break">
-  <div class="sec-hdr">:: {{ lbl.machine_specs }}</div>
-  {% for spec in specs %}
-  {% if spec.title or spec.desc %}
-  <div class="spec-row">
-    <div class="spec-img-cell">
-      {% if spec.img %}
-      <img src="/static/{{ spec.img }}" />
-      {% else %}
-      <div class="spec-img-empty"></div>
-      {% endif %}
-    </div>
-    <div class="spec-body">
-      <div class="spec-title">{{ spec.title }}</div>
-      <div class="spec-desc">{{ spec.desc }}</div>
-    </div>
-  </div>
-  {% endif %}
-  {% endfor %}
-</div>
-{% endif %}
 
 {% if items %}
 <!-- ════════════ OPTIONS ════════════ -->
-<div style="margin-top:{% if specs %}18px{% else %}0{% endif %};">
+<div style="margin-top:0;">
   <div class="sec-hdr">+ {{ lbl.selected_options }}</div>
   <table class="opt-tbl">
     <thead>
@@ -233,15 +210,6 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
             <td style="color:#666;padding:3px 0;vertical-align:top;">{{ lbl.deadline }}</td>
             <td style="font-weight:700;padding:3px 0;color:#c0392b;">{{ offer.termin_date }}</td>
           </tr>
-          {% endif %}
-          {% if specs %}
-          <tr><td colspan="2" style="padding:6px 0 3px;font-size:8pt;color:#1a5c3a;font-weight:600;border-top:1px solid #e0e0e0;">{{ lbl.std_features }}:</td></tr>
-          {% for spec in specs %}{% if spec.title or spec.desc %}
-          <tr>
-            <td style="color:#666;font-size:8.5pt;padding:2px 0;vertical-align:top;">{{ spec.title }}</td>
-            <td style="font-size:8.5pt;padding:2px 0;">{{ spec.desc }}</td>
-          </tr>
-          {% endif %}{% endfor %}
           {% endif %}
         </table>
       </div>
