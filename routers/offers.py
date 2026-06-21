@@ -190,6 +190,7 @@ async def create_offer(request: Request,
 
     model = fdb.get_model(model_id)
     base_price = float(model["base_price"]) if model else 0.0
+    saved_model_name = (model.get("name") or "") if model else ""
 
     selected_options = []
     try:
@@ -211,6 +212,7 @@ async def create_offer(request: Request,
         offer_no=offer_no,
         customer_id=customer_id,
         model_id=model_id,
+        model_name=saved_model_name,
         machine_count=machine_count,
         currency=currency,
         base_price=base_price,
@@ -306,6 +308,7 @@ async def update_offer(request: Request,
 
     model = fdb.get_model(model_id)
     base_price = float(model["base_price"]) if model else 0.0
+    saved_model_name = (model.get("name") or "") if model else ""
 
     selected_options = []
     try:
@@ -324,6 +327,7 @@ async def update_offer(request: Request,
     fdb.upd_offer(offer_id,
         customer_id=customer_id or None,
         model_id=model_id,
+        model_name=saved_model_name,
         machine_count=machine_count,
         currency=currency,
         base_price=base_price,

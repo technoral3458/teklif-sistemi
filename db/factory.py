@@ -348,6 +348,7 @@ def init():
         # Serial number on offers
         _acol(cur, "offers", "serial_number", "TEXT DEFAULT ''")
         _acol(cur, "offers", "final_price",   "REAL DEFAULT 0")
+        _acol(cur, "offers", "model_name",    "TEXT DEFAULT ''")
 
         # Proforma invoices per order
         cur.execute("""CREATE TABLE IF NOT EXISTS order_proformas(
@@ -743,14 +744,14 @@ _OFCOLS = ("id,offer_no,customer_id,model_id,machine_count,currency,"
            "admin_notes,termin_date,mfr_status,mfr_notes,mfr_status_date,"
            "delivery_method,delivery_time,logistics,payment_notes,created_at,"
            "delivery_term_id,delivery_term_discount,"
-           "cancel_reason,contract_notes,contract_photo,serial_number,final_price")
+           "cancel_reason,contract_notes,contract_photo,serial_number,final_price,model_name")
 _OFKEYS = ["id","offer_no","customer_id","model_id","machine_count","currency",
            "base_price","options_total","discount_pct","total_price","status",
            "notes","validity_date","dealer_id","manufacturer_id","admin_status",
            "admin_notes","termin_date","mfr_status","mfr_notes","mfr_status_date",
            "delivery_method","delivery_time","logistics","payment_notes","created_at",
            "delivery_term_id","delivery_term_discount",
-           "cancel_reason","contract_notes","contract_photo","serial_number","final_price"]
+           "cancel_reason","contract_notes","contract_photo","serial_number","final_price","model_name"]
 
 
 def _rof(r):
@@ -838,7 +839,7 @@ def create_offer(**kw):
                "base_price", "options_total", "discount_pct", "total_price",
                "status", "notes", "validity_date", "dealer_id",
                "delivery_method", "delivery_time", "logistics", "payment_notes",
-               "delivery_term_id", "delivery_term_discount", "final_price"]
+               "delivery_term_id", "delivery_term_discount", "final_price", "model_name"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -903,7 +904,7 @@ def upd_offer(oid, **kw):
                "base_price", "options_total", "discount_pct", "total_price",
                "status", "notes", "validity_date",
                "delivery_method", "delivery_time", "logistics", "payment_notes",
-               "delivery_term_id", "delivery_term_discount", "final_price"]
+               "delivery_term_id", "delivery_term_discount", "final_price", "model_name"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return
