@@ -244,6 +244,13 @@ async def approve_order(request: Request, oid: int,
     return RedirectResponse(f"/orders/{oid}", 303)
 
 
+@router.post("/{oid}/reset-status")
+async def reset_order_status(request: Request, oid: int):
+    auth.require_admin(request)
+    fdb.reset_order_status(oid)
+    return RedirectResponse(f"/orders/{oid}?msg=Sipariş+durumu+sıfırlandı&msg_type=info", 303)
+
+
 @router.post("/{oid}/reassign")
 async def reassign_manufacturer(request: Request, oid: int,
                                 manufacturer_id: int = Form(0)):

@@ -126,6 +126,14 @@
             {% if offer.admin_notes %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_note }}: {{ offer.admin_notes }}</div>{% endif %}
             {% if admin_done %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_mfr_label }}: <strong>{{ offer.manufacturer_name }}</strong></div>{% endif %}
 
+            {% if user.role == 'admin' and admin_done %}
+            <div style="margin-top:8px;">
+              <form method="post" action="/orders/{{ offer.id }}/reset-status" style="display:inline;" onsubmit="return confirm('Onayı geri al ve siparişi sıfırla?')">
+                <button type="submit" class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger);">↩ Onayı Sıfırla</button>
+              </form>
+            </div>
+            {% endif %}
+
             {% if user.role == 'admin' and not offer.admin_status %}
             <div style="margin-top:10px;padding:12px;background:var(--surface-2);border-radius:8px;display:flex;flex-direction:column;gap:8px;">
               <form method="post" action="/orders/{{ offer.id }}/approve" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">

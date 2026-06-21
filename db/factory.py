@@ -1072,6 +1072,13 @@ def approve_order(oid, manufacturer_id, admin_notes=""):
             (manufacturer_id, admin_notes, oid)
         )
 
+def reset_order_status(oid):
+    with _c() as c:
+        c.execute(
+            "UPDATE offers SET status='Sipariş Verildi', admin_status=NULL, manufacturer_id=NULL, admin_notes='' WHERE id=?",
+            (oid,)
+        )
+
 def reassign_order_manufacturer(oid, manufacturer_id):
     with _c() as c:
         c.execute("UPDATE offers SET manufacturer_id=? WHERE id=?", (manufacturer_id, oid))
