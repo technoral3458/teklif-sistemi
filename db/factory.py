@@ -349,6 +349,19 @@ def init():
         _acol(cur, "offers", "serial_number", "TEXT DEFAULT ''")
         _acol(cur, "offers", "final_price",   "REAL DEFAULT 0")
         _acol(cur, "offers", "model_name",    "TEXT DEFAULT ''")
+        _acol(cur, "order_stages", "stage_code", "TEXT DEFAULT ''")
+        cur.execute("""CREATE TABLE IF NOT EXISTS stage_rollback_requests(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            requested_by INTEGER NOT NULL,
+            requested_at TEXT DEFAULT(datetime('now')),
+            reason TEXT DEFAULT '',
+            target_stage_code TEXT DEFAULT '',
+            status TEXT DEFAULT 'pending',
+            resolved_by INTEGER,
+            resolved_at TEXT,
+            admin_notes TEXT DEFAULT ''
+        )""")
         # Backfill model_name for offers whose model still exists
         cur.execute("""
             UPDATE offers SET model_name = (
@@ -1121,24 +1134,66 @@ def del_production_step(id):
 
 # ── Order Stages ─────────────────────────────────────────────────────────────
 
-def add_order_stage(order_id, stage_name, notes, stage_date, photo=""):
+def add_order_stage(order_id, stage_code, stage_name, notes, stage_date, photo=""):
     with _c() as c:
         c.execute(
-            "INSERT INTO order_stages(order_id,stage_name,notes,stage_date,photo) VALUES(?,?,?,?,?)",
-            (order_id, stage_name, notes, stage_date, photo)
+            "INSERT INTO order_stages(order_id,stage_code,stage_name,notes,stage_date,photo) VALUES(?,?,?,?,?,?)",
+            (order_id, stage_code, stage_name, notes, stage_date, photo)
         )
 
 def get_order_stages(order_id):
     with _c() as c:
         rows = c.execute(
-            "SELECT id,order_id,stage_name,notes,stage_date,created_at,photo FROM order_stages WHERE order_id=? ORDER BY stage_date DESC,id DESC",
+            "SELECT id,order_id,stage_name,notes,stage_date,created_at,photo,stage_code FROM order_stages WHERE order_id=? ORDER BY stage_date ASC,id ASC",
             (order_id,)
         ).fetchall()
-    return [{"id":r[0],"order_id":r[1],"stage_name":r[2],"notes":r[3],"stage_date":r[4],"created_at":r[5],"photo":r[6] or ""} for r in rows]
+    return [{"id":r[0],"order_id":r[1],"stage_name":r[2],"notes":r[3],"stage_date":r[4],"created_at":r[5],"photo":r[6] or "","stage_code":r[7] or ""} for r in rows]
 
 def del_order_stage(sid):
     with _c() as c:
         c.execute("DELETE FROM order_stages WHERE id=?", (sid,))
+
+
+def create_stage_rollback_request(order_id, requested_by, reason, target_stage_code):
+    with _c() as c:
+        cur = c.execute(
+            "INSERT INTO stage_rollback_requests(order_id,requested_by,reason,target_stage_code) VALUES(?,?,?,?)",
+            (order_id, requested_by, reason, target_stage_code)
+        )
+        return cur.lastrowid
+
+def get_stage_rollback_requests(order_id=None, status=None):
+    q = "SELECT id,order_id,requested_by,requested_at,reason,target_stage_code,status,resolved_by,resolved_at,admin_notes FROM stage_rollback_requests WHERE 1=1"
+    params = []
+    if order_id is not None:
+        q += " AND order_id=?"
+        params.append(order_id)
+    if status is not None:
+        q += " AND status=?"
+        params.append(status)
+    q += " ORDER BY requested_at DESC"
+    with _c() as c:
+        rows = c.execute(q, params).fetchall()
+    keys = ["id","order_id","requested_by","requested_at","reason","target_stage_code","status","resolved_by","resolved_at","admin_notes"]
+    return [dict(zip(keys,r)) for r in rows]
+
+def resolve_stage_rollback_request(rid, status, resolved_by, admin_notes=""):
+    with _c() as c:
+        c.execute(
+            "UPDATE stage_rollback_requests SET status=?,resolved_by=?,resolved_at=datetime('now'),admin_notes=? WHERE id=?",
+            (status, resolved_by, admin_notes, rid)
+        )
+
+def apply_stage_rollback(order_id, target_stage_code):
+    steps = get_production_steps(active_only=False)
+    step = next((s for s in steps if s["code"] == target_stage_code), None)
+    if not step:
+        return
+    with _c() as c:
+        c.execute(
+            "UPDATE offers SET mfr_status=?,status=?,mfr_status_date='' WHERE id=?",
+            (target_stage_code, step["label_tr"], order_id)
+        )
 
 
 # ── Dealer Ledger ─────────────────────────────────────────────────────────────

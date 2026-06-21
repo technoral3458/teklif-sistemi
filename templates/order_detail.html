@@ -29,6 +29,12 @@
 {% endfor %}
 {% set mfr_in_prod = ns.current_sort > 0 %}
 
+{% set ns2 = namespace(next_step=none, prev_step=none) %}
+{% for s in production_steps %}
+  {% if s.sort_order == ns.current_sort + 1 %}{% set ns2.next_step = s %}{% endif %}
+  {% if s.sort_order == ns.current_sort - 1 %}{% set ns2.prev_step = s %}{% endif %}
+{% endfor %}
+
 {% block content %}
 <div style="display:flex;gap:8px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
   <a href="/orders" class="btn btn-ghost btn-sm">{{ T.ord_back }}</a>
@@ -231,7 +237,7 @@
   <div class="card">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
       <h3 class="card-title">{{ T.ord_stages_title }}</h3>
-      {% if (((user.role == 'manufacturer' or user.is_manufacturer) and can_stage) or user.role == 'admin') and mfr_confirmed %}
+      {% if (((user.role == 'manufacturer' or user.is_manufacturer) and can_stage) or user.role == 'admin') and mfr_confirmed and ns2.next_step %}
       <button class="btn btn-outline btn-sm" onclick="openModal('stageModal')">{{ T.ord_add_stage_btn }}</button>
       {% endif %}
     </div>
@@ -246,7 +252,7 @@
               <strong style="font-size:13px;">{{ s.stage_name }}</strong>
               <span style="font-size:11px;color:var(--text-muted);">{{ s.stage_date }}</span>
             </div>
-            {% if s.notes %}<div style="font-size:13px;color:var(--text-muted);margin-top:2px;">{{ s.notes }}</div>{% endif %}
+            <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">{{ s.notes }}</div>
             {% if s.photo %}<a href="/static/{{ s.photo }}" target="_blank"><img src="/static/{{ s.photo }}" style="margin-top:6px;max-width:100%;max-height:180px;border-radius:6px;object-fit:cover;display:block;" /></a>{% endif %}
           </div>
           {% if user.role == 'admin' %}
@@ -258,9 +264,38 @@
           {% endif %}
         </div>
         {% endfor %}
+        {% if (user.role == 'manufacturer' or user.is_manufacturer) and can_stage and ns2.prev_step and not rollback_requests|selectattr('status','equalto','pending')|list %}
+        <div style="padding:10px 0;text-align:right;">
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:var(--danger);" onclick="openModal('rollbackModal')">
+            ↩ Önceki Aşamaya Geri Dön Talebi
+          </button>
+        </div>
+        {% endif %}
       </div>
       {% else %}
       <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">{{ T.ord_no_stages }}</div>
+      {% endif %}
+      {% if user.role == 'admin' %}
+      {% set pending_rbs = rollback_requests|selectattr('status','equalto','pending')|list %}
+      {% if pending_rbs %}
+      <div style="padding:12px 16px;background:#fef3c7;border-top:1px solid var(--border);border-radius:0 0 8px 8px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:#92400e;">⚠️ Bekleyen Geri Alma Talepleri</div>
+        {% for rb in pending_rbs %}
+        <div style="background:#fff;border:1px solid #fcd34d;border-radius:6px;padding:10px 12px;margin-bottom:8px;">
+          <div style="font-size:12px;color:#92400e;margin-bottom:4px;">Hedef: <strong>{{ rb.target_stage_code }}</strong> · {{ rb.requested_at[:10] }}</div>
+          <div style="font-size:13px;margin-bottom:8px;">{{ rb.reason }}</div>
+          <form method="post" action="/orders/rollback-requests/{{ rb.id }}/approve" style="display:inline;">
+            <input type="hidden" name="admin_notes" value="" />
+            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Geri almayı onayla?')">Onayla</button>
+          </form>
+          <form method="post" action="/orders/rollback-requests/{{ rb.id }}/reject" style="display:inline;margin-left:6px;">
+            <input type="hidden" name="admin_notes" value="" />
+            <button type="submit" class="btn btn-danger btn-sm">Reddet</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% endif %}
     </div>
   </div>
@@ -445,33 +480,37 @@
 </div>
 
 <!-- Stage add modal -->
-<div id="stageModal" class="modal-overlay">
+<div id="stageModal" class="modal-overlay" data-static="true">
   <div class="modal-box" style="max-width:440px;">
     <div class="modal-header">
       <h3 class="modal-title">{{ T.ord_stage_modal_title }}</h3>
       <button class="modal-close" onclick="closeModal('stageModal')">&times;</button>
     </div>
     <form method="post" action="/orders/{{ offer.id }}/stage" enctype="multipart/form-data">
+      <input type="hidden" name="stage_code" value="{{ ns2.next_step.code if ns2.next_step else '' }}" />
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-        <div class="form-group">
-          <label class="form-label">{{ T.ord_stage_name }} *</label>
-          <input type="text" name="stage_name" class="form-control" required placeholder="{{ T.ord_stage_name_ph }}" />
+        {% if ns2.next_step %}
+        <div style="padding:10px 14px;background:var(--surface-2);border-radius:8px;border-left:3px solid var(--primary);">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Sonraki Aşama</div>
+          <div style="font-weight:700;font-size:15px;">
+            {{ ns2.next_step.label_zh if user.lang == 'zh' else (ns2.next_step.label_en if user.lang == 'en' else ns2.next_step.label_tr) }}
+          </div>
         </div>
+        {% endif %}
         <div class="form-group">
           <label class="form-label">{{ T.ord_stage_date }}</label>
           <input type="date" name="stage_date" class="form-control" />
         </div>
         <div class="form-group">
-          <label class="form-label">{{ T.ord_stage_note }}</label>
-          <textarea name="notes" class="form-control" rows="2" placeholder="{{ T.ord_stage_note_ph }}"></textarea>
+          <label class="form-label">{{ T.ord_stage_note }} <span style="color:var(--danger);">*</span></label>
+          <textarea name="notes" class="form-control" rows="3" required
+                    placeholder="Bu aşamaya geçiş için açıklama zorunludur..."></textarea>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">⚠️ Açıklama girilmeden aşama geçişi yapılamaz.</div>
         </div>
         <div class="form-group">
           <label class="form-label">{{ T.offer_contract_photo_label }}</label>
-          <input type="file" name="photo" id="stagePhotoInput"
-                 accept="image/*"
-                 capture="environment"
-                 style="display:none;"
-                 onchange="showStageFileName(this)" />
+          <input type="file" name="photo" id="stagePhotoInput" accept="image/*" capture="environment"
+                 style="display:none;" onchange="showStageFileName(this)" />
           <div style="display:flex;gap:8px;align-items:center;">
             <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('stagePhotoInput').click()">
               📷 {{ T.offer_contract_photo_hint }}
@@ -483,6 +522,40 @@
       <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
         <button type="button" class="btn btn-ghost" onclick="closeModal('stageModal')">{{ T.ord_cancel_btn }}</button>
         <button type="submit" class="btn btn-primary">{{ T.ord_add_btn }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="rollbackModal" class="modal-overlay" data-static="true">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <h3 class="modal-title" style="color:var(--danger);">↩ Önceki Aşamaya Geri Dön Talebi</h3>
+      <button class="modal-close" onclick="closeModal('rollbackModal')">&times;</button>
+    </div>
+    <form method="post" action="/orders/{{ offer.id }}/rollback-request">
+      <input type="hidden" name="target_stage_code" value="{{ ns2.prev_step.code if ns2.prev_step else '' }}" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        {% if ns2.prev_step %}
+        <div style="padding:10px 14px;background:#fef2f2;border-radius:8px;border-left:3px solid var(--danger);">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Geri Dönülecek Aşama</div>
+          <div style="font-weight:700;font-size:15px;color:var(--danger);">
+            {{ ns2.prev_step.label_zh if user.lang == 'zh' else (ns2.prev_step.label_en if user.lang == 'en' else ns2.prev_step.label_tr) }}
+          </div>
+        </div>
+        {% endif %}
+        <div style="font-size:13px;color:var(--text-muted);padding:8px;background:var(--surface-2);border-radius:6px;">
+          ⚠️ Bu talep yöneticiye iletilecek ve ancak yönetici onayıyla gerçekleştirilecektir.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Geri Alma Nedeni <span style="color:var(--danger);">*</span></label>
+          <textarea name="reason" class="form-control" rows="3" required
+                    placeholder="Neden önceki aşamaya dönmek istiyorsunuz?"></textarea>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('rollbackModal')">İptal</button>
+        <button type="submit" class="btn btn-danger">Talep Gönder</button>
       </div>
     </form>
   </div>

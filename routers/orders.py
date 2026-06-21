@@ -120,6 +120,7 @@ async def order_detail(request: Request, oid: int):
         "production_steps": steps,
         "proformas": proformas,
         "documents": documents,
+        "rollback_requests": fdb.get_stage_rollback_requests(order_id=oid),
     })
 
 
@@ -307,7 +308,7 @@ async def update_status(request: Request, oid: int,
 
 @router.post("/{oid}/stage")
 async def add_stage(request: Request, oid: int,
-                    stage_name: str = Form(""),
+                    stage_code: str = Form(""),
                     notes: str = Form(""),
                     stage_date: str = Form(""),
                     photo: Optional[UploadFile] = File(None)):
@@ -316,27 +317,100 @@ async def add_stage(request: Request, oid: int,
         return RedirectResponse(f"/orders/{oid}", 303)
     offer = fdb.get_offer(oid)
     mfr_id = udb.effective_mfr_id(user)
-    if offer and (offer.get("manufacturer_id") == mfr_id or user["role"] == "admin"):
-        if not stage_date:
-            stage_date = datetime.date.today().isoformat()
-        photo_path = ""
-        if photo and photo.filename:
-            ext = os.path.splitext(photo.filename)[1].lower() or ".jpg"
-            fname = f"stage_{oid}_{uuid.uuid4().hex[:8]}{ext}"
-            os.makedirs(IMAGES_DIR, exist_ok=True)
-            content = await photo.read()
-            with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
-                f.write(content)
-            photo_path = f"img/uploads/{fname}"
-        fdb.add_order_stage(oid, stage_name, notes, stage_date, photo_path)
-        _notify("Üretim Aşaması Eklendi", {
-            "Sipariş No": f"#{oid}",
-            "Üretici": user.get("company_name", "-"),
-            "Aşama": stage_name,
-            "Tarih": stage_date,
-            "Not": notes or "-",
-        })
+    if not offer or (user["role"] != "admin" and offer.get("manufacturer_id") != mfr_id):
+        return RedirectResponse(f"/orders/{oid}", 303)
+
+    # Notes are mandatory
+    if not notes.strip():
+        return RedirectResponse(f"/orders/{oid}?stage_error=notes_required", 303)
+
+    # Validate sequential: stage_code must be the next step
+    steps = fdb.get_production_steps()
+    step_map = {s["code"]: s for s in steps}
+    current_sort = 0
+    if offer.get("mfr_status") and offer["mfr_status"] in step_map:
+        current_sort = step_map[offer["mfr_status"]]["sort_order"]
+    next_steps = [s for s in steps if s["sort_order"] == current_sort + 1]
+    if not next_steps or stage_code not in [s["code"] for s in next_steps]:
+        return RedirectResponse(f"/orders/{oid}?stage_error=invalid_step", 303)
+
+    if not stage_date:
+        stage_date = datetime.date.today().isoformat()
+
+    step = step_map[stage_code]
+    stage_name = step["label_tr"]
+
+    photo_path = ""
+    if photo and photo.filename:
+        ext = os.path.splitext(photo.filename)[1].lower() or ".jpg"
+        fname = f"stage_{oid}_{uuid.uuid4().hex[:8]}{ext}"
+        os.makedirs(IMAGES_DIR, exist_ok=True)
+        content = await photo.read()
+        with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
+            f.write(content)
+        photo_path = f"img/uploads/{fname}"
+
+    fdb.add_order_stage(oid, stage_code, stage_name, notes.strip(), stage_date, photo_path)
+    fdb.update_mfr_status(oid, stage_code, stage_date)
+    _notify("Üretim Aşaması Güncellendi", {
+        "Sipariş No": f"#{oid}",
+        "Üretici": user.get("company_name", "-"),
+        "Aşama": stage_name,
+        "Tarih": stage_date,
+        "Not": notes,
+    })
     return RedirectResponse(f"/orders/{oid}", 303)
+
+
+@router.post("/{oid}/rollback-request")
+async def stage_rollback_request(request: Request, oid: int,
+                                  reason: str = Form(""),
+                                  target_stage_code: str = Form("")):
+    user = auth.require_user(request)
+    if not reason.strip():
+        return RedirectResponse(f"/orders/{oid}", 303)
+    offer = fdb.get_offer(oid)
+    mfr_id = udb.effective_mfr_id(user)
+    if not offer or (user["role"] != "admin" and offer.get("manufacturer_id") != mfr_id):
+        return RedirectResponse(f"/orders/{oid}", 303)
+    fdb.create_stage_rollback_request(oid, user["id"], reason.strip(), target_stage_code)
+    _notify("Geri Alma Talebi Oluşturuldu", {
+        "Sipariş No": f"#{oid}",
+        "Üretici": user.get("company_name", "-"),
+        "Neden": reason,
+        "Hedef Aşama": target_stage_code,
+    })
+    return RedirectResponse(f"/orders/{oid}", 303)
+
+
+@router.post("/rollback-requests/{rid}/approve")
+async def approve_rollback(request: Request, rid: int, admin_notes: str = Form("")):
+    user = auth.require_admin(request)
+    reqs = fdb.get_stage_rollback_requests()
+    req = next((r for r in reqs if r["id"] == rid), None)
+    if not req or req["status"] != "pending":
+        return RedirectResponse("/orders", 303)
+    fdb.apply_stage_rollback(req["order_id"], req["target_stage_code"])
+    fdb.resolve_stage_rollback_request(rid, "approved", user["id"], admin_notes)
+    # Add a rollback audit stage entry
+    steps = fdb.get_production_steps(active_only=False)
+    step = next((s for s in steps if s["code"] == req["target_stage_code"]), None)
+    stage_name = f"[Geri Alındı] → {step['label_tr']}" if step else "[Geri Alındı]"
+    fdb.add_order_stage(req["order_id"], req["target_stage_code"], stage_name,
+                        f"Yönetici onayıyla geri alındı. {admin_notes}".strip(),
+                        datetime.date.today().isoformat())
+    return RedirectResponse(f"/orders/{req['order_id']}", 303)
+
+
+@router.post("/rollback-requests/{rid}/reject")
+async def reject_rollback(request: Request, rid: int, admin_notes: str = Form("")):
+    user = auth.require_admin(request)
+    reqs = fdb.get_stage_rollback_requests()
+    req = next((r for r in reqs if r["id"] == rid), None)
+    if not req or req["status"] != "pending":
+        return RedirectResponse("/orders", 303)
+    fdb.resolve_stage_rollback_request(rid, "rejected", user["id"], admin_notes)
+    return RedirectResponse(f"/orders/{req['order_id']}", 303)
 
 
 @router.post("/proforma/delete")
