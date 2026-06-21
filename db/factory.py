@@ -349,6 +349,15 @@ def init():
         _acol(cur, "offers", "serial_number", "TEXT DEFAULT ''")
         _acol(cur, "offers", "final_price",   "REAL DEFAULT 0")
         _acol(cur, "offers", "model_name",    "TEXT DEFAULT ''")
+        # Backfill model_name for offers whose model still exists
+        cur.execute("""
+            UPDATE offers SET model_name = (
+                SELECT name FROM models WHERE models.id = offers.model_id
+            )
+            WHERE (model_name IS NULL OR model_name = '')
+              AND model_id IS NOT NULL
+              AND EXISTS (SELECT 1 FROM models WHERE models.id = offers.model_id)
+        """)
 
         # Proforma invoices per order
         cur.execute("""CREATE TABLE IF NOT EXISTS order_proformas(
