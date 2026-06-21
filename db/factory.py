@@ -838,7 +838,7 @@ def create_offer(**kw):
                "base_price", "options_total", "discount_pct", "total_price",
                "status", "notes", "validity_date", "dealer_id",
                "delivery_method", "delivery_time", "logistics", "payment_notes",
-               "delivery_term_id", "delivery_term_discount"]
+               "delivery_term_id", "delivery_term_discount", "final_price"]
     f = {k: v for k, v in kw.items() if k in allowed}
     cols = ",".join(f.keys())
     ph = ",".join("?" * len(f))
@@ -903,7 +903,7 @@ def upd_offer(oid, **kw):
                "base_price", "options_total", "discount_pct", "total_price",
                "status", "notes", "validity_date",
                "delivery_method", "delivery_time", "logistics", "payment_notes",
-               "delivery_term_id", "delivery_term_discount"]
+               "delivery_term_id", "delivery_term_discount", "final_price"]
     f = {k: v for k, v in kw.items() if k in allowed}
     if not f:
         return
