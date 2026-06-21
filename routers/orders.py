@@ -144,6 +144,7 @@ async def production_pdf(request: Request, oid: int, dl: int = 0):
         item["image_path"] = opt.get("variation_image_path") or opt.get("image_path", "") or ""
 
     model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
+    model = model or {}
     model_name = (model.get(f"name_{lang}") or model.get("name") or "") if lang != "tr" else (model.get("name") or "")
 
     from routers.offers import _best_display_image, _parse_specs, _filter_specs
