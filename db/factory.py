@@ -743,14 +743,14 @@ _OFCOLS = ("id,offer_no,customer_id,model_id,machine_count,currency,"
            "admin_notes,termin_date,mfr_status,mfr_notes,mfr_status_date,"
            "delivery_method,delivery_time,logistics,payment_notes,created_at,"
            "delivery_term_id,delivery_term_discount,"
-           "cancel_reason,contract_notes,contract_photo,serial_number")
+           "cancel_reason,contract_notes,contract_photo,serial_number,final_price")
 _OFKEYS = ["id","offer_no","customer_id","model_id","machine_count","currency",
            "base_price","options_total","discount_pct","total_price","status",
            "notes","validity_date","dealer_id","manufacturer_id","admin_status",
            "admin_notes","termin_date","mfr_status","mfr_notes","mfr_status_date",
            "delivery_method","delivery_time","logistics","payment_notes","created_at",
            "delivery_term_id","delivery_term_discount",
-           "cancel_reason","contract_notes","contract_photo","serial_number"]
+           "cancel_reason","contract_notes","contract_photo","serial_number","final_price"]
 
 
 def _rof(r):
