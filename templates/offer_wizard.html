@@ -675,6 +675,9 @@ function wizardBuildSummary() {
   const termSel = document.getElementById('wDeliveryTermId');
   const termName = (termSel && termSel.value !== '0') ? termSel.options[termSel.selectedIndex]?.text || '' : '';
 
+  const finalPriceInput = parseFloat(document.getElementById('wFinalPrice')?.value) || 0;
+  const displayTotal = finalPriceInput > 0 ? finalPriceInput : total;
+
   html += `<div style="padding:10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);margin-top:8px;">
     <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
       <span style="color:var(--text-muted);">{{ T.offer_subtotal }}</span>
@@ -688,9 +691,13 @@ function wizardBuildSummary() {
       <span>{{ T.offer_discount }} (${disc}%)</span>
       <span>-${(subtotal*(1-termDisc/100)*disc/100).toFixed(2)} ${cur}</span>
     </div>` : ''}
+    ${finalPriceInput > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:var(--text-muted);">
+      <span>✏️ Nihai Tutar (Manuel)</span>
+      <span>${finalPriceInput.toFixed(2)} ${cur}</span>
+    </div>` : ''}
     <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:800;color:var(--accent);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
       <span>{{ T.wiz_net_total }}</span>
-      <span>${total.toFixed(2)} ${cur}</span>
+      <span>${displayTotal.toFixed(2)} ${cur}</span>
     </div>
   </div>`;
 
