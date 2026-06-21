@@ -202,30 +202,6 @@
               {% else %}<span style="color:var(--text-muted);font-weight:400;"> — {{ T.ord_status_waiting }}</span>{% endif %}
             </div>
             {% if offer.mfr_status_date %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">📅 {{ offer.mfr_status_date }}</div>{% endif %}
-
-            {% if (((user.role == 'manufacturer' or user.is_manufacturer) and offer.manufacturer_id == effective_mfr_id and can_status) or user.role == 'admin') and mfr_confirmed %}
-            <div style="margin-top:10px;padding:12px;background:var(--surface-2);border-radius:8px;">
-              <form method="post" action="/orders/{{ offer.id }}/status" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
-                <div>
-                  <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:500;">{{ T.ord_step_production }}</div>
-                  <select name="mfr_status" class="form-control" style="min-width:180px;font-size:13px;">
-                    {% for s in production_steps %}
-                    {% if s.sort_order >= ns.current_sort %}
-                    <option value="{{ s.code }}" {% if offer.mfr_status == s.code %}selected{% endif %}>
-                      {{ s.label_zh if user.lang == 'zh' else (s.label_en if user.lang == 'en' else s.label_tr) }}
-                    </option>
-                    {% endif %}
-                    {% endfor %}
-                  </select>
-                </div>
-                <div>
-                  <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:500;">{{ T.ord_stage_date }}</div>
-                  <input type="date" name="mfr_status_date" class="form-control" style="max-width:160px;font-size:13px;" value="{{ offer.mfr_status_date or '' }}" />
-                </div>
-                <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;">{{ T.ord_update_btn }}</button>
-              </form>
-            </div>
-            {% endif %}
           </div>
         </div>
 
@@ -237,7 +213,8 @@
   <div class="card">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
       <h3 class="card-title">{{ T.ord_stages_title }}</h3>
-      {% if (((user.role == 'manufacturer' or user.is_manufacturer) and can_stage) or user.role == 'admin') and mfr_confirmed and ns2.next_step %}
+      {% set has_forward_steps = production_steps|selectattr('sort_order','gt', ns.current_sort)|list %}
+      {% if (((user.role == 'manufacturer' or user.is_manufacturer) and can_stage) or user.role == 'admin') and mfr_confirmed and has_forward_steps %}
       <button class="btn btn-outline btn-sm" onclick="openModal('stageModal')">{{ T.ord_add_stage_btn }}</button>
       {% endif %}
     </div>
@@ -487,16 +464,20 @@
       <button class="modal-close" onclick="closeModal('stageModal')">&times;</button>
     </div>
     <form method="post" action="/orders/{{ offer.id }}/stage" enctype="multipart/form-data">
-      <input type="hidden" name="stage_code" value="{{ ns2.next_step.code if ns2.next_step else '' }}" />
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-        {% if ns2.next_step %}
-        <div style="padding:10px 14px;background:var(--surface-2);border-radius:8px;border-left:3px solid var(--primary);">
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Sonraki Aşama</div>
-          <div style="font-weight:700;font-size:15px;">
-            {{ ns2.next_step.label_zh if user.lang == 'zh' else (ns2.next_step.label_en if user.lang == 'en' else ns2.next_step.label_tr) }}
-          </div>
+        <div class="form-group">
+          <label class="form-label">Üretim Aşaması <span style="color:var(--danger);">*</span></label>
+          <select name="stage_code" class="form-control" required>
+            <option value="">— Aşama Seçin —</option>
+            {% for s in production_steps %}
+            {% if s.sort_order > ns.current_sort %}
+            <option value="{{ s.code }}">
+              {{ s.label_zh if user.lang == 'zh' else (s.label_en if user.lang == 'en' else s.label_tr) }}
+            </option>
+            {% endif %}
+            {% endfor %}
+          </select>
         </div>
-        {% endif %}
         <div class="form-group">
           <label class="form-label">{{ T.ord_stage_date }}</label>
           <input type="date" name="stage_date" class="form-control" />

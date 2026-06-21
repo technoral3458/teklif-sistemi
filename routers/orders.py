@@ -324,14 +324,13 @@ async def add_stage(request: Request, oid: int,
     if not notes.strip():
         return RedirectResponse(f"/orders/{oid}?stage_error=notes_required", 303)
 
-    # Validate sequential: stage_code must be the next step
+    # Validate: stage_code must be a forward step (sort_order > current)
     steps = fdb.get_production_steps()
     step_map = {s["code"]: s for s in steps}
     current_sort = 0
     if offer.get("mfr_status") and offer["mfr_status"] in step_map:
         current_sort = step_map[offer["mfr_status"]]["sort_order"]
-    next_steps = [s for s in steps if s["sort_order"] == current_sort + 1]
-    if not next_steps or stage_code not in [s["code"] for s in next_steps]:
+    if stage_code not in step_map or step_map[stage_code]["sort_order"] <= current_sort:
         return RedirectResponse(f"/orders/{oid}?stage_error=invalid_step", 303)
 
     if not stage_date:
