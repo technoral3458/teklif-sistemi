@@ -1097,6 +1097,13 @@ def mfr_confirm_order(oid, termin_date, mfr_notes="", serial_number=""):
             (termin_date, mfr_notes, serial_number, oid)
         )
 
+def reset_mfr_confirmation(oid):
+    with _c() as c:
+        c.execute(
+            "UPDATE offers SET mfr_status=NULL, termin_date=NULL, mfr_notes='', status='Admin Onaylı' WHERE id=?",
+            (oid,)
+        )
+
 def update_mfr_status(oid, mfr_status, mfr_status_date=""):
     steps = get_production_steps(active_only=False)
     step = next((s for s in steps if s["code"] == mfr_status), None)

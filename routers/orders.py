@@ -251,6 +251,13 @@ async def reset_order_status(request: Request, oid: int):
     return RedirectResponse(f"/orders/{oid}?msg=Sipariş+durumu+sıfırlandı&msg_type=info", 303)
 
 
+@router.post("/{oid}/reset-mfr")
+async def reset_mfr_confirmation(request: Request, oid: int):
+    auth.require_admin(request)
+    fdb.reset_mfr_confirmation(oid)
+    return RedirectResponse(f"/orders/{oid}?msg=Üretici+onayı+sıfırlandı&msg_type=info", 303)
+
+
 @router.post("/{oid}/reassign")
 async def reassign_manufacturer(request: Request, oid: int,
                                 manufacturer_id: int = Form(0)):
