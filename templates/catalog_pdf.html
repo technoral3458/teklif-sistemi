@@ -224,15 +224,8 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
 
   <!-- Top header -->
   <div class="cov-header">
-    {% if company and company.logo_path %}
-    <img class="cov-logo" src="{{ base_url }}/static/{{ company.logo_path }}" />
-    {% else %}
-    <span class="cov-co-name">{{ company.company_name if company else '' }}</span>
-    {% endif %}
+    <div></div>
     <div class="cov-top-right">
-      {% if company and company.logo_path and company.company_name %}
-      <div class="cov-co-name" style="margin-bottom:2mm;">{{ company.company_name }}</div>
-      {% endif %}
       <div class="cov-cat-pill">{{ category_name }}</div>
       <div class="cov-date">{{ date_str }}</div>
     </div>
@@ -259,10 +252,6 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
 
     <div class="cov-foot-bar">
       <span class="cov-foot-label">{{ label_product_catalog }}</span>
-      <span class="cov-foot-contact">
-        {% if company and company.phone %}{{ company.phone }}{% endif %}
-        {% if company and company.email %} · {{ company.email }}{% endif %}
-      </span>
     </div>
   </div>
 </div>
@@ -304,7 +293,7 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
   {% endif %}
 
   <div class="pgfoot">
-    <span class="pgfoot-co">{{ company.company_name if company else '' }}</span>
+    <span class="pgfoot-co">{{ model_name }}</span>
     <span>{{ model_name }}</span>
     <span class="pgfoot-num">02</span>
   </div>
@@ -340,7 +329,7 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
     </tbody>
   </table>
   <div class="pgfoot">
-    <span class="pgfoot-co">{{ company.company_name if company else '' }}</span>
+    <span class="pgfoot-co">{{ model_name }}</span>
     <span>{{ model_name }}</span>
     <span class="pgfoot-num">03</span>
   </div>
@@ -384,7 +373,7 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
     {% endfor %}
   </table>
   <div class="pgfoot">
-    <span class="pgfoot-co">{{ company.company_name if company else '' }}</span>
+    <span class="pgfoot-co">{{ model_name }}</span>
     <span>{{ model_name }}</span>
     <span class="pgfoot-num">{{ '%02d'|format(pg_num) }}</span>
   </div>
@@ -396,24 +385,7 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
 <div class="back">
   <div class="back-gold-line"></div>
   <div class="back-body">
-    <div class="back-eyebrow">{{ label_contact_us }}</div>
-    <div class="back-co">{{ company.company_name if company else '' }}</div>
-    <div class="back-bar"></div>
     {% if ai.cta %}<div class="back-cta">{{ ai.cta }}</div>{% endif %}
-    <div class="back-tbl">
-      {% if company and company.phone %}
-      <div class="back-row"><div class="back-lbl">{{ label_phone }}</div><div class="back-val">{{ company.phone }}</div></div>
-      {% endif %}
-      {% if company and company.email %}
-      <div class="back-row"><div class="back-lbl">{{ label_email }}</div><div class="back-val">{{ company.email }}</div></div>
-      {% endif %}
-      {% if company and company.website %}
-      <div class="back-row"><div class="back-lbl">{{ label_web }}</div><div class="back-val">{{ company.website }}</div></div>
-      {% endif %}
-      {% if company and company.address %}
-      <div class="back-row"><div class="back-lbl">{{ label_address }}</div><div class="back-val">{{ company.address }}</div></div>
-      {% endif %}
-    </div>
   </div>
   <div class="back-foot">
     <span class="back-foot-model">{{ model_name }}</span>
