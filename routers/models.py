@@ -306,7 +306,6 @@ async def save_model(request: Request,
         model_id = id
     else:
         model_id = fdb.add_model(**kw)
-        print(f"[MODEL_SAVE] add_model done new_id={model_id}", file=sys.stderr, flush=True)
 
     # Save line images
     form_data = await request.form()
