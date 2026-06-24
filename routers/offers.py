@@ -517,6 +517,10 @@ async def offer_catalog_pdf(request: Request, offer_id: int):
     all_opts = {o["id"]: o for o in fdb.get_options()}
     options = [all_opts[oid] for oid in option_ids if oid in all_opts]
 
+    # Best display image (variation image > line image > model image)
+    opts_map = {o["id"]: o for o in fdb.get_options()}
+    display_image = _best_display_image(m, offer, items, opts_map)
+
     # Category / company
     cats = fdb.get_cats()
     cat = {c["id"]: c for c in cats}.get(m.get("category_id"), {})
@@ -557,6 +561,7 @@ async def offer_catalog_pdf(request: Request, offer_id: int):
 
     html_str = templates.get_template("catalog_pdf.html").render({
         "model": m,
+        "display_image": display_image,
         "model_name": model_name,
         "specs": specs,
         "options": options,

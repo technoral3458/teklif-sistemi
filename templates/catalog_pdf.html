@@ -214,8 +214,9 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background
 <div class="cover">
   <!-- Full-bleed background image -->
   <div class="cov-img-abs">
-    {% if model.image_path %}
-    <img src="{{ base_url }}/static/{{ model.image_path }}" />
+    {% set cover_img = display_image if display_image else model.image_path %}
+    {% if cover_img %}
+    <img src="{{ base_url }}/static/{{ cover_img }}" />
     {% endif %}
   </div>
   <!-- Gradient overlay -->
