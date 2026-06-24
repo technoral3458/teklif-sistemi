@@ -613,11 +613,20 @@ async function autoTranslateModel() {
   const descEN = (document.getElementById('mdesc_en')?.value || '').trim();
   const descZH = (document.getElementById('mdesc_zh')?.value || '').trim();
 
-  // Determine source language (the one with the most content)
+  // Count spec content per language for scoring
+  const specRows = Array.from(document.querySelectorAll('.spec-row'));
+  let trSpecCount = 0, enSpecCount = 0, zhSpecCount = 0;
+  specRows.forEach(row => {
+    if ((row.querySelector('.spec-desc')?.value || '').trim()) trSpecCount++;
+    if ((row.querySelector('.spec-desc-en')?.value || '').trim()) enSpecCount++;
+    if ((row.querySelector('.spec-desc-zh')?.value || '').trim()) zhSpecCount++;
+  });
+
+  // Determine source language (the one with the most overall content)
   const scores = {
-    tr: (nameTR ? 2 : 0) + (descTR ? 1 : 0),
-    en: (nameEN ? 2 : 0) + (descEN ? 1 : 0),
-    zh: (nameZH ? 2 : 0) + (descZH ? 1 : 0),
+    tr: (nameTR ? 3 : 0) + (descTR ? 2 : 0) + trSpecCount,
+    en: (nameEN ? 3 : 0) + (descEN ? 2 : 0) + enSpecCount,
+    zh: (nameZH ? 3 : 0) + (descZH ? 2 : 0) + zhSpecCount,
   };
   const srcLang = Object.entries(scores).sort((a,b) => b[1]-a[1])[0][0];
   const nameMap = {tr: nameTR, en: nameEN, zh: nameZH};
@@ -627,11 +636,18 @@ async function autoTranslateModel() {
   if (nameMap[srcLang]) texts['name'] = nameMap[srcLang];
   if (descMap[srcLang]) texts['description'] = descMap[srcLang];
 
-  // Spec row descriptions
-  const specRows = Array.from(document.querySelectorAll('.spec-row'));
-  const srcDescClass = {tr: '.spec-desc', en: '.spec-desc-en', zh: '.spec-desc-zh'}[srcLang];
+  // Spec row descriptions — collect from source lang, fall back to any filled lang
+  const descClassMap = {tr: '.spec-desc', en: '.spec-desc-en', zh: '.spec-desc-zh'};
+  const srcDescClass = descClassMap[srcLang];
+  const fallbackLangs = ['tr','en','zh'].filter(l => l !== srcLang);
   specRows.forEach((row, i) => {
-    const val = (row.querySelector(srcDescClass)?.value || '').trim();
+    let val = (row.querySelector(srcDescClass)?.value || '').trim();
+    if (!val) {
+      for (const fl of fallbackLangs) {
+        val = (row.querySelector(descClassMap[fl])?.value || '').trim();
+        if (val) break;
+      }
+    }
     if (val) texts[`spec_${i}_desc`] = val;
   });
 
