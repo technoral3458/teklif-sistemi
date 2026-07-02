@@ -10,6 +10,8 @@ build/
 
 # data (databases)
 data/
+db/data.db
+db/*.db
 
 # uploads
 static/img/uploads/
