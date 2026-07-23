@@ -1957,7 +1957,7 @@ def del_order_proforma(pid):
     with _c() as c:
         row = c.execute("SELECT file_path FROM order_proformas WHERE id=?", (pid,)).fetchone()
         c.execute("DELETE FROM order_proformas WHERE id=?", (pid,))
-        return dict(row)["file_path"] if row else None
+        return row[0] if row else None
 
 def get_order_documents(order_id):
     try:
@@ -1979,7 +1979,7 @@ def del_order_document(did):
     with _c() as c:
         row = c.execute("SELECT file_path FROM order_documents WHERE id=?", (did,)).fetchone()
         c.execute("DELETE FROM order_documents WHERE id=?", (did,))
-        return dict(row)["file_path"] if row else None
+        return row[0] if row else None
 
 def set_order_serial(order_id, serial_number):
     with _c() as c:
