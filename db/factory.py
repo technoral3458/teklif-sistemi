@@ -395,6 +395,9 @@ def init():
             uploaded_at TEXT DEFAULT(datetime('now'))
         )""")
 
+        # Clear conflict_group for tool-changer options so multiple can be selected
+        cur.execute("UPDATE options SET conflict_group='' WHERE conflict_group='Takım Değiştirme'")
+
         c.commit()
 
 
