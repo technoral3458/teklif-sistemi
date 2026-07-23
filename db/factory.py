@@ -381,6 +381,8 @@ def init():
             uploaded_by INTEGER DEFAULT NULL,
             uploaded_at TEXT DEFAULT(datetime('now'))
         )""")
+        _acol(cur, "order_proformas", "uploaded_at", "TEXT DEFAULT(datetime('now'))")
+        _acol(cur, "order_proformas", "uploaded_by", "INTEGER DEFAULT NULL")
 
         # Machine documents per order
         cur.execute("""CREATE TABLE IF NOT EXISTS order_documents(
@@ -1935,9 +1937,12 @@ def pending_price_requests_count():
 def get_order_proformas(order_id):
     try:
         with _c() as c:
-            return [dict(r) for r in c.execute(
-                "SELECT * FROM order_proformas WHERE order_id=? ORDER BY uploaded_at DESC", (order_id,)
-            )]
+            rows = c.execute(
+                "SELECT id, order_id, file_path, filename, uploaded_by, uploaded_at FROM order_proformas WHERE order_id=? ORDER BY id DESC",
+                (order_id,)
+            ).fetchall()
+            cols = ["id","order_id","file_path","filename","uploaded_by","uploaded_at"]
+            return [dict(zip(cols, r)) for r in rows]
     except Exception:
         return []
 
