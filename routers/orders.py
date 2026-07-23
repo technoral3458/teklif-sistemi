@@ -470,28 +470,31 @@ async def del_stage(request: Request,
 @router.post("/{oid}/proforma")
 async def upload_proforma(request: Request, oid: int,
                           proforma_file: UploadFile = File(...)):
+    import os as _os, urllib.parse as _up
     user = auth.require_user(request)
     offer = fdb.get_offer(oid)
     if not offer:
         return RedirectResponse("/orders", 303)
-    mfr_id = udb.effective_mfr_id(user)
-    is_mfr_user = auth.is_mfr(user)
-    if user["role"] != "admin" and not (is_mfr_user and offer.get("manufacturer_id") == mfr_id):
+    # Allow admin or any manufacturer user that can see this order
+    if user["role"] != "admin" and not auth.is_mfr(user):
         return RedirectResponse(f"/orders/{oid}?msg=Yetkisiz+işlem&msg_type=error", 303)
     if not proforma_file or not proforma_file.filename:
-        return RedirectResponse(f"/orders/{oid}", 303)
-    import os as _os
-    ext = _os.path.splitext(proforma_file.filename)[1].lower() or ".pdf"
-    fname = f"proforma_{oid}_{uuid.uuid4().hex[:8]}{ext}"
-    dest = _os.path.join(DOCS_DIR, fname)
-    _os.makedirs(DOCS_DIR, exist_ok=True)
-    content = await proforma_file.read()
-    if not content:
-        return RedirectResponse(f"/orders/{oid}?msg=Dosya+boş&msg_type=error", 303)
-    with open(dest, "wb") as f:
-        f.write(content)
-    fdb.add_order_proforma(oid, f"docs/{fname}", proforma_file.filename, user["id"])
-    return RedirectResponse(f"/orders/{oid}?msg=Proforma+yüklendi&msg_type=success", 303)
+        return RedirectResponse(f"/orders/{oid}?msg=Dosya+seçilmedi&msg_type=error", 303)
+    try:
+        ext = _os.path.splitext(proforma_file.filename)[1].lower() or ".pdf"
+        fname = f"proforma_{oid}_{uuid.uuid4().hex[:8]}{ext}"
+        dest = _os.path.join(DOCS_DIR, fname)
+        _os.makedirs(DOCS_DIR, exist_ok=True)
+        content = await proforma_file.read()
+        if not content:
+            return RedirectResponse(f"/orders/{oid}?msg=Dosya+boş&msg_type=error", 303)
+        with open(dest, "wb") as f:
+            f.write(content)
+        fdb.add_order_proforma(oid, f"docs/{fname}", proforma_file.filename, user["id"])
+        return RedirectResponse(f"/orders/{oid}?msg=Proforma+yüklendi&msg_type=success", 303)
+    except Exception as e:
+        err = _up.quote(f"Yükleme hatası: {e}")
+        return RedirectResponse(f"/orders/{oid}?msg={err}&msg_type=error", 303)
 
 
 @router.post("/{oid}/document")

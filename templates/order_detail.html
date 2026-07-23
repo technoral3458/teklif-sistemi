@@ -45,6 +45,10 @@
   </a>
 </div>
 
+{% set _msg = request.query_params.get('msg','') %}
+{% set _msg_type = request.query_params.get('msg_type','info') %}
+{% if _msg %}<div class="alert alert-{{ _msg_type }}" style="margin-bottom:16px;">{{ _msg.replace('+',' ') }}</div>{% endif %}
+
 <!-- ── Üst bilgi kartları ── -->
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
   <div class="card">
