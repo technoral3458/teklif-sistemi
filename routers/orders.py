@@ -475,8 +475,9 @@ async def upload_proforma(request: Request, oid: int,
     if not offer:
         return RedirectResponse("/orders", 303)
     mfr_id = udb.effective_mfr_id(user)
-    if user["role"] != "admin" and offer.get("manufacturer_id") != mfr_id:
-        return RedirectResponse("/orders", 303)
+    is_mfr_user = auth.is_mfr(user)
+    if user["role"] != "admin" and not (is_mfr_user and offer.get("manufacturer_id") == mfr_id):
+        return RedirectResponse(f"/orders/{oid}?msg=Yetkisiz+işlem&msg_type=error", 303)
     if not proforma_file or not proforma_file.filename:
         return RedirectResponse(f"/orders/{oid}", 303)
     import os as _os
@@ -485,10 +486,12 @@ async def upload_proforma(request: Request, oid: int,
     dest = _os.path.join(DOCS_DIR, fname)
     _os.makedirs(DOCS_DIR, exist_ok=True)
     content = await proforma_file.read()
+    if not content:
+        return RedirectResponse(f"/orders/{oid}?msg=Dosya+boş&msg_type=error", 303)
     with open(dest, "wb") as f:
         f.write(content)
     fdb.add_order_proforma(oid, f"docs/{fname}", proforma_file.filename, user["id"])
-    return RedirectResponse(f"/orders/{oid}", 303)
+    return RedirectResponse(f"/orders/{oid}?msg=Proforma+yüklendi&msg_type=success", 303)
 
 
 @router.post("/{oid}/document")

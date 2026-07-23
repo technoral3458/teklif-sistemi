@@ -427,7 +427,7 @@
       <div style="font-size:12px;color:var(--text-muted);">{{ T.ord_no_proformas }}</div>
       {% endif %}
       <form method="post" action="/orders/{{ offer.id }}/proforma" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;margin-top:4px;">
-        <input type="file" name="proforma_file" accept=".pdf,.PDF" required style="flex:1;font-size:12px;" />
+        <input type="file" name="proforma_file" required style="flex:1;font-size:12px;" />
         <button type="submit" class="btn btn-primary btn-sm">{{ T.ord_proforma_upload }}</button>
       </form>
     </div>
