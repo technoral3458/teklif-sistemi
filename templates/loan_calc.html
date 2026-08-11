@@ -52,8 +52,8 @@
   <div class="card-body">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
       <div class="form-group">
-        <label class="form-label">Kredi Tutarı</label>
-        <input type="number" id="loanAmount" class="form-control" value="100000" min="1000" step="1000"
+        <label class="form-label">Hesaba Geçecek Tutar</label>
+        <input type="number" id="loanAmount" class="form-control" value="1000000" min="1000" step="1000"
                oninput="calcLoan()" style="font-size:17px;font-weight:700;" />
       </div>
       <div class="form-group">
@@ -214,12 +214,12 @@ function calcLoan() {
 
   let cards = '';
   planRates.forEach(r => {
-    const rate      = r[rateKey];
-    const totalInt  = amount * rate / 100;
-    const fileFee   = amount * r.file_fee_pct / 100;
-    const total     = amount + totalInt;
-    const monthly   = total / r.term_months;
-    const totalCost = total + fileFee;
+    const rate     = r[rateKey];
+    const gross    = amount / (1 - rate / 100);   // çekilen kredi (brüt)
+    const interest = gross - amount;               // faiz/kesinti
+    const fileFee  = gross * r.file_fee_pct / 100;
+    const monthly  = gross / r.term_months;
+    const totalCost = gross + fileFee;
     const graceSub = r.grace_months ? `${r.grace_months} ay ödemesiz + ${r.term_months} taksit` : `${r.term_months} aylık eşit taksit`;
 
     cards += `<div class="loan-card">
@@ -234,9 +234,12 @@ function calcLoan() {
         </div>
       </div>
       <div class="lc-details">
-        <div class="lc-detail-item"><span>Toplam Faiz</span>${fmt(totalInt, currency)}</div>
+        <div class="lc-detail-item"><span>Çekilen Kredi</span>${fmt(gross, currency)}</div>
+        <div class="lc-detail-item"><span>Hesaba Geçen</span>${fmt(amount, currency)}</div>
         <div class="lc-detail-item"><span>Oran</span>${rate.toFixed(2)}%</div>
+        <div class="lc-detail-item"><span>Faiz/Kesinti</span>${fmt(interest, currency)}</div>
         <div class="lc-detail-item"><span>Dosya Masrafı</span>${fmt(fileFee, currency)}</div>
+        <div class="lc-detail-item"></div>
         <div class="lc-total"><span>Toplam Maliyet</span>${fmt(totalCost, currency)}</div>
       </div>
     </div>`;
