@@ -3,7 +3,10 @@ from config import USERS_DB, ADMIN_EMAIL, ADMIN_PASS, ADMIN_COMPANY
 
 
 def _c():
-    return sqlite3.connect(USERS_DB, check_same_thread=False)
+    con = sqlite3.connect(USERS_DB, check_same_thread=False, timeout=15)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=NORMAL")
+    return con
 
 def _acol(cur, tbl, col, typ):
     cols = [r[1] for r in cur.execute(f"PRAGMA table_info({tbl})").fetchall()]
@@ -48,17 +51,17 @@ def init():
             ("is_manufacturer","INTEGER DEFAULT 0"),
         ]:
             _acol(c.cursor(),"users",col,typ)
-        h = bcrypt.hashpw(ADMIN_PASS.encode(), bcrypt.gensalt()).decode()
         existing = c.execute("SELECT id FROM users WHERE role='admin' LIMIT 1").fetchone()
-        if existing:
-            c.execute(
-                "UPDATE users SET email=?,password=?,can_view_costs=1,is_approved=1,is_active=1 WHERE role='admin'",
-                (ADMIN_EMAIL, h),
-            )
-        else:
+        if not existing:
+            h = bcrypt.hashpw(ADMIN_PASS.encode(), bcrypt.gensalt()).decode()
             c.execute(
                 "INSERT INTO users(email,password,company_name,role,user_type,is_approved,is_active,can_view_costs) VALUES(?,?,?,'admin','admin',1,1,1)",
                 (ADMIN_EMAIL, h, ADMIN_COMPANY),
+            )
+        else:
+            # Keep existing password; only ensure account stays active
+            c.execute(
+                "UPDATE users SET is_approved=1,is_active=1,can_view_costs=1 WHERE role='admin'",
             )
 
 def _row(r):

@@ -4,7 +4,10 @@ from config import FACTORY_DB
 
 
 def _c():
-    return sqlite3.connect(FACTORY_DB, check_same_thread=False)
+    con = sqlite3.connect(FACTORY_DB, check_same_thread=False, timeout=15)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=NORMAL")
+    return con
 
 
 def _acol(cur, tbl, col, typ):
