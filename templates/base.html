@@ -97,12 +97,6 @@
       </a>
       {% endif %}
 
-      {% if not _menus or 'membrane' in _menus %}
-      <a href="/membrane" class="nav-link {% if active_page == 'membrane' %}active{% endif %}">
-        <span class="nav-icon" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
-        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_membrane }}</span>
-      </a>
-      {% endif %}
 
       {% if not _menus or 'costs' in _menus %}
       <a href="/costs" class="nav-link {% if active_page == 'costs' %}active{% endif %}">
