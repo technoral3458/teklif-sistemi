@@ -397,6 +397,219 @@ async def offer_detail(request: Request, offer_id: int):
     })
 
 
+@router.get("/{offer_id}/social-card")
+async def social_card(request: Request, offer_id: int):
+    import io, textwrap, re
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    from fastapi.responses import Response as FResponse
+
+    user = auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+
+    model   = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
+    items   = fdb.get_offer_items(offer_id)
+    opts    = {o["id"]: o for o in fdb.get_options()}
+    specs   = _filter_specs(_parse_specs(model or {}, "tr"), items, opts)
+    display = _best_display_image(model or {}, offer, items, opts)
+    company = fdb.get_company() or {}
+
+    model_name = (model or {}).get("name", offer.get("model_name", "")) or ""
+
+    # ── AI: select top specs & headline ────────────────────────────────────────
+    from config import ANTHROPIC_API_KEY
+    import httpx as _hx
+
+    headline  = model_name
+    key_specs = []
+
+    if specs:
+        for s in specs[:5]:
+            t = (s.get("title") or "").strip()
+            d = (s.get("desc") or "").strip()
+            if t:
+                key_specs.append(f"{t}: {d}" if d else t)
+
+    if ANTHROPIC_API_KEY and specs:
+        spec_block = "\n".join(f"- {s.get('title','')}: {s.get('desc','')}" for s in specs[:15])
+        try:
+            async with _hx.AsyncClient(timeout=12) as cli:
+                r = await cli.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                             "content-type": "application/json"},
+                    json={
+                        "model": "claude-haiku-4-5-20251001",
+                        "max_tokens": 256,
+                        "messages": [{"role": "user", "content":
+                            f"Makina: {model_name}\nÖzellikler:\n{spec_block}\n\n"
+                            "Bu makina için Instagram pazarlama görseli yapıyoruz. JSON döndür:\n"
+                            '{{"headline":"max 7 kelime etkileyici Türkçe başlık",'
+                            '"specs":["4 adet kısa öne çıkan özellik, değer dahil, örn: 180 Parça/Saat"]}}'
+                        }],
+                    }
+                )
+            if r.status_code == 200:
+                txt = r.json()["content"][0]["text"]
+                m = re.search(r'\{.*\}', txt, re.DOTALL)
+                if m:
+                    d = json.loads(m.group())
+                    headline  = d.get("headline", model_name) or model_name
+                    ai_specs  = d.get("specs") or []
+                    if ai_specs:
+                        key_specs = [str(s) for s in ai_specs[:4]]
+        except Exception:
+            pass
+
+    if not key_specs:
+        key_specs = [f"{s.get('title','')}: {s.get('desc','')}" for s in specs[:4] if s.get("title")]
+
+    # ── Pillow: build 1080×1080 image ─────────────────────────────────────────
+    W = H = 1080
+    DARK   = (10, 22, 40)
+    ACCENT = (56, 182, 255)
+    GREEN  = (52, 211, 153)
+    WHITE  = (255, 255, 255)
+    MUTED  = (160, 185, 215)
+
+    canvas = Image.new("RGB", (W, H), DARK)
+    draw   = ImageDraw.Draw(canvas)
+
+    # Background: blurred machine image
+    if display:
+        img_path = os.path.join(BASE_DIR, "static", display)
+        if os.path.exists(img_path):
+            try:
+                bg = Image.open(img_path).convert("RGB")
+                bg = bg.resize((W, H), Image.LANCZOS)
+                bg = bg.filter(ImageFilter.GaussianBlur(18))
+                # Darken
+                overlay = Image.new("RGB", (W, H), DARK)
+                canvas = Image.blend(bg, overlay, alpha=0.70)
+                draw   = ImageDraw.Draw(canvas)
+            except Exception:
+                pass
+
+    # Left gradient panel (makes text readable)
+    for x in range(600):
+        a = int(220 * (1 - x / 600) ** 0.5)
+        draw.line([(x, 0), (x, H)], fill=(*DARK, a))
+
+    # Right: clean machine image
+    if display:
+        img_path = os.path.join(BASE_DIR, "static", display)
+        if os.path.exists(img_path):
+            try:
+                mach = Image.open(img_path).convert("RGBA")
+                max_w, max_h = 560, 660
+                mach.thumbnail((max_w, max_h), Image.LANCZOS)
+                x_pos = W - mach.width - 20
+                y_pos = (H - mach.height) // 2
+                canvas.paste(mach, (x_pos, y_pos), mach)
+            except Exception:
+                pass
+
+    # Fonts
+    FONT_DIR = "/usr/share/fonts/truetype/liberation"
+    def _f(size, bold=True):
+        try:
+            fname = "LiberationSans-Bold.ttf" if bold else "LiberationSans-Regular.ttf"
+            return ImageFont.truetype(os.path.join(FONT_DIR, fname), size)
+        except Exception:
+            return ImageFont.load_default()
+
+    # Company logo (top-left)
+    logo_y = 54
+    logo_bottom = logo_y
+    logo_path = company.get("logo_path", "")
+    if logo_path:
+        lp = os.path.join(BASE_DIR, "static", logo_path)
+        if os.path.exists(lp):
+            try:
+                logo = Image.open(lp).convert("RGBA")
+                logo.thumbnail((220, 72), Image.LANCZOS)
+                canvas.paste(logo, (54, logo_y), logo)
+                logo_bottom = logo_y + logo.height + 8
+            except Exception:
+                pass
+    if logo_bottom == logo_y:
+        company_name_top = company.get("company_name", "")
+        if company_name_top:
+            draw.text((54, logo_y), company_name_top, font=_f(28), fill=ACCENT)
+            logo_bottom = logo_y + 40
+
+    # Accent top line
+    draw.rectangle([(54, logo_bottom + 12), (320, logo_bottom + 16)], fill=ACCENT)
+
+    # Headline
+    hl_y = logo_bottom + 36
+    hl_font = _f(52)
+    # Wrap headline to fit left panel
+    words = headline.split()
+    lines, line = [], ""
+    for w in words:
+        test = (line + " " + w).strip()
+        bbox = draw.textbbox((0, 0), test, font=hl_font)
+        if bbox[2] > 520:
+            if line:
+                lines.append(line)
+            line = w
+        else:
+            line = test
+    if line:
+        lines.append(line)
+    for ln in lines[:3]:
+        draw.text((54, hl_y), ln, font=hl_font, fill=WHITE)
+        hl_y += 62
+
+    # Model name
+    hl_y += 8
+    draw.text((54, hl_y), model_name, font=_f(30, bold=False), fill=ACCENT)
+    hl_y += 50
+
+    # Separator
+    draw.rectangle([(54, hl_y), (260, hl_y + 2)], fill=(*GREEN, 180))
+    hl_y += 20
+
+    # Key specs
+    spec_font  = _f(28)
+    label_font = _f(20, bold=False)
+    dot_color  = GREEN
+    for spec_str in key_specs[:4]:
+        if ":" in spec_str:
+            label, val = spec_str.split(":", 1)
+            draw.text((54, hl_y), "▸ ", font=spec_font, fill=dot_color)
+            draw.text((84, hl_y), val.strip(), font=spec_font, fill=WHITE)
+            draw.text((84, hl_y + 32), label.strip(), font=label_font, fill=MUTED)
+            hl_y += 78
+        else:
+            draw.text((54, hl_y), f"▸  {spec_str}", font=spec_font, fill=WHITE)
+            hl_y += 54
+
+    # Bottom bar
+    draw.rectangle([(0, H - 90), (W, H)], fill=(6, 14, 26))
+    draw.rectangle([(0, H - 90), (W, H - 87)], fill=ACCENT)
+    company_name = company.get("company_name", "")
+    website      = company.get("website", "") or ""
+    bottom_text  = company_name
+    if website:
+        bottom_text += f"  ·  {website}"
+    if bottom_text:
+        draw.text((54, H - 64), bottom_text, font=_f(26, bold=False), fill=WHITE)
+
+    # Save
+    buf = io.BytesIO()
+    canvas.save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+    slug = re.sub(r"[^a-z0-9-]", "-", model_name.lower())[:30].strip("-") or "kart"
+    return FResponse(
+        content=buf.read(),
+        media_type="image/png",
+        headers={"Content-Disposition": f'attachment; filename="sosyal-{slug}-{offer_id}.png"'},
+    )
+
+
 @router.get("/{offer_id}/print")
 async def offer_print(request: Request, offer_id: int):
     user = auth.require_user(request)
