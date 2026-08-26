@@ -160,7 +160,9 @@ def init():
         # Hat (line) machine support
         _acol(cur, "models", "image_path",      "TEXT DEFAULT ''")
         _acol(cur, "models", "is_line",         "INTEGER DEFAULT 0")
-        _acol(cur, "models", "line_configs",    "TEXT DEFAULT '2,3,4'")
+        _acol(cur, "models", "line_configs",    "TEXT DEFAULT '1,2,3,4'")
+        # Migrate existing line models that only have 2,3,4 → add 1 at front
+        cur.execute("UPDATE models SET line_configs='1,2,3,4' WHERE is_line=1 AND (line_configs='2,3,4' OR line_configs IS NULL OR line_configs='')")
         _acol(cur, "models", "manufacturer_id", "INTEGER DEFAULT NULL")
         _acol(cur, "models", "catalog_sort",    "INTEGER DEFAULT 999")
         cur.execute("""CREATE TABLE IF NOT EXISTS model_line_images(

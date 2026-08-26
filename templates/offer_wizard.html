@@ -349,10 +349,11 @@ function wizardSelectModel(modelId, modelName, basePrice, currency) {
   const isLine = parseInt(card?.dataset.isLine || '0');
   wizardLineCount = 0;
   if (isLine && card) {
-    const configs = (card.dataset.lineConfigs || '2,3,4').split(',').map(s => parseInt(s.trim())).filter(n => n > 0);
+    const configs = (card.dataset.lineConfigs || '1,2,3,4').split(',').map(s => parseInt(s.trim())).filter(n => n > 0);
     const btns = document.getElementById('lineConfigBtns');
+    const _hatSuffix = n => ({1:'\'li',2:'\'li',3:'\'lü',4:'\'lü',5:'\'li',6:'\'lı',7:'\'li',8:'\'li'}[n] || '\'li');
     btns.innerHTML = configs.map(lc =>
-      `<button type="button" class="btn btn-outline btn-sm line-cfg-btn" data-lc="${lc}" onclick="wizardSelectLine(${lc})">${lc}li Hat</button>`
+      `<button type="button" class="btn btn-outline btn-sm line-cfg-btn" data-lc="${lc}" onclick="wizardSelectLine(${lc})">${lc}${_hatSuffix(lc)} Hat</button>`
     ).join('');
     lineSection.style.display = '';
   } else {
