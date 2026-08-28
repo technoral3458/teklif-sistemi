@@ -403,6 +403,22 @@ def init():
         # Clear conflict_group for tool-changer options so multiple can be selected
         cur.execute("UPDATE options SET conflict_group='' WHERE conflict_group='Takım Değiştirme'")
 
+        cur.execute("""CREATE TABLE IF NOT EXISTS quote_requests(
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            ref_no       TEXT DEFAULT '',
+            model_id     INTEGER DEFAULT NULL,
+            model_name   TEXT DEFAULT '',
+            machine_count INTEGER DEFAULT 1,
+            options_json TEXT DEFAULT '[]',
+            customer_name TEXT DEFAULT '',
+            company_name  TEXT DEFAULT '',
+            email        TEXT DEFAULT '',
+            phone        TEXT DEFAULT '',
+            note         TEXT DEFAULT '',
+            status       TEXT DEFAULT 'Yeni',
+            created_at   TEXT DEFAULT(datetime('now'))
+        )""")
+
         c.commit()
 
 
@@ -1992,3 +2008,57 @@ def del_order_document(did):
 def set_order_serial(order_id, serial_number):
     with _c() as c:
         c.execute("UPDATE offers SET serial_number=? WHERE id=?", (serial_number, order_id))
+
+# ── Public Quote Requests ──────────────────────────────────────────────────────
+
+def add_quote_request(model_id, model_name, machine_count, options_json,
+                      customer_name, company_name, email, phone, note):
+    import random, string
+    ref = "TT" + "".join(random.choices(string.digits, k=6))
+    with _c() as c:
+        c.execute(
+            """INSERT INTO quote_requests
+               (ref_no,model_id,model_name,machine_count,options_json,
+                customer_name,company_name,email,phone,note)
+               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            (ref, model_id, model_name, machine_count, options_json,
+             customer_name, company_name, email, phone, note)
+        )
+        rid = c.execute("SELECT last_insert_rowid()").fetchone()[0]
+    return rid, ref
+
+def get_quote_requests(status=None):
+    with _c() as c:
+        if status:
+            rows = c.execute(
+                "SELECT * FROM quote_requests WHERE status=? ORDER BY id DESC", (status,)
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT * FROM quote_requests ORDER BY id DESC"
+            ).fetchall()
+        cols = ["id","ref_no","model_id","model_name","machine_count","options_json",
+                "customer_name","company_name","email","phone","note","status","created_at"]
+        return [dict(zip(cols, r)) for r in rows]
+
+def get_quote_request(rid):
+    with _c() as c:
+        row = c.execute("SELECT * FROM quote_requests WHERE id=?", (rid,)).fetchone()
+    if not row:
+        return None
+    cols = ["id","ref_no","model_id","model_name","machine_count","options_json",
+            "customer_name","company_name","email","phone","note","status","created_at"]
+    return dict(zip(cols, row))
+
+def upd_quote_request_status(rid, status):
+    with _c() as c:
+        c.execute("UPDATE quote_requests SET status=? WHERE id=?", (status, rid))
+
+def del_quote_request(rid):
+    with _c() as c:
+        c.execute("DELETE FROM quote_requests WHERE id=?", (rid,))
+
+def count_new_quote_requests():
+    with _c() as c:
+        r = c.execute("SELECT COUNT(*) FROM quote_requests WHERE status='Yeni'").fetchone()
+    return r[0] if r else 0

@@ -52,6 +52,8 @@ from routers.loan import router as loan_router
 from routers.admin_requests import router as admin_requests_router
 from routers.translate import router as translate_router
 from routers.price_requests import router as price_requests_router
+from routers.public_quote import router as public_quote_router
+from routers.quote_requests import router as quote_requests_router
 
 for r in [
     auth_router,
@@ -73,6 +75,8 @@ for r in [
     admin_requests_router,
     translate_router,
     price_requests_router,
+    public_quote_router,
+    quote_requests_router,
 ]:
     app.include_router(r)
 

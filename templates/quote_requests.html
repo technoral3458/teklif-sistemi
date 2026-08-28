@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}Teklif Talepleri{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <h3 class="card-title">📩 Teklif Talepleri</h3>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <a href="/admin/teklif-talepleri" class="btn btn-sm {% if not active_status %}btn-primary{% else %}btn-ghost{% endif %}">Tümü</a>
+      {% for s in statuses %}
+      <a href="/admin/teklif-talepleri?status={{ s }}" class="btn btn-sm {% if active_status == s %}btn-primary{% else %}btn-ghost{% endif %}">{{ s }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card-body" style="padding:0;overflow-x:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Ref</th>
+          <th>Makine</th>
+          <th>Müşteri</th>
+          <th>Firma</th>
+          <th>E-posta</th>
+          <th>Tel</th>
+          <th>Tarih</th>
+          <th>Durum</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr style="{% if r.status == 'Yeni' %}font-weight:700;{% endif %}">
+          <td>
+            <a href="/admin/teklif-talepleri/{{ r.id }}" style="color:var(--accent);font-weight:700;">{{ r.ref_no }}</a>
+          </td>
+          <td>{{ r.model_name or '—' }}{% if r.machine_count and r.machine_count > 1 %} <span style="font-size:11px;color:var(--text-muted);">({{ r.machine_count }}'li Hat)</span>{% endif %}</td>
+          <td>{{ r.customer_name }}</td>
+          <td>{{ r.company_name or '—' }}</td>
+          <td><a href="mailto:{{ r.email }}" style="color:var(--accent);">{{ r.email }}</a></td>
+          <td>{{ r.phone or '—' }}</td>
+          <td style="font-size:12px;color:var(--text-muted);">{{ r.created_at[:16] if r.created_at else '—' }}</td>
+          <td>
+            <span class="badge badge-{% if r.status == 'Yeni' %}amber{% elif r.status == 'Teklif Hazırlandı' %}green{% elif r.status == 'Reddedildi' %}red{% else %}blue{% endif %}">{{ r.status }}</span>
+          </td>
+          <td>
+            <a href="/admin/teklif-talepleri/{{ r.id }}" class="btn btn-ghost btn-sm">Detay</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:32px;">Teklif talebi bulunmuyor.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
