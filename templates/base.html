@@ -137,7 +137,7 @@
         <span class="nav-icon" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
         <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_requests }}{% if _preq > 0 %} <span style="background:#ef4444;color:#fff;border-radius:999px;padding:1px 6px;font-size:11px;font-weight:700;margin-left:4px;">{{ _preq }}</span>{% endif %}</span>
       </a>
-      {% set _qreq = fdb.count_new_quote_requests() %}
+      {% set _qreq = _count_quote_requests() %}
       <a href="/admin/teklif-talepleri" class="nav-link {% if active_page == 'quote_requests' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
         <span class="nav-label">Teklif Talepleri{% if _qreq > 0 %} <span style="background:#ef4444;color:#fff;border-radius:999px;padding:1px 6px;font-size:11px;font-weight:700;margin-left:4px;">{{ _qreq }}</span>{% endif %}</span>

@@ -19,13 +19,12 @@ def _pending_requests_count():
 
 templates.env.globals['_pending_requests_count'] = _pending_requests_count
 
-def _count_new_quote_requests():
+
+def _count_quote_requests():
     try:
         import db.factory as fdb
         return fdb.count_new_quote_requests()
     except Exception:
         return 0
 
-templates.env.globals['fdb'] = type('fdb', (), {
-    'count_new_quote_requests': staticmethod(_count_new_quote_requests)
-})()
+templates.env.globals['_count_quote_requests'] = _count_quote_requests
