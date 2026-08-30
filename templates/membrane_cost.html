@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ T.nav_membrane }}{% endblock %}
+
+{% block content %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+
+  <!-- ── Döviz Kurları ── -->
+  <div class="card">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 class="card-title">💱 {{ T.mb_exchange_rates }}</h3>
+      <form method="post" action="/membrane/rates/fetch" style="margin:0;">
+        <button type="submit" class="btn btn-outline btn-sm">{{ T.mb_fetch_rates }}</button>
+      </form>
+    </div>
+    <div class="card-body">
+      <form method="post" action="/membrane/rates/save">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px;">
+          {% for cur, sym in [('USD','$'),('EUR','€'),('GBP','£')] %}
+          {% set info = rates.get(cur, {}) %}
+          <div>
+            <label class="form-label" style="font-size:13px;">{{ sym }} {{ cur }}/TRY</label>
+            <input type="number" name="{{ cur|lower }}" class="form-control" step="0.0001"
+                   value="{{ '%.4f'|format(info.rate|default(1)|float) }}" required />
+            {% if info.updated_at %}
+            <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">{{ info.updated_at[:16] }}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">{{ T.mb_save_rates }}</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Özet ── -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">📊 {{ T.mb_cost_summary }}</h3></div>
+    <div class="card-body">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">{{ T.mb_total_cost_m2 }}</div>
+        <div style="font-size:32px;font-weight:800;color:var(--accent);">{{ "%.2f"|format(total_cost_per_m2) }} ₺</div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:12px;">
+        {% for mat in materials %}
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;">
+          <span style="color:var(--text-muted);">{{ mat.name }}</span>
+          <span>{{ "%.2f"|format(mat.cost_per_m2_try) }} ₺/m²</span>
+        </div>
+        {% endfor %}
+        {% if not materials %}
+        <div style="color:var(--text-muted);font-size:13px;text-align:center;">{{ T.mb_no_material }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Malzemeler ── -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3 class="card-title">🧱 {{ T.mb_materials }}</h3>
+    <button class="btn btn-primary btn-sm" onclick="openMatModal()">{{ T.mb_add_material }}</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ T.mb_col_mat_name }}</th>
+          <th>{{ T.mb_col_type }}</th>
+          <th style="text-align:right">{{ T.mb_col_price }}</th>
+          <th>{{ T.mb_col_unit }}</th>
+          <th>{{ T.mb_col_sheet_size }}</th>
+          <th>{{ T.mb_col_usage }}</th>
+          <th style="text-align:right">{{ T.mb_col_cost_m2 }}</th>
+          <th style="text-align:center">{{ T.order_action }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mat in materials %}
+        <tr>
+          <td><strong>{{ mat.name }}</strong>{% if mat.notes %}<br><small style="color:var(--text-muted)">{{ mat.notes }}</small>{% endif %}</td>
+          <td>
+            <span class="badge badge-{% if mat.material_type=='mdf' %}blue{% elif mat.material_type=='foil' %}green{% elif mat.material_type=='adhesive' %}amber{% else %}gray{% endif %}">
+              {% if mat.material_type=='mdf' %}{{ T.mb_type_mdf }}{% elif mat.material_type=='foil' %}{{ T.mb_type_foil }}{% elif mat.material_type=='adhesive' %}{{ T.mb_type_adhesive }}{% else %}{{ T.mb_type_other }}{% endif %}
+            </span>
+          </td>
+          <td style="text-align:right">{{ "%.2f"|format(mat.price|float) }} {{ mat.currency }}</td>
+          <td>{{ mat.unit }}</td>
+          <td style="color:var(--text-muted);font-size:12px;">
+            {% if mat.unit == 'plaka' and mat.sheet_width and mat.sheet_height %}
+            {{ mat.sheet_width|int }}×{{ mat.sheet_height|int }} cm
+            <br>= {{ "%.4f"|format((mat.sheet_width/100)*(mat.sheet_height/100)) }} m²
+            {% else %}—{% endif %}
+          </td>
+          <td style="text-align:center">{{ mat.usage_per_m2 if mat.unit not in ['m2','plaka'] else '—' }}</td>
+          <td style="text-align:right;font-weight:600;color:var(--accent);">{{ "%.2f"|format(mat.cost_per_m2_try) }} ₺</td>
+          <td style="text-align:center;">
+            <button class="btn btn-ghost btn-sm" onclick='editMat({{ mat|tojson }})'>✏️</button>
+            <form method="post" action="/membrane/material/delete" style="display:inline;">
+              <input type="hidden" name="id" value="{{ mat.id }}" />
+              <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('{{ T.mb_confirm_del_mat }}')" style="color:var(--danger)">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not materials %}
+        <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">{{ T.mb_no_material_hint }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Listeler ── -->
+<div class="card">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3 class="card-title">📋 {{ T.mb_door_lists }}</h3>
+    <div style="display:flex;gap:6px;">
+      <a href="/membrane/caps" class="btn btn-outline btn-sm">{{ T.mb_macros }}</a>
+      <a href="/membrane/jobs" class="btn btn-outline btn-sm">{{ T.mb_job_list }}</a>
+      <button class="btn btn-primary btn-sm" onclick="openListModal()">{{ T.mb_new_list_btn }}</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>{{ T.mb_col_list_name }}</th>
+          <th>{{ T.mb_col_date }}</th>
+          <th style="text-align:center">{{ T.mb_col_door }}</th>
+          <th style="text-align:center">{{ T.mb_col_total_qty }}</th>
+          <th style="text-align:right">{{ T.mb_col_total_cost }}</th>
+          <th style="text-align:center">{{ T.order_action }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lst in lists %}
+        <tr>
+          <td style="color:var(--text-muted)">{{ lst.id }}</td>
+          <td><a href="/membrane/list/{{ lst.id }}" style="color:var(--accent);font-weight:600;">{{ lst.name }}</a>
+            {% if lst.notes %}<br><small style="color:var(--text-muted)">{{ lst.notes }}</small>{% endif %}
+          </td>
+          <td style="color:var(--text-muted);font-size:12px;">{{ lst.created_at[:16] }}</td>
+          <td style="text-align:center">{{ lst.door_count }}</td>
+          <td style="text-align:center">{{ lst.total_qty }}</td>
+          <td style="text-align:right;font-weight:700;color:var(--accent);">{{ "%.2f"|format(lst.total_cost) }} ₺</td>
+          <td style="text-align:center;">
+            <a href="/membrane/list/{{ lst.id }}" class="btn btn-ghost btn-sm">👁️</a>
+            <a href="/membrane/list/{{ lst.id }}/print" target="_blank" class="btn btn-ghost btn-sm">🖨️</a>
+            <form method="post" action="/membrane/list/delete" style="display:inline;">
+              <input type="hidden" name="id" value="{{ lst.id }}" />
+              <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('{{ T.mb_confirm_del_list }}')" style="color:var(--danger)">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not lists %}
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">{{ T.mb_no_list_hint }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Malzeme Modal ── -->
+<div id="matModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="matModalTitle">{{ T.mb_add_mat_title }}</h3>
+      <button class="modal-close" onclick="closeModal('matModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/membrane/material/save" id="matForm">
+        <input type="hidden" name="id" id="mat_id" value="0" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="grid-column:span 2;">
+            <label class="form-label">{{ T.mb_mat_name_label }}</label>
+            <input type="text" name="name" id="mat_name" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.mb_type_label }}</label>
+            <select name="material_type" id="mat_type" class="form-control" onchange="togglePlaka()">
+              <option value="mdf">{{ T.mb_type_mdf }}</option>
+              <option value="foil">{{ T.mb_type_foil }}</option>
+              <option value="adhesive">{{ T.mb_type_adhesive }}</option>
+              <option value="other">{{ T.mb_type_other }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.mb_unit_label }}</label>
+            <select name="unit" id="mat_unit" class="form-control" onchange="togglePlaka()">
+              <option value="plaka">{{ T.mb_unit_sheet }}</option>
+              <option value="m2">{{ T.mb_unit_m2 }}</option>
+              <option value="kg">{{ T.mb_unit_kg }}</option>
+              <option value="lt">{{ T.mb_unit_lt }}</option>
+              <option value="adet">{{ T.mb_unit_pcs }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.mb_price_label }}</label>
+            <input type="number" name="price" id="mat_price" class="form-control" step="0.01" min="0" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.mb_currency_label }}</label>
+            <select name="currency" id="mat_currency" class="form-control">
+              <option value="TRY">TRY ₺</option>
+              <option value="USD">USD $</option>
+              <option value="EUR">EUR €</option>
+              <option value="GBP">GBP £</option>
+            </select>
+          </div>
+          <div id="plakaFields" style="grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label class="form-label">{{ T.mb_sheet_w_label }} <span style="color:var(--accent);font-size:11px;">cm</span></label>
+              <input type="number" name="sheet_width" id="mat_width" class="form-control" step="0.1" min="0" placeholder="ör: 244" />
+              <small style="color:var(--text-muted)">{{ T.mb_std_mdf_w }}</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.mb_sheet_h_label }} <span style="color:var(--accent);font-size:11px;">cm</span></label>
+              <input type="number" name="sheet_height" id="mat_height" class="form-control" step="0.1" min="0" placeholder="ör: 122" />
+              <small style="color:var(--text-muted)">{{ T.mb_std_mdf_h }}</small>
+            </div>
+          </div>
+          <div id="usageField" class="form-group" style="display:none;">
+            <label class="form-label">{{ T.mb_usage_coef }}</label>
+            <input type="number" name="usage_per_m2" id="mat_usage" class="form-control" step="0.001" min="0" value="1" />
+          </div>
+          <div class="form-group" style="grid-column:span 2;">
+            <label class="form-label">{{ T.mb_notes_label }}</label>
+            <input type="text" name="notes" id="mat_notes" class="form-control" placeholder="ör: 18mm, E1 kalite..." />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">{{ T.mb_save_btn }}</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- List Modal -->
+<div id="listModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ T.mb_new_list_title }}</h3>
+      <button class="modal-close" onclick="closeModal('listModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/membrane/list/save">
+        <input type="hidden" name="id" value="0" />
+        <div class="form-group">
+          <label class="form-label">{{ T.mb_list_name_label }}</label>
+          <input type="text" name="name" class="form-control" required placeholder="ör: Ahmet Bey Mutfak, Villa Projesi..." autofocus />
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.mb_notes_label }}</label>
+          <input type="text" name="notes" class="form-control" placeholder="{{ T.mb_list_notes_ph }}" />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">{{ T.mb_create_list_btn }}</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+var STR_ADD_MAT  = {{ T.mb_add_mat_title|tojson }};
+var STR_EDIT_MAT = {{ T.mb_edit_mat_title|tojson }};
+
+function togglePlaka() {
+  var unit = document.getElementById('mat_unit').value;
+  document.getElementById('plakaFields').style.display = (unit === 'plaka') ? 'grid' : 'none';
+  document.getElementById('usageField').style.display = (unit !== 'plaka' && unit !== 'm2') ? 'block' : 'none';
+}
+
+function openMatModal() {
+  document.getElementById('matModalTitle').textContent = STR_ADD_MAT;
+  document.getElementById('mat_id').value = '0';
+  document.getElementById('mat_name').value = '';
+  document.getElementById('mat_type').value = 'mdf';
+  document.getElementById('mat_unit').value = 'plaka';
+  document.getElementById('mat_price').value = '';
+  document.getElementById('mat_currency').value = 'TRY';
+  document.getElementById('mat_width').value = '';
+  document.getElementById('mat_height').value = '';
+  document.getElementById('mat_usage').value = '1';
+  document.getElementById('mat_notes').value = '';
+  togglePlaka();
+  openModal('matModal');
+}
+
+function editMat(mat) {
+  document.getElementById('matModalTitle').textContent = STR_EDIT_MAT;
+  document.getElementById('mat_id').value = mat.id;
+  document.getElementById('mat_name').value = mat.name;
+  document.getElementById('mat_type').value = mat.material_type;
+  document.getElementById('mat_unit').value = mat.unit;
+  document.getElementById('mat_price').value = mat.price;
+  document.getElementById('mat_currency').value = mat.currency;
+  document.getElementById('mat_width').value = mat.sheet_width;
+  document.getElementById('mat_height').value = mat.sheet_height;
+  document.getElementById('mat_usage').value = mat.usage_per_m2;
+  document.getElementById('mat_notes').value = mat.notes || '';
+  togglePlaka();
+  openModal('matModal');
+}
+
+function openListModal() { openModal('listModal'); }
+</script>
+{% endblock %}

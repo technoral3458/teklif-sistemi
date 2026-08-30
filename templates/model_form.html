@@ -1,0 +1,738 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ T.model_edit if model.id else T.model_new }}{% endblock %}
+
+{% block content %}
+{# _lang için user.lang doğrudan kullanılıyor #}
+<div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <a href="/models" class="btn btn-ghost btn-sm">{{ T.model_back }}</a>
+  {% if model.id %}
+  <a href="/models/{{ model.id }}/catalog-pdf?lang={{ user.lang or 'tr' }}"
+     target="_blank"
+     class="btn btn-outline btn-sm"
+     style="border-color:#3b82f6;color:#3b82f6;display:flex;align-items:center;gap:6px;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><polyline points="9 9 9 9"/></svg>
+    📖 Katalog Oluştur
+  </a>
+  {% endif %}
+</div>
+
+<form method="post" action="/models/save" enctype="multipart/form-data" onsubmit="serializeSpecs()">
+  <input type="hidden" name="id" value="{{ model.id|default(0) }}" />
+
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;">
+    <!-- Left column -->
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <h3 class="card-title" style="margin:0;">{{ T.model_basic_info }}</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <a href="/models/excel-template" class="btn btn-ghost btn-sm" download>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              {{ T.btn_excel_model_template }}
+            </a>
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              {{ T.btn_excel_import }}
+              <input type="file" id="excelImportInput" accept=".xlsx,.xls" style="display:none;" onchange="importFromExcel(this)" />
+            </label>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">{{ T.model_name }} *</label>
+            <input type="text" name="name" class="form-control" value="{{ model.name|default('') }}" required />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label class="form-label">{{ T.model_category }}</label>
+              <select name="category_id" id="categorySelect" class="form-control" onchange="onCategoryChange(this.value)">
+                <option value="0">{{ T.select_placeholder }}</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" data-line="{{ cat.is_line_capable or 0 }}" {% if model.category_id == cat.id %}selected{% endif %}>{{ (cat.get('name_'+user.lang) or cat.name) if user.lang and user.lang != 'tr' else cat.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.model_currency }}</label>
+              <select name="currency" class="form-control">
+                {% for cur in currencies %}
+                <option value="{{ cur }}" {% if model.currency == cur %}selected{% endif %}>{{ cur }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          {% if not is_mfr %}
+          <div class="form-group">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              Genel Katalog Sırası
+            </label>
+            <input type="number" name="catalog_sort" class="form-control" min="1" max="999"
+                   value="{{ model.catalog_sort if model.catalog_sort and model.catalog_sort != 999 else '' }}"
+                   placeholder="Sıra no (1=ilk, boş=otomatik)" style="max-width:200px;" />
+            <small style="color:var(--text-muted);font-size:11px;">Genel katalogda sıralama ve kapak mozaiği bu numaraya göre belirlenir.</small>
+          </div>
+          {% endif %}
+          {% if user.role == 'admin' and manufacturers %}
+          <div class="form-group">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+              Varsayılan Üretici
+            </label>
+            <select name="manufacturer_id" class="form-control">
+              <option value="0">-- Atanmadı --</option>
+              {% for mfr in manufacturers %}
+              <option value="{{ mfr.id }}" {% if model.manufacturer_id == mfr.id %}selected{% endif %}>{{ mfr.company_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+          {% if not is_mfr %}
+          <div class="form-group">
+            <label class="form-label">{{ T.model_sale_price }}</label>
+            <input type="number" name="base_price" class="form-control" step="0.01" min="0" value="{{ model.base_price|default(0) }}" />
+          </div>
+          {% endif %}
+
+          {% if is_mfr %}
+          {% set cur_pp = model.purchase_price|default(0)|float %}
+          <div class="form-group">
+            <label class="form-label" style="font-weight:600;">💰 {{ T.opt_purchase_price }}</label>
+            {% if model.id and cur_pp > 0 %}
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);margin-bottom:10px;">
+                <span style="font-size:18px;font-weight:700;color:var(--primary);">{{ "%.2f"|format(cur_pp) }} {{ model.purchase_currency or 'USD' }}</span>
+                <span style="font-size:12px;color:var(--text-muted);">{{ T.mfr_price_change_hint }}</span>
+              </div>
+              <div style="background:var(--surface-2);border-radius:8px;padding:12px;border:1px solid var(--border);">
+                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">📋 {{ T.mfr_price_change_req }}</div>
+                <div style="display:grid;grid-template-columns:1fr 110px auto;gap:8px;align-items:end;" id="priceReqForm">
+                  <div>
+                    <label class="form-label" style="font-size:11px;">{{ T.mfr_new_price }}</label>
+                    <input type="number" id="priceReqNewPrice" class="form-control" step="0.01" min="0" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:11px;">{{ T.offer_currency }}</label>
+                    <select id="priceReqCurrency" class="form-control">
+                      {% for cur in currencies %}<option value="{{ cur }}" {% if model.purchase_currency == cur %}selected{% endif %}>{{ cur }}</option>{% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:11px;">&nbsp;</label>
+                    <button type="button" class="btn btn-primary btn-sm" style="width:100%;"
+                      onclick="submitPriceReq('model', {{ model.id }})">{{ T.offer_send_btn }}</button>
+                  </div>
+                </div>
+                <div id="priceReqMsg" style="margin-top:6px;font-size:12px;display:none;"></div>
+              </div>
+            {% else %}
+              <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;">
+                <input type="number" name="purchase_price" class="form-control" step="0.01" min="0"
+                       value="{{ cur_pp if cur_pp > 0 else '' }}" placeholder="0.00" />
+                <select name="purchase_currency" class="form-control">
+                  {% for cur in currencies %}<option value="{{ cur }}" {% if model.purchase_currency == cur %}selected{% endif %}>{{ cur }}</option>{% endfor %}
+                </select>
+              </div>
+              {% if model.id %}<small style="color:var(--text-muted);font-size:11px;">{{ T.mfr_no_price_hint }}</small>{% endif %}
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <div class="form-group">
+            <label class="form-label">{{ T.model_desc }}</label>
+            <textarea name="description" class="form-control" rows="3">{{ model.description|default('') }}</textarea>
+          </div>
+          <div style="border-left:3px solid var(--border);padding-left:12px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:600;">{{ T.model_translations }}</div>
+              <button type="button" class="btn btn-ghost btn-sm" id="autoTranslateModelBtn" onclick="autoTranslateModel()" style="font-size:12px;" data-label="{{ T.auto_translate }}">
+                {{ T.auto_translate }}
+              </button>
+            </div>
+            <div id="autoTranslateModelStatus" style="display:none;font-size:12px;color:var(--text-muted);margin-bottom:6px;"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="form-group">
+                <label class="form-label">🇬🇧 {{ T.model_name }} (EN)</label>
+                <input type="text" name="name_en" id="mname_en" class="form-control" value="{{ model.name_en|default('') }}" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇨🇳 {{ T.model_name }} (ZH)</label>
+                <input type="text" name="name_zh" id="mname_zh" class="form-control" value="{{ model.name_zh|default('') }}" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇬🇧 {{ T.model_desc }} (EN)</label>
+                <textarea name="description_en" id="mdesc_en" class="form-control" rows="2">{{ model.description_en|default('') }}</textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇨🇳 {{ T.model_desc }} (ZH)</label>
+                <textarea name="description_zh" id="mdesc_zh" class="form-control" rows="2">{{ model.description_zh|default('') }}</textarea>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.model_specs }}</label>
+            <input type="hidden" name="specs"    id="specsData"    value="" />
+            <input type="hidden" name="specs_en" id="specsData_en" value="" />
+            <input type="hidden" name="specs_zh" id="specsData_zh" value="" />
+            <div id="specsRows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addSpecRow()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              {{ T.btn_add }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+
+      {% if user.can_view_costs %}
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><h3 class="card-title">{{ T.model_cost_info }}</h3></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label class="form-label">{{ T.model_purchase_price }}</label>
+              <input type="number" name="purchase_price" id="purchase_price" class="form-control" step="0.01" min="0" value="{{ model.purchase_price|default(0) }}" oninput="calcTotalCost()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.model_purchase_currency }}</label>
+              <select name="purchase_currency" class="form-control">
+                {% for cur in currencies %}
+                <option value="{{ cur }}" {% if model.purchase_currency == cur %}selected{% endif %}>{{ cur }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.model_shipping }}</label>
+              <input type="number" name="shipping_cost" id="shipping_cost" class="form-control" step="0.01" min="0" value="{{ model.shipping_cost|default(0) }}" oninput="calcTotalCost()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.model_customs }}</label>
+              <input type="number" name="customs_pct" id="customs_pct" class="form-control" step="0.01" min="0" value="{{ model.customs_pct|default(0) }}" oninput="calcTotalCost()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.model_extra_tax }}</label>
+              <input type="number" name="extra_tax_pct" id="extra_tax_pct" class="form-control" step="0.01" min="0" value="{{ model.extra_tax_pct|default(0) }}" oninput="calcTotalCost()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.model_port_cost }}</label>
+              <input type="number" name="port_cost" id="port_cost" class="form-control" step="0.01" min="0" value="{{ model.port_cost|default(0) }}" oninput="calcTotalCost()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.model_doc_cost }}</label>
+              <input type="number" name="document_cost" id="document_cost" class="form-control" step="0.01" min="0" value="{{ model.document_cost|default(0) }}" oninput="calcTotalCost()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.model_install_cost }}</label>
+              <input type="number" name="installation_cost" id="installation_cost" class="form-control" step="0.01" min="0" value="{{ model.installation_cost|default(0) }}" oninput="calcTotalCost()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ T.model_other_cost }}</label>
+              <input type="number" name="other_cost" id="other_cost" class="form-control" step="0.01" min="0" value="{{ model.other_cost|default(0) }}" oninput="calcTotalCost()" />
+            </div>
+          </div>
+          <div class="card" style="background:var(--surface-2);border:1px solid var(--accent);margin-top:8px;">
+            <div style="padding:16px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-weight:600;">{{ T.model_total_cost }}</span>
+              <span id="totalCostDisplay" style="font-size:20px;font-weight:700;color:var(--accent);">
+                {{ "%.2f"|format(model.total_cost|default(0)|float) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Right column -->
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><h3 class="card-title">{{ T.model_image_card }}</h3></div>
+        <div class="card-body" style="text-align:center;">
+          {% if model.image_path %}
+          <img id="imgPreview" src="/static/{{ model.image_path }}" alt="Model" style="max-width:100%;border-radius:8px;margin-bottom:12px;" />
+          {% else %}
+          <img id="imgPreview" style="display:none;max-width:100%;border-radius:8px;margin-bottom:12px;" />
+          {% endif %}
+          <input type="file" name="image" class="form-control" accept="image/*" data-preview="imgPreview" />
+          <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">{{ T.model_image_hint }}</p>
+        </div>
+      </div>
+
+      <!-- Hat Makinesi -->
+      <div id="lineMachineCard" class="card" style="margin-bottom:16px;display:none;">
+        <div class="card-header"><h3 class="card-title">🔗 {{ T.model_line_section }}</h3></div>
+        <div class="card-body">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:14px;">
+            <input type="checkbox" name="is_line" id="isLineCb" value="1"
+              onchange="toggleLineSection(this.checked)"
+              {% if model.is_line %}checked{% endif %} style="width:18px;height:18px;" />
+            <span style="font-weight:600;">{{ T.model_line_is_line }}</span>
+          </label>
+          <div id="lineSectionBody" style="{% if not model.is_line %}display:none;{% endif %}">
+            <div class="form-group" style="margin-bottom:14px;">
+              <label class="form-label">{{ T.model_line_configs_label }}</label>
+              <input type="text" name="line_configs" id="lineConfigs" class="form-control"
+                value="{{ model.line_configs or '1,2,3,4' }}" placeholder="1,2,3,4"
+                oninput="renderLineImageInputs()" />
+              <small style="color:var(--text-muted);">{{ T.model_line_configs_hint }}</small>
+            </div>
+            <div id="lineImagesArea"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">{{ T.model_compat_options }}</h3></div>
+        <div class="card-body">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+            {{ T.model_compat_hint }}
+          </p>
+          <div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+            {% for opt in options %}
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px;border-radius:6px;background:var(--surface-2);">
+              <input type="checkbox" name="compatible_options" value="{{ opt.id }}"
+                {% if compatible_options_selected and opt.id in compatible_options_selected %}checked{% endif %} />
+              <span style="font-size:13px;">{{ (opt.get('name_'+user.lang) or opt.name) if user.lang and user.lang != 'tr' else opt.name }}</span>
+              {% if not is_mfr %}<span style="font-size:11px;color:var(--text-muted);margin-left:auto;">{{ "%.0f"|format(opt.price|default(0)|float) }} {{ opt.currency }}</span>{% endif %}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-top:16px;">
+    <button type="submit" class="btn btn-primary">{{ T.btn_save }}</button>
+    <a href="/models" class="btn btn-ghost">{{ T.btn_cancel }}</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var _SPEC_TITLE_PH = {% if user.lang == 'zh' %}'规格标题'{% elif user.lang == 'en' %}'Feature title'{% else %}'Özellik başlığı'{% endif %};
+function calcTotalCost() {
+  const pp = parseFloat(document.getElementById('purchase_price').value) || 0;
+  const sc = parseFloat(document.getElementById('shipping_cost').value) || 0;
+  const cp = parseFloat(document.getElementById('customs_pct').value) || 0;
+  const ep = parseFloat(document.getElementById('extra_tax_pct').value) || 0;
+  const pc = parseFloat(document.getElementById('port_cost').value) || 0;
+  const dc = parseFloat(document.getElementById('document_cost').value) || 0;
+  const ic = parseFloat(document.getElementById('installation_cost').value) || 0;
+  const oc = parseFloat(document.getElementById('other_cost').value) || 0;
+  const total = pp + sc + (pp * cp / 100) + (pp * ep / 100) + pc + dc + ic + oc;
+  const el = document.getElementById('totalCostDisplay');
+  if (el) el.textContent = total.toFixed(2);
+}
+
+// ── Teknik Özellikler row editor ──────────────────────────────────────────
+
+function _esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _escQ(s) { return (s||'').replace(/"/g,'&quot;'); }
+
+function addSpecRow(title, desc, imgPath, descEn, descZh) {
+  title   = title   || '';
+  desc    = desc    || '';
+  imgPath = imgPath || '';
+  descEn  = descEn  || '';
+  descZh  = descZh  || '';
+  const container = document.getElementById('specsRows');
+  const row = document.createElement('div');
+  row.className = 'spec-row';
+  row.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);';
+
+  const hasImg = !!imgPath;
+  row.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0;padding-top:2px;">
+      <button type="button" onclick="moveSpecRow(this,-1)" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:12px;line-height:1;">▲</button>
+      <button type="button" onclick="moveSpecRow(this,1)"  class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:12px;line-height:1;">▼</button>
+    </div>
+    <div class="spec-img-wrap" style="flex-shrink:0;width:64px;cursor:pointer;" onclick="this.querySelector('.spec-img-input').click()" title="Resim seç">
+      <img class="spec-img-preview" src="${hasImg ? '/static/'+imgPath : ''}"
+           style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);${hasImg ? '' : 'display:none;'}" />
+      <div class="spec-img-placeholder" style="width:64px;height:64px;background:var(--surface);border-radius:6px;border:1px dashed var(--border);display:${hasImg ? 'none' : 'flex'};align-items:center;justify-content:center;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      </div>
+      <input type="file" class="spec-img-input" accept="image/*" style="display:none;" onchange="uploadSpecImage(this)" />
+      <input type="hidden" class="spec-img-path" value="${_escQ(imgPath)}" />
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;">
+      <input type="text" class="spec-title form-control" placeholder="${_SPEC_TITLE_PH}" value="${_escQ(title)}" style="font-size:13px;font-weight:600;" />
+      <textarea class="spec-desc    form-control" rows="1" placeholder="🇹🇷 Açıklama (TR)" style="font-size:12px;">${_esc(desc)}</textarea>
+      <textarea class="spec-desc-en form-control" rows="1" placeholder="🇬🇧 Description (EN)" style="font-size:12px;">${_esc(descEn)}</textarea>
+      <textarea class="spec-desc-zh form-control" rows="1" placeholder="🇨🇳 说明 (ZH)" style="font-size:12px;">${_esc(descZh)}</textarea>
+    </div>
+    <button type="button" onclick="removeSpecRow(this)" class="btn btn-danger btn-sm" style="flex-shrink:0;margin-top:2px;" title="Sil">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+async function uploadSpecImage(input) {
+  const row = input.closest('.spec-row');
+  if (!input.files[0]) return;
+  const fd = new FormData();
+  fd.append('image', input.files[0]);
+  try {
+    const res = await fetch('/models/spec-image', {method:'POST', body:fd});
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.path) {
+      const img = row.querySelector('.spec-img-preview');
+      const ph  = row.querySelector('.spec-img-placeholder');
+      img.src = '/static/' + data.path;
+      img.style.display = 'block';
+      ph.style.display  = 'none';
+      row.querySelector('.spec-img-path').value = data.path;
+    }
+  } catch(e) { console.error('Spec image upload failed', e); }
+}
+
+function removeSpecRow(btn) { btn.closest('.spec-row').remove(); }
+
+function moveSpecRow(btn, dir) {
+  const row    = btn.closest('.spec-row');
+  const parent = row.parentNode;
+  if (dir < 0 && row.previousElementSibling) {
+    parent.insertBefore(row, row.previousElementSibling);
+  } else if (dir > 0 && row.nextElementSibling) {
+    parent.insertBefore(row.nextElementSibling, row);
+  }
+}
+
+function serializeSpecs() {
+  const specs = [], specsEn = [], specsZh = [];
+  document.querySelectorAll('.spec-row').forEach(row => {
+    const title  = row.querySelector('.spec-title').value.trim();
+    const desc   = row.querySelector('.spec-desc').value.trim();
+    const descEn = row.querySelector('.spec-desc-en').value.trim();
+    const descZh = row.querySelector('.spec-desc-zh').value.trim();
+    const img    = row.querySelector('.spec-img-path').value;
+    specs.push({title, desc, img});
+    specsEn.push({title, desc: descEn, img});
+    specsZh.push({title, desc: descZh, img});
+  });
+  document.getElementById('specsData').value    = JSON.stringify(specs);
+  document.getElementById('specsData_en').value = JSON.stringify(specsEn);
+  document.getElementById('specsData_zh').value = JSON.stringify(specsZh);
+}
+
+function _parseSpecsRaw(raw) {
+  if (!raw || !raw.trim()) return [];
+  raw = raw.trim();
+  if (raw.startsWith('[')) { try { return JSON.parse(raw); } catch(e) {} }
+  if (raw.startsWith('{')) {
+    try {
+      const obj = JSON.parse(raw);
+      return Object.entries(obj).map(([k,v]) => ({title:k, desc:String(v), img:''}));
+    } catch(e) {}
+  }
+  if (raw.includes('|')) {
+    return raw.split('||').map(s => {
+      const p = s.trim().split('|').map(x => x.trim());
+      return {title:p[0]||'', desc:p[1]||'', img:p[2]||''};
+    }).filter(s => s.title || s.desc);
+  }
+  return [];
+}
+
+function loadSpecs(rawTr, rawEn, rawZh) {
+  const specs   = _parseSpecsRaw(rawTr);
+  const specsEn = _parseSpecsRaw(rawEn);
+  const specsZh = _parseSpecsRaw(rawZh);
+  specs.forEach((s, i) => {
+    addSpecRow(
+      s.title || '',
+      s.desc  || '',
+      s.img   || '',
+      (specsEn[i] || {}).desc || '',
+      (specsZh[i] || {}).desc || ''
+    );
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadSpecs(
+    {{ (model.specs    or '')|tojson }},
+    {{ (model.specs_en or '')|tojson }},
+    {{ (model.specs_zh or '')|tojson }}
+  );
+  if (document.getElementById('isLineCb')?.checked) renderLineImageInputs();
+});
+
+// ── Excel şablonundan yükleme ─────────────────────────────────────────────
+async function importFromExcel(input) {
+  if (!input.files[0]) return;
+  const btn = input.closest('label');
+  const origText = btn.querySelector('svg').nextSibling.textContent;
+  btn.querySelector('svg').nextSibling.textContent = ' Yükleniyor...';
+
+  const fd = new FormData();
+  fd.append('excel_file', input.files[0]);
+
+  let data;
+  try {
+    const res = await fetch('/models/excel-import', {method:'POST', body:fd});
+    data = await res.json();
+    if (data.error) { alert('Hata: ' + data.error); return; }
+  } catch(e) {
+    alert('Dosya işlenirken hata oluştu.');
+    return;
+  } finally {
+    btn.querySelector('svg').nextSibling.textContent = ' Excel\'den Yükle';
+    input.value = '';
+  }
+
+  // Temel alanlar
+  const setVal = (name, val) => {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el && val !== undefined && val !== null) el.value = val;
+  };
+  setVal('name',           data.name           || '');
+  setVal('name_en',        data.name_en        || '');
+  setVal('name_zh',        data.name_zh        || '');
+  setVal('description',    data.description    || '');
+  setVal('description_en', data.description_en || '');
+  setVal('description_zh', data.description_zh || '');
+  if (data.base_price !== undefined) setVal('base_price', data.base_price);
+
+  // Para birimi
+  if (data.currency) {
+    const sel = document.querySelector('[name="currency"]');
+    if (sel) {
+      for (const opt of sel.options) {
+        if (opt.value === data.currency) { sel.value = data.currency; break; }
+      }
+    }
+  }
+
+  // Kategori (ad eşleştirmesi)
+  if (data.category_name) {
+    const sel = document.querySelector('[name="category_id"]');
+    if (sel) {
+      const needle = data.category_name.trim().toLowerCase();
+      for (const opt of sel.options) {
+        if (opt.textContent.trim().toLowerCase() === needle) {
+          sel.value = opt.value;
+          break;
+        }
+      }
+    }
+  }
+
+  // Teknik özellikler (TR + EN + ZH)
+  if (data.specs && data.specs.length > 0) {
+    document.getElementById('specsRows').innerHTML = '';
+    data.specs.forEach((s, i) => {
+      const en = (data.specs_en || [])[i] || {};
+      const zh = (data.specs_zh || [])[i] || {};
+      addSpecRow(s.title || '', s.desc || '', '', en.desc || '', zh.desc || '');
+    });
+  }
+
+  // Başarı bildirimi
+  const notice = document.createElement('div');
+  notice.style.cssText = 'position:fixed;top:20px;right:20px;background:#059669;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.2);';
+  notice.textContent = 'Excel verileri yüklendi. Kontrol edip kaydedebilirsiniz.';
+  document.body.appendChild(notice);
+  setTimeout(() => notice.remove(), 3500);
+}
+
+// ── Hat Makinesi ──────────────────────────────────────────────────────────────
+const EXISTING_LINE_IMAGES = {{ (line_images or {})|tojson }};
+
+function onCategoryChange(catId) {
+  const sel = document.getElementById('categorySelect');
+  const opt = sel.options[sel.selectedIndex];
+  const isLine = opt && parseInt(opt.getAttribute('data-line') || '0');
+  const card = document.getElementById('lineMachineCard');
+  card.style.display = isLine ? '' : 'none';
+  if (!isLine) {
+    document.getElementById('isLineCb').checked = false;
+    document.getElementById('lineSectionBody').style.display = 'none';
+  }
+}
+
+function toggleLineSection(on) {
+  document.getElementById('lineSectionBody').style.display = on ? '' : 'none';
+  if (on) renderLineImageInputs();
+}
+
+function renderLineImageInputs() {
+  const raw = document.getElementById('lineConfigs').value || '1,2,3,4';
+  const counts = raw.split(',').map(s => parseInt(s.trim())).filter(n => n > 0);
+  const area = document.getElementById('lineImagesArea');
+  let html = '<div style="display:flex;flex-direction:column;gap:12px;">';
+  counts.forEach(lc => {
+    const ex = EXISTING_LINE_IMAGES[lc] || {};
+    const imgSrc = ex.image_path ? `/static/${ex.image_path}` : '';
+    const prio = ex.priority || 0;
+    html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;">
+      <input type="hidden" name="line_img_count_${lc}" value="${lc}" />
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        ${imgSrc ? `<img src="${imgSrc}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border);" />` : ''}
+        <div style="flex:1;min-width:160px;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px;">${lc}${({1:"'li",2:"'li",3:"'lü",4:"'lü",5:"'li",6:"'lı",7:"'li",8:"'li"}[lc]||"'li")} Hat Varyasyon Resmi</div>
+          <input type="file" name="line_img_${lc}" accept="image/*" class="form-control" style="margin-bottom:6px;" />
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:12px;color:var(--text-muted);">Öncelik:</label>
+            <input type="number" name="line_img_prio_${lc}" value="${prio}" min="0" max="99" class="form-control" style="width:70px;" />
+          </div>
+        </div>
+        ${ex.id ? `<form method="post" action="/models/line-image/delete" onsubmit="return confirm('Resmi sil?')">
+          <input type="hidden" name="img_id" value="${ex.id}" />
+          <input type="hidden" name="model_id" value="{{ model.id|default(0) }}" />
+          <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+        </form>` : ''}
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+// Initialize on page load if already a line machine
+document.addEventListener('DOMContentLoaded', function() {
+  // Show/hide hat makinesi card based on current category
+  onCategoryChange(document.getElementById('categorySelect').value);
+  if (document.getElementById('isLineCb') && document.getElementById('isLineCb').checked) {
+    renderLineImageInputs();
+  }
+});
+
+// ── Auto-translate ─────────────────────────────────────────────────────────
+async function autoTranslateModel() {
+  const btn    = document.getElementById('autoTranslateModelBtn');
+  const status = document.getElementById('autoTranslateModelStatus');
+
+  // Detect filled language and build source texts
+  const nameTR = (document.querySelector('[name="name"]')?.value || '').trim();
+  const nameEN = (document.getElementById('mname_en')?.value || '').trim();
+  const nameZH = (document.getElementById('mname_zh')?.value || '').trim();
+  const descTR = (document.querySelector('[name="description"]')?.value || '').trim();
+  const descEN = (document.getElementById('mdesc_en')?.value || '').trim();
+  const descZH = (document.getElementById('mdesc_zh')?.value || '').trim();
+
+  // Count spec content per language for scoring
+  const specRows = Array.from(document.querySelectorAll('.spec-row'));
+  let trSpecCount = 0, enSpecCount = 0, zhSpecCount = 0;
+  specRows.forEach(row => {
+    if ((row.querySelector('.spec-desc')?.value || '').trim()) trSpecCount++;
+    if ((row.querySelector('.spec-desc-en')?.value || '').trim()) enSpecCount++;
+    if ((row.querySelector('.spec-desc-zh')?.value || '').trim()) zhSpecCount++;
+  });
+
+  // Determine source language (the one with the most overall content)
+  const scores = {
+    tr: (nameTR ? 3 : 0) + (descTR ? 2 : 0) + trSpecCount,
+    en: (nameEN ? 3 : 0) + (descEN ? 2 : 0) + enSpecCount,
+    zh: (nameZH ? 3 : 0) + (descZH ? 2 : 0) + zhSpecCount,
+  };
+  const srcLang = Object.entries(scores).sort((a,b) => b[1]-a[1])[0][0];
+  const nameMap = {tr: nameTR, en: nameEN, zh: nameZH};
+  const descMap = {tr: descTR, en: descEN, zh: descZH};
+
+  const texts = {};
+  if (nameMap[srcLang]) texts['name'] = nameMap[srcLang];
+  if (descMap[srcLang]) texts['description'] = descMap[srcLang];
+
+  // Spec row descriptions — collect from source lang, fall back to any filled lang
+  const descClassMap = {tr: '.spec-desc', en: '.spec-desc-en', zh: '.spec-desc-zh'};
+  const srcDescClass = descClassMap[srcLang];
+  const fallbackLangs = ['tr','en','zh'].filter(l => l !== srcLang);
+  specRows.forEach((row, i) => {
+    let val = (row.querySelector(srcDescClass)?.value || '').trim();
+    if (!val) {
+      for (const fl of fallbackLangs) {
+        val = (row.querySelector(descClassMap[fl])?.value || '').trim();
+        if (val) break;
+      }
+    }
+    if (val) texts[`spec_${i}_desc`] = val;
+  });
+
+  if (!Object.keys(texts).length) {
+    status.style.display = 'block';
+    status.textContent = '⚠ Çevrilecek metin bulunamadı.';
+    return;
+  }
+
+  const targetLangs = ['tr','en','zh'].filter(l => l !== srcLang);
+  btn.disabled = true;
+  btn.textContent = '⏳ Çevriliyor...';
+  status.style.display = 'block';
+  status.textContent = '';
+
+  try {
+    const resp = await fetch('/api/translate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({texts, source_lang: srcLang, target_langs: targetLangs})
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || 'Sunucu hatası');
+
+    const setField = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    const setTA    = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    const nameInputTR = document.querySelector('[name="name"]');
+    const descTA_TR   = document.querySelector('[name="description"]');
+
+    const specDescClass = {tr: '.spec-desc', en: '.spec-desc-en', zh: '.spec-desc-zh'};
+    for (const [lang, vals] of Object.entries(data.translations)) {
+      if (lang === 'tr') {
+        if (vals.name        && nameInputTR) nameInputTR.value = vals.name;
+        if (vals.description && descTA_TR)   descTA_TR.value   = vals.description;
+      } else if (lang === 'en') {
+        setField('mname_en', vals.name);
+        setTA('mdesc_en', vals.description);
+      } else if (lang === 'zh') {
+        setField('mname_zh', vals.name);
+        setTA('mdesc_zh', vals.description);
+      }
+      // Fill spec descriptions for this language
+      const cls = specDescClass[lang];
+      if (cls) {
+        specRows.forEach((row, i) => {
+          const translated = vals[`spec_${i}_desc`];
+          if (translated) {
+            const el = row.querySelector(cls);
+            if (el) el.value = translated;
+          }
+        });
+      }
+    }
+    status.style.color = 'var(--success, #22c55e)';
+    status.textContent = '✓ Çeviri tamamlandı. Kaydetmeyi unutmayın.';
+  } catch(e) {
+    status.style.color = 'var(--danger, #ef4444)';
+    status.textContent = '✗ Hata: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = document.getElementById('autoTranslateModelBtn')?.dataset.label || '🌐 Otomatik Çevir';
+  }
+}
+
+async function submitPriceReq(entityType, entityId) {
+  const newPrice = parseFloat(document.getElementById('priceReqNewPrice').value);
+  const currency = document.getElementById('priceReqCurrency').value;
+  const msgEl = document.getElementById('priceReqMsg');
+  if (!newPrice || newPrice <= 0) {
+    msgEl.style.display = 'block';
+    msgEl.style.color = 'var(--danger)';
+    msgEl.textContent = '{{ T.mfr_new_price }}: 0';
+    return;
+  }
+  const body = new URLSearchParams({entity_type: entityType, entity_id: entityId, new_price: newPrice, currency: currency});
+  const resp = await fetch('/price-requests/submit', {method: 'POST', body});
+  msgEl.style.display = 'block';
+  if (resp.ok || resp.redirected) {
+    msgEl.style.color = 'var(--success, #22c55e)';
+    msgEl.textContent = '✓ {{ T.mfr_price_change_req }} {{ T.offer_send_btn|lower }}';
+    document.getElementById('priceReqNewPrice').value = '';
+  } else {
+    msgEl.style.color = 'var(--danger)';
+    msgEl.textContent = '✗ Hata';
+  }
+}
+</script>
+{% endblock %}

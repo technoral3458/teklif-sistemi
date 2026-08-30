@@ -1,0 +1,575 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ T.nav_orders }} #{{ offer.offer_no or offer.id }}{% endblock %}
+
+{% set STATUS_COLOR = {
+  'Sipariş Verildi': 'blue',
+  'Admin Onaylı': 'amber',
+  'Üretimde': 'amber',
+  'Tamamlandı': 'green',
+  'Teslim Edildi': 'green',
+  'İptal': 'red'
+} %}
+
+{% set MFR_STATUS_LABEL = {
+  '': T.ord_status_waiting,
+  'confirmed': T.ord_status_confirmed,
+  'in_production': T.ord_status_in_production,
+  'completed': T.ord_status_completed,
+  'delivered': T.ord_status_delivered
+} %}
+
+{# Compute current production step info for no-going-back and label display #}
+{% set ns = namespace(current_sort=0, step_label='') %}
+{% for s in production_steps %}
+  {% if s.code == (offer.mfr_status or '') %}
+    {% set ns.current_sort = s.sort_order %}
+    {% set ns.step_label = s.label_zh if user.lang == 'zh' else (s.label_en if user.lang == 'en' else s.label_tr) %}
+  {% endif %}
+{% endfor %}
+{% set mfr_in_prod = ns.current_sort > 0 %}
+
+{% set ns2 = namespace(next_step=none, prev_step=none) %}
+{% for s in production_steps %}
+  {% if s.sort_order == ns.current_sort + 1 %}{% set ns2.next_step = s %}{% endif %}
+  {% if s.sort_order == ns.current_sort - 1 %}{% set ns2.prev_step = s %}{% endif %}
+{% endfor %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
+  <a href="/orders" class="btn btn-ghost btn-sm">{{ T.ord_back }}</a>
+  <span class="badge badge-{{ STATUS_COLOR.get(offer.status, 'blue') }}" style="font-size:13px;">{{ offer.status }}</span>
+  <a href="/orders/{{ offer.id }}/production-pdf" target="_blank" class="btn btn-outline btn-sm" style="margin-left:auto;border-color:#1a5c3a;color:#1a5c3a;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    {{ T.ord_production_pdf }}
+  </a>
+</div>
+
+{% set _msg = request.query_params.get('msg','') %}
+{% set _msg_type = request.query_params.get('msg_type','info') %}
+{% if _msg %}<div class="alert alert-{{ _msg_type }}" style="margin-bottom:16px;">{{ _msg.replace('+',' ') }}</div>{% endif %}
+
+<!-- ── Üst bilgi kartları ── -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+  <div class="card">
+    <div class="card-body" style="padding:16px;">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">{{ T.ord_customer }}</div>
+      <div style="font-weight:600;">{% if user.role == 'manufacturer' or user.is_manufacturer %}—{% else %}{{ offer.customer_name }}{% endif %}</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-body" style="padding:16px;">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">{{ T.ord_model }}</div>
+      <div style="font-weight:600;">{{ offer.model_name }}</div>
+      {% if show_prices %}<div style="font-size:12px;color:var(--text-muted);">{{ offer.machine_count }} {{ T.ord_qty_unit }} × {{ "%.0f"|format(offer.base_price) }} {{ offer.currency }}</div>{% endif %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-body" style="padding:16px;">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">{{ T.ord_total }}</div>
+      {% if show_prices %}<div style="font-weight:700;font-size:18px;">{{ "%.2f"|format(offer.total_price) }} {{ offer.currency }}</div>{% else %}<div style="font-weight:700;font-size:18px;">—</div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start;">
+
+<!-- ── Sol: Akış + Aşamalar ── -->
+<div style="display:flex;flex-direction:column;gap:16px;">
+
+  <!-- Workflow status -->
+  {% set admin_done = offer.admin_status == 'approved' %}
+  {% set admin_rejected = offer.admin_status == 'rejected' %}
+  {% set mfr_confirmed = offer.mfr_status == 'confirmed' or mfr_in_prod %}
+  {% set in_prod = mfr_in_prod %}
+  {% set max_step = namespace(val=0) %}
+  {% for s in production_steps %}{% if s.sort_order > max_step.val %}{% set max_step.val = s.sort_order %}{% endif %}{% endfor %}
+  {% set all_done = in_prod and ns.current_sort == max_step.val %}
+
+  <div class="card">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <h3 class="card-title">{{ T.ord_workflow }}</h3>
+      <span class="badge badge-{{ 'green' if all_done else ('amber' if in_prod else ('blue' if mfr_confirmed else ('green' if admin_done else ('red' if admin_rejected else 'blue')))) }}" style="font-size:12px;">
+        {% if all_done %}{{ ns.step_label or T.ord_status_delivered }}
+        {% elif in_prod %}{{ ns.step_label or T.ord_status_in_production }}
+        {% elif mfr_confirmed %}{{ T.ord_status_confirmed }}
+        {% elif admin_done %}{{ T.ord_approved }}
+        {% elif admin_rejected %}{{ T.ord_rejected }}
+        {% else %}{{ T.ord_step_order }}{% endif %}
+      </span>
+    </div>
+    <div class="card-body" style="padding:20px 24px;">
+      <div style="position:relative;padding-left:42px;">
+        <!-- Vertical timeline line -->
+        <div style="position:absolute;left:13px;top:14px;bottom:14px;width:2px;background:var(--border);z-index:0;"></div>
+
+        <!-- Step 1: Order received -->
+        <div style="position:relative;margin-bottom:28px;">
+          <div style="position:absolute;left:-42px;top:0;width:28px;height:28px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;z-index:1;box-shadow:0 0 0 3px var(--surface);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div style="padding-top:4px;">
+            <div style="font-weight:600;font-size:13px;line-height:1.3;">{{ T.ord_step_order }}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_dealer }}: <strong>{{ offer.dealer_name }}</strong> · {{ offer.created_at[:10] }}</div>
+          </div>
+        </div>
+
+        <!-- Step 2: Admin approval -->
+        <div style="position:relative;margin-bottom:28px;">
+          <div style="position:absolute;left:-42px;top:0;width:28px;height:28px;border-radius:50%;background:{% if admin_rejected %}var(--danger){% elif admin_done %}var(--success){% else %}var(--surface-2){% endif %};border:2px solid {% if admin_done or admin_rejected %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;z-index:1;box-shadow:0 0 0 3px var(--surface);">
+            {% if admin_done %}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            {% elif admin_rejected %}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            {% else %}<span style="font-size:11px;font-weight:600;color:var(--text-muted);">2</span>{% endif %}
+          </div>
+          <div style="padding-top:4px;flex:1;">
+            <div style="font-weight:600;font-size:13px;line-height:1.3;">
+              {{ T.ord_step_admin }}
+              {% if admin_rejected %}<span style="color:var(--danger);font-weight:400;"> — {{ T.ord_rejected }}</span>
+              {% elif admin_done %}<span style="color:var(--success);font-weight:400;"> — {{ T.ord_approved }}</span>{% endif %}
+            </div>
+            {% if offer.admin_notes %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_note }}: {{ offer.admin_notes }}</div>{% endif %}
+            {% if admin_done %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_mfr_label }}: <strong>{{ offer.manufacturer_name }}</strong></div>{% endif %}
+
+            {% if user.role == 'admin' and admin_done %}
+            <div style="margin-top:8px;">
+              <form method="post" action="/orders/{{ offer.id }}/reset-status" style="display:inline;" onsubmit="return confirm('Onayı geri al ve siparişi sıfırla?')">
+                <button type="submit" class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger);">↩ Onayı Sıfırla</button>
+              </form>
+            </div>
+            {% endif %}
+
+            {% if user.role == 'admin' and not offer.admin_status %}
+            <div style="margin-top:10px;padding:12px;background:var(--surface-2);border-radius:8px;display:flex;flex-direction:column;gap:8px;">
+              <form method="post" action="/orders/{{ offer.id }}/approve" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <select name="manufacturer_id" class="form-control" style="flex:1;min-width:160px;font-size:13px;" required>
+                  <option value="">{{ T.ord_select_mfr }}</option>
+                  {% for m in manufacturers %}
+                  <option value="{{ m.id }}" {% if m.id == default_mfr_id %}selected{% endif %}>{{ m.company_name or m.email }}</option>
+                  {% endfor %}
+                </select>
+                <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="flex:1;min-width:140px;font-size:13px;" />
+                <button type="submit" class="btn btn-success btn-sm">{{ T.ord_approve_btn }}</button>
+              </form>
+              <form method="post" action="/orders/{{ offer.id }}/reject" style="display:flex;gap:8px;align-items:center;">
+                <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_reject_reason }}" style="flex:1;font-size:13px;" />
+                <button type="submit" class="btn btn-danger btn-sm">{{ T.ord_reject_btn }}</button>
+              </form>
+            </div>
+            {% endif %}
+
+            {% if user.role == 'admin' and admin_done %}
+            <form method="post" action="/orders/{{ offer.id }}/reassign" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <select name="manufacturer_id" class="form-control" style="max-width:200px;font-size:13px;">
+                <option value="">{{ T.ord_select_mfr }}</option>
+                {% for m in manufacturers %}
+                <option value="{{ m.id }}" {% if m.id == offer.manufacturer_id %}selected{% endif %}>{{ m.company_name or m.email }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-outline btn-sm">{{ T.ord_change_mfr }}</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Step 3: Manufacturer confirm -->
+        <div style="position:relative;margin-bottom:28px;">
+          <div style="position:absolute;left:-42px;top:0;width:28px;height:28px;border-radius:50%;background:{% if mfr_confirmed %}var(--success){% else %}var(--surface-2){% endif %};border:2px solid {% if mfr_confirmed %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;z-index:1;box-shadow:0 0 0 3px var(--surface);">
+            {% if mfr_confirmed %}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            {% else %}<span style="font-size:11px;font-weight:600;color:var(--text-muted);">3</span>{% endif %}
+          </div>
+          <div style="padding-top:4px;flex:1;">
+            <div style="font-weight:600;font-size:13px;line-height:1.3;">
+              {{ T.ord_step_mfr }}
+              {% if mfr_confirmed %}<span style="color:var(--success);font-weight:400;"> — {{ T.ord_approved }}</span>{% endif %}
+            </div>
+            {% if offer.termin_date %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_deadline }}: <strong>{{ offer.termin_date }}</strong></div>{% endif %}
+            {% if offer.mfr_notes %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ T.ord_note }}: {{ offer.mfr_notes }}</div>{% endif %}
+
+            {% if user.role == 'admin' and mfr_confirmed %}
+            <div style="margin-top:8px;">
+              <form method="post" action="/orders/{{ offer.id }}/reset-mfr" style="display:inline;" onsubmit="return confirm('Üretici onayını sıfırla?')">
+                <button type="submit" class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger);">↩ Üretici Onayını Sıfırla</button>
+              </form>
+            </div>
+            {% endif %}
+
+            {% if (user.role == 'manufacturer' or user.is_manufacturer) and admin_done and not mfr_confirmed and can_confirm %}
+            <div style="margin-top:10px;padding:12px;background:var(--surface-2);border-radius:8px;">
+              <form method="post" action="/orders/{{ offer.id }}/confirm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input type="date" name="termin_date" class="form-control" style="max-width:160px;font-size:13px;" required />
+                <input type="text" name="mfr_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="flex:1;min-width:140px;font-size:13px;" />
+                <input type="text" name="serial_number" class="form-control" placeholder="{{ T.ord_serial_no_ph }}" value="{{ offer.serial_number or '' }}" style="flex:1;min-width:140px;font-size:13px;font-family:monospace;" />
+                <button type="submit" class="btn btn-success btn-sm">{{ T.ord_approve_deadline }}</button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Step 4: Production status -->
+        <div style="position:relative;">
+          <div style="position:absolute;left:-42px;top:0;width:28px;height:28px;border-radius:50%;background:{% if all_done %}var(--success){% elif in_prod %}#f59e0b{% else %}var(--surface-2){% endif %};border:2px solid {% if in_prod %}transparent{% else %}var(--border){% endif %};display:flex;align-items:center;justify-content:center;z-index:1;box-shadow:0 0 0 3px var(--surface);">
+            {% if all_done %}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            {% elif in_prod %}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="5 3 19 12 5 21 5 3"/></svg>
+            {% else %}<span style="font-size:11px;font-weight:600;color:var(--text-muted);">4</span>{% endif %}
+          </div>
+          <div style="padding-top:4px;flex:1;">
+            <div style="font-weight:600;font-size:13px;line-height:1.3;">
+              {{ T.ord_step_production }}
+              {% if offer.mfr_status == 'confirmed' %}<span style="color:var(--text-muted);font-weight:400;"> — {{ T.ord_status_confirmed }}</span>
+              {% elif ns.step_label %}<span style="color:{% if all_done %}var(--success){% else %}#f59e0b{% endif %};font-weight:400;"> — {{ ns.step_label }}</span>
+              {% else %}<span style="color:var(--text-muted);font-weight:400;"> — {{ T.ord_status_waiting }}</span>{% endif %}
+            </div>
+            {% if offer.mfr_status_date %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">📅 {{ offer.mfr_status_date }}</div>{% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Production stages log -->
+  <div class="card">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <h3 class="card-title">{{ T.ord_stages_title }}</h3>
+      {% set has_forward_steps = production_steps|selectattr('sort_order','gt', ns.current_sort)|list %}
+      {% if (((user.role == 'manufacturer' or user.is_manufacturer) and can_stage) or user.role == 'admin') and mfr_confirmed and has_forward_steps %}
+      <button class="btn btn-outline btn-sm" onclick="openModal('stageModal')">{{ T.ord_add_stage_btn }}</button>
+      {% endif %}
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if stages %}
+      <div style="padding:0 16px;">
+        {% for s in stages %}
+        <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--primary);margin-top:6px;flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <strong style="font-size:13px;">{{ s.stage_name }}</strong>
+              <span style="font-size:11px;color:var(--text-muted);">{{ s.stage_date }}</span>
+            </div>
+            <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">{{ s.notes }}</div>
+            {% if s.photo %}<a href="/static/{{ s.photo }}" target="_blank"><img src="/static/{{ s.photo }}" style="margin-top:6px;max-width:100%;max-height:180px;border-radius:6px;object-fit:cover;display:block;" /></a>{% endif %}
+          </div>
+          {% if user.role == 'admin' %}
+          <form method="post" action="/orders/stage/delete">
+            <input type="hidden" name="id" value="{{ s.id }}" />
+            <input type="hidden" name="order_id" value="{{ offer.id }}" />
+            <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 6px;" onclick="return confirm('Sil?')">×</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% if (user.role == 'manufacturer' or user.is_manufacturer) and can_stage and ns2.prev_step and not rollback_requests|selectattr('status','equalto','pending')|list %}
+        <div style="padding:10px 0;text-align:right;">
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:var(--danger);" onclick="openModal('rollbackModal')">
+            ↩ Önceki Aşamaya Geri Dön Talebi
+          </button>
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">{{ T.ord_no_stages }}</div>
+      {% endif %}
+      {% if user.role == 'admin' %}
+      {% set pending_rbs = rollback_requests|selectattr('status','equalto','pending')|list %}
+      {% if pending_rbs %}
+      <div style="padding:12px 16px;background:#fef3c7;border-top:1px solid var(--border);border-radius:0 0 8px 8px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:#92400e;">⚠️ Bekleyen Geri Alma Talepleri</div>
+        {% for rb in pending_rbs %}
+        <div style="background:#fff;border:1px solid #fcd34d;border-radius:6px;padding:10px 12px;margin-bottom:8px;">
+          <div style="font-size:12px;color:#92400e;margin-bottom:4px;">Hedef: <strong>{{ rb.target_stage_code }}</strong> · {{ rb.requested_at[:10] }}</div>
+          <div style="font-size:13px;margin-bottom:8px;">{{ rb.reason }}</div>
+          <form method="post" action="/orders/rollback-requests/{{ rb.id }}/approve" style="display:inline;">
+            <input type="hidden" name="admin_notes" value="" />
+            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Geri almayı onayla?')">Onayla</button>
+          </form>
+          <form method="post" action="/orders/rollback-requests/{{ rb.id }}/reject" style="display:inline;margin-left:6px;">
+            <input type="hidden" name="admin_notes" value="" />
+            <button type="submit" class="btn btn-danger btn-sm">Reddet</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Sağ: Opsiyonlar + Hakediş ── -->
+<div style="display:flex;flex-direction:column;gap:16px;">
+
+  <!-- Order items -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ T.ord_items_title }}</h3></div>
+    <div class="card-body" style="padding:0;">
+      <table style="width:100%;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="padding:8px 16px;text-align:left;">{{ T.ord_option_col }}</th>
+            <th style="padding:8px 8px;text-align:right;">{{ T.ord_qty_col }}</th>
+            {% if show_prices %}<th style="padding:8px 16px;text-align:right;">{{ T.ord_amount_col }}</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 16px;">{{ it.option_name }}</td>
+            <td style="padding:8px;text-align:right;">{{ it.qty }}</td>
+            {% if show_prices %}<td style="padding:8px 16px;text-align:right;">{{ "%.0f"|format(it.line_total) }}</td>{% endif %}
+          </tr>
+          {% else %}
+          <tr><td colspan="{{ 3 if show_prices else 2 }}" style="padding:16px;text-align:center;color:var(--text-muted);">{{ T.ord_no_options }}</td></tr>
+          {% endfor %}
+          {% if show_prices %}
+          <tr style="background:var(--surface-2);font-weight:600;">
+            <td colspan="2" style="padding:8px 16px;">{{ T.ord_total_row }}</td>
+            <td style="padding:8px 16px;text-align:right;">{{ "%.2f"|format(offer.total_price) }} {{ offer.currency }}</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Manufacturer payment (admin only) -->
+  {% if user.role == 'admin' and admin_done %}
+  <div class="card">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <h3 class="card-title">{{ T.ord_mfr_payment }}</h3>
+      <a href="/ledger/manufacturers/{{ offer.manufacturer_name }}" class="btn btn-ghost btn-sm">{{ T.ord_ledger_link }}</a>
+    </div>
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--text-muted);">{{ T.ord_mfr_payment_desc }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Dealer: production progress card -->
+  {% if user.role == 'dealer' %}
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ T.ord_step_production }}</h3></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+      {% set ns2 = namespace(found=false) %}
+      {% for s in production_steps %}
+      {% set active = s.code == (offer.mfr_status or '') %}
+      {% set passed = s.sort_order < ns.current_sort %}
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:{% if active %}rgba(59,130,246,0.12){% elif passed %}rgba(16,185,129,0.08){% else %}var(--surface-2){% endif %};">
+        <div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:{% if active %}var(--primary){% elif passed %}var(--success){% else %}var(--border){% endif %};">
+          {% if passed %}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          {% elif active %}<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="5 3 19 12 5 21 5 3"/></svg>
+          {% else %}<span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);display:block;"></span>{% endif %}
+        </div>
+        <span style="font-size:13px;font-weight:{% if active %}600{% else %}400{% endif %};color:{% if active %}var(--primary){% elif passed %}var(--success){% else %}var(--text-muted){% endif %};">
+          {{ s.label_zh if user.lang == 'zh' else (s.label_en if user.lang == 'en' else s.label_tr) }}
+        </span>
+        {% if active and offer.mfr_status_date %}
+        <span style="margin-left:auto;font-size:11px;color:var(--text-muted);">{{ offer.mfr_status_date }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% if not mfr_confirmed %}
+      <div style="text-align:center;font-size:12px;color:var(--text-muted);padding:8px;">⏳ {{ T.ord_status_waiting }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Dealer info (admin only) -->
+  {% if user.role == 'admin' %}
+  <div class="card">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <h3 class="card-title">{{ T.ord_dealer_info }}</h3>
+      {% if offer.dealer_id %}
+      <a href="/ledger/dealers/{{ offer.dealer_id }}" class="btn btn-ghost btn-sm">{{ T.ord_ledger_link }}</a>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      <div style="font-size:13px;">{{ offer.dealer_name }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Serial Number -->
+  {% if user.role == 'admin' or (user.role == 'manufacturer' or user.is_manufacturer) %}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header"><h3 class="card-title">🔢 {{ T.ord_serial_no }}</h3></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+      {% if offer.serial_number %}
+      <div style="font-family:monospace;font-size:14px;font-weight:600;color:var(--primary);padding:8px 10px;background:var(--surface-2);border-radius:6px;">{{ offer.serial_number }}</div>
+      {% endif %}
+      <form method="post" action="/orders/{{ offer.id }}/serial" style="display:flex;gap:8px;">
+        <input type="text" name="serial_number" class="form-control" placeholder="{{ T.ord_serial_no_ph }}" value="{{ offer.serial_number or '' }}" style="flex:1;font-size:13px;font-family:monospace;" />
+        <button type="submit" class="btn btn-outline btn-sm">{{ T.btn_save }}</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Proforma Invoices -->
+  {% if user.role == 'admin' or (user.role == 'manufacturer' or user.is_manufacturer) %}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header"><h3 class="card-title">📄 {{ T.ord_proforma }}</h3></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+      {% if proformas %}
+      {% for pf in proformas %}
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface-2);border-radius:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <a href="/static/{{ pf.file_path }}" target="_blank" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--primary);">{{ pf.filename }}</a>
+        <span style="font-size:11px;color:var(--text-muted);">{{ pf.uploaded_at[:10] }}</span>
+        <form method="post" action="/orders/proforma/delete" style="margin:0;">
+          <input type="hidden" name="id" value="{{ pf.id }}" />
+          <input type="hidden" name="order_id" value="{{ offer.id }}" />
+          <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px;" onclick="return confirm('Sil?')">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="font-size:12px;color:var(--text-muted);">{{ T.ord_no_proformas }}</div>
+      {% endif %}
+      <form method="post" action="/orders/{{ offer.id }}/proforma" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+        <input type="file" name="proforma_file" required style="flex:1;font-size:12px;" />
+        <button type="submit" class="btn btn-primary btn-sm">{{ T.ord_proforma_upload }}</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Machine Documents -->
+  {% if user.role == 'admin' or (user.role == 'manufacturer' or user.is_manufacturer) %}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header"><h3 class="card-title">📁 {{ T.ord_documents }}</h3></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+      {% if documents %}
+      {% for doc in documents %}
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface-2);border-radius:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div style="flex:1;min-width:0;">
+          <a href="/static/{{ doc.file_path }}" target="_blank" style="font-size:13px;color:var(--primary);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ doc.filename }}</a>
+          {% if doc.doc_type %}<div style="font-size:11px;color:var(--text-muted);">{{ doc.doc_type }}</div>{% endif %}
+        </div>
+        <span style="font-size:11px;color:var(--text-muted);">{{ doc.uploaded_at[:10] }}</span>
+        <form method="post" action="/orders/document/delete" style="margin:0;">
+          <input type="hidden" name="id" value="{{ doc.id }}" />
+          <input type="hidden" name="order_id" value="{{ offer.id }}" />
+          <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px;" onclick="return confirm('Sil?')">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="font-size:12px;color:var(--text-muted);">{{ T.ord_no_documents }}</div>
+      {% endif %}
+      <form method="post" action="/orders/{{ offer.id }}/document" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+        <input type="text" name="doc_type" class="form-control" placeholder="{{ T.ord_doc_type_ph }}" style="font-size:12px;" />
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="file" name="doc_file" accept=".pdf,.PDF,.doc,.docx,.xls,.xlsx,.zip" required style="flex:1;font-size:12px;" />
+          <button type="submit" class="btn btn-primary btn-sm">{{ T.ord_document_upload }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+</div>
+
+<!-- Stage add modal -->
+<div id="stageModal" class="modal-overlay" data-static="true">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ T.ord_stage_modal_title }}</h3>
+      <button class="modal-close" onclick="closeModal('stageModal')">&times;</button>
+    </div>
+    <form method="post" action="/orders/{{ offer.id }}/stage" enctype="multipart/form-data">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Üretim Aşaması <span style="color:var(--danger);">*</span></label>
+          <select name="stage_code" class="form-control" required>
+            <option value="">— Aşama Seçin —</option>
+            {% for s in production_steps %}
+            {% if s.sort_order > ns.current_sort %}
+            <option value="{{ s.code }}">
+              {{ s.label_zh if user.lang == 'zh' else (s.label_en if user.lang == 'en' else s.label_tr) }}
+            </option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.ord_stage_date }}</label>
+          <input type="date" name="stage_date" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.ord_stage_note }} <span style="color:var(--danger);">*</span></label>
+          <textarea name="notes" class="form-control" rows="3" required
+                    placeholder="Bu aşamaya geçiş için açıklama zorunludur..."></textarea>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">⚠️ Açıklama girilmeden aşama geçişi yapılamaz.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.offer_contract_photo_label }}</label>
+          <input type="file" name="photo" id="stagePhotoInput" accept="image/*" capture="environment"
+                 style="display:none;" onchange="showStageFileName(this)" />
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('stagePhotoInput').click()">
+              📷 {{ T.offer_contract_photo_hint }}
+            </button>
+            <span id="stageFileName" style="font-size:12px;color:var(--text-muted);"></span>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('stageModal')">{{ T.ord_cancel_btn }}</button>
+        <button type="submit" class="btn btn-primary">{{ T.ord_add_btn }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="rollbackModal" class="modal-overlay" data-static="true">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <h3 class="modal-title" style="color:var(--danger);">↩ Önceki Aşamaya Geri Dön Talebi</h3>
+      <button class="modal-close" onclick="closeModal('rollbackModal')">&times;</button>
+    </div>
+    <form method="post" action="/orders/{{ offer.id }}/rollback-request">
+      <input type="hidden" name="target_stage_code" value="{{ ns2.prev_step.code if ns2.prev_step else '' }}" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        {% if ns2.prev_step %}
+        <div style="padding:10px 14px;background:#fef2f2;border-radius:8px;border-left:3px solid var(--danger);">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Geri Dönülecek Aşama</div>
+          <div style="font-weight:700;font-size:15px;color:var(--danger);">
+            {{ ns2.prev_step.label_zh if user.lang == 'zh' else (ns2.prev_step.label_en if user.lang == 'en' else ns2.prev_step.label_tr) }}
+          </div>
+        </div>
+        {% endif %}
+        <div style="font-size:13px;color:var(--text-muted);padding:8px;background:var(--surface-2);border-radius:6px;">
+          ⚠️ Bu talep yöneticiye iletilecek ve ancak yönetici onayıyla gerçekleştirilecektir.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Geri Alma Nedeni <span style="color:var(--danger);">*</span></label>
+          <textarea name="reason" class="form-control" rows="3" required
+                    placeholder="Neden önceki aşamaya dönmek istiyorsunuz?"></textarea>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('rollbackModal')">İptal</button>
+        <button type="submit" class="btn btn-danger">Talep Gönder</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showStageFileName(input) {
+  const el = document.getElementById('stageFileName');
+  if (input.files && input.files[0]) {
+    el.textContent = '📎 ' + input.files[0].name;
+  }
+}
+</script>
+{% endblock %}

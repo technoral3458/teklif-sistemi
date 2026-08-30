@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html data-theme="{{ user.theme if user else 'dark' }}" translate="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="google" content="notranslate" />
+  <title>{{ page_title|default('B2B Sistem') }} | B2B Teklif</title>
+  <script>(function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
+  <style>
+    html[data-theme="dark"]  { background:#0f172a; }
+    html[data-theme="light"] { background:#f1f5f9; }
+  </style>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+  <!-- Impersonation banner -->
+  {% set _imp = _get_impersonator(request) %}
+  {% if _imp %}
+  <div id="impersonateBanner" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#f59e0b;color:#1a1a1a;padding:7px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.3);">
+    <span>👁️ Kullanıcı görünümü: <strong>{{ user.company_name if user else '?' }}</strong> — {{ user.role if user else '' }}</span>
+    <form method="post" action="/admin/impersonate/exit" style="margin:0;">
+      <button type="submit" style="background:#1a1a1a;color:#f59e0b;border:none;padding:4px 14px;border-radius:5px;cursor:pointer;font-weight:700;font-size:12px;white-space:nowrap;">← Admin'e Dön</button>
+    </form>
+  </div>
+  <style>
+    .sidebar  { top: 34px !important; }
+    .topbar   { top: 34px !important; }
+    .main-content { margin-top: calc(var(--topbar-h) + 34px) !important; }
+  </style>
+  {% endif %}
+
+  <!-- Mobile overlay -->
+  <div class="overlay"></div>
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      {% if company and company.logo %}
+        <img src="/static/uploads/{{ company.logo }}" alt="Logo" class="sidebar-logo-img" />
+      {% else %}
+        <span class="sidebar-logo-text">B2B Sistem</span>
+      {% endif %}
+    </div>
+
+    {% set _menus = (user.allowed_menus or '').split(',') if user and user.allowed_menus else [] %}
+    {% macro show_menu(key) %}{% if not _menus or key in _menus %}show{% endif %}{% endmacro %}
+
+    <nav class="sidebar-nav">
+
+      {% if not _menus or 'dashboard' in _menus %}
+      <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_dashboard }}</span>
+      </a>
+      {% endif %}
+
+      {% if not _menus or 'customers' in _menus %}
+      <a href="/customers" class="nav-link {% if active_page == 'customers' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_customers }}</span>
+      </a>
+      {% endif %}
+
+      {% if not _menus or 'models' in _menus or (user and user.is_manufacturer) %}
+      <a href="/models" class="nav-link {% if active_page == 'models' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_models }}</span>
+      </a>
+      {% endif %}
+
+      {% if not _menus or 'options' in _menus or (user and user.is_manufacturer) %}
+      <a href="/options" class="nav-link {% if active_page == 'options' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#10b981,#34d399);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_options }}</span>
+      </a>
+      {% endif %}
+
+      {% if not _menus or 'categories' in _menus %}
+      <a href="/categories" class="nav-link {% if active_page == 'categories' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#ec4899,#f472b6);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_categories }}</span>
+      </a>
+      {% endif %}
+
+      {% if not _menus or 'offers' in _menus %}
+      <a href="/offers" class="nav-link {% if active_page == 'offers' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#3b82f6,#60a5fa);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_offers }}</span>
+      </a>
+      {% endif %}
+
+      {% if not _menus or 'orders' in _menus or (user and (user.role == 'manufacturer' or user.is_manufacturer)) %}
+      <a href="/orders" class="nav-link {% if active_page == 'orders' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#f97316,#fb923c);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_orders }}</span>
+      </a>
+      {% endif %}
+
+
+      {% if not _menus or 'costs' in _menus %}
+      <a href="/costs" class="nav-link {% if active_page == 'costs' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#14b8a6,#2dd4bf);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_costs }}</span>
+      </a>
+      {% endif %}
+
+      {% if not _menus or 'loan' in _menus %}
+      <a href="/loan-calc" class="nav-link {% if active_page == 'loan' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#22c55e,#4ade80);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/><line x1="14" y1="15" x2="18" y2="15"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_loan }}</span>
+      </a>
+      {% endif %}
+
+      <a href="/profile" class="nav-link {% if active_page == 'profile' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#64748b,#94a3b8);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').profile_title }}</span>
+      </a>
+
+      {% if user and (user.role == 'manufacturer' or user.is_manufacturer) %}
+      <a href="/price-requests/mine" class="nav-link {% if active_page == 'price_requests' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#C9961A,#f0b429);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_price_requests_mine }}</span>
+      </a>
+      {% endif %}
+
+      {% if user and user.role == 'admin' %}
+      <a href="/dealers" class="nav-link {% if active_page == 'dealers' %}active{% endif %}">        <span class="nav-icon" style="background:linear-gradient(135deg,#0ea5e9,#7dd3fc);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_dealers }}</span>
+      </a>
+      <a href="/manufacturers" class="nav-link {% if active_page == 'manufacturers' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#64748b,#94a3b8);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_manufacturers }}</span>
+      </a>
+      {% set _preq = _pending_requests_count() %}
+      <a href="/admin/requests" class="nav-link {% if active_page == 'admin_requests' %}active{% endif %}" style="position:relative;">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_requests }}{% if _preq > 0 %} <span style="background:#ef4444;color:#fff;border-radius:999px;padding:1px 6px;font-size:11px;font-weight:700;margin-left:4px;">{{ _preq }}</span>{% endif %}</span>
+      </a>
+      {% set _qreq = _count_quote_requests() %}
+      <a href="/admin/teklif-talepleri" class="nav-link {% if active_page == 'quote_requests' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+        <span class="nav-label">Teklif Talepleri{% if _qreq > 0 %} <span style="background:#ef4444;color:#fff;border-radius:999px;padding:1px 6px;font-size:11px;font-weight:700;margin-left:4px;">{{ _qreq }}</span>{% endif %}</span>
+      </a>
+      <a href="/price-requests" class="nav-link {% if active_page == 'price_requests' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#C9961A,#f0b429);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_price_requests }}</span>
+      </a>
+      <a href="/admin/production-steps" class="nav-link {% if active_page == 'production_steps' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#0f766e,#14b8a6);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_production_steps }}</span>
+      </a>
+      <a href="/admin/delivery-terms" class="nav-link {% if active_page == 'delivery_terms' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#0891b2,#06b6d4);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_delivery_terms }}</span>
+      </a>
+      <a href="/admin" class="nav-link {% if active_page == 'admin' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#ef4444,#f87171);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
+        <span class="nav-label">{{ _T(user.lang if user else 'tr').nav_settings }}</span>
+      </a>
+      {% endif %}
+
+    </nav>
+
+    <!-- Sidebar bottom user info -->
+    <div class="sidebar-user">
+      <a href="/profile" class="sidebar-user-link">
+        <div class="sidebar-user-avatar">
+          {{ (user.company_name[0] if user and user.company_name else 'U')|upper }}
+        </div>
+        <div class="sidebar-user-info">
+          <span class="sidebar-user-name">{{ user.company_name if user else 'Kullanıcı' }}</span>
+          <span class="sidebar-user-role badge badge-{{ user.role if user else 'dealer' }}">
+            {% if user %}{% set _rt = {'admin':'Admin','manufacturer':'Üretici','dealer':'Bayi'} %}{{ _rt.get(user.role, user.role) }}{% if user.is_manufacturer and user.role != 'manufacturer' %} + Üretici{% endif %}{% endif %}
+          </span>
+        </div>
+      </a>
+    </div>
+  </aside>
+
+  <!-- ── Topbar ── -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-icon" onclick="toggleSidebar()" aria-label="Menü Aç/Kapat">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+    </div>
+    <div class="topbar-right">
+      <!-- Theme toggle -->
+      <button id="themeToggleBtn" class="btn-icon" onclick="toggleTheme()" title="Tema Değiştir">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+
+      <!-- Language selector -->
+      <div class="lang-selector" style="display:flex;gap:2px;align-items:center;margin-right:4px;">
+        {% for code, flag in [('tr','🇹🇷'),('en','🇬🇧'),('zh','🇨🇳')] %}
+        <button type="button" class="btn-icon lang-btn" onclick="setLang('{{ code }}')" style="font-size:14px;padding:4px 7px;{% if user and user.lang == code %}opacity:1;box-shadow:0 0 0 2px var(--accent);border-radius:4px;{% else %}opacity:0.35;{% endif %}" title="{{ code.upper() }}">{{ flag }}</button>
+        {% endfor %}
+      </div>
+
+      <!-- Profile link -->
+      <a href="/profile" class="btn-icon topbar-profile" title="Profil">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </a>
+
+      <!-- Logout -->
+      <form method="post" action="/auth/logout" style="display:inline;">
+        <button type="submit" class="btn-icon" title="Çıkış Yap">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </header>
+
+  <!-- ── Main Content ── -->
+  <main class="main-content">
+    <div class="container">
+
+      <!-- Flash messages -->
+      {% if msg %}
+      <div class="alert alert-{{ msg_type|default('info') }}">
+        <span>{{ msg }}</span>
+        <button class="alert-close" onclick="this.parentElement.remove()" type="button">&times;</button>
+      </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+
+    </div>
+  </main>
+
+  <script src="/static/js/app.js?v=2"></script>
+  <script>
+  function setLang(code) {
+    var f = document.createElement('form');
+    f.method = 'POST';
+    f.action = '/set-lang';
+    var i = document.createElement('input');
+    i.type = 'hidden'; i.name = 'lang'; i.value = code;
+    f.appendChild(i);
+    document.body.appendChild(f);
+    f.submit();
+  }
+
+  /* ── Custom file input: hide native, show translated button ── */
+  (function() {
+    var _labels = {
+      tr: { btn: 'Dosya Seç', none: 'Dosya seçilmedi' },
+      en: { btn: 'Choose File', none: 'No file selected' },
+      zh: { btn: '选择文件',   none: '未选择文件' }
+    };
+    function _initFileInput(inp) {
+      if (inp.dataset.cfDone) return;
+      inp.dataset.cfDone = '1';
+      inp.style.cssText = 'position:absolute;opacity:0;width:0;height:0;overflow:hidden;';
+      var lang = document.documentElement.lang || '{{ user.lang if user else "tr" }}';
+      var L = _labels[lang] || _labels['tr'];
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = L.btn;
+      btn.className = 'btn btn-outline btn-sm';
+      btn.style.flexShrink = '0';
+      var lbl = document.createElement('span');
+      lbl.textContent = inp.value ? inp.value.split('\\').pop() : L.none;
+      lbl.style.cssText = 'font-size:13px;color:var(--text-muted);word-break:break-all;';
+      btn.addEventListener('click', function(){ inp.click(); });
+      inp.addEventListener('change', function(){
+        lbl.textContent = inp.files && inp.files[0] ? inp.files[0].name : L.none;
+        lbl.style.color = inp.files && inp.files[0] ? 'var(--text)' : 'var(--text-muted)';
+      });
+      inp.parentNode.insertBefore(wrap, inp.nextSibling);
+      wrap.appendChild(inp);
+      wrap.appendChild(btn);
+      wrap.appendChild(lbl);
+    }
+    function _initAll() {
+      document.querySelectorAll('input[type="file"]:not([data-cf-done]):not([style*="display:none"])').forEach(_initFileInput);
+    }
+    document.addEventListener('DOMContentLoaded', _initAll);
+    /* also handle dynamically added inputs (e.g. line images) */
+    var _ob = new MutationObserver(function(){ _initAll(); });
+    document.addEventListener('DOMContentLoaded', function(){
+      _ob.observe(document.body, { childList: true, subtree: true });
+    });
+  })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}Üretim Aşamaları{% endblock %}
+{% block content %}
+{% if msg %}
+<div class="alert alert-{{ msg_type }}" style="margin-bottom:16px;">{{ msg }}</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;">
+
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Üretim Aşamaları</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px;">#</th>
+          <th>Kod</th>
+          <th>Türkçe</th>
+          <th>English</th>
+          <th>中文</th>
+          <th style="width:60px;">Sıra</th>
+          <th style="width:70px;">Aktif</th>
+          <th style="width:80px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in steps %}
+        <tr>
+          <td>{{ s.id }}</td>
+          <td><code style="font-size:12px;">{{ s.code }}</code></td>
+          <td>{{ s.label_tr }}</td>
+          <td>{{ s.label_en }}</td>
+          <td>{{ s.label_zh }}</td>
+          <td>{{ s.sort_order }}</td>
+          <td>{% if s.is_active %}<span class="badge badge-green">Aktif</span>{% else %}<span class="badge badge-gray">Pasif</span>{% endif %}</td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="editStep({{ s.id }}, '{{ s.code|e }}', '{{ s.label_tr|e }}', '{{ s.label_en|e }}', '{{ s.label_zh|e }}', {{ s.sort_order }}, {{ s.is_active }})">Düzenle</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted);">Henüz aşama yok</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" id="stepFormCard">
+  <div class="card-header"><h3 class="card-title" id="formTitle">Yeni Aşama</h3></div>
+  <div class="card-body">
+    <form method="post" action="/admin/production-steps/save" id="stepForm">
+      <input type="hidden" name="id" id="stepId" value="0" />
+      <div class="form-group">
+        <label class="form-label">Kod <small style="color:var(--text-muted);">(benzersiz, değiştirme)</small></label>
+        <input type="text" name="code" id="stepCode" class="form-control" required placeholder="örn: quality_check" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Türkçe Etiket *</label>
+        <input type="text" name="label_tr" id="stepLabelTr" class="form-control" required placeholder="örn: Kalite Kontrol" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">English Label</label>
+        <input type="text" name="label_en" id="stepLabelEn" class="form-control" placeholder="e.g. Quality Check" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">中文标签</label>
+        <input type="text" name="label_zh" id="stepLabelZh" class="form-control" placeholder="例如：质量检查" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sıra</label>
+        <input type="number" name="sort_order" id="stepSort" class="form-control" value="10" min="0" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Durum</label>
+        <select name="is_active" id="stepActive" class="form-control">
+          <option value="1">Aktif</option>
+          <option value="0">Pasif</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+        <button type="button" class="btn btn-ghost" onclick="resetForm()">Temizle</button>
+      </div>
+    </form>
+    <div id="deleteSection" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+      <form method="post" action="/admin/production-steps/delete" onsubmit="return confirm('Bu aşamayı sil?')">
+        <input type="hidden" name="id" id="deleteId" value="0" />
+        <button type="submit" class="btn btn-danger btn-sm">Aşamayı Sil</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function editStep(id, code, tr, en, zh, sort, active) {
+  document.getElementById('stepId').value = id;
+  document.getElementById('stepCode').value = code;
+  document.getElementById('stepLabelTr').value = tr;
+  document.getElementById('stepLabelEn').value = en;
+  document.getElementById('stepLabelZh').value = zh;
+  document.getElementById('stepSort').value = sort;
+  document.getElementById('stepActive').value = active;
+  document.getElementById('formTitle').textContent = 'Aşama Düzenle';
+  document.getElementById('deleteId').value = id;
+  document.getElementById('deleteSection').style.display = 'block';
+  document.getElementById('stepFormCard').scrollIntoView({behavior:'smooth'});
+}
+function resetForm() {
+  document.getElementById('stepId').value = '0';
+  document.getElementById('stepForm').reset();
+  document.getElementById('formTitle').textContent = 'Yeni Aşama';
+  document.getElementById('deleteSection').style.display = 'none';
+}
+</script>
+{% endblock %}
