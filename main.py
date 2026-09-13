@@ -54,6 +54,7 @@ from routers.translate import router as translate_router
 from routers.price_requests import router as price_requests_router
 from routers.public_quote import router as public_quote_router
 from routers.quote_requests import router as quote_requests_router
+from routers.parametric import router as parametric_router
 
 for r in [
     auth_router,
@@ -77,6 +78,7 @@ for r in [
     price_requests_router,
     public_quote_router,
     quote_requests_router,
+    parametric_router,
 ]:
     app.include_router(r)
 

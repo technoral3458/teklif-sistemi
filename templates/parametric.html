@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}Parametrik Kesim{% endblock %}
+
+{% block content %}
+{% if err %}
+<div class="alert alert-danger">
+  <span>{{ err }}</span>
+  <button class="alert-close" onclick="this.parentElement.remove()" type="button">&times;</button>
+</div>
+{% endif %}
+
+<!-- ── Yeni model yükle ── -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header">
+    <h3 class="card-title">📐 Parametrik Kesim — Yeni Model</h3>
+  </div>
+  <div class="card-body">
+    <p style="color:var(--text-muted);font-size:13px;margin:0 0 16px;line-height:1.6;">
+      3B katı modelinizi yükleyin; sistem modeli panel kalınlığınıza göre dilimler,
+      her dilimin kesitini çıkarır ve CNC'de kesmeye hazır <strong>DXF</strong> dosyası üretir.
+      Paneller aralarına boşluk bırakılarak üst üste dizildiğinde modelin 3B formunu oluşturur.
+      <br>
+      <span style="color:var(--text-muted);">
+        Desteklenen biçimler: <strong>STL</strong> (binary/ASCII) ve <strong>OBJ</strong> —
+        en fazla {{ max_mb }} MB. Ölçü birimi <strong>milimetre</strong> kabul edilir.
+      </span>
+    </p>
+
+    <form method="post" action="/parametric/upload" enctype="multipart/form-data"
+          style="display:grid;grid-template-columns:1fr 1.4fr auto;gap:12px;align-items:end;">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">İş Adı</label>
+        <input type="text" name="name" class="form-control" placeholder="ör. Dalgalı Bank" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Katı Model Dosyası (.stl / .obj)</label>
+        <input type="file" name="file" accept=".stl,.obj" required class="form-control" />
+      </div>
+      <button type="submit" class="btn btn-primary">Yükle ve Devam</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── Kayıtlı işler ── -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Kayıtlı Çalışmalar</h3>
+    <span style="color:var(--text-muted);font-size:12px;">{{ jobs|length }} kayıt</span>
+  </div>
+  <div class="card-body" style="padding:0;">
+    {% if jobs %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>İş Adı</th>
+            <th>Dosya</th>
+            <th>Panel</th>
+            <th>Kalınlık</th>
+            <th>Plaka</th>
+            <th>Durum</th>
+            <th>Tarih</th>
+            <th style="text-align:right;">İşlem</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for j in jobs %}
+          <tr>
+            <td style="font-weight:600;">{{ j.name }}</td>
+            <td style="color:var(--text-muted);font-size:12px;">
+              {{ j.orig_name }}<br>
+              <span style="font-size:11px;">{{ '{:,}'.format(j.tri_count) }} üçgen</span>
+            </td>
+            <td>{% if j.panel_count %}<strong>{{ j.panel_count }}</strong>{% else %}—{% endif %}</td>
+            <td>{{ '%g'|format(j.thickness) }} mm{% if j.gap %} + {{ '%g'|format(j.gap) }} boşluk{% endif %}</td>
+            <td>{% if j.sheet_count %}{{ j.sheet_count }}{% else %}—{% endif %}</td>
+            <td>
+              {% if j.status == 'Hazır' %}
+                <span class="badge badge-green">Hazır</span>
+              {% else %}
+                <span class="badge badge-amber">Bekliyor</span>
+              {% endif %}
+            </td>
+            <td style="color:var(--text-muted);font-size:12px;">{{ j.created_at[:16] if j.created_at else '' }}</td>
+            <td style="text-align:right;white-space:nowrap;">
+              <a href="/parametric/{{ j.id }}" class="btn btn-outline btn-sm">Aç</a>
+              {% if j.status == 'Hazır' %}
+              <a href="/parametric/{{ j.id }}/dxf" class="btn btn-outline btn-sm"
+                 style="border-color:#22c55e;color:#22c55e;">DXF</a>
+              {% endif %}
+              <form method="post" action="/parametric/{{ j.id }}/delete" style="display:inline;"
+                    onsubmit="return confirm('{{ j.name }} silinsin mi?')">
+                <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:48px 20px;text-align:center;">
+      <div class="empty-icon" style="font-size:40px;">📐</div>
+      <p style="color:var(--text-muted);margin-top:10px;">
+        Henüz kayıt yok. Yukarıdan bir katı model yükleyerek başlayın.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

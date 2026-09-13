@@ -419,7 +419,40 @@ def init():
             created_at   TEXT DEFAULT(datetime('now'))
         )""")
 
+        cur.execute("""CREATE TABLE IF NOT EXISTS parametric_jobs(
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id      INTEGER DEFAULT 0,
+            name         TEXT DEFAULT '',
+            src_file     TEXT DEFAULT '',
+            orig_name    TEXT DEFAULT '',
+            tri_count    INTEGER DEFAULT 0,
+            axis         TEXT DEFAULT 'z',
+            thickness    REAL DEFAULT 18,
+            gap          REAL DEFAULT 0,
+            scale        REAL DEFAULT 1,
+            simplify_tol REAL DEFAULT 0.15,
+            hole_count   INTEGER DEFAULT 2,
+            hole_dia     REAL DEFAULT 10,
+            sheet_w      REAL DEFAULT 2100,
+            sheet_h      REAL DEFAULT 2800,
+            part_gap     REAL DEFAULT 15,
+            panel_count  INTEGER DEFAULT 0,
+            sheet_count  INTEGER DEFAULT 0,
+            summary_json TEXT DEFAULT '{}',
+            svg          TEXT DEFAULT '',
+            status       TEXT DEFAULT 'Yeni',
+            created_at   TEXT DEFAULT(datetime('now'))
+        )""")
+
         c.commit()
+
+
+PARAMETRIC_COLS = [
+    "id", "user_id", "name", "src_file", "orig_name", "tri_count", "axis",
+    "thickness", "gap", "scale", "simplify_tol", "hole_count", "hole_dia",
+    "sheet_w", "sheet_h", "part_gap", "panel_count", "sheet_count",
+    "summary_json", "svg", "status", "created_at",
+]
 
 
 def _init_loan_rates(cur):
@@ -2062,3 +2095,51 @@ def count_new_quote_requests():
     with _c() as c:
         r = c.execute("SELECT COUNT(*) FROM quote_requests WHERE status='Yeni'").fetchone()
     return r[0] if r else 0
+
+
+# ── Parametrik dilimleme işleri ───────────────────────────────────────────────
+
+def add_parametric_job(user_id, name, src_file, orig_name, tri_count):
+    with _c() as c:
+        c.execute(
+            """INSERT INTO parametric_jobs(user_id,name,src_file,orig_name,tri_count)
+               VALUES(?,?,?,?,?)""",
+            (user_id, name, src_file, orig_name, tri_count)
+        )
+        return c.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+
+def get_parametric_jobs(user_id=None):
+    with _c() as c:
+        if user_id is None:
+            rows = c.execute(
+                "SELECT * FROM parametric_jobs ORDER BY id DESC").fetchall()
+        else:
+            rows = c.execute(
+                "SELECT * FROM parametric_jobs WHERE user_id=? ORDER BY id DESC",
+                (user_id,)).fetchall()
+    return [dict(zip(PARAMETRIC_COLS, r)) for r in rows]
+
+
+def get_parametric_job(jid):
+    with _c() as c:
+        row = c.execute("SELECT * FROM parametric_jobs WHERE id=?", (jid,)).fetchone()
+    return dict(zip(PARAMETRIC_COLS, row)) if row else None
+
+
+def upd_parametric_job(jid, **kw):
+    allowed = {"name", "axis", "thickness", "gap", "scale", "simplify_tol",
+               "hole_count", "hole_dia", "sheet_w", "sheet_h", "part_gap",
+               "panel_count", "sheet_count", "summary_json", "svg", "status"}
+    fields = {k: v for k, v in kw.items() if k in allowed}
+    if not fields:
+        return
+    sets = ",".join(f"{k}=?" for k in fields)
+    with _c() as c:
+        c.execute(f"UPDATE parametric_jobs SET {sets} WHERE id=?",
+                  (*fields.values(), jid))
+
+
+def del_parametric_job(jid):
+    with _c() as c:
+        c.execute("DELETE FROM parametric_jobs WHERE id=?", (jid,))

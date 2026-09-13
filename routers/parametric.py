@@ -1,0 +1,280 @@
+"""Parametrik kesim: 3B katı model → panel dilimleri → CNC için DXF."""
+
+import json
+import os
+import re
+import time
+
+from fastapi import APIRouter, Request, Form, UploadFile, File
+from fastapi.responses import RedirectResponse, Response
+from starlette.concurrency import run_in_threadpool
+
+import auth
+import db.factory as fdb
+import parametric_slicer as ps
+from config import DATA_DIR
+from tmpl import templates
+
+router = APIRouter(prefix="/parametric")
+
+PARAM_DIR = os.path.join(DATA_DIR, "parametric")
+os.makedirs(PARAM_DIR, exist_ok=True)
+
+MAX_UPLOAD_MB = 60
+ALLOWED_EXTS = {"stl", "obj"}
+AXES = [("z", "Z ekseni (dikey / yukarıdan aşağı)"),
+        ("y", "Y ekseni (derinlik)"),
+        ("x", "X ekseni (yatay / soldan sağa)")]
+
+
+def _safe(s, default="model"):
+    s = re.sub(r"[^A-Za-z0-9_\-]+", "_", (s or "").strip())
+    return s.strip("_")[:60] or default
+
+
+def _src_path(job):
+    return os.path.join(PARAM_DIR, job["src_file"]) if job.get("src_file") else ""
+
+
+def _res_path(jid):
+    return os.path.join(PARAM_DIR, f"{jid}_panels.json.gz")
+
+
+# Aynı modelin tekrar tekrar ayrıştırılmaması için küçük bellek içi önbellek
+_MESH_CACHE = {}
+
+
+def _load_mesh_cached(path):
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        raise ValueError("Model dosyası bulunamadı. Lütfen yeniden yükleyin.")
+    key = (path, mtime)
+    hit = _MESH_CACHE.get(key)
+    if hit is not None:
+        return hit
+    with open(path, "rb") as f:
+        tris = ps.load_mesh(f.read(), path)
+    _MESH_CACHE.clear()          # tek model yeterli — bellek şişmesin
+    _MESH_CACHE[key] = tris
+    return tris
+
+
+def _load_result(jid):
+    p = _res_path(jid)
+    if not os.path.exists(p):
+        return None
+    with open(p, "rb") as f:
+        return ps.load_result(f.read())
+
+
+# ── Liste + yükleme ───────────────────────────────────────────────────────────
+
+@router.get("")
+async def index(request: Request, msg: str = "", err: str = ""):
+    user = auth.require_user(request)
+    jobs = fdb.get_parametric_jobs()
+    for j in jobs:
+        try:
+            j["summary"] = json.loads(j.get("summary_json") or "{}")
+        except Exception:
+            j["summary"] = {}
+    return templates.TemplateResponse(request, "parametric.html", {
+        "user": user,
+        "jobs": jobs,
+        "msg": msg,
+        "err": err,
+        "active_page": "parametric",
+        "max_mb": MAX_UPLOAD_MB,
+    })
+
+
+@router.post("/upload")
+async def upload(request: Request,
+                 name: str = Form(""),
+                 file: UploadFile = File(...)):
+    user = auth.require_user(request)
+
+    fname = file.filename or ""
+    ext = fname.rsplit(".", 1)[-1].lower() if "." in fname else ""
+    if ext not in ALLOWED_EXTS:
+        return RedirectResponse(
+            "/parametric?err=" + f"Sadece STL ve OBJ desteklenir ('.{ext}' yüklendi). "
+            "CAD programınızdan STL olarak dışa aktarın.", 303)
+
+    data = await file.read()
+    if not data:
+        return RedirectResponse("/parametric?err=Dosya boş.", 303)
+    if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
+        return RedirectResponse(
+            f"/parametric?err=Dosya çok büyük ({len(data)/1048576:.0f} MB). "
+            f"Üst sınır {MAX_UPLOAD_MB} MB.", 303)
+
+    try:
+        tris = await run_in_threadpool(ps.load_mesh, data, fname)
+    except ValueError as e:
+        return RedirectResponse(f"/parametric?err={e}", 303)
+    except Exception:
+        return RedirectResponse(
+            "/parametric?err=Model okunamadı. Dosyanın geçerli bir STL/OBJ olduğundan emin olun.", 303)
+
+    title = (name or "").strip() or os.path.splitext(fname)[0]
+    stored = f"{int(time.time())}_{_safe(title)}.{ext}"
+    with open(os.path.join(PARAM_DIR, stored), "wb") as f:
+        f.write(data)
+
+    jid = fdb.add_parametric_job(user["id"], title, stored, fname, len(tris))
+    return RedirectResponse(f"/parametric/{jid}", 303)
+
+
+# ── Detay + dilimleme ─────────────────────────────────────────────────────────
+
+@router.get("/{jid}")
+async def detail(request: Request, jid: int, msg: str = "", err: str = ""):
+    user = auth.require_user(request)
+    job = fdb.get_parametric_job(jid)
+    if not job:
+        return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
+
+    try:
+        job["summary"] = json.loads(job.get("summary_json") or "{}")
+    except Exception:
+        job["summary"] = {}
+
+    # Model sınırlarını göster (ölçek seçimine yardımcı olur)
+    bounds = None
+    try:
+        tris = await run_in_threadpool(_load_mesh_cached, _src_path(job))
+        bounds = ps.mesh_info(tris)
+    except Exception:
+        pass
+
+    return templates.TemplateResponse(request, "parametric_detail.html", {
+        "user": user,
+        "job": job,
+        "bounds": bounds,
+        "axes": AXES,
+        "msg": msg,
+        "err": err,
+        "active_page": "parametric",
+    })
+
+
+@router.post("/{jid}/slice")
+async def do_slice(request: Request, jid: int,
+                   axis: str = Form("z"),
+                   thickness: float = Form(18.0),
+                   gap: float = Form(0.0),
+                   scale: float = Form(1.0),
+                   target_len: float = Form(0.0),
+                   simplify_tol: float = Form(0.15),
+                   hole_count: int = Form(2),
+                   hole_dia: float = Form(10.0),
+                   sheet_w: float = Form(2100.0),
+                   sheet_h: float = Form(2800.0),
+                   part_gap: float = Form(15.0)):
+    auth.require_user(request)
+    job = fdb.get_parametric_job(jid)
+    if not job:
+        return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
+
+    if thickness <= 0:
+        return RedirectResponse(f"/parametric/{jid}?err=Panel kalınlığı sıfırdan büyük olmalı.", 303)
+    if gap < 0:
+        gap = 0.0
+
+    def work():
+        tris = _load_mesh_cached(_src_path(job))
+        sc = float(scale) if scale and scale > 0 else 1.0
+        # "Hedef boy" verilmişse ölçek buradan hesaplanır
+        if target_len and target_len > 0:
+            span = ps.mesh_info(tris)["size"][ps._AXIS_IDX[axis if axis in ps._AXIS_IDX else "z"]]
+            if span > 0:
+                sc = target_len / span
+        res = ps.build_panels(
+            tris, axis=axis, thickness=thickness, gap=gap, scale=sc,
+            simplify_tol=max(0.0, simplify_tol),
+            hole_count=max(0, hole_count), hole_dia=hole_dia,
+        )
+        _, sheets, oversize = ps.export_dxf(
+            res, sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap)
+        blob = ps.dump_result(res)
+        svg = ps.export_svg(res)
+        return res, sheets, oversize, blob, svg, sc
+
+    try:
+        res, sheets, oversize, blob, svg, sc = await run_in_threadpool(work)
+    except ValueError as e:
+        return RedirectResponse(f"/parametric/{jid}?err={e}", 303)
+    except Exception as e:
+        return RedirectResponse(f"/parametric/{jid}?err=Dilimleme hatası: {e}", 303)
+
+    with open(_res_path(jid), "wb") as f:
+        f.write(blob)
+
+    summ = ps.summary(res, sheets)
+    if oversize:
+        summ.setdefault("warnings", []).append(
+            f"{len(oversize)} panel plakaya sığmıyor "
+            f"(no: {', '.join(str(n) for n in oversize[:8])}). "
+            "Plaka ölçüsünü büyütün veya modeli küçültün.")
+
+    fdb.upd_parametric_job(
+        jid, axis=axis, thickness=thickness, gap=gap, scale=sc,
+        simplify_tol=simplify_tol, hole_count=hole_count, hole_dia=hole_dia,
+        sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap,
+        panel_count=summ["panel_count"], sheet_count=sheets,
+        summary_json=json.dumps(summ, default=float), svg=svg, status="Hazır")
+
+    return RedirectResponse(
+        f"/parametric/{jid}?msg={summ['panel_count']} panel hazırlandı.", 303)
+
+
+# ── İndirmeler ────────────────────────────────────────────────────────────────
+
+@router.get("/{jid}/dxf")
+async def download_dxf(request: Request, jid: int):
+    auth.require_user(request)
+    job = fdb.get_parametric_job(jid)
+    if not job:
+        return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
+    res = _load_result(jid)
+    if not res:
+        return RedirectResponse(f"/parametric/{jid}?err=Önce 'Dilimle' butonuna basın.", 303)
+
+    dxf, _, _ = await run_in_threadpool(
+        ps.export_dxf, res, job["sheet_w"], job["sheet_h"], job["part_gap"])
+    fn = f"{_safe(job['name'])}_paneller.dxf"
+    return Response(dxf, media_type="application/dxf",
+                    headers={"Content-Disposition": f'attachment; filename="{fn}"'})
+
+
+@router.get("/{jid}/zip")
+async def download_zip(request: Request, jid: int):
+    auth.require_user(request)
+    job = fdb.get_parametric_job(jid)
+    if not job:
+        return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
+    res = _load_result(jid)
+    if not res:
+        return RedirectResponse(f"/parametric/{jid}?err=Önce 'Dilimle' butonuna basın.", 303)
+
+    blob = await run_in_threadpool(ps.export_zip, res, True, _safe(job["name"]))
+    fn = f"{_safe(job['name'])}_paneller.zip"
+    return Response(blob, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{fn}"'})
+
+
+@router.post("/{jid}/delete")
+async def delete(request: Request, jid: int):
+    auth.require_user(request)
+    job = fdb.get_parametric_job(jid)
+    if job:
+        for p in (_src_path(job), _res_path(jid)):
+            try:
+                if p and os.path.exists(p):
+                    os.remove(p)
+            except OSError:
+                pass
+        fdb.del_parametric_job(jid)
+    return RedirectResponse("/parametric?msg=Kayıt silindi.", 303)

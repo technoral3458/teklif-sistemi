@@ -112,6 +112,13 @@
       </a>
       {% endif %}
 
+      {% if not _menus or 'parametric' in _menus %}
+      <a href="/parametric" class="nav-link {% if active_page == 'parametric' %}active{% endif %}">
+        <span class="nav-icon" style="background:linear-gradient(135deg,#a16207,#d97706);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="3" y1="4" x2="3" y2="20"/><line x1="8" y1="4" x2="8" y2="20"/><line x1="13" y1="4" x2="13" y2="20"/><line x1="18" y1="4" x2="18" y2="20"/><path d="M21 8c-1.5 2-1.5 6 0 8"/></svg></span>
+        <span class="nav-label">Parametrik Kesim</span>
+      </a>
+      {% endif %}
+
       <a href="/profile" class="nav-link {% if active_page == 'profile' %}active{% endif %}">
         <span class="nav-icon" style="background:linear-gradient(135deg,#64748b,#94a3b8);border-radius:8px;padding:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
         <span class="nav-label">{{ _T(user.lang if user else 'tr').profile_title }}</span>
