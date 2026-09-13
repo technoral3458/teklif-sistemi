@@ -22,6 +22,8 @@ os.makedirs(PARAM_DIR, exist_ok=True)
 
 MAX_UPLOAD_MB = 60
 ALLOWED_EXTS = {"stl", "obj"}
+MAX_IMAGE_MB = 20
+IMAGE_EXTS = {"png", "jpg", "jpeg", "webp", "bmp", "gif"}
 AXES = [("z", "Z ekseni (dikey / yukarıdan aşağı)"),
         ("y", "Y ekseni (derinlik)"),
         ("x", "X ekseni (yatay / soldan sağa)")]
@@ -127,6 +129,143 @@ async def upload(request: Request,
     return RedirectResponse(f"/parametric/{jid}", 303)
 
 
+@router.post("/upload-image")
+async def upload_image(request: Request,
+                       name: str = Form(""),
+                       file: UploadFile = File(...)):
+    """Resim yükle → kabartma (relief) modunda iş oluştur."""
+    user = auth.require_user(request)
+
+    fname = file.filename or ""
+    ext = fname.rsplit(".", 1)[-1].lower() if "." in fname else ""
+    if ext not in IMAGE_EXTS:
+        return RedirectResponse(
+            f"/parametric?err=Desteklenmeyen resim biçimi ('.{ext}'). "
+            "PNG, JPG veya WEBP kullanın.", 303)
+
+    data = await file.read()
+    if not data:
+        return RedirectResponse("/parametric?err=Dosya boş.", 303)
+    if len(data) > MAX_IMAGE_MB * 1024 * 1024:
+        return RedirectResponse(
+            f"/parametric?err=Resim çok büyük ({len(data)/1048576:.0f} MB). "
+            f"Üst sınır {MAX_IMAGE_MB} MB.", 303)
+
+    def probe():
+        from PIL import Image
+        import io as _io
+        im = Image.open(_io.BytesIO(data))
+        im.load()
+        return im.size
+
+    try:
+        iw, ih = await run_in_threadpool(probe)
+    except Exception:
+        return RedirectResponse("/parametric?err=Resim okunamadı veya bozuk.", 303)
+
+    title = (name or "").strip() or os.path.splitext(fname)[0]
+    stored = f"{int(time.time())}_{_safe(title)}.{ext}"
+    with open(os.path.join(PARAM_DIR, stored), "wb") as f:
+        f.write(data)
+
+    jid = fdb.add_parametric_job(user["id"], title, stored, fname, 0, src_kind="image")
+    # Resmin en-boy oranını koruyan makul bir başlangıç ölçüsü öner
+    w0 = 1200.0
+    fdb.upd_parametric_job(jid, img_w=w0, img_h=round(w0 * ih / iw, 1) if iw else 800.0)
+    return RedirectResponse(f"/parametric/{jid}", 303)
+
+
+@router.get("/{jid}/image")
+async def source_image(request: Request, jid: int):
+    """Yüklenen kaynak resmi gösterir (data/ klasörü web'e açık değil)."""
+    auth.require_user(request)
+    job = fdb.get_parametric_job(jid)
+    if not job or job.get("src_kind") != "image":
+        return Response(status_code=404)
+    p = _src_path(job)
+    if not p or not os.path.exists(p):
+        return Response(status_code=404)
+    ext = p.rsplit(".", 1)[-1].lower()
+    mt = {"png": "image/png", "webp": "image/webp", "gif": "image/gif",
+          "bmp": "image/bmp"}.get(ext, "image/jpeg")
+    with open(p, "rb") as f:
+        return Response(f.read(), media_type=mt,
+                        headers={"Cache-Control": "private, max-age=600"})
+
+
+@router.post("/{jid}/slice-image")
+async def slice_image(request: Request, jid: int,
+                      img_w: float = Form(1200.0),
+                      img_h: float = Form(800.0),
+                      img_depth: float = Form(180.0),
+                      min_depth: float = Form(40.0),
+                      thickness: float = Form(18.0),
+                      gap: float = Form(0.0),
+                      orient: str = Form("v"),
+                      shape_mode: str = Form("single"),
+                      invert: int = Form(0),
+                      smooth: float = Form(1.0),
+                      normalize: int = Form(0),
+                      simplify_tol: float = Form(0.3),
+                      hole_count: int = Form(2),
+                      hole_dia: float = Form(10.0),
+                      sheet_w: float = Form(2100.0),
+                      sheet_h: float = Form(2800.0),
+                      part_gap: float = Form(15.0)):
+    auth.require_user(request)
+    job = fdb.get_parametric_job(jid)
+    if not job:
+        return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
+    if thickness <= 0:
+        return RedirectResponse(f"/parametric/{jid}?err=Panel kalınlığı sıfırdan büyük olmalı.", 303)
+
+    def work():
+        from PIL import Image
+        with Image.open(_src_path(job)) as im:
+            im.load()
+            res = ps.build_panels_from_image(
+                im, width=img_w, height=img_h, depth=img_depth,
+                min_depth=min_depth, thickness=thickness, gap=max(0.0, gap),
+                orient=orient, invert=bool(invert), smooth=max(0.0, smooth),
+                normalize=bool(normalize), shape=shape_mode,
+                simplify_tol=max(0.0, simplify_tol),
+                hole_count=max(0, hole_count), hole_dia=hole_dia)
+        _, sheets, oversize = ps.export_dxf(
+            res, sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap)
+        return (res, sheets, oversize, ps.dump_result(res),
+                ps.export_svg(res), ps.export_assembly_svg(res))
+
+    try:
+        res, sheets, oversize, blob, svg, asm = await run_in_threadpool(work)
+    except ValueError as e:
+        return RedirectResponse(f"/parametric/{jid}?err={e}", 303)
+    except Exception as e:
+        return RedirectResponse(f"/parametric/{jid}?err=Kabartma hatası: {e}", 303)
+
+    with open(_res_path(jid), "wb") as f:
+        f.write(blob)
+
+    summ = ps.summary(res, sheets)
+    if oversize:
+        summ.setdefault("warnings", []).append(
+            f"{len(oversize)} panel plakaya sığmıyor "
+            f"(no: {', '.join(str(n) for n in oversize[:8])}). "
+            "Plaka ölçüsünü büyütün veya işi küçültün.")
+
+    fdb.upd_parametric_job(
+        jid, img_w=img_w, img_h=img_h, img_depth=img_depth, min_depth=min_depth,
+        thickness=thickness, gap=gap, orient=orient, shape_mode=shape_mode,
+        invert=int(bool(invert)), smooth=smooth, normalize=int(bool(normalize)),
+        simplify_tol=simplify_tol, hole_count=hole_count, hole_dia=hole_dia,
+        sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap,
+        panel_count=summ["panel_count"], sheet_count=sheets,
+        summary_json=json.dumps(summ, default=float), svg=svg, asm_svg=asm,
+        status="Hazır")
+
+    return RedirectResponse(
+        f"/parametric/{jid}?msg={summ['panel_count']} panel hazırlandı.", 303)
+
+
 # ── Detay + dilimleme ─────────────────────────────────────────────────────────
 
 @router.get("/{jid}")
@@ -141,18 +280,31 @@ async def detail(request: Request, jid: int, msg: str = "", err: str = ""):
     except Exception:
         job["summary"] = {}
 
-    # Model sınırlarını göster (ölçek seçimine yardımcı olur)
-    bounds = None
-    try:
-        tris = await run_in_threadpool(_load_mesh_cached, _src_path(job))
-        bounds = ps.mesh_info(tris)
-    except Exception:
-        pass
+    bounds = None       # 3B model sınırları (ölçek seçimine yardımcı olur)
+    img_size = None     # resmin piksel ölçüsü ve en-boy oranı
+    if job.get("src_kind") == "image":
+        def probe():
+            from PIL import Image
+            with Image.open(_src_path(job)) as im:
+                return im.size
+        try:
+            img_size = await run_in_threadpool(probe)
+        except Exception:
+            pass
+    else:
+        try:
+            tris = await run_in_threadpool(_load_mesh_cached, _src_path(job))
+            bounds = ps.mesh_info(tris)
+        except Exception:
+            pass
 
-    return templates.TemplateResponse(request, "parametric_detail.html", {
+    tpl = ("parametric_image.html" if job.get("src_kind") == "image"
+           else "parametric_detail.html")
+    return templates.TemplateResponse(request, tpl, {
         "user": user,
         "job": job,
         "bounds": bounds,
+        "img_size": img_size,
         "axes": AXES,
         "msg": msg,
         "err": err,
@@ -198,12 +350,11 @@ async def do_slice(request: Request, jid: int,
         )
         _, sheets, oversize = ps.export_dxf(
             res, sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap)
-        blob = ps.dump_result(res)
-        svg = ps.export_svg(res)
-        return res, sheets, oversize, blob, svg, sc
+        return (res, sheets, oversize, ps.dump_result(res),
+                ps.export_svg(res), ps.export_assembly_svg(res), sc)
 
     try:
-        res, sheets, oversize, blob, svg, sc = await run_in_threadpool(work)
+        res, sheets, oversize, blob, svg, asm, sc = await run_in_threadpool(work)
     except ValueError as e:
         return RedirectResponse(f"/parametric/{jid}?err={e}", 303)
     except Exception as e:
@@ -224,7 +375,8 @@ async def do_slice(request: Request, jid: int,
         simplify_tol=simplify_tol, hole_count=hole_count, hole_dia=hole_dia,
         sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap,
         panel_count=summ["panel_count"], sheet_count=sheets,
-        summary_json=json.dumps(summ, default=float), svg=svg, status="Hazır")
+        summary_json=json.dumps(summ, default=float), svg=svg, asm_svg=asm,
+        status="Hazır")
 
     return RedirectResponse(
         f"/parametric/{jid}?msg={summ['panel_count']} panel hazırlandı.", 303)

@@ -444,6 +444,22 @@ def init():
             created_at   TEXT DEFAULT(datetime('now'))
         )""")
 
+        # Resimden kabartma modu için ek alanlar
+        for col, typ in (
+            ("src_kind",  "TEXT DEFAULT 'mesh'"),
+            ("img_w",     "REAL DEFAULT 1200"),
+            ("img_h",     "REAL DEFAULT 800"),
+            ("img_depth", "REAL DEFAULT 180"),
+            ("min_depth", "REAL DEFAULT 40"),
+            ("orient",    "TEXT DEFAULT 'v'"),
+            ("shape_mode", "TEXT DEFAULT 'single'"),
+            ("invert",    "INTEGER DEFAULT 0"),
+            ("smooth",    "REAL DEFAULT 1"),
+            ("normalize", "INTEGER DEFAULT 1"),
+            ("asm_svg",   "TEXT DEFAULT ''"),
+        ):
+            _acol(cur, "parametric_jobs", col, typ)
+
         c.commit()
 
 
@@ -452,7 +468,10 @@ PARAMETRIC_COLS = [
     "thickness", "gap", "scale", "simplify_tol", "hole_count", "hole_dia",
     "sheet_w", "sheet_h", "part_gap", "panel_count", "sheet_count",
     "summary_json", "svg", "status", "created_at",
+    "src_kind", "img_w", "img_h", "img_depth", "min_depth", "orient",
+    "shape_mode", "invert", "smooth", "normalize", "asm_svg",
 ]
+_PSEL = ",".join(PARAMETRIC_COLS)
 
 
 def _init_loan_rates(cur):
@@ -2099,12 +2118,14 @@ def count_new_quote_requests():
 
 # ── Parametrik dilimleme işleri ───────────────────────────────────────────────
 
-def add_parametric_job(user_id, name, src_file, orig_name, tri_count):
+def add_parametric_job(user_id, name, src_file, orig_name, tri_count,
+                       src_kind="mesh"):
     with _c() as c:
         c.execute(
-            """INSERT INTO parametric_jobs(user_id,name,src_file,orig_name,tri_count)
-               VALUES(?,?,?,?,?)""",
-            (user_id, name, src_file, orig_name, tri_count)
+            """INSERT INTO parametric_jobs
+               (user_id,name,src_file,orig_name,tri_count,src_kind)
+               VALUES(?,?,?,?,?,?)""",
+            (user_id, name, src_file, orig_name, tri_count, src_kind)
         )
         return c.execute("SELECT last_insert_rowid()").fetchone()[0]
 
@@ -2113,24 +2134,27 @@ def get_parametric_jobs(user_id=None):
     with _c() as c:
         if user_id is None:
             rows = c.execute(
-                "SELECT * FROM parametric_jobs ORDER BY id DESC").fetchall()
+                f"SELECT {_PSEL} FROM parametric_jobs ORDER BY id DESC").fetchall()
         else:
             rows = c.execute(
-                "SELECT * FROM parametric_jobs WHERE user_id=? ORDER BY id DESC",
+                f"SELECT {_PSEL} FROM parametric_jobs WHERE user_id=? ORDER BY id DESC",
                 (user_id,)).fetchall()
     return [dict(zip(PARAMETRIC_COLS, r)) for r in rows]
 
 
 def get_parametric_job(jid):
     with _c() as c:
-        row = c.execute("SELECT * FROM parametric_jobs WHERE id=?", (jid,)).fetchone()
+        row = c.execute(
+            f"SELECT {_PSEL} FROM parametric_jobs WHERE id=?", (jid,)).fetchone()
     return dict(zip(PARAMETRIC_COLS, row)) if row else None
 
 
 def upd_parametric_job(jid, **kw):
     allowed = {"name", "axis", "thickness", "gap", "scale", "simplify_tol",
                "hole_count", "hole_dia", "sheet_w", "sheet_h", "part_gap",
-               "panel_count", "sheet_count", "summary_json", "svg", "status"}
+               "panel_count", "sheet_count", "summary_json", "svg", "status",
+               "img_w", "img_h", "img_depth", "min_depth", "orient",
+               "shape_mode", "invert", "smooth", "normalize", "asm_svg"}
     fields = {k: v for k, v in kw.items() if k in allowed}
     if not fields:
         return

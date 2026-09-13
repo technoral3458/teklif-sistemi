@@ -42,6 +42,39 @@
   </div>
 </div>
 
+<!-- ── Resimden kabartma ── -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header">
+    <h3 class="card-title">🖼 Resimden Kabartma — Yeni İş</h3>
+  </div>
+  <div class="card-body">
+    <p style="color:var(--text-muted);font-size:13px;margin:0 0 16px;line-height:1.6;">
+      Elinizde 3B model yoksa düz bir <strong>resim</strong> de yükleyebilirsiniz.
+      İşin <strong>enini, yüksekliğini ve derinliğini</strong> yazın; sistem resmin
+      parlaklığını derinliğe çevirerek kabartma (relief) bir katı model kurar ve
+      aynı şekilde panellere bölüp DXF üretir. Açık bölgeler derin, koyu bölgeler sığ olur
+      (tersi de seçilebilir).
+      <br>
+      <span style="color:var(--text-muted);">
+        PNG, JPG veya WEBP — en fazla 20 MB. Sade, kontrastı yüksek görseller en iyi sonucu verir.
+      </span>
+    </p>
+
+    <form method="post" action="/parametric/upload-image" enctype="multipart/form-data"
+          style="display:grid;grid-template-columns:1fr 1.4fr auto;gap:12px;align-items:end;">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">İş Adı</label>
+        <input type="text" name="name" class="form-control" placeholder="ör. Dalga Duvar Paneli" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Resim Dosyası (.png / .jpg / .webp)</label>
+        <input type="file" name="file" accept="image/*" required class="form-control" />
+      </div>
+      <button type="submit" class="btn btn-primary">Yükle ve Devam</button>
+    </form>
+  </div>
+</div>
+
 <!-- ── Kayıtlı işler ── -->
 <div class="card">
   <div class="card-header">
@@ -67,10 +100,19 @@
         <tbody>
           {% for j in jobs %}
           <tr>
-            <td style="font-weight:600;">{{ j.name }}</td>
+            <td style="font-weight:600;">
+              {{ j.name }}<br>
+              {% if j.src_kind == 'image' %}
+              <span class="badge badge-blue" style="font-size:10px;">Resim</span>
+              {% else %}
+              <span class="badge badge-gray" style="font-size:10px;">3B Model</span>
+              {% endif %}
+            </td>
             <td style="color:var(--text-muted);font-size:12px;">
               {{ j.orig_name }}<br>
-              <span style="font-size:11px;">{{ '{:,}'.format(j.tri_count) }} üçgen</span>
+              <span style="font-size:11px;">
+                {% if j.src_kind == 'image' %}kabartma{% else %}{{ '{:,}'.format(j.tri_count) }} üçgen{% endif %}
+              </span>
             </td>
             <td>{% if j.panel_count %}<strong>{{ j.panel_count }}</strong>{% else %}—{% endif %}</td>
             <td>{{ '%g'|format(j.thickness) }} mm{% if j.gap %} + {{ '%g'|format(j.gap) }} boşluk{% endif %}</td>

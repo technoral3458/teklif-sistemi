@@ -739,33 +739,52 @@ def _esc(s):
     return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
-def export_svg(result, cols=6, cell=190, pad=10):
-    """Panel kesitlerini ızgara halinde gösteren SVG önizleme üretir."""
+def export_svg(result, cols=None, cell=190, pad=10, max_w=1140):
+    """Panel kesitlerini ızgara halinde gösteren SVG önizleme üretir.
+
+    Hücre oranı panellerin biçimine uydurulur: ince-uzun paneller dar hücrelere
+    girer, böylece bir satıra daha çok panel sığar ve önizleme okunaklı kalır.
+    """
     panels = result["panels"]
     n = len(panels)
-    cols = max(1, min(cols, n))
-    rows = int(math.ceil(n / cols))
-    W = cols * cell
-    H = rows * cell
-
-    parts = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
-        f'width="100%" style="max-width:{W}px;height:auto;">'
-    ]
 
     # Paneller birbiriyle kıyaslanabilsin diye tek ortak ölçek kullanılır
     gw = max((p["bbox"][2] - p["bbox"][0]) for p in panels)
     gh = max((p["bbox"][3] - p["bbox"][1]) for p in panels)
-    s = min((cell - 2 * pad) / max(gw, 1e-6), (cell - 2 * pad - 12) / max(gh, 1e-6))
+    aspect = max(gw, 1e-6) / max(gh, 1e-6)
+
+    label_h = 14
+    if aspect >= 1.0:
+        inner_w = cell
+        inner_h = max(38.0, cell / aspect)
+    else:
+        inner_h = cell
+        inner_w = max(30.0, cell * aspect)
+    cell_w = inner_w + 2 * pad
+    cell_h = inner_h + 2 * pad + label_h
+
+    if cols is None:
+        cols = max(1, min(n, int(max_w // cell_w)))
+    cols = max(1, min(int(cols), n))
+    rows = int(math.ceil(n / cols))
+    W = cols * cell_w
+    H = rows * cell_h
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W:.0f} {H:.0f}" '
+        f'width="100%" style="max-width:{W:.0f}px;height:auto;">'
+    ]
+
+    s = min(inner_w / max(gw, 1e-6), inner_h / max(gh, 1e-6))
 
     for i, p in enumerate(panels):
-        cx = (i % cols) * cell
-        cy = (i // cols) * cell
+        cx = (i % cols) * cell_w
+        cy = (i // cols) * cell_h
         bx0, by0, bx1, by1 = p["bbox"]
         w = max(bx1 - bx0, 1e-6)
         h = max(by1 - by0, 1e-6)
-        ox = cx + (cell - w * s) / 2
-        oy = cy + (cell - 12 - h * s) / 2
+        ox = cx + (cell_w - w * s) / 2
+        oy = cy + pad + (inner_h - h * s) / 2
 
         # SVG'de Y aşağı doğru → kesiti dikey çevir
         def tx(x, y):
@@ -788,7 +807,7 @@ def export_svg(result, cols=6, cell=190, pad=10):
             parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{max(r * s, 1.2):.1f}" '
                          f'fill="#1b1b1b" opacity="0.75"/>')
         parts.append(
-            f'<text x="{cx + cell / 2:.0f}" y="{cy + cell - 4:.0f}" text-anchor="middle" '
+            f'<text x="{cx + cell_w / 2:.0f}" y="{cy + cell_h - 4:.0f}" text-anchor="middle" '
             f'font-family="system-ui,sans-serif" font-size="11" fill="#8b949e">'
             f'{p["no"]:02d}</text>'
         )
@@ -881,3 +900,213 @@ def load_result(blob: bytes):
     d["info"]["min"] = tuple(d["info"]["min"])
     d["info"]["max"] = tuple(d["info"]["max"])
     return d
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  8) Resimden kabartma (relief) → panel kesitleri
+#
+#  Resmin parlaklığı derinliğe çevrilir: her panel, resmin bir sütununa
+#  (ya da satırına) karşılık gelen dalgalı bir tahtadır. Ara mesh üretmeye
+#  gerek yoktur — kesit doğrudan resimden hesaplanır, böylece hem hızlı
+#  hem de temiz kontur elde edilir.
+# ══════════════════════════════════════════════════════════════════════════
+
+MAX_IMAGE_PX = 4000
+
+
+def _gray_grid(img, nx, ny, smooth=1.0, normalize=True, invert=False):
+    """Resmi nx×ny gri ızgaraya indirger; 0..1 arası değer listesi döndürür.
+
+    Dönüş: rows[y][x] — y=0 resmin üst satırı.
+    """
+    from PIL import Image, ImageFilter
+
+    if img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGBA")
+        bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        img = Image.alpha_composite(bg, img)
+    img = img.convert("L")
+
+    # Çok büyük resimlerde önce makul bir boyuta indir (alan ortalamalı)
+    if max(img.size) > MAX_IMAGE_PX:
+        r = MAX_IMAGE_PX / max(img.size)
+        img = img.resize((max(1, int(img.width * r)), max(1, int(img.height * r))),
+                         Image.BOX)
+
+    # Hedef ızgaraya alan ortalamasıyla indir → gürültü kendiliğinden azalır
+    img = img.resize((max(1, nx), max(1, ny)), Image.BOX)
+
+    if smooth and smooth > 0:
+        img = img.filter(ImageFilter.GaussianBlur(radius=float(smooth)))
+
+    px = list(img.getdata())
+    vals = [v / 255.0 for v in px]
+
+    if invert:
+        vals = [1.0 - v for v in vals]
+
+    if normalize:
+        lo, hi = min(vals), max(vals)
+        if hi - lo > 1e-6:
+            k = 1.0 / (hi - lo)
+            vals = [(v - lo) * k for v in vals]
+        else:
+            vals = [0.5] * len(vals)
+
+    return [vals[y * nx:(y + 1) * nx] for y in range(ny)]
+
+
+def build_panels_from_image(img, width, height, depth, min_depth=25.0,
+                            thickness=18.0, gap=0.0, orient="v",
+                            invert=False, smooth=1.0, normalize=True,
+                            shape="single", samples=260, simplify_tol=0.3,
+                            hole_count=0, hole_dia=10.0, hole_margin=6.0):
+    """Resmi kabartma katı modele çevirip panel kesitlerini üretir.
+
+    width   : işin eni (paneller bu yön boyunca dizilir)
+    height  : işin yüksekliği (panel profilinin uzun kenarı)
+    depth   : en derin noktadaki panel derinliği
+    min_depth: en sığ noktadaki derinlik — panelin kopmaması için taban payı
+    orient  : 'v' paneller dikey (resmin sütunları) · 'h' yatay (satırları)
+    shape   : 'single' arkası düz (duvar paneli) · 'double' simetrik (ayaklı)
+    """
+    width = float(width)
+    height = float(height)
+    depth = float(depth)
+    min_depth = max(0.0, float(min_depth))
+
+    if width <= 0 or height <= 0:
+        raise ValueError("En ve yükseklik sıfırdan büyük olmalı.")
+    if depth <= 0:
+        raise ValueError("Derinlik sıfırdan büyük olmalı.")
+    if min_depth >= depth:
+        raise ValueError(
+            f"Taban derinliği ({min_depth:g} mm) toplam derinlikten ({depth:g} mm) "
+            "küçük olmalı."
+        )
+
+    positions, pitch = plan_positions(0.0, width, thickness, gap)
+    n = len(positions)
+    S = max(24, min(int(samples), 1200))
+
+    # orient='v' → panel = resmin sütunu · orient='h' → panel = resmin satırı
+    if orient == "h":
+        grid = _gray_grid(img, S, n, smooth, normalize, invert)
+        rows = [grid[i] for i in range(n)]            # panel i → tek satır
+    else:
+        grid = _gray_grid(img, n, S, smooth, normalize, invert)
+        rows = [[grid[j][i] for j in range(S)] for i in range(n)]
+
+    span = depth - min_depth
+    step = height / (S - 1)
+    panels = []
+
+    for i in range(n):
+        col = rows[i]
+        # j=0 altta olacak şekilde ters çevir (resimde 0. satır üsttedir)
+        ds = [min_depth + span * col[S - 1 - j] for j in range(S)]
+
+        if shape == "double":
+            front = [(d / 2.0, j * step) for j, d in enumerate(ds)]
+            back = [(-d / 2.0, j * step) for j, d in reversed(list(enumerate(ds)))]
+            loop = _simplify(front, simplify_tol) + _simplify(back, simplify_tol)
+        else:
+            front = _simplify([(d, j * step) for j, d in enumerate(ds)], simplify_tol)
+            loop = front + [(0.0, height), (0.0, 0.0)]
+
+        if len(loop) < 3:
+            continue
+        xs = [p[0] for p in loop]
+        ys = [p[1] for p in loop]
+        panels.append({
+            "no": len(panels) + 1,
+            "pos": positions[i],
+            "loops": [loop],
+            "bbox": (min(xs), min(ys), max(xs), max(ys)),
+        })
+
+    if not panels:
+        raise ValueError("Resimden panel üretilemedi.")
+
+    warnings = []
+    holes = []
+    if hole_count > 0:
+        holes, hw = find_assembly_holes(panels, hole_count, hole_dia, hole_margin)
+        if hw:
+            warnings.append(hw)
+        if holes:
+            r = hole_dia / 2.0
+            for p in panels:
+                p["holes"] = [(hx, hy, r) for hx, hy in holes]
+
+    return {
+        "panels": panels,
+        "positions": positions,
+        "pitch": pitch,
+        "axis": "x",
+        "thickness": thickness,
+        "gap": gap,
+        "scale": 1.0,
+        "holes": holes,
+        "hole_dia": hole_dia,
+        "info": {
+            "tri_count": 0,
+            "min": (0.0, 0.0, 0.0),
+            "max": (width, depth, height),
+            "size": (width, depth, height),
+        },
+        "warnings": warnings,
+    }
+
+
+def export_assembly_svg(result, target_w=980, skew=0.55, rise=0.14):
+    """Panellerin monte edilmiş hâlini eğik (oblik) görünümle gösterir.
+
+    Kesim öncesi 'ne çıkacak' sorusunu yanıtlar — paneller gerçek aralıklarıyla
+    arkadan öne doğru çizilir.
+    """
+    panels = result["panels"]
+    if not panels:
+        return ""
+
+    umin = min(p["bbox"][0] for p in panels)
+    umax = max(p["bbox"][2] for p in panels)
+    vmin = min(p["bbox"][1] for p in panels)
+    vmax = max(p["bbox"][3] for p in panels)
+    wmin = min(p["pos"] for p in panels)
+    wmax = max(p["pos"] for p in panels)
+    du, dv, dw = max(umax - umin, 1e-6), max(vmax - vmin, 1e-6), max(wmax - wmin, 1e-6)
+
+    pad = 14
+    s = (target_w - 2 * pad) / (du + dw * skew)
+    W = target_w
+    H = (dv + dw * rise) * s + 2 * pad
+    base = H - pad
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W:.0f} {H:.0f}" '
+        f'width="100%" style="max-width:{W}px;height:auto;">'
+    ]
+
+    n = len(panels)
+    # Arkadan öne: son panel en arkada kalsın, öndekiler üstünü örtsün
+    for rank, p in enumerate(sorted(panels, key=lambda q: -q["pos"])):
+        k = (p["pos"] - wmin) / dw
+        ox = pad + k * dw * skew * s
+        oy = k * dw * rise * s
+        t = 1.0 - (rank / max(1, n - 1))          # önde = açık, arkada = koyu
+        r_ = int(96 + 106 * t); g_ = int(72 + 84 * t); b_ = int(44 + 54 * t)
+        d = []
+        for lp in p["loops"]:
+            x, y = ox + (lp[0][0] - umin) * s, base - oy - (lp[0][1] - vmin) * s
+            d.append(f"M{x:.1f} {y:.1f}")
+            for ux, vy in lp[1:]:
+                d.append(f"L{ox + (ux - umin) * s:.1f} {base - oy - (vy - vmin) * s:.1f}")
+            d.append("Z")
+        parts.append(
+            f'<path d="{" ".join(d)}" fill="rgb({r_},{g_},{b_})" fill-rule="evenodd" '
+            f'stroke="rgba(0,0,0,0.45)" stroke-width="0.7"/>'
+        )
+
+    parts.append("</svg>")
+    return "".join(parts)
