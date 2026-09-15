@@ -6,7 +6,7 @@ import re
 import time
 
 from fastapi import APIRouter, Request, Form, UploadFile, File
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import RedirectResponse, Response, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 import auth
@@ -209,6 +209,10 @@ async def slice_image(request: Request, jid: int,
                       simplify_tol: float = Form(0.3),
                       hole_count: int = Form(2),
                       hole_dia: float = Form(10.0),
+                      frame_count: int = Form(0),
+                      frame_t: float = Form(18.0),
+                      frame_h: float = Form(120.0),
+                      frame_fit: float = Form(0.2),
                       sheet_w: float = Form(2100.0),
                       sheet_h: float = Form(2800.0),
                       part_gap: float = Form(15.0)):
@@ -230,6 +234,9 @@ async def slice_image(request: Request, jid: int,
                 normalize=bool(normalize), shape=shape_mode,
                 simplify_tol=max(0.0, simplify_tol),
                 hole_count=max(0, hole_count), hole_dia=hole_dia)
+        if frame_count > 0:
+            ps.add_frames(res, count=frame_count, frame_t=frame_t,
+                          frame_h=frame_h, fit=frame_fit)
         _, sheets, oversize = ps.export_dxf(
             res, sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap)
         return (res, sheets, oversize, ps.dump_result(res),
@@ -257,6 +264,8 @@ async def slice_image(request: Request, jid: int,
         thickness=thickness, gap=gap, orient=orient, shape_mode=shape_mode,
         invert=int(bool(invert)), smooth=smooth, normalize=int(bool(normalize)),
         simplify_tol=simplify_tol, hole_count=hole_count, hole_dia=hole_dia,
+        frame_count=frame_count, frame_t=frame_t, frame_h=frame_h,
+        frame_fit=frame_fit,
         sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap,
         panel_count=summ["panel_count"], sheet_count=sheets,
         summary_json=json.dumps(summ, default=float), svg=svg, asm_svg=asm,
@@ -322,6 +331,10 @@ async def do_slice(request: Request, jid: int,
                    simplify_tol: float = Form(0.15),
                    hole_count: int = Form(2),
                    hole_dia: float = Form(10.0),
+                   frame_count: int = Form(0),
+                   frame_t: float = Form(18.0),
+                   frame_h: float = Form(120.0),
+                   frame_fit: float = Form(0.2),
                    sheet_w: float = Form(2100.0),
                    sheet_h: float = Form(2800.0),
                    part_gap: float = Form(15.0)):
@@ -348,6 +361,9 @@ async def do_slice(request: Request, jid: int,
             simplify_tol=max(0.0, simplify_tol),
             hole_count=max(0, hole_count), hole_dia=hole_dia,
         )
+        if frame_count > 0:
+            ps.add_frames(res, count=frame_count, frame_t=frame_t,
+                          frame_h=frame_h, fit=frame_fit)
         _, sheets, oversize = ps.export_dxf(
             res, sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap)
         return (res, sheets, oversize, ps.dump_result(res),
@@ -373,6 +389,8 @@ async def do_slice(request: Request, jid: int,
     fdb.upd_parametric_job(
         jid, axis=axis, thickness=thickness, gap=gap, scale=sc,
         simplify_tol=simplify_tol, hole_count=hole_count, hole_dia=hole_dia,
+        frame_count=frame_count, frame_t=frame_t, frame_h=frame_h,
+        frame_fit=frame_fit,
         sheet_w=sheet_w, sheet_h=sheet_h, part_gap=part_gap,
         panel_count=summ["panel_count"], sheet_count=sheets,
         summary_json=json.dumps(summ, default=float), svg=svg, asm_svg=asm,
@@ -415,6 +433,17 @@ async def download_zip(request: Request, jid: int):
     fn = f"{_safe(job['name'])}_paneller.zip"
     return Response(blob, media_type="application/zip",
                     headers={"Content-Disposition": f'attachment; filename="{fn}"'})
+
+
+@router.get("/{jid}/3d")
+async def geometry_3d(request: Request, jid: int):
+    """Fareyle döndürülebilir önizleme için katı geometri (JSON)."""
+    auth.require_user(request)
+    res = _load_result(jid)
+    if not res:
+        return JSONResponse({"parts": [], "bb": [0, 0, 0, 1, 1, 1]})
+    data = await run_in_threadpool(ps.export_3d, res)
+    return JSONResponse(data)
 
 
 @router.post("/{jid}/delete")

@@ -457,6 +457,10 @@ def init():
             ("smooth",    "REAL DEFAULT 1"),
             ("normalize", "INTEGER DEFAULT 1"),
             ("asm_svg",   "TEXT DEFAULT ''"),
+            ("frame_count", "INTEGER DEFAULT 0"),
+            ("frame_t",   "REAL DEFAULT 18"),
+            ("frame_h",   "REAL DEFAULT 120"),
+            ("frame_fit", "REAL DEFAULT 0.2"),
         ):
             _acol(cur, "parametric_jobs", col, typ)
 
@@ -470,6 +474,7 @@ PARAMETRIC_COLS = [
     "summary_json", "svg", "status", "created_at",
     "src_kind", "img_w", "img_h", "img_depth", "min_depth", "orient",
     "shape_mode", "invert", "smooth", "normalize", "asm_svg",
+    "frame_count", "frame_t", "frame_h", "frame_fit",
 ]
 _PSEL = ",".join(PARAMETRIC_COLS)
 
@@ -2154,7 +2159,8 @@ def upd_parametric_job(jid, **kw):
                "hole_count", "hole_dia", "sheet_w", "sheet_h", "part_gap",
                "panel_count", "sheet_count", "summary_json", "svg", "status",
                "img_w", "img_h", "img_depth", "min_depth", "orient",
-               "shape_mode", "invert", "smooth", "normalize", "asm_svg"}
+               "shape_mode", "invert", "smooth", "normalize", "asm_svg",
+               "frame_count", "frame_t", "frame_h", "frame_fit"}
     fields = {k: v for k, v in kw.items() if k in allowed}
     if not fields:
         return
