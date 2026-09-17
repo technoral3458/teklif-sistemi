@@ -28,12 +28,18 @@ async def requests_list(request: Request):
     step_labels = {s["code"]: s["label_tr"] for s in steps}
     rollback_pending = sum(1 for r in rollback_reqs if r["status"] == "pending")
 
+    service_reqs = fdb.get_service_requests()
+    service_pending = sum(1 for r in service_reqs
+                          if r["status"] in ("Yeni", "İnceleniyor", "Servis Planlandı"))
+
     return templates.TemplateResponse(request, "admin_requests.html", {
         "user": user,
         "requests": reqs,
         "pending_count": pending_count,
         "rollback_requests": rollback_reqs,
         "rollback_pending": rollback_pending,
+        "service_requests": service_reqs,
+        "service_pending": service_pending,
         "step_labels": step_labels,
         "active_page": "admin_requests",
     })

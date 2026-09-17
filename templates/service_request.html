@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Servis Talebi | {{ company.company_name or 'B2B Teklif Sistemi' }}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    body { min-height:100vh; padding:24px 16px 60px; }
+    .sv-wrap { width:100%; max-width:720px; margin:0 auto; }
+    .sv-head { text-align:center; margin-bottom:24px; }
+    .sv-head img { max-height:70px; max-width:220px; object-fit:contain; margin-bottom:10px; }
+    .sv-head h1 { font-size:22px; font-weight:700; margin:0 0 6px; }
+    .sv-head p { font-size:13px; color:var(--text-muted); margin:0; line-height:1.6; }
+    .sv-card { background:var(--surface); border:1px solid var(--border);
+               border-radius:12px; padding:26px; }
+    .sv-sec { font-size:12px; font-weight:700; color:var(--text-muted);
+              letter-spacing:.4px; margin:22px 0 10px; padding-top:16px;
+              border-top:1px solid var(--border); }
+    .sv-sec:first-of-type { margin-top:0; padding-top:0; border-top:none; }
+    .sv-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .req::after { content:" *"; color:#ef4444; font-weight:700; }
+    .sv-drop { border:2px dashed var(--border); border-radius:10px; padding:20px;
+               text-align:center; cursor:pointer; transition:border-color .15s, background .15s; }
+    .sv-drop:hover { border-color:var(--accent); background:var(--surface-2); }
+    .sv-thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .sv-thumb { position:relative; width:84px; height:84px; border-radius:8px;
+                overflow:hidden; border:1px solid var(--border); }
+    .sv-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .sv-thumb button { position:absolute; top:2px; right:2px; width:20px; height:20px;
+                       border:none; border-radius:50%; background:rgba(0,0,0,.72); color:#fff;
+                       cursor:pointer; font-size:13px; line-height:1; padding:0; }
+    .sv-back { position:fixed; top:14px; left:14px; z-index:10; }
+    @media (max-width:560px) { .sv-row { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="sv-back">
+    <a href="/login" class="btn btn-ghost btn-sm">← Giriş Ekranı</a>
+  </div>
+
+  <div class="sv-wrap">
+    <div class="sv-head">
+      {% if company.logo %}<img src="/static/{{ company.logo }}" alt="{{ company.company_name }}" />{% endif %}
+      <h1>🛠 Servis Talebi</h1>
+      <p>
+        Makinenizde bir arıza varsa aşağıdaki formu doldurun.
+        Ekibimiz en kısa sürede sizinle iletişime geçecektir.<br>
+        <strong>Üye olmanıza gerek yoktur.</strong>
+      </p>
+    </div>
+
+    {% if err %}
+    <div class="alert alert-danger" style="margin-bottom:16px;">
+      <span>{{ err }}</span>
+      <button class="alert-close" onclick="this.parentElement.remove()" type="button">&times;</button>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/servis-talebi/gonder" enctype="multipart/form-data"
+          id="svForm" class="sv-card">
+
+      <div class="sv-sec">MAKİNE BİLGİLERİ</div>
+      <div class="sv-row">
+        <div class="form-group">
+          <label class="form-label req">Seri Numarası</label>
+          <input type="text" name="serial_no" class="form-control" required
+                 placeholder="ör. 2024-0731" />
+          <small style="color:var(--text-muted);font-size:11px;">
+            Makinenin üzerindeki etikette yazar.
+          </small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Model</label>
+          <input type="text" name="model_name" class="form-control" list="modelList"
+                 placeholder="Makine modeli" />
+          <datalist id="modelList">
+            {% for m in models %}<option value="{{ m }}"></option>{% endfor %}
+          </datalist>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label req">Arıza Açıklaması</label>
+        <textarea name="fault_desc" class="form-control" rows="5" required minlength="10"
+                  placeholder="Makine ne zaman, hangi işlemde arıza veriyor? Ekranda bir hata kodu çıkıyor mu? Ses, koku, titreşim var mı?"></textarea>
+        <small style="color:var(--text-muted);font-size:11px;">
+          Ne kadar ayrıntı yazarsanız, ekibimiz o kadar hızlı çözüm üretir.
+        </small>
+      </div>
+
+      <div class="sv-sec">ARIZA FOTOĞRAFLARI</div>
+      <div class="sv-drop" onclick="document.getElementById('svPhotos').click()">
+        <div style="font-size:26px;margin-bottom:4px;">📷</div>
+        <div style="font-size:14px;font-weight:600;">Fotoğraf eklemek için tıklayın</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+          En fazla {{ max_images }} fotoğraf · dosya başına {{ max_mb }} MB · JPG, PNG, WEBP
+        </div>
+      </div>
+      <input type="file" name="photos" id="svPhotos" accept="image/*" multiple
+             style="display:none;" onchange="svPreview()" />
+      <div class="sv-thumbs" id="svThumbs"></div>
+
+      <div class="sv-sec">İLETİŞİM BİLGİLERİ</div>
+      <div class="sv-row">
+        <div class="form-group">
+          <label class="form-label req">Ad</label>
+          <input type="text" name="first_name" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label req">Soyad</label>
+          <input type="text" name="last_name" class="form-control" required />
+        </div>
+      </div>
+      <div class="sv-row">
+        <div class="form-group">
+          <label class="form-label req">Telefon</label>
+          <input type="tel" name="phone" id="svPhone" class="form-control" required
+                 placeholder="0555 111 22 33" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-posta</label>
+          <input type="email" name="email" class="form-control" placeholder="ornek@firma.com" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Firma Adı</label>
+        <input type="text" name="company_name" class="form-control" />
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="svBtn"
+              style="width:100%;margin-top:14px;padding:12px;font-size:15px;">
+        Servis Talebini Gönder
+      </button>
+      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:12px 0 0;">
+        <span style="color:#ef4444;">*</span> işaretli alanlar zorunludur.
+        {% if company.phone %}Acil durumlarda: <strong>{{ company.phone }}</strong>{% endif %}
+      </p>
+    </form>
+  </div>
+
+<script>
+var svFiles = [];
+var MAXN = {{ max_images }}, MAXB = {{ max_mb }} * 1024 * 1024;
+
+function svPreview() {
+  var inp = document.getElementById('svPhotos');
+  var incoming = Array.prototype.slice.call(inp.files);
+  for (var i = 0; i < incoming.length; i++) {
+    if (svFiles.length >= MAXN) { alert('En fazla ' + MAXN + ' fotoğraf ekleyebilirsiniz.'); break; }
+    if (incoming[i].size > MAXB) { alert(incoming[i].name + ' çok büyük (üst sınır ' + {{ max_mb }} + ' MB).'); continue; }
+    svFiles.push(incoming[i]);
+  }
+  svSync();
+}
+
+function svRemove(i) { svFiles.splice(i, 1); svSync(); }
+
+function svSync() {
+  var dt = new DataTransfer();
+  svFiles.forEach(function (f) { dt.items.add(f); });
+  document.getElementById('svPhotos').files = dt.files;
+
+  var box = document.getElementById('svThumbs');
+  box.innerHTML = '';
+  svFiles.forEach(function (f, i) {
+    var d = document.createElement('div');
+    d.className = 'sv-thumb';
+    var img = document.createElement('img');
+    img.src = URL.createObjectURL(f);
+    img.onload = function () { URL.revokeObjectURL(img.src); };
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = '×';
+    b.onclick = function (e) { e.stopPropagation(); svRemove(i); };
+    d.appendChild(img); d.appendChild(b);
+    box.appendChild(d);
+  });
+}
+
+document.getElementById('svForm').addEventListener('submit', function (e) {
+  var p = document.getElementById('svPhone').value.replace(/\D/g, '');
+  if (p.length < 10) {
+    e.preventDefault();
+    alert('Lütfen geçerli bir telefon numarası girin (en az 10 hane).');
+    return;
+  }
+  var b = document.getElementById('svBtn');
+  b.disabled = true; b.textContent = 'Gönderiliyor…';
+});
+</script>
+</body>
+</html>

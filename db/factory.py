@@ -419,6 +419,23 @@ def init():
             created_at   TEXT DEFAULT(datetime('now'))
         )""")
 
+        cur.execute("""CREATE TABLE IF NOT EXISTS service_requests(
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            ref_no       TEXT DEFAULT '',
+            serial_no    TEXT DEFAULT '',
+            model_name   TEXT DEFAULT '',
+            fault_desc   TEXT DEFAULT '',
+            images_json  TEXT DEFAULT '[]',
+            first_name   TEXT DEFAULT '',
+            last_name    TEXT DEFAULT '',
+            phone        TEXT DEFAULT '',
+            email        TEXT DEFAULT '',
+            company_name TEXT DEFAULT '',
+            status       TEXT DEFAULT 'Yeni',
+            admin_note   TEXT DEFAULT '',
+            created_at   TEXT DEFAULT(datetime('now'))
+        )""")
+
         cur.execute("""CREATE TABLE IF NOT EXISTS parametric_jobs(
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id      INTEGER DEFAULT 0,
@@ -2173,3 +2190,74 @@ def upd_parametric_job(jid, **kw):
 def del_parametric_job(jid):
     with _c() as c:
         c.execute("DELETE FROM parametric_jobs WHERE id=?", (jid,))
+
+
+# ── Servis (arıza) talepleri ───────────────────────────────────────────────────
+
+SERVICE_COLS = [
+    "id", "ref_no", "serial_no", "model_name", "fault_desc", "images_json",
+    "first_name", "last_name", "phone", "email", "company_name",
+    "status", "admin_note", "created_at",
+]
+_SSEL = ",".join(SERVICE_COLS)
+
+SERVICE_STATUSES = ["Yeni", "İnceleniyor", "Servis Planlandı", "Çözüldü", "İptal"]
+
+
+def add_service_request(serial_no, model_name, fault_desc, images_json,
+                        first_name, last_name, phone, email="", company_name=""):
+    import random
+    ref = "SRV" + "".join(random.choices("0123456789", k=6))
+    with _c() as c:
+        c.execute(
+            """INSERT INTO service_requests
+               (ref_no,serial_no,model_name,fault_desc,images_json,
+                first_name,last_name,phone,email,company_name)
+               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            (ref, serial_no, model_name, fault_desc, images_json,
+             first_name, last_name, phone, email, company_name)
+        )
+        rid = c.execute("SELECT last_insert_rowid()").fetchone()[0]
+    return rid, ref
+
+
+def get_service_requests(status=None):
+    with _c() as c:
+        if status:
+            rows = c.execute(
+                f"SELECT {_SSEL} FROM service_requests WHERE status=? ORDER BY id DESC",
+                (status,)).fetchall()
+        else:
+            rows = c.execute(
+                f"SELECT {_SSEL} FROM service_requests ORDER BY id DESC").fetchall()
+    return [dict(zip(SERVICE_COLS, r)) for r in rows]
+
+
+def get_service_request(rid):
+    with _c() as c:
+        row = c.execute(
+            f"SELECT {_SSEL} FROM service_requests WHERE id=?", (rid,)).fetchone()
+    return dict(zip(SERVICE_COLS, row)) if row else None
+
+
+def upd_service_request(rid, **kw):
+    allowed = {"status", "admin_note"}
+    fields = {k: v for k, v in kw.items() if k in allowed}
+    if not fields:
+        return
+    sets = ",".join(f"{k}=?" for k in fields)
+    with _c() as c:
+        c.execute(f"UPDATE service_requests SET {sets} WHERE id=?",
+                  (*fields.values(), rid))
+
+
+def del_service_request(rid):
+    with _c() as c:
+        c.execute("DELETE FROM service_requests WHERE id=?", (rid,))
+
+
+def count_new_service_requests():
+    with _c() as c:
+        r = c.execute(
+            "SELECT COUNT(*) FROM service_requests WHERE status='Yeni'").fetchone()
+    return r[0] if r else 0
