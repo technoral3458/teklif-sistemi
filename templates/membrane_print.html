@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Membran Kapak Listesi - {{ lst.name }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #000; background: #fff; }
+    .page { max-width: 210mm; margin: 0 auto; padding: 15mm; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+    .company-name { font-size: 20px; font-weight: bold; }
+    .company-info { font-size: 11px; color: #555; margin-top: 4px; }
+    .title-section { text-align: center; margin-bottom: 20px; }
+    .title-section h1 { font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+    .meta { display: flex; gap: 40px; margin-bottom: 5px; font-size: 12px; }
+    .meta span { color: #555; }
+    .meta strong { color: #000; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th { background: #333; color: #fff; padding: 7px 8px; text-align: left; font-size: 11px; }
+    th.right { text-align: right; }
+    th.center { text-align: center; }
+    td { padding: 6px 8px; border-bottom: 1px solid #ddd; font-size: 11px; }
+    td.right { text-align: right; }
+    td.center { text-align: center; }
+    tr:nth-child(even) td { background: #f9f9f9; }
+    .total-row td { font-weight: bold; font-size: 13px; border-top: 2px solid #333; border-bottom: none; background: #f0f0f0; }
+    .footer { margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+    .sign-box { border: 1px solid #ccc; padding: 10px 15px; }
+    .sign-box .sign-title { font-size: 11px; color: #555; margin-bottom: 40px; }
+    .sign-box .sign-line { border-top: 1px solid #333; padding-top: 5px; font-size: 10px; color: #555; }
+    .cost-box { background: #f5f5f5; border: 1px solid #ddd; padding: 12px 15px; }
+    .cost-line { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+    .cost-total { display: flex; justify-content: space-between; padding: 8px 0 0; border-top: 2px solid #333; font-size: 16px; font-weight: bold; }
+    @media print {
+      .no-print { display: none; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Print button (hidden in print) -->
+  <div class="no-print" style="text-align:right;margin-bottom:15px;">
+    <button onclick="window.print()" style="padding:8px 20px;background:#333;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;">🖨️ Yazdır</button>
+    <a href="/membrane/list/{{ lst.id }}" style="padding:8px 20px;background:#eee;color:#333;border-radius:4px;text-decoration:none;font-size:13px;margin-left:8px;">← Geri</a>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      {% if company and company.logo_path %}
+      <img src="/static/uploads/{{ company.logo_path }}" alt="Logo" style="height:50px;margin-bottom:8px;" /><br>
+      {% endif %}
+      <div class="company-name">{{ company.company_name if company and company.company_name else 'Firma Adı' }}</div>
+      <div class="company-info">
+        {% if company %}
+        {{ company.phone }}{% if company.phone and company.email %} · {% endif %}{{ company.email }}<br>
+        {{ company.address }}
+        {% endif %}
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:11px;color:#555;">Belge No</div>
+      <div style="font-size:14px;font-weight:bold;">#{{ lst.id }}</div>
+      <div style="font-size:11px;color:#555;margin-top:8px;">Tarih</div>
+      <div style="font-size:13px;font-weight:bold;">{{ lst.created_at[:10] }}</div>
+    </div>
+  </div>
+
+  <!-- Title -->
+  <div class="title-section">
+    <h1>Membran Kapak Ölçü Listesi</h1>
+    <div style="font-size:16px;font-weight:bold;margin-top:8px;color:#333;">{{ lst.name }}</div>
+    {% if lst.notes %}<div style="font-size:12px;color:#666;margin-top:4px;">{{ lst.notes }}</div>{% endif %}
+  </div>
+
+  <!-- Door table -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px">#</th>
+        <th>Kapak Adı / Renk</th>
+        <th class="center">En (mm)</th>
+        <th class="center">Boy (mm)</th>
+        <th class="center">Alan (m²)</th>
+        <th class="center">Adet</th>
+        <th class="right">Birim Maliyet</th>
+        <th class="right">Toplam</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for door in doors %}
+      <tr>
+        <td class="center" style="color:#999;">{{ loop.index }}</td>
+        <td>{{ door.door_name or ('Kapak ' ~ loop.index) }}</td>
+        <td class="center">{{ door.width_mm|int }}</td>
+        <td class="center">{{ door.height_mm|int }}</td>
+        <td class="center">{{ "%.4f"|format(door.area_m2) }}</td>
+        <td class="center">{{ door.quantity }}</td>
+        <td class="right">{{ "%.2f"|format(door.unit_cost) }} ₺</td>
+        <td class="right">{{ "%.2f"|format(door.total_cost) }} ₺</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="total-row">
+        <td colspan="4" style="text-align:right;">TOPLAM</td>
+        <td class="center">{{ "%.4f"|format(grand_area) }} m²</td>
+        <td></td>
+        <td></td>
+        <td class="right">{{ "%.2f"|format(grand_total) }} ₺</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Footer: signatures -->
+  <div class="footer">
+    <div class="sign-box">
+      <div class="sign-title">Hazırlayan</div>
+      <div class="sign-line">Ad Soyad / İmza</div>
+    </div>
+    <div class="sign-box">
+      <div class="sign-title">Müşteri Onayı</div>
+      <div class="sign-line">Ad Soyad / İmza / Tarih</div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:10px;">
+    Bu belge {{ lst.created_at[:16] }} tarihinde oluşturulmuştur. Malzeme maliyeti: {{ "%.2f"|format(total_cost_per_m2) }} ₺/m²
+  </div>
+
+</div>
+</body>
+</html>

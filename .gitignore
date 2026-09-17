@@ -1,3 +1,36 @@
-images/
-*.db
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# data (databases)
+data/
+db/data.db
+db/*.db
+
+# uploads
+static/img/uploads/
+
+# environment
+.env
+.env.local
+*.env
+
+# virtualenv
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+old_data/
+.claude/

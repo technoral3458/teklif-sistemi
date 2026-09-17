@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% set is_mfr = user.role == 'manufacturer' %}
+{% set is_dealer = user.role == 'dealer' %}
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(59,130,246,.15);color:#3b82f6">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.customer_count|default(0) }}</div>
+      <div class="stat-label">{{ T.dash_customer }}</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(34,197,94,.15);color:#22c55e">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.offer_count|default(0) }}</div>
+      <div class="stat-label">{% if is_mfr %}{{ T.dash_my_orders }}{% else %}{{ T.dash_total_offers_count }}{% endif %}</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(245,158,11,.15);color:#f59e0b">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.pending_offers|default(0) }}</div>
+      <div class="stat-label">{% if is_mfr %}{{ T.dash_awaiting_confirm }}{% else %}{{ T.dash_pending }}{% endif %}</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(168,85,247,.15);color:#a855f7">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.order_count|default(0) }}</div>
+      <div class="stat-label">{% if is_mfr %}{{ T.dash_in_production }}{% else %}{{ T.dash_order }}{% endif %}</div>
+    </div>
+  </div>
+</div>
+
+{% if not is_mfr %}
+<div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+  <a href="/offers/new" class="btn btn-primary">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    {{ T.dash_new_offer }}
+  </a>
+  <a href="/customers" class="btn btn-outline">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    {{ T.dash_new_customer }}
+  </a>
+</div>
+{% else %}
+<div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+  <a href="/orders" class="btn btn-primary">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+    {{ T.dash_view_orders }}
+  </a>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% if is_mfr %}{{ T.dash_recent_orders }}{% else %}{{ T.dash_recent_offers }}{% endif %}</h3>
+    <a href="{% if is_mfr %}/orders{% else %}/offers{% endif %}" class="btn btn-ghost btn-sm">{{ T.dash_view_all }}</a>
+  </div>
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>{{ T.dash_offer_no }}</th>
+          {% if not is_mfr %}<th>{{ T.offer_customer }}</th>{% endif %}
+          <th>{{ T.dash_model }}</th>
+          {% if not is_mfr %}<th>{{ T.dash_amount }}</th>{% endif %}
+          <th>{{ T.offer_status }}</th>
+          <th>{{ T.dash_date }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in recent_offers %}
+        <tr>
+          <td><code>{{ o.offer_no }}</code></td>
+          {% if not is_mfr %}<td>{{ o.customer_name }}</td>{% endif %}
+          <td>{{ o.model_name }}</td>
+          {% if not is_mfr %}<td>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</td>{% endif %}
+          <td>
+            {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray','Admin Onaylı':'amber','Üretimde':'blue','Tamamlandı':'green','Teslim Edildi':'green'} %}
+            {% set sl = {'Beklemede':T.status_pending,'Onaylandı':T.status_approved,'Reddedildi':T.status_rejected,'Sipariş Verildi':T.status_ordered,'İptal':T.status_cancelled,'Admin Onaylı':T.status_admin_approved,'Üretimde':T.status_in_production,'Tamamlandı':T.status_completed,'Teslim Edildi':T.status_delivered} %}
+            <span class="badge badge-{{ sc.get(o.status, 'gray') }}">{{ sl.get(o.status, o.status) }}</span>
+          </td>
+          <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
+          <td><a href="{% if is_mfr %}/orders/{{ o.id }}{% else %}/offers/{{ o.id }}{% endif %}" class="btn btn-ghost btn-sm">{{ T.dash_view }}</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 6 if is_mfr else 7 }}" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.dash_no_offers }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

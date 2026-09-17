@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block page_title %}Silme Talepleri{% endblock %}
+
+{% block content %}
+{% set msg = request.query_params.get('msg','') %}
+{% set msg_type = request.query_params.get('msg_type','info') %}
+{% if msg %}
+<div class="alert alert-{{ msg_type }}" style="margin-bottom:16px;">{{ msg.replace('+',' ') }}</div>
+{% endif %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+  <h2 style="margin:0;font-size:20px;">Talepler
+    {% set total_pending = pending_count + rollback_pending + service_pending %}
+    {% if total_pending > 0 %}
+    <span class="badge badge-amber" style="margin-left:8px;font-size:13px;">{{ total_pending }} bekleyen</span>
+    {% endif %}
+  </h2>
+</div>
+
+<!-- ── Servis (arıza) talepleri ── -->
+<div style="margin-bottom:24px;">
+  <h3 style="font-size:15px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+    🛠 Servis Talepleri
+    {% if service_pending > 0 %}<span class="badge badge-amber">{{ service_pending }} açık</span>{% endif %}
+    <span style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:auto;">
+      Müşteriler giriş ekranındaki “Servis Talebi” butonundan oluşturur
+    </span>
+  </h3>
+  <div class="card">
+    {% if service_requests %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tarih</th>
+            <th>Referans</th>
+            <th>Müşteri</th>
+            <th>Telefon</th>
+            <th>Seri No / Model</th>
+            <th>Arıza</th>
+            <th>Foto</th>
+            <th>Durum</th>
+            <th style="text-align:center;">İşlem</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in service_requests %}
+          {% set _n = (r.images_json or '[]').count('"') // 2 %}
+          <tr>
+            <td style="white-space:nowrap;font-size:12px;color:var(--text-muted);">{{ r.created_at[:16] if r.created_at else '-' }}</td>
+            <td style="font-weight:700;white-space:nowrap;">{{ r.ref_no }}</td>
+            <td>
+              <strong>{{ (r.first_name ~ ' ' ~ r.last_name)|trim }}</strong>
+              {% if r.company_name %}<br><small style="color:var(--text-muted);">{{ r.company_name }}</small>{% endif %}
+            </td>
+            <td style="white-space:nowrap;"><a href="tel:{{ r.phone }}" style="color:var(--accent);">{{ r.phone }}</a></td>
+            <td>
+              <strong>{{ r.serial_no or '-' }}</strong>
+              {% if r.model_name %}<br><small style="color:var(--text-muted);">{{ r.model_name }}</small>{% endif %}
+            </td>
+            <td style="max-width:260px;font-size:13px;">
+              {{ r.fault_desc[:110] }}{% if r.fault_desc|length > 110 %}…{% endif %}
+            </td>
+            <td style="text-align:center;">{% if _n %}📷 {{ _n }}{% else %}—{% endif %}</td>
+            <td>
+              {% set _c = {'Yeni':'amber','İnceleniyor':'blue','Servis Planlandı':'blue',
+                           'Çözüldü':'green','İptal':'red'} %}
+              <span class="badge badge-{{ _c.get(r.status,'gray') }}">{{ r.status }}</span>
+            </td>
+            <td style="text-align:center;white-space:nowrap;">
+              <a href="/admin/requests/servis/{{ r.id }}" class="btn btn-outline btn-sm">Aç</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body" style="text-align:center;padding:32px 20px;color:var(--text-muted);font-size:13px;">
+      Henüz servis talebi yok.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+
+{% if rollback_requests %}
+<div style="margin-bottom:24px;">
+  <h3 style="font-size:15px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+    ↩ Aşama Geri Alma Talepleri
+    {% if rollback_pending > 0 %}<span class="badge badge-amber">{{ rollback_pending }} bekleyen</span>{% endif %}
+  </h3>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tarih</th>
+            <th>Sipariş</th>
+            <th>Üretici</th>
+            <th>Hedef Aşama</th>
+            <th>Neden</th>
+            <th>Durum</th>
+            <th style="text-align:center;">İşlem</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rollback_requests %}
+          <tr>
+            <td style="white-space:nowrap;font-size:12px;color:var(--text-muted);">{{ r.requested_at[:16] if r.requested_at else '-' }}</td>
+            <td><a href="/orders/{{ r.order_id }}" style="font-weight:600;">{{ r.offer_no }}</a></td>
+            <td>
+              <strong>{{ r.requester.company_name or r.requester.email or '-' }}</strong>
+              {% if r.requester.email %}<br><small style="color:var(--text-muted);">{{ r.requester.email }}</small>{% endif %}
+            </td>
+            <td><span class="badge badge-blue">{{ step_labels.get(r.target_stage_code, r.target_stage_code) }}</span></td>
+            <td style="max-width:200px;font-size:13px;">{{ r.reason }}</td>
+            <td>
+              {% if r.status == 'pending' %}<span class="badge badge-amber">Bekliyor</span>
+              {% elif r.status == 'approved' %}<span class="badge badge-green">Onaylandı</span>
+              {% else %}<span class="badge badge-red">Reddedildi</span>{% endif %}
+            </td>
+            <td style="text-align:center;">
+              {% if r.status == 'pending' %}
+              <div style="display:flex;gap:6px;justify-content:center;">
+                <form method="post" action="/orders/rollback-requests/{{ r.id }}/approve" style="margin:0;">
+                  <input type="hidden" name="admin_notes" value="" />
+                  <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Geri almayı onayla?')">✓ Onayla</button>
+                </form>
+                <form method="post" action="/orders/rollback-requests/{{ r.id }}/reject" style="margin:0;">
+                  <input type="hidden" name="admin_notes" value="" />
+                  <button type="submit" class="btn btn-outline btn-sm">✕ Reddet</button>
+                </form>
+              </div>
+              {% else %}
+              <span style="font-size:12px;color:var(--text-muted);">{{ r.resolved_at[:10] if r.resolved_at else '' }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">Talep bulunmuyor.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<h3 style="font-size:15px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+  🗑 Silme Talepleri
+  {% if pending_count > 0 %}<span class="badge badge-amber">{{ pending_count }} bekleyen</span>{% endif %}
+</h3>
+
+<div class="card">
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>Tarih</th>
+          <th>Üretici</th>
+          <th>Tür</th>
+          <th>İçerik Adı</th>
+          <th>Durum</th>
+          <th style="text-align:center;">İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr>
+          <td style="white-space:nowrap;font-size:12px;color:var(--text-muted);">{{ r.created_at[:16] if r.created_at else '-' }}</td>
+          <td>
+            <strong>{{ r.requester.company_name or r.requester.email or '-' }}</strong>
+            {% if r.requester.email %}<br><small style="color:var(--text-muted);">{{ r.requester.email }}</small>{% endif %}
+          </td>
+          <td>
+            {% if r.item_type == 'model' %}
+            <span class="badge badge-amber">Model</span>
+            {% else %}
+            <span class="badge badge-blue">Opsiyon</span>
+            {% endif %}
+          </td>
+          <td><strong>{{ r.item_name }}</strong></td>
+          <td>
+            {% if r.status == 'pending' %}
+            <span class="badge badge-amber">Bekliyor</span>
+            {% elif r.status == 'approved' %}
+            <span class="badge badge-green">Onaylandı</span>
+            {% else %}
+            <span class="badge badge-red">Reddedildi</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;">
+            {% if r.status == 'pending' %}
+            <div style="display:flex;gap:6px;justify-content:center;">
+              <form method="post" action="/admin/requests/approve" style="margin:0;">
+                <input type="hidden" name="req_id" value="{{ r.id }}" />
+                <button type="submit" class="btn btn-success btn-sm"
+                  onclick="return confirm('{{ r.item_name }} silinsin mi?')">
+                  ✓ Onayla
+                </button>
+              </form>
+              <form method="post" action="/admin/requests/reject" style="margin:0;">
+                <input type="hidden" name="req_id" value="{{ r.id }}" />
+                <button type="submit" class="btn btn-outline btn-sm">✕ Reddet</button>
+              </form>
+            </div>
+            {% else %}
+            <span style="font-size:12px;color:var(--text-muted);">{{ r.resolved_at[:10] if r.resolved_at else '' }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">Talep bulunmuyor.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof initTableSearch === 'function') initTableSearch('tableSearch', 'mainTable');
+});
+</script>
+{% endblock %}

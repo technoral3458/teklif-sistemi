@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ T.options_title }}{% endblock %}
+
+{% block content %}
+{% set qty_labels = {'MANUAL': T.qty_manual, 'FIXED_1': T.qty_fixed1, 'PER_MACHINE': T.qty_per_machine} %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <form method="get" style="display:flex;gap:8px;align-items:center;margin:0;">
+    <select name="category_id" class="form-control" style="max-width:200px;" onchange="this.form.submit()">
+      <option value="0">{{ T.model_all_categories }}</option>
+      {% for cat in categories %}
+      <option value="{{ cat.id }}" {% if selected_cat == cat.id %}selected{% endif %}>{{ (cat.get('name_'+user.lang) or cat.name) if user.lang and user.lang != 'tr' else cat.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <input type="text" id="tableSearch" class="search-box" placeholder="{{ T.btn_search }}..." style="max-width:280px;" />
+  <button class="btn btn-primary" onclick="newOpt()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    {{ T.btn_new }} {{ T.options_title }}
+  </button>
+  {% if user.role == 'admin' %}
+  <a href="/options/excel-template" class="btn btn-ghost btn-sm" download>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    {{ T.btn_excel_template }}
+  </a>
+  <form method="post" action="/options/excel-import" enctype="multipart/form-data" style="margin:0;" id="optExcelForm">
+    <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      {{ T.btn_excel_import }}
+      <input type="file" name="excel_file" accept=".xlsx,.xls" style="display:none;"
+             onchange="if(this.files[0]){if(confirm({{ T.opt_excel_import_confirm|tojson }}))this.closest('form').submit();else this.value='';}" />
+    </label>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th style="width:56px;"></th>
+          <th>{{ T.option_name }}</th>
+          <th>{{ T.model_category }}</th>
+          <th>{{ T.opt_qty_type }}</th>
+          {% if user.role != 'manufacturer' %}<th>{{ T.option_price }}</th>{% endif %}
+          <th style="width:60px;text-align:center;"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in options %}
+        <tr>
+          <td>
+            <div style="display:flex;gap:4px;align-items:center;">
+              {% if o.image_path %}
+              <img src="/static/{{ o.image_path }}" title="{{ T.opt_image_label }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);" />
+              {% else %}
+              <div title="{{ T.opt_image_label }}" style="width:36px;height:36px;background:var(--surface-2);border-radius:4px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </div>
+              {% endif %}
+              {% if o.variation_image_path %}
+              <img src="/static/{{ o.variation_image_path }}" title="Varyasyon resmi" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:2px solid var(--accent);" />
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <strong>{% if user.lang != 'tr' and o.get('name_'+user.lang) %}{{ o['name_'+user.lang] }}{% else %}{{ o.name }}{% endif %}</strong>
+            {% if o.description %}<br><small style="color:var(--text-muted)">{{ o.description[:60] }}{% if o.description|length > 60 %}...{% endif %}</small>{% endif %}
+          </td>
+          <td>{{ o.category_names or 'Genel' }}</td>
+          <td><span class="badge badge-{{ 'blue' if o.qty_type == 'MANUAL' else ('amber' if o.qty_type == 'PER_MACHINE' else 'green') }}">{{ qty_labels.get(o.qty_type, o.qty_type) }}</span></td>
+          {% if user.role != 'manufacturer' %}<td>{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</td>{% endif %}
+          <td style="text-align:center;">
+            {% if o.image_priority %}
+            <span class="badge badge-amber">{{ o.image_priority }}</span>
+            {% else %}
+            <span style="color:var(--text-muted);font-size:12px;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-ghost btn-sm" onclick='editOpt(
+                {{ o.id }},
+                {{ o.name|tojson }},
+                {{ (o.description or "")|tojson }},
+                {{ o.price|float if o.price != none else 0 }},
+                {{ (o.currency or "USD")|tojson }},
+                {{ (o.category_ids or "")|tojson }},
+                {{ (o.qty_type or "MANUAL")|tojson }},
+                {{ (o.conflict_group or "")|tojson }},
+                {{ (o.image_path or "")|tojson }},
+                {{ o.image_priority or 0 }},
+                {{ (o.variation_image_path or "")|tojson }},
+                {{ (o.video_url or "")|tojson }},
+                {{ (o.name_en or "")|tojson }},
+                {{ (o.description_en or "")|tojson }},
+                {{ (o.name_zh or "")|tojson }},
+                {{ (o.description_zh or "")|tojson }},
+                {{ o.manufacturer_id or 0 }},
+                {{ (o.requires_option_ids or "")|tojson }},
+                {{ o.purchase_price|float if o.purchase_price != none else 0 }},
+                {{ (o.purchase_currency or "USD")|tojson }}
+              )' title="{{ T.btn_edit }}" style="padding:6px 8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+              {% if user.role == 'admin' %}
+              <button class="btn btn-outline btn-sm" title="Kopyala" style="padding:6px 8px;" onclick='editOpt(
+                0,
+                {{ (o.name + " (Kopya)")|tojson }},
+                {{ (o.description or "")|tojson }},
+                {{ o.price|float if o.price != none else 0 }},
+                {{ (o.currency or "USD")|tojson }},
+                {{ (o.category_ids or "")|tojson }},
+                {{ (o.qty_type or "MANUAL")|tojson }},
+                {{ (o.conflict_group or "")|tojson }},
+                {{ (o.image_path or "")|tojson }},
+                {{ o.image_priority or 0 }},
+                {{ (o.variation_image_path or "")|tojson }},
+                {{ (o.video_url or "")|tojson }},
+                {{ (o.name_en or "")|tojson }},
+                {{ (o.description_en or "")|tojson }},
+                {{ (o.name_zh or "")|tojson }},
+                {{ (o.description_zh or "")|tojson }}
+              )'>📋</button>
+              <form method="post" action="/options/delete" onsubmit="return confirmDelete(this)" style="margin:0;">
+                <input type="hidden" name="id" value="{{ o.id }}" />
+                <button type="submit" class="btn btn-danger btn-sm" title="{{ T.btn_delete }}" style="padding:6px 8px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </form>
+              {% elif user.role == 'manufacturer' %}
+              <form method="post" action="/options/request-delete"
+                    onsubmit="return confirm('{{ o.name|e }} - {{ T.opt_del_request_confirm }}')" style="margin:0;">
+                <input type="hidden" name="id" value="{{ o.id }}" />
+                <button type="submit" class="btn btn-outline btn-sm" title="{{ T.opt_del_request_btn }}" style="padding:6px 8px;color:var(--danger);">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">-</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="optModal" class="modal-overlay" data-static="true">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="optModalTitle">{{ T.btn_new }} {{ T.options_title }}</h3>
+      <button class="modal-close" onclick="closeModal('optModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/options/save" enctype="multipart/form-data" id="optForm">
+        <input type="hidden" name="id" id="oid" value="0" />
+        <input type="hidden" name="current_image_path" id="ocurrent_image" value="" />
+        <input type="hidden" name="current_variation_image_path" id="ocurrent_varimage" value="" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">{{ T.option_name }} *</label>
+            <input type="text" name="name" id="oname" class="form-control" required />
+          </div>
+
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">{{ T.option_desc }}</label>
+            <textarea name="description" id="odesc" class="form-control" rows="2"></textarea>
+          </div>
+
+          <div class="form-group" style="grid-column:1/-1;border-left:3px solid var(--border);padding-left:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:600;">{{ T.trans_section | upper }}</div>
+              <button type="button" class="btn btn-ghost btn-sm" id="autoTranslateOptBtn" onclick="autoTranslateOpt()" style="font-size:12px;">
+                🌐 Otomatik Çevir
+              </button>
+            </div>
+            <div id="autoTranslateOptStatus" style="display:none;font-size:12px;margin-bottom:6px;"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="form-group">
+                <label class="form-label">🇬🇧 {{ T.trans_english }}</label>
+                <input type="text" name="name_en" id="oname_en" class="form-control" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇬🇧 {{ T.trans_eng_desc }}</label>
+                <textarea name="description_en" id="odesc_en" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇨🇳 {{ T.trans_chinese }}</label>
+                <input type="text" name="name_zh" id="oname_zh" class="form-control" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">🇨🇳 {{ T.trans_zh_desc }}</label>
+                <textarea name="description_zh" id="odesc_zh" class="form-control" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+
+          {% if user.role != 'manufacturer' %}
+          <div class="form-group">
+            <label class="form-label">{{ T.option_price }}</label>
+            <input type="number" name="price" id="oprice" class="form-control" step="0.01" min="0" value="0" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">{{ T.offer_currency }}</label>
+            <select name="currency" id="ocurrency" class="form-control">
+              {% for cur in currencies %}
+              <option value="{{ cur }}">{{ cur }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          {# Purchase price: admin sees it alongside sale price; manufacturer sets it instead of sale price #}
+          <div class="form-group" id="mfr-price-new" style="grid-column:1/-1;">
+            <label class="form-label">💰 {{ T.opt_purchase_price }}</label>
+            <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;">
+              <input type="number" name="purchase_price" id="opurchase_price" class="form-control" step="0.01" min="0" value="0" />
+              <select name="purchase_currency" id="opurchase_currency" class="form-control">
+                {% for cur in currencies %}<option value="{{ cur }}">{{ cur }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">{{ T.opt_qty_type }}</label>
+            <select name="qty_type" id="oqty_type" class="form-control">
+              {% for qt in qty_types %}
+              <option value="{{ qt }}">{{ qty_labels.get(qt, qt) }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">{{ T.model_category }} <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_cat_hint }})</span></label>
+            <div id="ocatChecks" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
+              {% for cat in categories %}
+              <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="category_ids" value="{{ cat.id }}" class="ocat-cb" />
+                {{ (cat.get('name_'+user.lang) or cat.name) if user.lang and user.lang != 'tr' else cat.name }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">{{ T.opt_conflict_group }}</label>
+            <input type="text" name="conflict_group" id="oconflict" class="form-control" placeholder="" />
+          </div>
+
+          {% if user.role == 'admin' %}
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+              🔗 {{ T.opt_required_opts }}
+              <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_required_opts_hint }})</span>
+            </label>
+            <div id="oreqChecks" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:160px;overflow-y:auto;padding:8px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              {% for opt in options %}
+              <label style="display:flex;align-items:center;gap:5px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:12px;">
+                <input type="checkbox" name="requires_option_ids" value="{{ opt.id }}" class="oreq-cb" />
+                {{ opt.name }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if user.role == 'admin' and manufacturers %}
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+              {{ T.opt_owner_label }}
+            </label>
+            <select name="manufacturer_id" id="omanufacturer_id" class="form-control">
+              <option value="0">{{ T.opt_not_assigned }}</option>
+              {% for mfr in manufacturers %}
+              <option value="{{ mfr.id }}">{{ mfr.company_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <!-- Option thumbnail -->
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">{{ T.opt_image_label }} <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_image_hint }})</span></label>
+            <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+              <img id="oImgPreview" style="display:none;width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;" />
+              <div style="flex:1;min-width:200px;">
+                <input type="file" name="image" id="oimage" accept="image/*" class="form-control"
+                  onchange="previewImg(this,'oImgPreview','oClearImg')" />
+                <button type="button" id="oClearImg" class="btn btn-ghost btn-sm" style="display:none;margin-top:6px;"
+                  onclick="clearImg('oimage','ocurrent_image','oImgPreview','oClearImg')">{{ T.opt_remove }}</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Variation image (overrides machine main image in offers) -->
+          <div class="form-group" style="grid-column:1/-1;padding:12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+            <label class="form-label" style="color:var(--accent);">{{ T.opt_var_image_label }} <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_var_image_hint }})</span></label>
+            <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+              <img id="oVarImgPreview" style="display:none;width:120px;height:90px;object-fit:cover;border-radius:6px;border:2px solid var(--accent);flex-shrink:0;" />
+              <div style="flex:1;min-width:200px;">
+                <input type="file" name="variation_image" id="ovarimage" accept="image/*" class="form-control"
+                  onchange="previewImg(this,'oVarImgPreview','oClearVarImg')" />
+                <button type="button" id="oClearVarImg" class="btn btn-ghost btn-sm" style="display:none;margin-top:6px;"
+                  onclick="clearImg('ovarimage','ocurrent_varimage','oVarImgPreview','oClearVarImg')">{{ T.opt_remove }}</button>
+                <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">{{ T.opt_var_image_desc }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              {{ T.opt_priority_label }}
+              <span style="font-size:11px;color:var(--text-muted);margin-left:4px;">({{ T.opt_priority_hint }})</span>
+            </label>
+            <input type="number" name="image_priority" id="oimage_priority" class="form-control" min="0" max="100" value="0" />
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ T.opt_priority_desc }}</p>
+          </div>
+
+          <!-- Video URL -->
+          <div class="form-group" style="grid-column:1/-1;border-left:3px solid #e67e22;padding-left:12px;">
+            <label class="form-label">▶ {{ T.opt_video_label }} <span style="font-size:11px;color:var(--text-muted);">({{ T.opt_video_hint }})</span></label>
+            <input type="url" name="video_url" id="ovideo_url" class="form-control" placeholder="{{ T.opt_video_placeholder }}" />
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ T.opt_video_desc }}</p>
+          </div>
+
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('optModal')">{{ T.btn_cancel }}</button>
+          <button type="submit" class="btn btn-primary">{{ T.btn_save }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Generic helpers for any image field pair
+function previewImg(input, previewId, clearBtnId) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const p = document.getElementById(previewId);
+      p.src = e.target.result;
+      p.style.display = 'block';
+      document.getElementById(clearBtnId).style.display = 'inline-flex';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+function clearImg(inputId, currentHiddenId, previewId, clearBtnId) {
+  document.getElementById(inputId).value = '';
+  document.getElementById(currentHiddenId).value = '';
+  document.getElementById(previewId).style.display = 'none';
+  document.getElementById(clearBtnId).style.display = 'none';
+}
+function setImgPreview(previewId, clearBtnId, path) {
+  const p = document.getElementById(previewId);
+  const b = document.getElementById(clearBtnId);
+  if (path) { p.src = '/static/' + path; p.style.display = 'block'; b.style.display = 'inline-flex'; }
+  else       { p.style.display = 'none'; b.style.display = 'none'; }
+}
+
+function _setCatChecks(catIdsStr) {
+  const selected = (catIdsStr || '').split(',').map(s => s.trim()).filter(Boolean);
+  document.querySelectorAll('.ocat-cb').forEach(cb => {
+    cb.checked = selected.includes(cb.value);
+  });
+}
+
+function _setReqChecks(reqIdsStr) {
+  const selected = (reqIdsStr || '').split(',').map(s => s.trim()).filter(Boolean);
+  document.querySelectorAll('.oreq-cb').forEach(cb => {
+    cb.checked = selected.includes(cb.value);
+  });
+}
+
+function newOpt() {
+  document.getElementById('optModalTitle').textContent = '{{ T.btn_new }} {{ T.options_title }}';
+  document.getElementById('oid').value = '0';
+  document.getElementById('oname').value = '';
+  document.getElementById('odesc').value = '';
+  const _p0 = document.getElementById('oprice'); if (_p0) _p0.value = '0';
+  const _c0 = document.getElementById('ocurrency'); if (_c0) _c0.value = 'USD';
+  const _pp0 = document.getElementById('opurchase_price'); if (_pp0) _pp0.value = '0';
+  const _pc0 = document.getElementById('opurchase_currency'); if (_pc0) _pc0.value = 'USD';
+  document.getElementById('oqty_type').value = 'MANUAL';
+  _setCatChecks('');
+  document.getElementById('oconflict').value = '';
+  document.getElementById('oimage_priority').value = '0';
+  clearImg('oimage', 'ocurrent_image', 'oImgPreview', 'oClearImg');
+  clearImg('ovarimage', 'ocurrent_varimage', 'oVarImgPreview', 'oClearVarImg');
+  document.getElementById('oname_en').value = '';
+  document.getElementById('odesc_en').value = '';
+  document.getElementById('oname_zh').value = '';
+  document.getElementById('odesc_zh').value = '';
+  document.getElementById('ovideo_url').value = '';
+  const mfrSel = document.getElementById('omanufacturer_id');
+  if (mfrSel) mfrSel.value = 0;
+  _setReqChecks('');
+  openModal('optModal');
+}
+
+function editOpt(id, name, desc, price, currency, catIds, qtyType, conflict, imagePath, imagePriority, varImagePath, videoUrl, nameEn, descEn, nameZh, descZh, manufacturerId, requiresOptionIds, purchasePrice, purchaseCurrency) {
+  document.getElementById('optModalTitle').textContent = '{{ T.btn_edit }} {{ T.options_title }}';
+  document.getElementById('oid').value = id;
+  document.getElementById('oname').value = name;
+  document.getElementById('odesc').value = desc;
+  const _pe = document.getElementById('oprice'); if (_pe) _pe.value = price;
+  const _ce = document.getElementById('ocurrency'); if (_ce) _ce.value = currency;
+  const _pp = document.getElementById('opurchase_price'); if (_pp) _pp.value = purchasePrice || 0;
+  const _pc = document.getElementById('opurchase_currency'); if (_pc) _pc.value = purchaseCurrency || 'USD';
+  _setCatChecks(catIds);
+  document.getElementById('oqty_type').value = qtyType;
+  document.getElementById('oconflict').value = conflict;
+  document.getElementById('oimage_priority').value = imagePriority || 0;
+  document.getElementById('ocurrent_image').value = imagePath || '';
+  document.getElementById('ocurrent_varimage').value = varImagePath || '';
+  document.getElementById('oimage').value = '';
+  document.getElementById('ovarimage').value = '';
+  document.getElementById('oname_en').value = nameEn || '';
+  document.getElementById('odesc_en').value = descEn || '';
+  document.getElementById('oname_zh').value = nameZh || '';
+  document.getElementById('odesc_zh').value = descZh || '';
+  document.getElementById('ovideo_url').value = videoUrl || '';
+  const mfrSel = document.getElementById('omanufacturer_id');
+  if (mfrSel) mfrSel.value = manufacturerId || 0;
+  _setReqChecks(requiresOptionIds || '');
+  setImgPreview('oImgPreview', 'oClearImg', imagePath);
+  setImgPreview('oVarImgPreview', 'oClearVarImg', varImagePath);
+  openModal('optModal');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  initTableSearch('tableSearch', 'mainTable');
+});
+
+async function autoTranslateOpt() {
+  const btn    = document.getElementById('autoTranslateOptBtn');
+  const status = document.getElementById('autoTranslateOptStatus');
+
+  const nameTR = (document.getElementById('oname')?.value || '').trim();
+  const nameEN = (document.getElementById('oname_en')?.value || '').trim();
+  const nameZH = (document.getElementById('oname_zh')?.value || '').trim();
+  const descTR = (document.getElementById('odesc')?.value || '').trim();
+  const descEN = (document.getElementById('odesc_en')?.value || '').trim();
+  const descZH = (document.getElementById('odesc_zh')?.value || '').trim();
+
+  const scores = {
+    tr: (nameTR ? 2 : 0) + (descTR ? 1 : 0),
+    en: (nameEN ? 2 : 0) + (descEN ? 1 : 0),
+    zh: (nameZH ? 2 : 0) + (descZH ? 1 : 0),
+  };
+  const srcLang = Object.entries(scores).sort((a,b) => b[1]-a[1])[0][0];
+  const nameMap = {tr: nameTR, en: nameEN, zh: nameZH};
+  const descMap = {tr: descTR, en: descEN, zh: descZH};
+
+  const texts = {};
+  if (nameMap[srcLang]) texts['name'] = nameMap[srcLang];
+  if (descMap[srcLang]) texts['description'] = descMap[srcLang];
+
+  if (!Object.keys(texts).length) {
+    status.style.display = 'block';
+    status.textContent = '⚠ Çevrilecek metin bulunamadı.';
+    return;
+  }
+
+  const targetLangs = ['tr','en','zh'].filter(l => l !== srcLang);
+  btn.disabled = true;
+  btn.textContent = '⏳ Çevriliyor...';
+  status.style.display = 'block';
+  status.style.color = 'var(--text-muted)';
+  status.textContent = '';
+
+  try {
+    const resp = await fetch('/api/translate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({texts, source_lang: srcLang, target_langs: targetLangs})
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || 'Sunucu hatası');
+
+    for (const [lang, vals] of Object.entries(data.translations)) {
+      const setV = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+      if (lang === 'tr') { setV('oname', vals.name); setV('odesc', vals.description); }
+      if (lang === 'en') { setV('oname_en', vals.name); setV('odesc_en', vals.description); }
+      if (lang === 'zh') { setV('oname_zh', vals.name); setV('odesc_zh', vals.description); }
+    }
+    status.style.color = '#22c55e';
+    status.textContent = '✓ Çeviri tamamlandı. Kaydetmeyi unutmayın.';
+  } catch(e) {
+    status.style.color = '#ef4444';
+    status.textContent = '✗ Hata: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🌐 Otomatik Çevir';
+  }
+}
+</script>
+{% endblock %}

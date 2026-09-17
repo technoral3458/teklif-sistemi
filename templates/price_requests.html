@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block page_title %}Fiyat Talepleri{% endblock %}
+
+{% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+  <h2 style="font-size:20px;font-weight:700;margin:0;">
+    Fiyat Değişikliği Talepleri
+    {% if pending_count > 0 %}
+    <span style="background:#ef4444;color:#fff;border-radius:999px;padding:2px 9px;font-size:13px;font-weight:700;margin-left:8px;">{{ pending_count }}</span>
+    {% endif %}
+  </h2>
+  <div style="display:flex;gap:8px;">
+    <a href="/price-requests?status=pending" class="btn {% if filter_status == 'pending' %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">Bekleyen</a>
+    <a href="/price-requests?status=approved" class="btn {% if filter_status == 'approved' %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">Onaylanan</a>
+    <a href="/price-requests?status=rejected" class="btn {% if filter_status == 'rejected' %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">Reddedilen</a>
+    <a href="/price-requests?status=all" class="btn {% if filter_status == 'all' %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">Tümü</a>
+  </div>
+</div>
+
+{% if requests %}
+<div style="display:flex;flex-direction:column;gap:12px;">
+  {% for r in requests %}
+  <div class="card" style="border-left:4px solid {% if r.status == 'pending' %}#f59e0b{% elif r.status == 'approved' %}#22c55e{% else %}#ef4444{% endif %};">
+    <div class="card-body" style="padding:16px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+
+        <div style="flex:1;min-width:200px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:700;background:{% if r.entity_type == 'model' %}#dbeafe{% else %}#ede9fe{% endif %};color:{% if r.entity_type == 'model' %}#1d4ed8{% else %}#6d28d9{% endif %};">
+              {{ 'Makine' if r.entity_type == 'model' else 'Opsiyon' }}
+            </span>
+            <strong style="font-size:15px;">{{ r.entity_name }}</strong>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="text-align:center;">
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Mevcut</div>
+              <div style="font-size:16px;font-weight:600;color:var(--text-muted);">{{ "%.2f"|format(r.current_price|float) }} {{ r.currency }}</div>
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            <div style="text-align:center;">
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Yeni</div>
+              <div style="font-size:18px;font-weight:700;color:var(--success);">{{ "%.2f"|format(r.new_price|float) }} {{ r.currency }}</div>
+            </div>
+          </div>
+          {% if r.note %}
+          <div style="margin-top:8px;font-size:13px;color:var(--text-muted);">📝 {{ r.note }}</div>
+          {% endif %}
+          <div style="margin-top:6px;font-size:11px;color:var(--text-muted);">{{ r.created_at[:16] if r.created_at else '' }}</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+          {% if r.status == 'pending' %}
+          <form method="post" action="/price-requests/{{ r.id }}/approve" style="margin:0;display:flex;align-items:center;gap:6px;">
+            <input type="text" name="admin_note" class="form-control" placeholder="Not (isteğe bağlı)" style="font-size:12px;padding:5px 8px;width:160px;" />
+            <button type="submit" class="btn btn-sm" style="background:#22c55e;color:#fff;border:none;">✓ Onayla</button>
+          </form>
+          <form method="post" action="/price-requests/{{ r.id }}/reject" style="margin:0;display:flex;align-items:center;gap:6px;">
+            <input type="text" name="admin_note" class="form-control" placeholder="Ret nedeni" style="font-size:12px;padding:5px 8px;width:160px;" />
+            <button type="submit" class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;">✗ Reddet</button>
+          </form>
+          {% else %}
+          <span style="font-size:12px;padding:4px 12px;border-radius:999px;font-weight:700;background:{% if r.status == 'approved' %}#dcfce7;color:#15803d{% else %}#fee2e2;color:#b91c1c{% endif %};">
+            {{ 'Onaylandı' if r.status == 'approved' else 'Reddedildi' }}
+          </span>
+          {% if r.admin_note %}
+          <div style="font-size:12px;color:var(--text-muted);text-align:right;max-width:180px;">{{ r.admin_note }}</div>
+          {% endif %}
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:40px;color:var(--text-muted);">
+    {% if filter_status == 'pending' %}Bekleyen fiyat talebi yok.{% else %}Kayıt bulunamadı.{% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

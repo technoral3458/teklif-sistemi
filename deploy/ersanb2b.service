@@ -1,0 +1,20 @@
+[Unit]
+Description=B2B Teklif Sistemi (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/teklif-sistemi
+ExecStart=/opt/teklif-sistemi/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8501 --workers 2
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=SECRET_KEY=change-this-to-random-64-char-string-in-production
+Environment=ADMIN_EMAIL=admin@ersanmakina.net
+Environment=ADMIN_PASS=20132017
+Environment=ADMIN_COMPANY=Titanium Makina
+Environment=ANTHROPIC_API_KEY=sk-ant-BURAYA_KENDI_API_KEYINIZI_YAZIN
+
+[Install]
+WantedBy=multi-user.target

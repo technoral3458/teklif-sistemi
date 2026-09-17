@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ lst.name }}{% endblock %}
+
+{% block content %}
+
+<!-- Breadcrumb -->
+<div style="margin-bottom:16px;font-size:13px;color:var(--text-muted);">
+  <a href="/membrane" style="color:var(--accent);">{{ T.nav_membrane }}</a> › <span>{{ lst.name }}</span>
+</div>
+
+<!-- List header card -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    <div>
+      <div style="font-size:20px;font-weight:800;">{{ lst.name }}</div>
+      {% if lst.notes %}<div style="font-size:13px;color:var(--text-muted);margin-top:2px;">{{ lst.notes }}</div>{% endif %}
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">{{ T.mb_created_at }}: {{ lst.created_at[:16] }}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/membrane/list/{{ lst.id }}/print" target="_blank" class="btn btn-outline btn-sm">{{ T.mb_print }}</a>
+      <button class="btn btn-outline btn-sm" onclick="openEditModal()">{{ T.mb_edit_btn }}</button>
+      <form method="post" action="/membrane/list/delete" style="margin:0;">
+        <input type="hidden" name="id" value="{{ lst.id }}" />
+        <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('{{ T.mb_confirm_del_list }}')" style="color:var(--danger)">{{ T.mb_delete_list_btn }}</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Cost summary bar -->
+{% if materials %}
+<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <div class="card" style="flex:1;min-width:160px;">
+    <div class="card-body" style="padding:12px 16px;">
+      <div style="font-size:11px;color:var(--text-muted);">{{ T.mb_cost_per_m2 }}</div>
+      <div style="font-size:22px;font-weight:800;color:var(--accent);">{{ "%.2f"|format(total_cost_per_m2) }} ₺</div>
+    </div>
+  </div>
+  <div class="card" style="flex:1;min-width:160px;">
+    <div class="card-body" style="padding:12px 16px;">
+      <div style="font-size:11px;color:var(--text-muted);">{{ T.mb_total_area }}</div>
+      <div style="font-size:22px;font-weight:800;">{{ "%.3f"|format(grand_area) }} m²</div>
+    </div>
+  </div>
+  <div class="card" style="flex:1;min-width:160px;">
+    <div class="card-body" style="padding:12px 16px;">
+      <div style="font-size:11px;color:var(--text-muted);">{{ T.mb_total_cost }}</div>
+      <div style="font-size:22px;font-weight:800;color:var(--accent);">{{ "%.2f"|format(grand_total) }} ₺</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Door list -->
+<div class="card">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3 class="card-title">🚪 {{ T.mb_doors_header }} ({{ doors|length }})</h3>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="openDoorModal()">{{ T.mb_add_door_btn }}</button>
+      <button class="btn btn-outline btn-sm" onclick="openScanModal()">{{ T.mb_scan_btn_label }}</button>
+      {% if doors %}
+      <form method="post" action="/membrane/list/{{ lst.id }}/door/clear" style="margin:0;">
+        <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('{{ T.mb_confirm_clear }}')" style="color:var(--danger)">{{ T.mb_clear_btn }}</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>{{ T.mb_col_door_name }}</th>
+          <th style="text-align:center">{{ T.mb_col_width }} <small style="color:var(--text-muted)">(mm)</small></th>
+          <th style="text-align:center">{{ T.mb_col_height }} <small style="color:var(--text-muted)">(mm)</small></th>
+          <th style="text-align:center">{{ T.mb_col_area }} <small style="color:var(--text-muted)">(m²)</small></th>
+          <th style="text-align:center">{{ T.mb_col_qty }}</th>
+          <th style="text-align:right">{{ T.mb_col_unit_cost }}</th>
+          <th style="text-align:right">{{ T.mb_col_total }}</th>
+          <th style="text-align:center">{{ T.mb_col_action }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for door in doors %}
+        <tr>
+          <td style="color:var(--text-muted);font-size:12px;">{{ loop.index }}</td>
+          <td><strong>{{ door.door_name or (T.mb_doors_header ~ ' #' ~ door.id) }}</strong></td>
+          <td style="text-align:center">{{ door.width_mm|int }}</td>
+          <td style="text-align:center">{{ door.height_mm|int }}</td>
+          <td style="text-align:center;color:var(--text-muted);">{{ "%.4f"|format(door.area_m2) }}</td>
+          <td style="text-align:center">{{ door.quantity }}</td>
+          <td style="text-align:right">{{ "%.2f"|format(door.unit_cost) }} ₺</td>
+          <td style="text-align:right;font-weight:700;color:var(--accent);">{{ "%.2f"|format(door.total_cost) }} ₺</td>
+          <td style="text-align:center;">
+            <button class="btn btn-ghost btn-sm" onclick='editDoor({{ door|tojson }})'>✏️</button>
+            <form method="post" action="/membrane/list/{{ lst.id }}/door/delete" style="display:inline;">
+              <input type="hidden" name="id" value="{{ door.id }}" />
+              <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not doors %}
+        <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px;">{{ T.mb_empty_list }}</td></tr>
+        {% endif %}
+      </tbody>
+      {% if doors %}
+      <tfoot>
+        <tr style="font-weight:700;font-size:14px;background:var(--surface-2,var(--surface));">
+          <td colspan="4" style="text-align:right;color:var(--text-muted);">{{ T.mb_col_total|upper }}</td>
+          <td style="text-align:center;">{{ "%.4f"|format(grand_area) }} m²</td>
+          <td></td>
+          <td></td>
+          <td style="text-align:right;color:var(--accent);font-size:16px;">{{ "%.2f"|format(grand_total) }} ₺</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+<!-- Edit List Modal -->
+<div id="editListModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ T.mb_edit_list_title }}</h3>
+      <button class="modal-close" onclick="closeModal('editListModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/membrane/list/save">
+        <input type="hidden" name="id" value="{{ lst.id }}" />
+        <div class="form-group">
+          <label class="form-label">{{ T.mb_list_name_label }}</label>
+          <input type="text" name="name" class="form-control" required value="{{ lst.name }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.mb_notes_label }}</label>
+          <input type="text" name="notes" class="form-control" value="{{ lst.notes or '' }}" />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">{{ T.mb_save_btn }}</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Door Modal -->
+<div id="doorModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="doorModalTitle">{{ T.mb_add_door_title }}</h3>
+      <button class="modal-close" onclick="closeModal('doorModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/membrane/list/{{ lst.id }}/door/save" id="doorForm">
+        <input type="hidden" name="id" id="door_id" value="0" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="grid-column:span 2;">
+            <label class="form-label">{{ T.mb_door_name_label }}</label>
+            <input type="text" name="door_name" id="door_name" class="form-control" placeholder="ör: Mutfak Üst - Beyaz" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.mb_width_label }} <span style="color:var(--accent);font-size:11px;">mm</span> *</label>
+            <input type="number" name="width_mm" id="door_width" class="form-control" step="0.1" min="1" required placeholder="ör: 400" oninput="calcPreview()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.mb_height_label }} <span style="color:var(--accent);font-size:11px;">mm</span> *</label>
+            <input type="number" name="height_mm" id="door_height" class="form-control" step="0.1" min="1" required placeholder="ör: 720" oninput="calcPreview()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.mb_qty_label }}</label>
+            <input type="number" name="quantity" id="door_qty" class="form-control" step="1" min="1" value="1" oninput="calcPreview()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.mb_est_cost_label }}</label>
+            <div id="costPreview" style="padding:9px 12px;background:var(--surface-2,#1e293b);border-radius:6px;border:1px solid var(--border);font-weight:700;color:var(--accent);font-size:15px;">—</div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">{{ T.mb_add_to_list_btn }}</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Scan Modal -->
+<div id="scanModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ T.mb_scan_modal_title }}</h3>
+      <button class="modal-close" onclick="closeScanModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">{{ T.mb_scan_desc }}</p>
+      <div id="scanDropzone"
+           style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:border-color .2s;"
+           onclick="document.getElementById('scanFileInput').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+           ondragleave="this.style.borderColor='var(--border)'"
+           ondrop="handleDrop(event)">
+        <div id="scanDropzoneContent">
+          <div style="font-size:36px;margin-bottom:8px;">📁</div>
+          <div style="font-size:14px;font-weight:600;">{{ T.mb_click_select }}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">{{ T.mb_drag_drop }}</div>
+        </div>
+        <img id="scanPreviewImg" src="" alt="" style="display:none;max-width:100%;max-height:280px;border-radius:6px;margin-top:8px;" />
+      </div>
+      <input type="file" id="scanFileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(this)" />
+      <div id="scanResult" style="display:none;margin-top:16px;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button id="scanBtn" class="btn btn-primary" style="flex:1;" onclick="doScan()" disabled>
+          <span id="scanBtnText">{{ T.mb_scan_and_add }}</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeScanModal()">{{ T.mb_cancel }}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const COST_PER_M2 = {{ total_cost_per_m2 }};
+const LIST_ID = {{ lst.id }};
+var STR = {
+  add_door:    {{ T.mb_add_door_title|tojson }},
+  edit_door:   {{ T.mb_edit_door_title|tojson }},
+  scan_btn:    {{ T.mb_scan_and_add|tojson }},
+  scanning:    {{ T.mb_scanning|tojson }},
+  scan_fail:   {{ T.mb_scan_fail|tojson }},
+  doors_added: {{ T.mb_doors_added|tojson }},
+  view_list:   {{ T.mb_view_list|tojson }},
+  col_name:    {{ T.mb_col_name_color|tojson }},
+  col_w:       {{ T.mb_col_width|tojson }},
+  col_h:       {{ T.mb_col_height|tojson }},
+  col_qty:     {{ T.mb_col_qty|tojson }},
+};
+
+function openEditModal() { openModal('editListModal'); }
+
+function openDoorModal() {
+  document.getElementById('doorModalTitle').textContent = STR.add_door;
+  document.getElementById('door_id').value = '0';
+  document.getElementById('door_name').value = '';
+  document.getElementById('door_width').value = '';
+  document.getElementById('door_height').value = '';
+  document.getElementById('door_qty').value = '1';
+  document.getElementById('costPreview').textContent = '—';
+  openModal('doorModal');
+}
+
+function editDoor(door) {
+  document.getElementById('doorModalTitle').textContent = STR.edit_door;
+  document.getElementById('door_id').value = door.id;
+  document.getElementById('door_name').value = door.door_name || '';
+  document.getElementById('door_width').value = door.width_mm;
+  document.getElementById('door_height').value = door.height_mm;
+  document.getElementById('door_qty').value = door.quantity;
+  calcPreview();
+  openModal('doorModal');
+}
+
+function calcPreview() {
+  var w = parseFloat(document.getElementById('door_width').value) || 0;
+  var h = parseFloat(document.getElementById('door_height').value) || 0;
+  var q = parseInt(document.getElementById('door_qty').value) || 1;
+  if (w > 0 && h > 0) {
+    var area = (w/1000)*(h/1000);
+    var unitCost = COST_PER_M2 * area;
+    var total = unitCost * q;
+    var el = document.getElementById('costPreview');
+    el.innerHTML = (q>1 ? q+' × '+unitCost.toFixed(2)+' = <br>' : '') +
+      '<span style="font-size:18px">'+total.toFixed(2)+' ₺</span>' +
+      '<br><small style="color:var(--text-muted);font-size:11px;">'+(area*10000).toFixed(1)+' dm² = '+area.toFixed(4)+' m²</small>';
+  } else {
+    document.getElementById('costPreview').textContent = '—';
+  }
+}
+
+var _scanFile = null;
+
+function openScanModal() {
+  _scanFile = null;
+  document.getElementById('scanFileInput').value = '';
+  document.getElementById('scanPreviewImg').style.display = 'none';
+  document.getElementById('scanDropzoneContent').style.display = 'block';
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanResult').innerHTML = '';
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('scanBtnText').textContent = STR.scan_btn;
+  openModal('scanModal');
+}
+
+function closeScanModal() { closeModal('scanModal'); }
+
+function handleFileSelect(input) {
+  if (input.files && input.files[0]) { _scanFile = input.files[0]; showScanPreview(_scanFile); }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('scanDropzone').style.borderColor = 'var(--border)';
+  var file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) { _scanFile = file; showScanPreview(file); }
+}
+
+function showScanPreview(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = document.getElementById('scanPreviewImg');
+    img.src = e.target.result; img.style.display = 'block';
+    document.getElementById('scanDropzoneContent').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanResult').innerHTML = '';
+  document.getElementById('scanBtn').disabled = false;
+  document.getElementById('scanBtnText').textContent = STR.scan_btn;
+}
+
+function doScan() {
+  if (!_scanFile) return;
+  var btn = document.getElementById('scanBtn');
+  var btnText = document.getElementById('scanBtnText');
+  btn.disabled = true;
+  btnText.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> ' + STR.scanning;
+  var fd = new FormData();
+  fd.append('image', _scanFile);
+  fetch('/membrane/list/'+LIST_ID+'/door/scan', {method:'POST', body:fd})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      btn.disabled = false; btnText.textContent = STR.scan_btn;
+      var res = document.getElementById('scanResult');
+      res.style.display = 'block';
+      if (data.error) { res.innerHTML='<div class="alert alert-danger" style="margin:0;"><strong>Hata:</strong> '+data.error+'</div>'; return; }
+      if (!data.count||data.count===0) { res.innerHTML='<div class="alert alert-warning" style="margin:0;">'+STR.scan_fail+'</div>'; return; }
+      var rows=data.saved.map(function(d){
+        return '<tr><td>'+(d.door_name||'—')+'</td><td style="text-align:center">'+d.width_mm+'</td><td style="text-align:center">'+d.height_mm+'</td><td style="text-align:center">'+d.quantity+'</td></tr>';
+      }).join('');
+      res.innerHTML='<div class="alert alert-success" style="margin-bottom:10px;">✅ <strong>'+data.count+' '+STR.doors_added+'</strong></div>'+
+        '<div style="overflow:auto;max-height:200px;"><table style="width:100%;font-size:12px;border-collapse:collapse;">'+
+        '<thead><tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:4px 6px;">'+STR.col_name+'</th>'+
+        '<th style="text-align:center;padding:4px 6px;">'+STR.col_w+' (mm)</th><th style="text-align:center;padding:4px 6px;">'+STR.col_h+' (mm)</th>'+
+        '<th style="text-align:center;padding:4px 6px;">'+STR.col_qty+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+        '<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="location.reload()">'+STR.view_list+'</button>';
+    })
+    .catch(function(err){
+      btn.disabled=false; btnText.textContent=STR.scan_btn;
+      var res=document.getElementById('scanResult');
+      res.style.display='block';
+      res.innerHTML='<div class="alert alert-danger" style="margin:0;">Bağlantı hatası: '+err.message+'</div>';
+    });
+}
+</script>
+<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+{% endblock %}

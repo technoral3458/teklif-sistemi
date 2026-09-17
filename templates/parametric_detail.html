@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% set s = job.summary %}
+{% block page_title %}{{ job.name }} — Parametrik Kesim{% endblock %}
+
+{% block content %}
+{% if err %}
+<div class="alert alert-danger">
+  <span>{{ err }}</span>
+  <button class="alert-close" onclick="this.parentElement.remove()" type="button">&times;</button>
+</div>
+{% endif %}
+
+<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+  <a href="/parametric" class="btn btn-ghost btn-sm">← Geri</a>
+  <span style="font-weight:700;font-size:16px;">{{ job.name }}</span>
+  <span style="color:var(--text-muted);font-size:12px;">
+    {{ job.orig_name }} · {{ '{:,}'.format(job.tri_count) }} üçgen
+  </span>
+</div>
+
+<div style="display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start;">
+
+  <!-- ══ Sol: parametreler ══ -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">⚙️ Kesim Parametreleri</h3></div>
+    <div class="card-body">
+
+      {% if bounds %}
+      <div style="background:var(--surface-2);border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:12px;">
+        <div style="color:var(--text-muted);margin-bottom:4px;font-weight:600;">Model Ölçüleri (ham)</div>
+        <div style="display:flex;gap:14px;">
+          <span>X: <strong>{{ '%.1f'|format(bounds.size[0]) }}</strong></span>
+          <span>Y: <strong>{{ '%.1f'|format(bounds.size[1]) }}</strong></span>
+          <span>Z: <strong>{{ '%.1f'|format(bounds.size[2]) }}</strong></span>
+        </div>
+      </div>
+      {% endif %}
+
+      <form method="post" action="/parametric/{{ job.id }}/slice" id="sliceForm">
+
+        <div class="form-group">
+          <label class="form-label">Dilimleme Ekseni</label>
+          <select name="axis" class="form-control">
+            {% for code, label in axes %}
+            <option value="{{ code }}" {% if job.axis == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <small style="color:var(--text-muted);font-size:11px;">
+            Paneller bu eksen boyunca dizilir.
+          </small>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Panel Kalınlığı (mm)</label>
+            <input type="number" name="thickness" class="form-control" step="0.1" min="0.5"
+                   value="{{ '%g'|format(job.thickness) }}" required />
+            <small style="color:var(--text-muted);font-size:11px;">18 mm MDF, 12 mm kontrplak…</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Panel Arası Boşluk (mm)</label>
+            <input type="number" name="gap" class="form-control" step="0.5" min="0"
+                   value="{{ '%g'|format(job.gap) }}" />
+            <small style="color:var(--text-muted);font-size:11px;">Ara takozu/boru payı.</small>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:14px 0 12px;padding-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">ÖLÇEK</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Çarpan</label>
+              <input type="number" name="scale" class="form-control" step="0.01" min="0.01"
+                     value="{{ '%g'|format(job.scale) }}" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Hedef Boy (mm)</label>
+              <input type="number" name="target_len" class="form-control" step="1" min="0"
+                     placeholder="opsiyonel" />
+              <small style="color:var(--text-muted);font-size:11px;">
+                Girilirse çarpan yok sayılır.
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:14px 0 12px;padding-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">
+            MONTAJ DELİKLERİ
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Delik Adedi</label>
+              <select name="hole_count" class="form-control">
+                {% for n in [0, 1, 2, 3, 4] %}
+                <option value="{{ n }}" {% if job.hole_count == n %}selected{% endif %}>
+                  {% if n == 0 %}Delik yok{% else %}{{ n }} delik{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Delik Çapı (mm)</label>
+              <input type="number" name="hole_dia" class="form-control" step="0.5" min="1"
+                     value="{{ '%g'|format(job.hole_dia) }}" />
+            </div>
+          </div>
+          <small style="color:var(--text-muted);font-size:11px;display:block;margin-top:6px;">
+            Tüm panellerde aynı konuma açılır — montaj mili/çubuğu buradan geçer.
+          </small>
+        </div>
+
+
+        <div style="border-top:1px solid var(--border);margin:14px 0 12px;padding-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">
+            GEÇME ÇERÇEVE (KAYIT)
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Kayıt Adedi</label>
+              <select name="frame_count" class="form-control">
+                {% for n in [0, 1, 2, 3, 4] %}
+                <option value="{{ n }}" {% if job.frame_count == n %}selected{% endif %}>
+                  {% if n == 0 %}Kayıt yok{% else %}{{ n }} kayıt{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Kayıt Kalınlığı (mm)</label>
+              <input type="number" name="frame_t" class="form-control" step="0.1" min="3"
+                     value="{{ '%g'|format(job.frame_t or 18) }}" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Kayıt Yüksekliği (mm)</label>
+              <input type="number" name="frame_h" class="form-control" step="5" min="20"
+                     value="{{ '%g'|format(job.frame_h or 120) }}" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Geçme Payı (mm)</label>
+              <input type="number" name="frame_fit" class="form-control" step="0.05" min="0" max="2"
+                     value="{{ '%g'|format(job.frame_fit or 0.2) }}" />
+              <small style="color:var(--text-muted);font-size:11px;">Sıkı geçme için 0,1–0,3.</small>
+            </div>
+          </div>
+          <small style="color:var(--text-muted);font-size:11px;display:block;margin-top:6px;line-height:1.6;">
+            Paneller alttan, kayıtlar üstten kanallanır; panel yukarıdan indirilip kayıda oturur.
+            Kayıt yüksekliğinin yarısı kadar geçme olur. Kayıtlar da DXF'e eklenir (K1, K2…).
+            Geçme çerçeve kullanıyorsanız montaj deliğine genelde gerek kalmaz.
+          </small>
+        </div>
+        <div style="border-top:1px solid var(--border);margin:14px 0 12px;padding-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">
+            PLAKA VE YERLEŞİM
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Plaka En (mm)</label>
+              <input type="number" name="sheet_w" class="form-control" step="10" min="100"
+                     value="{{ '%g'|format(job.sheet_w) }}" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Plaka Boy (mm)</label>
+              <input type="number" name="sheet_h" class="form-control" step="10" min="100"
+                     value="{{ '%g'|format(job.sheet_h) }}" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Parça Arası (mm)</label>
+              <input type="number" name="part_gap" class="form-control" step="1" min="0"
+                     value="{{ '%g'|format(job.part_gap) }}" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Hassasiyet (mm)</label>
+              <input type="number" name="simplify_tol" class="form-control" step="0.05" min="0"
+                     value="{{ '%g'|format(job.simplify_tol) }}" />
+              <small style="color:var(--text-muted);font-size:11px;">Küçük = daha çok nokta.</small>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;"
+                id="sliceBtn">
+          ✂️ Dilimle ve DXF Hazırla
+        </button>
+        <div id="sliceWait" style="display:none;text-align:center;color:var(--text-muted);
+             font-size:12px;margin-top:8px;">
+          Hesaplanıyor, lütfen bekleyin…
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══ Sağ: sonuç ══ -->
+  <div>
+    {% if job.status == 'Hazır' and s %}
+
+    {% for w in s.warnings %}
+    <div class="alert alert-warning" style="margin-bottom:12px;"><span>⚠️ {{ w }}</span></div>
+    {% endfor %}
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <h3 class="card-title">🧊 3B Önizleme</h3>
+        <span id="p3dStatus" style="color:var(--text-muted);font-size:12px;">yükleniyor…</span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <canvas id="p3dCanvas" style="width:100%;height:470px;display:block;
+                background:linear-gradient(180deg,#161b22,#0d1117);touch-action:none;"></canvas>
+      </div>
+      <div style="padding:8px 14px;border-top:1px solid var(--border);
+                  display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="p3d&&p3d.view(-0.60,0.32)">Perspektif</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="p3d&&p3d.view(0,0)">Ön</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="p3d&&p3d.view(1.5708,0)">Yan</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="p3d&&p3d.view(0,1.5708)">Üst</button>
+        <span style="color:var(--text-muted);font-size:11px;margin-left:auto;">
+          Sürükle: döndür · Shift+sürükle: kaydır · Tekerlek: yakınlaştır · Çift tık: sıfırla
+        </span>
+      </div>
+    </div>
+
+    {% if job.asm_svg %}
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <h3 class="card-title">🧊 Montaj Görünümü</h3>
+        <span style="color:var(--text-muted);font-size:12px;">Paneller dizildiğinde ortaya çıkan form</span>
+      </div>
+      <div class="card-body" style="overflow-x:auto;">{{ job.asm_svg|safe }}</div>
+    </div>
+    {% endif %}
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <h3 class="card-title">Sonuç</h3>
+        <div style="display:flex;gap:8px;">
+          <a href="/parametric/{{ job.id }}/dxf" class="btn btn-primary btn-sm">
+            ⬇ DXF İndir (plakaya dizili)
+          </a>
+          <a href="/parametric/{{ job.id }}/zip" class="btn btn-outline btn-sm">
+            ⬇ ZIP (panel başına DXF)
+          </a>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;">
+          {% set cells = [
+            ('Panel Sayısı', s.panel_count ~ ' adet'),
+            ('Panel Kalınlığı', '%g mm'|format(s.thickness)),
+            ('Panel Aralığı', '%g mm'|format(s.gap)),
+            ('Adım (pitch)', '%.1f mm'|format(s.pitch)),
+            ('Toplam Boy', '%.0f mm'|format(s.stack_len)),
+            ('Kesit Ölçüsü', '%.0f × %.0f mm'|format(s.profile_w, s.profile_h)),
+            ('Toplam Kesim', '%.1f m'|format(s.cut_len_m)),
+            ('Plaka Adedi', (s.sheet_count or '—') ~ ' adet'),
+          ] %}
+          {% for label, val in cells %}
+          <div style="background:var(--surface-2);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:11px;color:var(--text-muted);">{{ label }}</div>
+            <div style="font-size:16px;font-weight:700;margin-top:2px;">{{ val }}</div>
+          </div>
+          {% endfor %}
+          {% if s.frame_count %}
+          <div style="background:var(--surface-2);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:11px;color:var(--text-muted);">Geçme Kayıt</div>
+            <div style="font-size:16px;font-weight:700;margin-top:2px;">
+              {{ s.frame_count }} × {{ '%.0f'|format(s.frame_len) }}×{{ '%g'|format(s.frame_h) }}
+            </div>
+          </div>
+          {% endif %}
+          {% if s.hole_count %}
+          <div style="background:var(--surface-2);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:11px;color:var(--text-muted);">Montaj Deliği</div>
+            <div style="font-size:16px;font-weight:700;margin-top:2px;">
+              {{ s.hole_count }} × Ø{{ '%g'|format(s.hole_dia) }}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <div style="margin-top:14px;padding:10px 12px;background:var(--surface-2);
+                    border-radius:8px;font-size:12px;color:var(--text-muted);line-height:1.7;">
+          <strong style="color:var(--text);">DXF katmanları:</strong>
+          <span style="color:#e74c3c;">KESIM_DIS</span> dış kontur ·
+          <span style="color:#2ecc71;">KESIM_IC</span> iç boşluklar ·
+          <span style="color:#3498db;">DELIK</span> montaj delikleri ·
+          <span style="color:#f1c40f;">YAZI</span> panel numaraları (kesmeyin) ·
+          <span style="color:#95a5a6;">PLAKA</span> plaka sınırı (referans).
+          Birim: milimetre.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Panel Önizleme</h3>
+        <span style="color:var(--text-muted);font-size:12px;">
+          Sıra: 01 → {{ '%02d'|format(s.panel_count) }} (montaj sırası)
+        </span>
+      </div>
+      <div class="card-body" style="overflow-x:auto;">
+        {{ job.svg|safe }}
+      </div>
+    </div>
+
+    {% else %}
+    <div class="card">
+      <div class="card-body">
+        <div class="empty-state" style="padding:56px 20px;text-align:center;">
+          <div class="empty-icon" style="font-size:40px;">✂️</div>
+          <p style="color:var(--text-muted);margin-top:10px;max-width:420px;
+                    margin-left:auto;margin-right:auto;line-height:1.7;">
+            Soldaki parametreleri ayarlayıp <strong>Dilimle</strong> butonuna basın.
+            Model, panel kalınlığı kadar aralıklarla kesilerek her dilimin kesiti çıkarılacak
+            ve DXF olarak indirmeye hazır hâle gelecek.
+          </p>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+document.getElementById('sliceForm').addEventListener('submit', function () {
+  var b = document.getElementById('sliceBtn');
+  b.disabled = true;
+  b.textContent = 'Hesaplanıyor…';
+  document.getElementById('sliceWait').style.display = 'block';
+});
+</script>
+
+
+<script src="/static/js/parametric3d.js?v=4"></script>
+<script>var p3d = Parametric3D.mount('p3dCanvas', '/parametric/{{ job.id }}/3d', 'p3dStatus');</script>
+<style>
+@media (max-width: 900px) {
+  #sliceForm { max-width:100%; }
+  .card + div { grid-template-columns:1fr !important; }
+}
+</style>
+{% endblock %}

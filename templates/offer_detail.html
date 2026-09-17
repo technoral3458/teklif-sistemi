@@ -1,0 +1,627 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% macro mname(obj) %}{{ (obj.get('name_'+user.lang) or obj.name) if user.lang and user.lang != 'tr' else obj.name }}{% endmacro %}
+{% block page_title %}{{ T.offer_no }} {{ offer.offer_no }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+  <a href="/offers" class="btn btn-ghost btn-sm">{{ T.offer_back }}</a>
+  <a href="/offers/{{ offer.id }}/edit" class="btn btn-outline btn-sm">✏️ {{ T.btn_edit }}</a>
+  <a href="/offers/{{ offer.id }}/pdf-view" class="btn btn-primary btn-sm">📄 {{ T.btn_pdf }}</a>
+  {% if offer.model_id %}
+  <a href="/offers/{{ offer.id }}/catalog-pdf" target="_blank" class="btn btn-outline btn-sm" style="border-color:#C9961A;color:#C9961A;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+    Katalog PDF
+  </a>
+  <a href="/offers/{{ offer.id }}/social-card" class="btn btn-outline btn-sm" style="border-color:#a855f7;color:#a855f7;" title="Instagram için 1080×1080 PNG oluştur (yapay zeka destekli)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+    Sosyal Medya Görseli
+  </a>
+  {% endif %}
+</div>
+
+{% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray','Admin Onaylı':'amber','Üretimde':'blue','Tamamlandı':'green','Teslim Edildi':'green'} %}
+{% set sl = {'Beklemede':T.status_pending,'Onaylandı':T.status_approved,'Reddedildi':T.status_rejected,'Sipariş Verildi':T.status_ordered,'İptal':T.status_cancelled,'Admin Onaylı':T.status_admin_approved,'Üretimde':T.status_in_production,'Tamamlandı':T.status_completed,'Teslim Edildi':T.status_delivered} %}
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;">
+  <div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h3 class="card-title">{{ offer.offer_no }}</h3>
+          <div style="font-size:13px;color:var(--text-muted);">{{ offer.created_at[:10] if offer.created_at else '' }}</div>
+        </div>
+        <span class="badge badge-{{ sc.get(offer.status, 'gray') }}" style="font-size:14px;padding:6px 12px;">{{ sl.get(offer.status, offer.status) }}</span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">{{ T.offer_customer | upper }}</div>
+            <div style="font-weight:600;">{{ customer.name if customer else '-' }}</div>
+            {% if customer and customer.contact_person %}<div style="font-size:13px;">{{ customer.contact_person }}</div>{% endif %}
+            {% if customer and customer.email %}<div style="font-size:13px;color:var(--text-muted);">{{ customer.email }}</div>{% endif %}
+            {% if customer and customer.phone %}<div style="font-size:13px;color:var(--text-muted);">{{ customer.phone }}</div>{% endif %}
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">{{ T.offer_model | upper }}</div>
+            <div style="font-weight:600;">{{ mname(model) if model else '-' }}</div>
+            <div style="font-size:13px;color:var(--text-muted);">{{ T.offer_count }}: {{ offer.machine_count }}</div>
+            <div style="font-size:13px;color:var(--text-muted);">{{ T.offer_currency }}: {{ offer.currency }}</div>
+            {% if offer.validity_date %}<div style="font-size:13px;color:var(--text-muted);">{{ T.offer_validity }}: {{ offer.validity_date }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><h3 class="card-title">{{ T.offer_price_detail }}</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:52px;"></th><th>{{ T.offer_item }}</th><th style="text-align:center">{{ T.offer_count }}</th><th style="text-align:right">{{ T.offer_unit_price }}</th><th style="text-align:right">{{ T.offer_total }}</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>
+                {% if model and model.image_path %}
+                <img src="/static/{{ model.image_path }}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block;" />
+                {% else %}
+                <div style="width:44px;height:44px;background:var(--surface-2);border-radius:6px;border:1px dashed var(--border);"></div>
+                {% endif %}
+              </td>
+              <td><strong>{{ mname(model) if model else 'Model' }}</strong></td>
+              <td style="text-align:center">{{ offer.machine_count }}</td>
+              <td style="text-align:right">{{ "%.2f"|format(offer.base_price|default(0)|float) }} {{ offer.currency }}</td>
+              <td style="text-align:right">{{ "%.2f"|format((offer.base_price|default(0)|float) * (offer.machine_count|default(1)|int)) }} {{ offer.currency }}</td>
+            </tr>
+            {% for item in items %}
+            <tr>
+              <td>
+                {% if item.image_path %}
+                <img src="/static/{{ item.image_path }}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block;" />
+                {% else %}
+                <div style="width:44px;height:44px;background:var(--surface-2);border-radius:6px;border:1px dashed var(--border);"></div>
+                {% endif %}
+              </td>
+              <td>
+                <div>{{ item.option_name }}</div>
+                {% if item.description %}<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ item.description[:80] }}{% if item.description|length > 80 %}...{% endif %}</div>{% endif %}
+                {% if item.video_url %}
+                <button class="btn btn-ghost btn-sm" style="margin-top:4px;color:#e67e22;border-color:#e67e22;" onclick='openVideoModal({{ item.video_url|tojson }})'>▶ Video İzle</button>
+                {% endif %}
+              </td>
+              <td style="text-align:center">{{ item.qty }}</td>
+              <td style="text-align:right">{{ "%.2f"|format(item.unit_price|default(0)|float) }}</td>
+              <td style="text-align:right">{{ "%.2f"|format(item.line_total|default(0)|float) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            {% set _subtotal = (offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int) + (offer.options_total|default(0)|float) %}
+            {% set _show_sub = (offer.discount_pct and offer.discount_pct > 0) or (offer.delivery_term_discount and offer.delivery_term_discount > 0) %}
+            {% if _show_sub %}
+            <tr>
+              <td colspan="3" style="text-align:right;color:var(--text-muted);">{{ T.offer_subtotal }}</td>
+              <td style="text-align:right">{{ "%.2f"|format(_subtotal) }} {{ offer.currency }}</td>
+            </tr>
+            {% endif %}
+            {% if offer.delivery_term_discount and offer.delivery_term_discount > 0 %}
+            <tr>
+              <td colspan="3" style="text-align:right;color:var(--success);">🚢 Teslim Şekli İskontosu ({{ offer.delivery_term_discount }}%)</td>
+              <td style="text-align:right;color:var(--success);">-{{ "%.2f"|format(_subtotal * (offer.delivery_term_discount|default(0)|float)/100) }}</td>
+            </tr>
+            {% endif %}
+            {% if offer.discount_pct and offer.discount_pct > 0 %}
+            <tr>
+              <td colspan="3" style="text-align:right;color:var(--success);">{{ T.offer_discount }} ({{ offer.discount_pct }}%)</td>
+              <td style="text-align:right;color:var(--success);">-{{ "%.2f"|format(_subtotal * (1 - (offer.delivery_term_discount|default(0)|float)/100) * (offer.discount_pct|default(0)|float)/100) }}</td>
+            </tr>
+            {% endif %}
+            <tr style="font-size:16px;font-weight:700;">
+              <td colspan="3" style="text-align:right;">{{ T.offer_total_label }}</td>
+              <td style="text-align:right;color:var(--accent);">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    {% if offer.notes %}
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">{{ T.offer_notes }}</h3></div>
+      <div class="card-body"><p>{{ offer.notes }}</p></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Status & actions -->
+  <div>
+    {% if display_image %}
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-body" style="padding:12px;">
+        <img src="/static/{{ display_image }}" alt="Makine görseli"
+             style="width:100%;border-radius:8px;object-fit:cover;max-height:200px;" />
+        {% if model and model.image_path and display_image != model.image_path %}
+        <div style="font-size:11px;color:var(--accent);margin-top:6px;text-align:center;">Varyasyon resmi aktif</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% if user.role == 'admin' %}
+    <!-- ADMIN: send to manufacturer (always visible until sent) -->
+    {% if not offer.admin_status %}
+    <div class="card" style="margin-bottom:16px;border-left:3px solid var(--success);">
+      <div class="card-header" style="background:rgba(16,185,129,0.06);">
+        <h3 class="card-title" style="color:var(--success);">🏭 {{ T.ord_send_to_mfr }}</h3>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+        {% if offer.contract_notes or offer.contract_photo %}
+        <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:12px;color:var(--text-muted);">
+          {{ T.offer_contract_section }}:
+          {% if offer.contract_notes %}<span>{{ offer.contract_notes }}</span>{% endif %}
+          {% if offer.contract_photo %}<a href="/static/{{ offer.contract_photo }}" target="_blank" style="margin-left:6px;">📎 {{ T.offer_view_contract }}</a>{% endif %}
+        </div>
+        {% endif %}
+        <form method="post" action="/orders/{{ offer.id }}/approve" style="display:flex;flex-direction:column;gap:8px;">
+          <select name="manufacturer_id" class="form-control" style="font-size:13px;">
+            <option value="">{{ T.ord_select_mfr }}</option>
+            {% for m in manufacturers %}
+            <option value="{{ m.id }}" {% if m.id == default_mfr_id %}selected{% endif %}>{{ m.company_name or m.email }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="font-size:13px;" />
+          <button type="submit" class="btn btn-success">✓ {{ T.ord_send_to_mfr_btn }}</button>
+        </form>
+        <form method="post" action="/orders/{{ offer.id }}/reject" style="display:flex;gap:8px;">
+          <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_reject_reason }}" style="flex:1;font-size:13px;" />
+          <button type="submit" class="btn btn-danger">{{ T.ord_reject_btn }}</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+    <!-- ADMIN: full status dropdown -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><h3 class="card-title">{{ T.offer_status_update }}</h3></div>
+      <div class="card-body">
+        <form method="post" action="/offers/{{ offer.id }}/status">
+          <div class="form-group">
+            <select name="status" class="form-control">
+              {% for s in statuses %}
+              <option value="{{ s }}" {% if offer.status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%">{{ T.btn_update }} {{ T.offer_status }}</button>
+        </form>
+      </div>
+    </div>
+    <!-- ADMIN: cancel reason if cancelled -->
+    {% if offer.status == 'İptal' and offer.cancel_reason %}
+    <div class="card" style="margin-bottom:16px;border-left:3px solid var(--danger);">
+      <div class="card-header"><h3 class="card-title" style="color:var(--danger);">{{ T.offer_cancel_reason_section }}</h3></div>
+      <div class="card-body"><p style="font-size:13px;margin:0;">{{ offer.cancel_reason }}</p></div>
+    </div>
+    {% endif %}
+    <!-- ADMIN: contract info if submitted -->
+    {% if offer.status in ('Sipariş Verildi', 'Admin Onaylı', 'Üretimde', 'Tamamlandı', 'Teslim Edildi') and (offer.contract_notes or offer.contract_photo) %}
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><h3 class="card-title">{{ T.offer_contract_section }}</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+        {% if offer.contract_notes %}<p style="font-size:13px;margin:0;">{{ offer.contract_notes }}</p>{% endif %}
+        {% if offer.contract_photo %}<a href="/static/{{ offer.contract_photo }}" target="_blank" class="btn btn-outline btn-sm">📎 {{ T.offer_view_contract }}</a>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+    <!-- ADMIN: change requests -->
+    {% if change_requests %}
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><h3 class="card-title">{{ T.offer_change_reqs_section }}</h3></div>
+      <div class="card-body" style="padding:0;">
+        {% for cr in change_requests %}
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span class="badge badge-{% if cr.status == 'pending' %}amber{% elif cr.status == 'approved' %}green{% else %}red{% endif %}" style="font-size:11px;">
+              {% if cr.status == 'pending' %}{{ T.offer_req_pending }}{% elif cr.status == 'approved' %}{{ T.offer_req_approved }}{% else %}{{ T.offer_req_rejected }}{% endif %}
+            </span>
+            <span style="font-size:11px;color:var(--text-muted);">{{ cr.created_at[:10] }}</span>
+          </div>
+          <p style="font-size:13px;margin:0 0 8px 0;">{{ cr.description }}</p>
+          {% if cr.status == 'pending' %}
+          <form method="post" action="/offers/{{ offer.id }}/change-request/resolve" style="display:flex;gap:6px;flex-wrap:wrap;">
+            <input type="hidden" name="req_id" value="{{ cr.id }}" />
+            <input type="text" name="admin_notes" class="form-control" placeholder="{{ T.ord_note_optional }}" style="flex:1;min-width:120px;font-size:12px;" />
+            <button name="action" value="approved" type="submit" class="btn btn-success btn-sm">{{ T.offer_req_approve }}</button>
+            <button name="action" value="rejected" type="submit" class="btn btn-danger btn-sm">{{ T.offer_req_reject }}</button>
+          </form>
+          {% elif cr.admin_notes %}
+          <p style="font-size:12px;color:var(--text-muted);margin:0;">{{ T.ord_note }}: {{ cr.admin_notes }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- DEALER: smart action section -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><h3 class="card-title">{{ T.offer_actions_title }}</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+
+        {% if offer.status == 'Beklemede' %}
+        <!-- Dealer can approve or cancel -->
+        <button class="btn btn-success" style="width:100%;" onclick="openModal('approveModal')">✓ {{ T.offer_btn_approve_order }}</button>
+        <button class="btn btn-danger btn-outline" style="width:100%;" onclick="openModal('cancelModal')">✕ {{ T.offer_btn_cancel }}</button>
+
+        {% elif offer.status == 'Reddedildi' %}
+        <!-- Admin rejected -->
+        <div style="padding:10px;background:rgba(var(--danger-rgb,239,68,68),0.1);border-radius:8px;border:1px solid var(--danger);">
+          <div style="font-weight:600;color:var(--danger);margin-bottom:4px;">{{ T.offer_status_rejected_lbl }}</div>
+          {% if offer.admin_notes %}<div style="font-size:12px;color:var(--text-muted);">{{ offer.admin_notes }}</div>{% endif %}
+        </div>
+        <form method="post" action="/offers/{{ offer.id }}/status">
+          <input type="hidden" name="status" value="Beklemede" />
+          <button type="submit" class="btn btn-outline" style="width:100%;">↺ {{ T.offer_reactivate }}</button>
+        </form>
+
+        {% elif offer.status == 'İptal' %}
+        <!-- Cancelled -->
+        <div style="padding:10px;background:rgba(var(--danger-rgb,239,68,68),0.08);border-radius:8px;border:1px solid var(--border);">
+          <div style="font-weight:600;color:var(--danger);">{{ T.offer_status_cancelled_lbl }}</div>
+          {% if offer.cancel_reason %}<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">{{ offer.cancel_reason }}</div>{% endif %}
+        </div>
+
+        {% else %}
+        <!-- Submitted / in progress -->
+        {% if offer.status == 'Sipariş Verildi' or offer.status == 'Onaylandı' %}
+        <div style="padding:10px;background:rgba(59,130,246,0.1);border-radius:8px;border:1px solid var(--primary);">
+          <div style="font-weight:600;color:var(--primary);">⏳ {{ T.offer_status_waiting_admin }}</div>
+        </div>
+        {% elif offer.status == 'Admin Onaylı' %}
+        <div style="padding:10px;background:rgba(245,158,11,0.1);border-radius:8px;border:1px solid #f59e0b;">
+          <div style="font-weight:600;color:#f59e0b;">⏳ {{ T.offer_status_waiting_mfr }}</div>
+        </div>
+        {% elif offer.status in ('Üretimde', 'Tamamlandı', 'Teslim Edildi') %}
+        <div style="padding:10px;background:rgba(16,185,129,0.1);border-radius:8px;border:1px solid var(--success);">
+          <div style="font-weight:600;color:var(--success);">{{ offer.status }}</div>
+        </div>
+        <a href="/orders/{{ offer.id }}" class="btn btn-primary" style="width:100%;text-align:center;">{{ T.offer_view_order_btn }}</a>
+        {% endif %}
+
+        {% if offer.contract_notes or offer.contract_photo %}
+        <div style="padding:8px 12px;background:var(--surface-2);border-radius:6px;font-size:12px;color:var(--text-muted);">
+          {{ T.offer_contract_section }}:
+          {% if offer.contract_notes %}<span>{{ offer.contract_notes[:60] }}{% if offer.contract_notes|length > 60 %}...{% endif %}</span>{% endif %}
+          {% if offer.contract_photo %}<a href="/static/{{ offer.contract_photo }}" target="_blank" style="margin-left:6px;">📎</a>{% endif %}
+        </div>
+        {% endif %}
+
+        <button class="btn btn-outline btn-sm" style="width:100%;" onclick="openModal('changeReqModal')">{{ T.offer_btn_change_req }}</button>
+
+        <!-- Dealer change requests status -->
+        {% for cr in change_requests %}
+        <div style="padding:8px 12px;background:var(--surface-2);border-radius:6px;font-size:12px;">
+          <span class="badge badge-{% if cr.status == 'pending' %}amber{% elif cr.status == 'approved' %}green{% else %}red{% endif %}" style="font-size:10px;margin-right:6px;">
+            {% if cr.status == 'pending' %}{{ T.offer_req_pending }}{% elif cr.status == 'approved' %}{{ T.offer_req_approved }}{% else %}{{ T.offer_req_rejected }}{% endif %}
+          </span>
+          {{ cr.description[:50] }}{% if cr.description|length > 50 %}...{% endif %}
+          {% if cr.admin_notes %}<br><span style="color:var(--text-muted);">{{ T.ord_note }}: {{ cr.admin_notes }}</span>{% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">{{ T.offer_summary }}</h3></div>
+      <div class="card-body">
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-muted)">{{ T.offer_no }}</span>
+            <code>{{ offer.offer_no }}</code>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-muted)">{{ T.offer_date }}</span>
+            <span>{{ offer.created_at[:10] if offer.created_at else '-' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-muted)">{{ T.offer_customer }}</span>
+            <span>{{ customer.name if customer else '-' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-muted)">{{ T.offer_count }}</span>
+            <span>{{ offer.machine_count }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">
+            <span>{{ T.offer_total }}</span>
+            <span style="color:var(--accent)">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SÖZLEŞME / TEKLİF ÖZETİ ─────────────────────────────────── -->
+{% set _subtotal2 = (offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int) + (offer.options_total|default(0)|float) %}
+{% set _td = offer.delivery_term_discount|default(0)|float %}
+{% set _md = offer.discount_pct|default(0)|float %}
+<div class="card" style="margin-top:24px;border:2px solid var(--accent);border-radius:12px;page-break-inside:avoid;">
+  <div class="card-header" style="background:var(--accent);border-radius:10px 10px 0 0;padding:12px 20px;">
+    <h3 class="card-title" style="color:#fff;margin:0;">📋 Teklif &amp; Sözleşme Özeti</h3>
+  </div>
+  <div class="card-body" style="padding:20px;">
+
+    <!-- Row 1: Opsiyonlar / Donanımlar -->
+    {% if items %}
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">⚙️ Dahil Opsiyonlar / Donanımlar</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        {% for item in items %}
+        <div style="display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
+          <span style="color:var(--accent);font-weight:600;">✓</span>
+          <span>{{ item.option_name }}</span>
+          {% if item.qty > 1 %}<span style="font-size:11px;color:var(--text-muted);">({{ item.qty }} adet)</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Row 2: Makine bilgileri + Fiyat + Koşullar -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-bottom:20px;border-top:1px solid var(--border);padding-top:16px;">
+
+      <!-- Makine Bilgileri -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">🔩 Makine Bilgileri</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);width:90px;vertical-align:top;">Model</td>
+            <td style="padding:5px 0;font-weight:700;">{{ (model.get('name_'+user.lang) or model.name) if user.lang and user.lang != 'tr' else model.name if model else '-' }}</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Adet</td>
+            <td style="padding:5px 0;font-weight:700;">{{ offer.machine_count }}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Fiyat Özeti -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">💰 Fiyat Özeti</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);">Baz Fiyat ({{ offer.machine_count }} adet)</td>
+            <td style="padding:5px 0;text-align:right;">{{ "%.2f"|format((offer.base_price|default(0)|float)*(offer.machine_count|default(1)|int)) }} {{ offer.currency }}</td>
+          </tr>
+          {% if offer.options_total and offer.options_total > 0 %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);">Opsiyonlar</td>
+            <td style="padding:5px 0;text-align:right;">{{ "%.2f"|format(offer.options_total|float) }} {{ offer.currency }}</td>
+          </tr>
+          {% endif %}
+          {% if _td > 0 or _md > 0 %}
+          <tr>
+            <td colspan="2" style="border-top:1px solid var(--border);"></td>
+          </tr>
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);">Ara Toplam</td>
+            <td style="padding:5px 0;text-align:right;font-weight:600;">{{ "%.2f"|format(_subtotal2) }} {{ offer.currency }}</td>
+          </tr>
+          {% if _td > 0 %}
+          <tr>
+            <td style="padding:3px 0;color:var(--success);font-size:12px;">🚢 Teslim İskontosu (%{{ "%.1f"|format(_td) }})</td>
+            <td style="padding:3px 0;text-align:right;color:var(--success);font-size:12px;">-{{ "%.2f"|format(_subtotal2 * _td/100) }} {{ offer.currency }}</td>
+          </tr>
+          {% endif %}
+          {% if _md > 0 %}
+          <tr>
+            <td style="padding:3px 0;color:var(--success);font-size:12px;">Ek İskonto (%{{ "%.1f"|format(_md) }})</td>
+            <td style="padding:3px 0;text-align:right;color:var(--success);font-size:12px;">-{{ "%.2f"|format(_subtotal2*(1-_td/100)*_md/100) }} {{ offer.currency }}</td>
+          </tr>
+          {% endif %}
+          {% endif %}
+          <tr style="border-top:2px solid var(--accent);">
+            <td style="padding:10px 0 4px;font-weight:800;font-size:15px;">NET FİYAT (KDV Hariç)</td>
+            <td style="padding:10px 0 4px;text-align:right;font-weight:800;font-size:15px;color:var(--accent);">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Koşullar -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">📑 Sözleşme Koşulları</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          {% if delivery_term %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);width:100px;vertical-align:top;">Teslim Şekli</td>
+            <td style="padding:5px 0;font-weight:700;color:var(--accent);">{{ delivery_term.name }}{% if delivery_term.discount_pct > 0 %} <span style="font-size:11px;font-weight:400;">(-%{{ "%.1f"|format(delivery_term.discount_pct) }} iskonto)</span>{% endif %}</td>
+          </tr>
+          {% elif offer.delivery_method %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);width:100px;vertical-align:top;">Teslim Şekli</td>
+            <td style="padding:5px 0;font-weight:600;">{{ offer.delivery_method }}</td>
+          </tr>
+          {% endif %}
+          {% if offer.delivery_time %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Teslim Süresi</td>
+            <td style="padding:5px 0;">{{ offer.delivery_time }}</td>
+          </tr>
+          {% endif %}
+          {% if offer.logistics %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Lojistik</td>
+            <td style="padding:5px 0;">{{ offer.logistics }}</td>
+          </tr>
+          {% endif %}
+          {% if offer.payment_notes %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Ödeme</td>
+            <td style="padding:5px 0;white-space:pre-line;">{{ offer.payment_notes }}</td>
+          </tr>
+          {% endif %}
+          {% if offer.validity_date %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Geçerlilik</td>
+            <td style="padding:5px 0;font-weight:600;color:#e67e22;">{{ offer.validity_date }}</td>
+          </tr>
+          {% endif %}
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Teklif No</td>
+            <td style="padding:5px 0;"><code>{{ offer.offer_no }}</code></td>
+          </tr>
+          <tr>
+            <td style="padding:5px 0;color:var(--text-muted);vertical-align:top;">Tarih</td>
+            <td style="padding:5px 0;">{{ offer.created_at[:10] if offer.created_at else '-' }}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Row 3: Notlar -->
+    {% if offer.notes %}
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;font-size:13px;">
+      <span style="font-weight:600;color:var(--text-muted);">Not: </span>
+      <span style="white-space:pre-line;">{{ offer.notes }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Footer note -->
+    <div style="margin-top:16px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);text-align:center;">
+      Bu teklif {{ offer.created_at[:10] if offer.created_at else '' }} tarihinde oluşturulmuştur.
+      Yukarıdaki koşullar ve fiyat geçerlilik tarihi dahilinde geçerlidir.
+    </div>
+  </div>
+</div>
+
+<!-- Video Modal -->
+<div id="videoModal" class="modal-overlay" onclick="if(event.target===this)closeVideoModal()">
+  <div class="modal-box" style="max-width:760px;padding:0;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);">
+      <span style="font-weight:600;">▶ Video</span>
+      <button class="modal-close" onclick="closeVideoModal()">&times;</button>
+    </div>
+    <div style="position:relative;padding-bottom:56.25%;height:0;background:#000;">
+      <iframe id="videoFrame" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+    </div>
+  </div>
+</div>
+<!-- ── Dealer modals ── -->
+{% if user.role != 'admin' %}
+
+<!-- Cancel modal -->
+<div id="cancelModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ T.offer_cancel_modal_title }}</h3>
+      <button class="modal-close" onclick="closeModal('cancelModal')">&times;</button>
+    </div>
+    <form method="post" action="/offers/{{ offer.id }}/cancel-offer">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">{{ T.offer_cancel_reason_label }}</label>
+          <textarea name="cancel_reason" class="form-control" rows="4" required placeholder="{{ T.offer_cancel_reason_ph }}"></textarea>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('cancelModal')">{{ T.btn_cancel }}</button>
+        <button type="submit" class="btn btn-danger">✕ {{ T.offer_btn_cancel }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Approve order modal -->
+<div id="approveModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ T.offer_approve_modal_title }}</h3>
+      <button class="modal-close" onclick="closeModal('approveModal')">&times;</button>
+    </div>
+    <form method="post" action="/offers/{{ offer.id }}/dealer-approve" enctype="multipart/form-data">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="form-group">
+          <label class="form-label">{{ T.offer_contract_notes_label }}</label>
+          <textarea name="contract_notes" class="form-control" rows="3" placeholder="{{ T.offer_contract_notes_ph }}"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.offer_contract_photo_label }}</label>
+          <div style="border:2px dashed var(--border);border-radius:8px;padding:16px;text-align:center;">
+            <input type="file" name="contract_photo" id="contractPhotoInput"
+                   accept="image/*,.pdf"
+                   capture="environment"
+                   style="display:none;"
+                   onchange="showContractFileName(this)" />
+            <div style="margin-bottom:8px;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('contractPhotoInput').click()">
+                📷 {{ T.offer_contract_photo_hint }}
+              </button>
+            </div>
+            <div id="contractFileName" style="font-size:12px;color:var(--text-muted);"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('approveModal')">{{ T.btn_cancel }}</button>
+        <button type="submit" class="btn btn-success">✓ {{ T.offer_btn_approve_order }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Change request modal -->
+<div id="changeReqModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ T.offer_change_req_title }}</h3>
+      <button class="modal-close" onclick="closeModal('changeReqModal')">&times;</button>
+    </div>
+    <form method="post" action="/offers/{{ offer.id }}/change-request">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">{{ T.offer_change_req_label }}</label>
+          <textarea name="description" class="form-control" rows="4" required placeholder="{{ T.offer_change_req_ph }}"></textarea>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('changeReqModal')">{{ T.btn_cancel }}</button>
+        <button type="submit" class="btn btn-primary">{{ T.offer_send_btn }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showContractFileName(input) {
+  const el = document.getElementById('contractFileName');
+  if (input.files && input.files[0]) {
+    el.textContent = '📎 ' + input.files[0].name;
+  }
+}
+function _toEmbedUrl(url) {
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (ytMatch) return 'https://www.youtube.com/embed/' + ytMatch[1] + '?autoplay=1';
+  const vmMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vmMatch) return 'https://player.vimeo.com/video/' + vmMatch[1] + '?autoplay=1';
+  return null;
+}
+function openVideoModal(url) {
+  const embed = _toEmbedUrl(url);
+  if (embed) {
+    document.getElementById('videoFrame').src = embed;
+    openModal('videoModal');
+  } else {
+    window.open(url, '_blank');
+  }
+}
+function closeVideoModal() {
+  document.getElementById('videoFrame').src = '';
+  closeModal('videoModal');
+}
+</script>
+{% endblock %}

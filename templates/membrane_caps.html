@@ -1,0 +1,1899 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}Kapak Makroları{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+  <a href="/membrane" class="btn btn-ghost btn-sm">← Membran</a>
+  <h2 style="margin:0;font-size:18px;font-weight:700;flex:1;">🔧 Parametrik Kapak Makroları</h2>
+  {% if not edit_model %}
+  <button class="btn btn-ghost btn-sm" onclick="openModal('toolLibModal');loadTools();">🔧 Takım Kütüphanesi</button>
+  <button class="btn btn-outline btn-sm" onclick="openModal('dxfModal')">📐 DXF'ten İçe Aktar</button>
+  <button class="btn btn-primary btn-sm" onclick="openModal('newModelModal')">+ Yeni Model</button>
+  {% else %}
+  <a href="/membrane/caps" class="btn btn-ghost btn-sm">← Modeller</a>
+  {% endif %}
+</div>
+
+{% if msg %}
+<div class="alert alert-{{ msg_type }}" style="margin-bottom:12px;">{{ msg }}</div>
+{% endif %}
+
+{% if edit_model %}
+{# ═══════════ EDIT VIEW ═══════════ #}
+
+{# Header row #}
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+  <h3 style="margin:0;font-size:17px;font-weight:700;flex:1;">⚙️ {{ edit_model.name }}</h3>
+  <button class="btn btn-outline btn-sm" onclick="openModal('editModelModal')">✏️ Düzenle</button>
+  <form method="post" action="/membrane/caps/delete"
+        onsubmit="return confirm('\"{{ edit_model.name }}\" silinsin?')" style="margin:0;">
+    <input type="hidden" name="id" value="{{ edit_model.id }}" />
+    <button type="submit" class="btn btn-danger btn-sm">🗑 Sil</button>
+  </form>
+</div>
+
+{# Stage 1: Dimensions + Corner #}
+<div class="card" style="margin-bottom:14px;">
+  <div class="card-header" style="padding:10px 14px;">
+    <span class="card-title" style="margin:0;font-size:13px;">📐 Levha Ölçüleri</span>
+  </div>
+  <div class="card-body" style="padding:12px 14px;">
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;flex:1;min-width:80px;">
+        <label class="form-label" style="font-size:11px;">Boy — LPX</label>
+        <input type="number" id="ncLPX" class="form-control" value="900" step="1" oninput="updateOpsPreview(_opsData)" />
+      </div>
+      <div class="form-group" style="margin:0;flex:1;min-width:80px;">
+        <label class="form-label" style="font-size:11px;">En — LPY</label>
+        <input type="number" id="ncLPY" class="form-control" value="600" step="1" oninput="updateOpsPreview(_opsData)" />
+      </div>
+      <div class="form-group" style="margin:0;flex:1;min-width:80px;">
+        <label class="form-label" style="font-size:11px;">Kalınlık — LPZ</label>
+        <input type="number" id="ncLPZ" class="form-control" value="18" step="0.5" oninput="updateOpsPreview(_opsData)" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="font-size:11px;">Referans Köşe</label>
+        <input type="hidden" id="ncRefCorner" value="BL" />
+        <div style="display:flex;gap:4px;">
+          {% for corner, label in [('TL','Sol Üst'),('TR','Sağ Üst'),('BL','Sol Alt'),('BR','Sağ Alt')] %}
+          <button type="button" id="ncCpBtn{{ corner }}" onclick="setNcCorner('{{ corner }}')"
+            style="padding:5px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1.5px solid var(--border);
+                   background:var(--surface-2);cursor:pointer;{% if corner == 'BL' %}border-color:var(--accent);background:rgba(59,130,246,.18);color:var(--accent);{% endif %}">
+            {{ corner }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% if edit_model.constants %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:12px;">
+      {% for k,v in edit_model.constants.items() %}
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="font-size:11px;">{{ k }}</label>
+        <input type="number" id="ncConst_{{ k }}" class="form-control" value="{{ v }}" step="any" oninput="updateOpsPreview(_opsData)" />
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# Stage 2: Operations #}
+<div class="card" style="margin-bottom:14px;">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3 class="card-title" style="margin:0;">⚙️ Freze İşlemleri</h3>
+    <button class="btn btn-primary btn-sm" onclick="openOpModal(0)">+ İşlem Ekle</button>
+  </div>
+  <div id="opsContainer" style="padding:0;">
+    <div style="padding:32px;text-align:center;color:var(--text-muted);">
+      <div style="font-size:24px;margin-bottom:8px;">⏳</div>
+      <div>Yükleniyor...</div>
+    </div>
+  </div>
+</div>
+
+{# Stage 3: Path preview (shown when ops exist) #}
+<div id="opsPreviewWrap" style="display:none;margin-bottom:14px;">
+  <div class="card">
+    <div class="card-header" style="padding:10px 14px;">
+      <span class="card-title" style="margin:0;font-size:13px;">📐 Takım Yolu Önizleme</span>
+    </div>
+    <div style="padding:10px 14px;">
+      <canvas id="opsPreviewCanvas" width="800" height="280"
+        style="width:100%;border-radius:6px;border:1px solid var(--border);background:#0f172a;display:block;"></canvas>
+      <div id="opsPreviewLegend" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:10px;"></div>
+    </div>
+  </div>
+</div>
+
+{# Stage 4: NC Output + Download #}
+<div class="card">
+  <div class="card-header"><h3 class="card-title" style="margin:0;">🖥️ NC Kodu</h3></div>
+  <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+
+    {% if edit_model.constants %}
+    <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11px;color:var(--text-muted);">
+      Sabitler: {% for k,v in edit_model.constants.items() %}<code>{{ k }}</code>={{ v }}{% if not loop.last %}, {% endif %}{% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="generateNC()">▶ Ön İzleme</button>
+      <button class="btn btn-outline" style="flex:1;" onclick="downloadNC()">⬇ .nc İndir</button>
+    </div>
+
+    <div id="ncStatus" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;background:var(--surface-2);"></div>
+
+    {# Tab switcher #}
+    <div style="display:flex;border-bottom:1px solid var(--border);gap:0;">
+      <button id="tabGcode" onclick="switchTab('gcode')"
+        style="padding:6px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);">
+        G-Code
+      </button>
+      <button id="tabSim" onclick="switchTab('sim')"
+        style="padding:6px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);">
+        🎬 Simülasyon
+      </button>
+    </div>
+
+    {# G-Code panel #}
+    <div id="panelGcode" style="position:relative;">
+      <textarea id="ncOutput" readonly
+        style="width:100%;height:340px;font-family:monospace;font-size:11px;line-height:1.5;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text-primary);resize:vertical;box-sizing:border-box;"
+        placeholder="Parametreleri girin → Ön İzleme..."></textarea>
+      <button onclick="copyNC()"
+        style="position:absolute;top:8px;right:8px;padding:3px 9px;font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-muted);">
+        📋 Kopyala
+      </button>
+    </div>
+
+    {# Simulation panel #}
+    <div id="panelSim" style="display:none;">
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <canvas id="simCanvas" width="800" height="400"
+          style="width:100%;display:block;background:#0f172a;"></canvas>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+        <button id="simPlayBtn" class="btn btn-primary btn-sm" onclick="simPlay()" disabled>▶ Oynat</button>
+        <button class="btn btn-ghost btn-sm" onclick="simReset()">↺ Sıfırla</button>
+        <div style="flex:1;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--text-muted);">Hız:</span>
+          <input type="range" id="simSpeed" min="0" max="10" value="3" style="flex:1;" oninput="updateSpeedLabel()" />
+          <span id="simSpeedLabel" style="font-size:11px;color:var(--text-muted);min-width:28px;">x1</span>
+        </div>
+        <div id="simInfo" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">—</div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;flex-wrap:wrap;">
+        <span>⬜ Hızlı hareket</span>
+        <span style="color:#3b82f6;">━ Düz kesim</span>
+        <span style="color:#a855f7;">━ Yay kesim</span>
+        <span style="color:#22c55e;">━ Cep kesim</span>
+        <span style="color:#ef4444;">● Takım</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# Edit Model Modal #}
+<div id="editModelModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Model Düzenle</h3>
+      <button class="modal-close" onclick="closeModal('editModelModal')">&times;</button>
+    </div>
+    <form method="post" action="/membrane/caps/save">
+      <input type="hidden" name="id" value="{{ edit_model.id }}" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Model Adı *</label>
+          <input type="text" name="name" class="form-control" required value="{{ edit_model.name }}" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Açıklama</label>
+          <input type="text" name="description" class="form-control" value="{{ edit_model.description }}" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Takım No</label>
+            <input type="number" name="tool_no" class="form-control" value="{{ edit_model.tool_no }}" min="1" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Devir (S)</label>
+            <input type="number" name="spindle_speed" class="form-control" value="{{ edit_model.spindle_speed }}" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Güvenli Z</label>
+            <input type="number" name="safe_z" class="form-control" value="{{ edit_model.safe_z }}" step="0.5" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Besleme XY</label>
+            <input type="number" name="feed_xy" class="form-control" value="{{ edit_model.feed_xy }}" /></div>
+          <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Besleme Z</label>
+            <input type="number" name="feed_z" class="form-control" value="{{ edit_model.feed_z }}" /></div>
+        </div>
+          <input type="text" name="constants_json" id="editConstJson" class="form-control" style="font-family:monospace;"
+                 value="{{ edit_model.constants_json }}" />
+        </div>
+        <div style="padding:10px;background:var(--surface-2);border-radius:8px;">
+          <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:var(--text-muted);">Sabit Ekle / Çıkar</div>
+          <div id="editConstBuilder" style="display:flex;flex-direction:column;gap:6px;"></div>
+          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px;"
+                  onclick="addConstRow('editConstBuilder','editConstJson')">+ Sabit Ekle</button>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editModelModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Op Add/Edit Modal #}
+<div id="opModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="opModalTitle">Frezeleme İşlemi</h3>
+      <button class="modal-close" onclick="closeModal('opModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+      <input type="hidden" id="opId" value="0" />
+      <input type="hidden" id="opToolId" value="0" />
+
+      {# Row 1: Name #}
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">İşlem Adı <span style="color:var(--text-muted);font-weight:400;">(opsiyonel)</span></label>
+        <input type="text" id="opName" class="form-control" placeholder="örn: Çerçeve kesim" />
+      </div>
+
+      {# Row 2: Tool selector from library #}
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="display:flex;justify-content:space-between;">
+          <span>Takım Seç</span>
+          <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:10px;" onclick="openModal('toolLibModal');loadTools();">+ Kütüphane</button>
+        </label>
+        <div id="opToolCards" style="display:flex;gap:6px;flex-wrap:wrap;min-height:36px;padding:4px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+          <span style="font-size:11px;color:var(--text-muted);align-self:center;padding:2px 4px;">Yükleniyor...</span>
+        </div>
+      </div>
+
+      {# Row 3: Tool No + Depth + Feed #}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Takım No <span style="color:var(--text-muted);font-size:9px;">(manuel)</span></label>
+          <input type="number" id="opTool" class="form-control" value="1" min="1" max="99" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Derinlik <span style="color:var(--text-muted);font-size:9px;">(formül)</span></label>
+          <input type="text" id="opDepth" class="form-control" value="-LPZ" placeholder="-LPZ veya -5" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Besleme <span style="color:var(--text-muted);font-size:9px;">(boş=model)</span></label>
+          <input type="text" id="opFeed" class="form-control" placeholder="3000" />
+        </div>
+      </div>
+
+      {# Row 4: Corner picker + op type side by side #}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+        {# Graphical corner picker #}
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Referans Köşe</label>
+          <input type="hidden" id="opRefCorner" value="BL" />
+          <div style="display:flex;flex-direction:column;gap:3px;">
+            <!-- TL: origin top-left → X right, Y down -->
+            <button type="button" id="cpBtnTL" onclick="setCorner('TL')"
+              style="width:100%;padding:6px 10px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;font-weight:700;">TL</span>
+              <span style="font-size:9px;color:var(--text-muted);">X→ Y↓</span>
+            </button>
+            <!-- TR: origin top-right → X left, Y down -->
+            <button type="button" id="cpBtnTR" onclick="setCorner('TR')"
+              style="width:100%;padding:6px 10px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9px;color:var(--text-muted);">X← Y↓</span>
+              <span style="font-size:10px;font-weight:700;">TR</span>
+            </button>
+            <!-- center dimension label -->
+            <div style="text-align:center;font-size:9px;color:var(--text-muted);padding:1px 0;letter-spacing:.5px;">LPX × LPY</div>
+            <!-- BL: origin bottom-left → X right, Y up -->
+            <button type="button" id="cpBtnBL" onclick="setCorner('BL')"
+              style="width:100%;padding:6px 10px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;font-weight:700;">BL</span>
+              <span style="font-size:9px;color:var(--text-muted);">X→ Y↑</span>
+            </button>
+            <!-- BR: origin bottom-right → X left, Y up -->
+            <button type="button" id="cpBtnBR" onclick="setCorner('BR')"
+              style="width:100%;padding:6px 10px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9px;color:var(--text-muted);">X← Y↑</span>
+              <span style="font-size:10px;font-weight:700;">BR</span>
+            </button>
+          </div>
+        </div>
+
+        {# Op type + comp mode #}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Kesim Türü</label>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;cursor:pointer;font-size:12px;">
+                <input type="radio" name="opType" value="inner" checked style="accent-color:var(--accent);" />
+                <span>● <strong>İç Kesim</strong> <span style="color:var(--text-muted);font-size:10px;">cep/delik</span></span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;cursor:pointer;font-size:12px;">
+                <input type="radio" name="opType" value="outer" style="accent-color:var(--accent);" />
+                <span>○ <strong>Dış Kontur</strong> <span style="color:var(--text-muted);font-size:10px;">profil/dış</span></span>
+              </label>
+            </div>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Takım Yolu Tipi <span style="color:var(--text-muted);font-size:9px;">(G40/G41/G42)</span></label>
+            <select id="opCompMode" class="form-control" style="font-size:12px;">
+              <option value="none">Merkez — G40 (kompansasyon yok)</option>
+              <option value="G41">İçten — G41 (sol kompansasyon)</option>
+              <option value="G42">Dıştan — G42 (sağ kompansasyon)</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11px;color:var(--text-muted);">
+        Formül değişkenleri: <code>LPX</code> <code>LPY</code> <code>LPZ</code>
+        {% if edit_model and edit_model.constants %}{% for k in edit_model.constants.keys() %}<code>{{ k }}</code>{% endfor %}{% endif %}
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('opModal')">İptal</button>
+      <button type="button" class="btn btn-primary" onclick="saveOp()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+{# Path Add/Edit Modal (kept for legacy models) — hidden, not removed #}
+<div id="pathModal" class="modal-overlay" style="display:none!important;">
+  <div class="modal-box" style="max-width:540px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="pathModalTitle">Yol Ekle</h3>
+      <button class="modal-close" onclick="closeModal('pathModal')">&times;</button>
+    </div>
+    <form method="post" action="/membrane/caps/{{ edit_model.id }}/path/save">
+      <input type="hidden" name="id" id="pid" value="0" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Etiket</label>
+            <input type="text" name="label" id="plabel" class="form-control" placeholder="örn: Üst profil" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Sıra</label>
+            <input type="number" name="seq" id="pseq" class="form-control" value="{{ (paths|length + 1) * 10 }}" />
+          </div>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Yol Tipi</label>
+          <select name="path_type" id="ptype" class="form-control" onchange="updatePathFields()">
+            <option value="LINE">📏 Düz Çizgi (G1)</option>
+            <option value="ARC_CW">↻ Yay – Saat Yönü (G2)</option>
+            <option value="ARC_CCW">↺ Yay – Saat Aksi (G3)</option>
+            <option value="POCKET">◻ Cep Frezeleme</option>
+          </select>
+        </div>
+
+        <div style="padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:11px;color:var(--text-muted);">
+          <strong>Formül değişkenleri:</strong>
+          <code>LPX</code> <code>LPY</code> <code>LPZ</code>
+          {% for k in edit_model.constants.keys() %}<code>{{ k }}</code>{% endfor %}
+          — Örn: <code>LPX/2-10</code>, <code>LPY-50</code>, <code>-LPZ*0.8</code>
+        </div>
+
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+          <legend style="font-size:11px;font-weight:600;padding:0 6px;color:var(--text-muted);">Başlangıç Noktası</legend>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">X Başlangıç</label>
+              <input type="text" name="x1" id="px1" class="form-control" value="0" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Y Başlangıç</label>
+              <input type="text" name="y1" id="py1" class="form-control" value="0" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Z Başlangıç</label>
+              <input type="text" name="z1" id="pz1" class="form-control" value="0" /></div>
+          </div>
+        </fieldset>
+
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+          <legend style="font-size:11px;font-weight:600;padding:0 6px;color:var(--text-muted);">Bitiş Noktası</legend>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">X Bitiş</label>
+              <input type="text" name="x2" id="px2" class="form-control" value="LPX" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Y Bitiş</label>
+              <input type="text" name="y2" id="py2" class="form-control" value="LPY" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Z Kesim Derinliği</label>
+              <input type="text" name="z2" id="pz2" class="form-control" value="-LPZ" /></div>
+          </div>
+        </fieldset>
+
+        <fieldset id="arcFields" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:none;">
+          <legend style="font-size:11px;font-weight:600;padding:0 6px;color:var(--text-muted);">Yay Merkezi</legend>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Merkez X</label>
+              <input type="text" name="ix" id="pix" class="form-control" value="0" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Merkez Y</label>
+              <input type="text" name="jy" id="pjy" class="form-control" value="0" /></div>
+          </div>
+        </fieldset>
+
+        <fieldset id="pocketFields" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:none;">
+          <legend style="font-size:11px;font-weight:600;padding:0 6px;color:var(--text-muted);">Cep Ayarları</legend>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Takım Çapı (mm)</label>
+              <input type="number" name="tool_dia" id="ptooldia" class="form-control" value="8" step="0.1" /></div>
+            <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Step Over (0.1–1.0)</label>
+              <input type="number" name="step_over" id="pstepover" class="form-control" value="0.5" step="0.05" min="0.1" max="1.0" /></div>
+          </div>
+        </fieldset>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Besleme Override <span style="color:var(--text-muted);">(boş = model varsayılanı)</span></label>
+            <input type="text" name="feed_override" id="pfeed" class="form-control" placeholder="örn: 1500" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Takım No <span style="color:var(--text-muted);">(0 = model takımı)</span></label>
+            <input type="number" name="tool_no" id="ptoolno" class="form-control" value="0" min="0" max="99" />
+          </div>
+        </div>
+
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('pathModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% else %}
+{# ═══════════ LIST VIEW ═══════════ #}
+<div class="card">
+  <div style="padding:0;">
+    {% if models %}
+    <div class="table-wrap">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;text-align:left;">Model Adı</th>
+            <th class="col-hide-sm" style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;">Açıklama</th>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;text-align:center;">Takım</th>
+            <th class="col-hide-sm" style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;">S / F-XY</th>
+            <th style="padding:10px 16px;font-size:12px;color:var(--text-muted);font-weight:600;">İşlemler</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in models %}
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:12px 16px;font-weight:700;">{{ m.name }}</td>
+            <td class="col-hide-sm" style="padding:12px 16px;font-size:12px;color:var(--text-muted);">{{ m.description or '—' }}</td>
+            <td style="padding:12px 16px;text-align:center;font-family:monospace;">T{{ m.tool_no }}</td>
+            <td class="col-hide-sm" style="padding:12px 16px;font-family:monospace;font-size:12px;">{{ m.spindle_speed }} / {{ m.feed_xy }}</td>
+            <td style="padding:12px 16px;">
+              <div style="display:flex;gap:4px;">
+                <a href="/membrane/caps/{{ m.id }}" class="btn btn-outline btn-sm">✏️ <span class="btn-text">Düzenle</span></a>
+                <form method="post" action="/membrane/caps/delete"
+                      onsubmit="return confirm('Bu modeli sil?')" style="display:inline;">
+                  <input type="hidden" name="id" value="{{ m.id }}" />
+                  <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:48px;text-align:center;color:var(--text-muted);">
+      <div style="font-size:36px;margin-bottom:8px;">🔧</div>
+      <div style="margin-bottom:16px;">Henüz kapak makro modeli yok.</div>
+      <button class="btn btn-primary" onclick="openModal('newModelModal')">+ İlk Modeli Oluştur</button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# Tool Library Modal #}
+<div id="toolLibModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:640px;">
+    <div class="modal-header">
+      <h3 class="modal-title">🔧 Takım Kütüphanesi</h3>
+      <button class="modal-close" onclick="closeModal('toolLibModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div id="toolLibList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+      <div style="border-top:1px solid var(--border);padding-top:10px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text-muted);">Yeni Takım / Düzenle</div>
+        <input type="hidden" id="tlId" value="0" />
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" style="font-size:11px;">Takım Adı *</label>
+            <input type="text" id="tlName" class="form-control" placeholder="örn: 6mm Düz Freze" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Takım No (T)</label>
+            <input type="number" id="tlNo" class="form-control" value="1" min="1" max="99" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Çap Ø (mm)</label>
+            <input type="number" id="tlDia" class="form-control" value="6" step="0.1" min="0.1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Boy (mm)</label>
+            <input type="number" id="tlLen" class="form-control" value="0" step="1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Besleme XY (mm/dk)</label>
+            <input type="number" id="tlFeedXY" class="form-control" value="3000" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Dalış Z (mm/dk)</label>
+            <input type="number" id="tlFeedZ" class="form-control" value="1000" />
+          </div>
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" style="font-size:11px;">Not</label>
+            <input type="text" id="tlNotes" class="form-control" placeholder="opsiyonel" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="btn btn-ghost" onclick="tlClear()">Temizle</button>
+      <button type="button" class="btn btn-ghost" onclick="closeModal('toolLibModal')">Kapat</button>
+      <button type="button" class="btn btn-primary" onclick="tlSave()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+{# DXF Import Modal #}
+<div id="dxfModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:780px;width:95%;">
+    <div class="modal-header">
+      <h3 class="modal-title">📐 DXF'ten Model İçe Aktar</h3>
+      <button class="modal-close" onclick="closeDxfModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+
+      {# Step 1: upload #}
+      <div id="dxfStep1">
+        <label for="dxfFile" style="display:block;border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:border-color 0.15s;">
+          <div style="font-size:36px;margin-bottom:8px;">📐</div>
+          <div style="font-size:14px;font-weight:600;">DXF Dosyasını Seç</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">.dxf uzantılı dosya</div>
+          <input type="file" id="dxfFile" accept=".dxf" style="display:none;" onchange="dxfLoad(this)" />
+        </label>
+        <div id="dxfStatus" style="display:none;margin-top:10px;font-size:13px;padding:8px 12px;border-radius:6px;background:var(--surface-2);"></div>
+      </div>
+
+      {# Step 2: preview + assign #}
+      <div id="dxfStep2" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">ÖNİZLEME</div>
+            <canvas id="dxfCanvas" width="340" height="240"
+              style="width:100%;border-radius:8px;border:1px solid var(--border);background:#0f172a;"></canvas>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:11px;">Model Adı *</label>
+              <input type="text" id="dxfModelName" class="form-control" placeholder="örn: Standart Kapak" />
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Besleme XY (mm/dk)</label>
+                <input type="number" id="dxfFeedXY" class="form-control" value="3000" /></div>
+              <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Besleme Z (mm/dk)</label>
+                <input type="number" id="dxfFeedZ" class="form-control" value="1000" /></div>
+              <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Devir (S)</label>
+                <input type="number" id="dxfSpindle" class="form-control" value="18000" /></div>
+              <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:10px;">Güvenli Z (mm)</label>
+                <input type="number" id="dxfSafeZ" class="form-control" value="5" step="0.5" /></div>
+            </div>
+            <div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11px;">
+              <strong>Boyut:</strong> <span id="dxfDimText">—</span><br>
+              <span style="color:var(--text-muted);">Koordinatlar sol-alt köşeye (BL) normalize edildi.</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text-muted);">KONTURLAR — her biri ayrı bir işlem olacak</div>
+        <div id="dxfContourList" style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
+      </div>
+
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="btn btn-ghost" onclick="closeDxfModal()">İptal</button>
+      <button type="button" id="dxfCreateBtn" class="btn btn-primary" style="display:none;" onclick="dxfCreate()">
+        ✓ Modeli Oluştur
+      </button>
+    </div>
+  </div>
+</div>
+
+{# New Model Modal (list view) #}
+<div id="newModelModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Yeni Kapak Modeli</h3>
+      <button class="modal-close" onclick="closeModal('newModelModal')">&times;</button>
+    </div>
+    <form method="post" action="/membrane/caps/save">
+      <input type="hidden" name="id" value="0" />
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Model Adı *</label>
+          <input type="text" name="name" class="form-control" required placeholder="örn: Standart Membran Kapak" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Açıklama</label>
+          <input type="text" name="description" class="form-control" placeholder="Opsiyonel" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Özel Sabitler (JSON) <span style="color:var(--text-muted);">örn: {"A":50,"B":25}</span></label>
+          <input type="text" name="constants_json" id="newConstJson" class="form-control" style="font-family:monospace;" value="{}" />
+        </div>
+        <div style="padding:10px;background:var(--surface-2);border-radius:8px;">
+          <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:var(--text-muted);">Sabit Ekle / Çıkar</div>
+          <div id="newConstBuilder" style="display:flex;flex-direction:column;gap:6px;"></div>
+          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px;"
+                  onclick="addConstRow('newConstBuilder','newConstJson')">+ Sabit Ekle</button>
+        </div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('newModelModal')">İptal</button>
+        <button type="submit" class="btn btn-primary">Oluştur</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MODEL_ID = {{ edit_model.id if edit_model else 0 }};
+{% if edit_model and edit_model.constants %}
+const MODEL_CONSTS = {{ edit_model.constants|tojson }};
+{% else %}
+const MODEL_CONSTS = {};
+{% endif %}
+
+// ── Path modal ────────────────────────────────────────────────────────────
+function openPathModal(id, seq, label, ptype, x1,y1,z1,x2,y2,z2,ix,jy,tooldia,stepover,feed,toolno) {
+  document.getElementById('pid').value = id || 0;
+  document.getElementById('pathModalTitle').textContent = id ? 'Yol Düzenle' : 'Yol Ekle';
+  document.getElementById('plabel').value = label != null ? label : '';
+  document.getElementById('pseq').value   = seq != null ? seq : {{ (paths|length + 1) * 10 if paths is defined else 10 }};
+  document.getElementById('ptype').value  = ptype || 'LINE';
+  document.getElementById('px1').value = x1 != null ? x1 : '0';
+  document.getElementById('py1').value = y1 != null ? y1 : '0';
+  document.getElementById('pz1').value = z1 != null ? z1 : '0';
+  document.getElementById('px2').value = x2 != null ? x2 : 'LPX';
+  document.getElementById('py2').value = y2 != null ? y2 : 'LPY';
+  document.getElementById('pz2').value = z2 != null ? z2 : '-LPZ';
+  document.getElementById('pix').value = ix != null ? ix : '0';
+  document.getElementById('pjy').value = jy != null ? jy : '0';
+  document.getElementById('ptooldia').value  = tooldia || 8;
+  document.getElementById('pstepover').value = stepover || 0.5;
+  document.getElementById('pfeed').value     = feed || '';
+  document.getElementById('ptoolno').value   = toolno || 0;
+  updatePathFields();
+  openModal('pathModal');
+}
+
+function updatePathFields() {
+  const t = document.getElementById('ptype')?.value;
+  if (!t) return;
+  document.getElementById('arcFields').style.display    = (t === 'ARC_CW' || t === 'ARC_CCW') ? '' : 'none';
+  document.getElementById('pocketFields').style.display = t === 'POCKET' ? '' : 'none';
+}
+
+// ── Constants builder ─────────────────────────────────────────────────────
+function addConstRow(builderId, jsonId) {
+  const builder = document.getElementById(builderId);
+  if (!builder) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;';
+  row.innerHTML = `
+    <input type="text" placeholder="Ad (A,B...)" value=""
+      style="width:80px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:monospace;"
+      oninput="syncConst('${builderId}','${jsonId}')" />
+    <span style="color:var(--text-muted);">=</span>
+    <input type="number" placeholder="Değer" value="" step="any"
+      style="width:90px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);"
+      oninput="syncConst('${builderId}','${jsonId}')" />
+    <button type="button" onclick="this.parentElement.remove();syncConst('${builderId}','${jsonId}');"
+      style="padding:4px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--danger);">✕</button>
+  `;
+  builder.appendChild(row);
+}
+
+function syncConst(builderId, jsonId) {
+  const builder = document.getElementById(builderId);
+  const input   = document.getElementById(jsonId);
+  if (!builder || !input) return;
+  const obj = {};
+  builder.querySelectorAll('div').forEach(row => {
+    const ins = row.querySelectorAll('input');
+    if (ins.length >= 2) {
+      const k = ins[0].value.trim();
+      const v = parseFloat(ins[1].value);
+      if (k && !isNaN(v)) obj[k] = v;
+    }
+  });
+  input.value = JSON.stringify(obj);
+}
+
+function initConstBuilder(builderId, jsonId) {
+  const input = document.getElementById(jsonId);
+  if (!input) return;
+  let obj = {};
+  try { obj = JSON.parse(input.value || '{}'); } catch(e) {}
+  for (const [k, v] of Object.entries(obj)) {
+    const builder = document.getElementById(builderId);
+    if (!builder) return;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;';
+    row.innerHTML = `
+      <input type="text" value="${k}"
+        style="width:80px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:monospace;"
+        oninput="syncConst('${builderId}','${jsonId}')" />
+      <span style="color:var(--text-muted);">=</span>
+      <input type="number" value="${v}" step="any"
+        style="width:90px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);"
+        oninput="syncConst('${builderId}','${jsonId}')" />
+      <button type="button" onclick="this.parentElement.remove();syncConst('${builderId}','${jsonId}');"
+        style="padding:4px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--danger);">✕</button>
+    `;
+    builder.appendChild(row);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  initConstBuilder('editConstBuilder', 'editConstJson');
+  initConstBuilder('newConstBuilder',  'newConstJson');
+  updatePathFields();
+  if (MODEL_ID) loadOps();
+});
+
+// ── Ops/Moves AJAX management ─────────────────────────────────────────────
+
+const CORNER_LABELS = {BL:'Sol-Alt',TL:'Sol-Üst',BR:'Sağ-Alt',TR:'Sağ-Üst'};
+const MOVE_ICONS = {start:'●',line:'→',arc_cw:'↻',arc_ccw:'↺',arc_cw_r:'↻',arc_ccw_r:'↺',arc_3p:'⌓'};
+const MOVE_COLORS = {start:'#22c55e',line:'#3b82f6',arc_cw:'#a855f7',arc_ccw:'#a855f7',arc_cw_r:'#a855f7',arc_ccw_r:'#a855f7',arc_3p:'#ec4899'};
+let _opsData = [];  // current ops state
+
+async function loadOps() {
+  try {
+    const res = await fetch(`/membrane/caps/${MODEL_ID}/ops`);
+    _opsData = await res.json();
+    renderOps(_opsData);
+  } catch(e) {
+    document.getElementById('opsContainer').innerHTML =
+      `<div style="padding:16px;color:var(--danger);">Yükleme hatası: ${e.message}</div>`;
+  }
+}
+
+// Track which ops are collapsed (default: all expanded)
+const _collapsedOps = new Set();
+
+function toggleOp(opId) {
+  const body = document.getElementById(`opBody_${opId}`);
+  const chev = document.getElementById(`opChev_${opId}`);
+  if (!body) return;
+  if (body.style.display === 'none') {
+    body.style.display = '';
+    if (chev) chev.textContent = '▼';
+    _collapsedOps.delete(opId);
+  } else {
+    body.style.display = 'none';
+    if (chev) chev.textContent = '▶';
+    _collapsedOps.add(opId);
+  }
+}
+
+function renderOps(ops) {
+  const c = document.getElementById('opsContainer');
+  if (!ops.length) {
+    c.innerHTML = `
+      <div style="padding:32px;text-align:center;color:var(--text-muted);">
+        <div style="font-size:32px;margin-bottom:8px;">⚙️</div>
+        <div style="margin-bottom:12px;">Henüz işlem tanımlanmadı.</div>
+        <button class="btn btn-outline btn-sm" onclick="openOpModal(0)">+ İlk İşlemi Ekle</button>
+      </div>`;
+    document.getElementById('opsPreviewWrap').style.display = 'none';
+    return;
+  }
+
+  const OP_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316','#ef4444'];
+  let html = '';
+  ops.forEach((op, idx) => {
+    const ref = CORNER_LABELS[op.ref_corner] || op.ref_corner;
+    const feedLabel = op.feed ? `F=${op.feed}` : 'F=model';
+    const typeBadge = op.op_type === 'outer'
+      ? `<span style="font-size:10px;color:#f59e0b;background:rgba(245,158,11,0.15);border-radius:4px;padding:1px 5px;">Dış Kontur</span>`
+      : `<span style="font-size:10px;color:#22c55e;background:rgba(34,197,94,0.15);border-radius:4px;padding:1px 5px;">İç Kesim</span>`;
+    const cm = op.comp_mode || 'none';
+    const compBadge = cm !== 'none'
+      ? `<span style="font-size:10px;color:#60a5fa;background:rgba(96,165,250,.12);border-radius:4px;padding:1px 5px;">${cm==='G41'?'İçten G41':'Dıştan G42'}</span>`
+      : '';
+    const isCollapsed = _collapsedOps.has(op.id);
+    const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${OP_COLORS[idx%OP_COLORS.length]};margin-right:4px;flex-shrink:0;"></span>`;
+    html += `
+    <div style="border-top:1px solid var(--border);">
+      <div style="padding:10px 14px;display:flex;align-items:center;gap:8px;background:var(--surface-2);cursor:pointer;user-select:none;"
+           onclick="toggleOp(${op.id})">
+        <div style="width:22px;height:22px;border-radius:50%;background:${OP_COLORS[idx%OP_COLORS.length]};color:#fff;
+             display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">
+          ${idx+1}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span class="badge" style="background:rgba(245,158,11,.2);color:#fbbf24;font-size:10px;">T${op.tool_no}</span>
+            <strong style="font-size:13px;">${op.name || ('İşlem ' + (idx+1))}</strong>
+            ${typeBadge}${compBadge}
+            <span style="font-size:10px;color:var(--text-muted);">${ref} · Z=${op.depth} · ${feedLabel}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${op.moves.length} hareket</div>
+        </div>
+        <span id="opChev_${op.id}" style="font-size:11px;color:var(--text-muted);margin-right:2px;">${isCollapsed ? '▶' : '▼'}</span>
+        <div style="display:flex;gap:4px;" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost btn-sm" onclick="openOpModal(${op.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteOp(${op.id})">🗑</button>
+        </div>
+      </div>
+
+      <div id="opBody_${op.id}" style="${isCollapsed ? 'display:none;' : ''}padding:8px 14px 4px 14px;">
+        ${renderMoves(op)}
+        <div style="padding:6px 0 8px 0;border-top:1px dashed var(--border);margin-top:6px;">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Hareket ekle:</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;" id="addBtns_${op.id}">
+            <button class="btn btn-sm" style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);"
+              onclick="showMoveForm(${op.id},'start')">● Başlangıç</button>
+            <button class="btn btn-sm" style="background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.3);"
+              onclick="showMoveForm(${op.id},'line')">→ Çizgi</button>
+            <button class="btn btn-sm" style="background:rgba(168,85,247,.12);color:#c084fc;border:1px solid rgba(168,85,247,.3);"
+              onclick="showMoveForm(${op.id},'arc_cw')">↻ Yay CW (I,J)</button>
+            <button class="btn btn-sm" style="background:rgba(168,85,247,.12);color:#c084fc;border:1px solid rgba(168,85,247,.3);"
+              onclick="showMoveForm(${op.id},'arc_ccw')">↺ Yay CCW (I,J)</button>
+            <button class="btn btn-sm" style="background:rgba(168,85,247,.12);color:#c084fc;border:1px solid rgba(168,85,247,.3);"
+              onclick="showMoveForm(${op.id},'arc_cw_r')">↻ Yay CW (R)</button>
+            <button class="btn btn-sm" style="background:rgba(168,85,247,.12);color:#c084fc;border:1px solid rgba(168,85,247,.3);"
+              onclick="showMoveForm(${op.id},'arc_ccw_r')">↺ Yay CCW (R)</button>
+            <button class="btn btn-sm" style="background:rgba(236,72,153,.12);color:#f472b6;border:1px solid rgba(236,72,153,.3);"
+              onclick="showMoveForm(${op.id},'arc_3p')">⌓ 3 Nokta</button>
+          </div>
+          <div id="moveForm_${op.id}" style="display:none;margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>`;
+  });
+  c.innerHTML = html;
+  updateOpsPreview(ops);
+}
+
+// ── Live path preview ───────────────────────────────────────────────────────
+function _evalExprJS(expr, LPX, LPY, LPZ) {
+  try {
+    expr = String(expr).replace(/\blpx\b/gi,'LPX').replace(/\blpy\b/gi,'LPY').replace(/\blpz\b/gi,'LPZ');
+    return +new Function('LPX','LPY','LPZ','return (' + expr + ')')(LPX, LPY, LPZ);
+  } catch { return 0; }
+}
+
+function _circumcenterJS(x1, y1, x2, y2, x3, y3) {
+  const ax = x2-x1, ay = y2-y1, bx = x3-x1, by = y3-y1;
+  const D = 2*(ax*by - ay*bx);
+  if (Math.abs(D) < 1e-10) return null;
+  const ux = (by*(ax*ax+ay*ay) - ay*(bx*bx+by*by)) / D;
+  const uy = (ax*(bx*bx+by*by) - bx*(ax*ax+ay*ay)) / D;
+  return [x1+ux, y1+uy];
+}
+
+// Returns true if angle `a` falls within the CW arc from `sa` to `ea`
+function _isAngleInArcCW(sa, ea, a) {
+  const n = x => ((x % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI);
+  const ns = n(sa), ne = n(ea), na = n(a);
+  return ns <= ne ? (na >= ns && na <= ne) : (na >= ns || na <= ne);
+}
+
+function _centerFromRadiusJS(x1, y1, x2, y2, R, isCW) {
+  const dx = x2-x1, dy = y2-y1, d = Math.hypot(dx, dy);
+  const absR = Math.abs(R);
+  if (d > 2*absR + 1e-6) return null;
+  const mx = (x1+x2)/2, my = (y1+y2)/2;
+  const h = Math.sqrt(Math.max(0, absR*absR - (d/2)**2));
+  const nx = -dy/d, ny = dx/d; // left perpendicular of chord
+  const sign = (isCW === (R > 0)) ? -1 : 1;
+  return [mx + sign*h*nx, my + sign*h*ny];
+}
+
+function _applyCornerJS(x, y, ref, LPX, LPY) {
+  if (ref === 'TL') return [x, LPY - y];
+  if (ref === 'BR') return [LPX - x, y];
+  if (ref === 'TR') return [LPX - x, LPY - y];
+  return [x, y];
+}
+
+function updateOpsPreview(ops) {
+  const wrap = document.getElementById('opsPreviewWrap');
+  if (!ops || !ops.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  const LPX = parseFloat(document.getElementById('ncLPX')?.value) || 600;
+  const LPY = parseFloat(document.getElementById('ncLPY')?.value) || 900;
+  const LPZ = parseFloat(document.getElementById('ncLPZ')?.value) || 18;
+
+  const canvas = document.getElementById('opsPreviewCanvas');
+  const ctx = canvas.getContext('2d');
+  const cw = canvas.width, ch = canvas.height;
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, cw, ch);
+
+  const mg = 14;
+  const scale = Math.min((cw - 2*mg) / (LPX||1), (ch - 2*mg) / (LPY||1));
+  const ox = (cw - LPX * scale) / 2;
+  const oy = (ch - LPY * scale) / 2;
+
+  // Sheet outline
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ox, oy, LPX * scale, LPY * scale);
+
+  const tx = x => ox + x * scale;
+  const ty = y => ch - oy - y * scale;
+
+  const OP_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316','#ef4444'];
+  const legend = document.getElementById('opsPreviewLegend');
+  legend.innerHTML = '';
+
+  ops.forEach((op, oi) => {
+    const color = OP_COLORS[oi % OP_COLORS.length];
+    const ref = op.ref_corner || 'BL';
+    legend.innerHTML += `<span style="display:flex;align-items:center;gap:3px;color:${color};">
+      <span style="display:inline-block;width:14px;height:3px;background:${color};border-radius:2px;"></span>
+      ${op.name || ('İşlem ' + (oi+1))}
+    </span>`;
+
+    let cx_ = 0, cy_ = 0, started = false;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+
+    for (const mv of op.moves) {
+      const mx = _evalExprJS(mv.x || '0', LPX, LPY, LPZ);
+      const my = _evalExprJS(mv.y || '0', LPX, LPY, LPZ);
+      const [ax, ay] = _applyCornerJS(mx, my, ref, LPX, LPY);
+
+      if (mv.move_type === 'start') {
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(tx(ax), ty(ay), 3, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(tx(ax), ty(ay));
+        cx_ = ax; cy_ = ay; started = true;
+      } else if (mv.move_type === 'line' && started) {
+        ctx.lineTo(tx(ax), ty(ay));
+        cx_ = ax; cy_ = ay;
+      } else if ((mv.move_type === 'arc_cw' || mv.move_type === 'arc_ccw') && started) {
+        const mcx = _evalExprJS(mv.cx || '0', LPX, LPY, LPZ);
+        const mcy = _evalExprJS(mv.cy || '0', LPX, LPY, LPZ);
+        const [acx, acy] = _applyCornerJS(mcx, mcy, ref, LPX, LPY);
+        const r = Math.hypot(cx_ - acx, cy_ - acy);
+        const sa = Math.atan2(cy_ - acy, cx_ - acx);
+        const ea = Math.atan2(ay - acy, ax - acx);
+        ctx.stroke(); ctx.beginPath();
+        ctx.arc(tx(acx), ty(acy), r * scale, -sa, -ea, mv.move_type === 'arc_cw');
+        cx_ = ax; cy_ = ay;
+      } else if (mv.move_type === 'arc_3p' && started) {
+        // cx,cy = through/mid point
+        const mmx = _evalExprJS(mv.cx || '0', LPX, LPY, LPZ);
+        const mmy = _evalExprJS(mv.cy || '0', LPX, LPY, LPZ);
+        const [amid_x, amid_y] = _applyCornerJS(mmx, mmy, ref, LPX, LPY);
+        const cc = _circumcenterJS(cx_, cy_, amid_x, amid_y, ax, ay);
+        if (cc) {
+          const [acx, acy] = cc;
+          const r = Math.hypot(cx_ - acx, cy_ - acy);
+          const sa = Math.atan2(cy_ - acy, cx_ - acx);
+          const ea = Math.atan2(ay - acy, ax - acx);
+          const ma = Math.atan2(amid_y - acy, amid_x - acx);
+          // In canvas space Y is flipped, so angles negate. Determine which
+          // arc direction (anticlockwise flag) places the through-point inside.
+          const antiCCW = !_isAngleInArcCW(-sa, -ea, -ma);
+          ctx.stroke(); ctx.beginPath();
+          ctx.arc(tx(acx), ty(acy), r * scale, -sa, -ea, antiCCW);
+        }
+        cx_ = ax; cy_ = ay;
+      } else if ((mv.move_type === 'arc_cw_r' || mv.move_type === 'arc_ccw_r') && started) {
+        const r_val = _evalExprJS(mv.r || '0', LPX, LPY, LPZ);
+        const isCW = mv.move_type === 'arc_cw_r';
+        const cc = _centerFromRadiusJS(cx_, cy_, ax, ay, r_val, isCW);
+        if (cc) {
+          const [acx, acy] = cc;
+          const r = Math.abs(r_val);
+          const sa = Math.atan2(cy_ - acy, cx_ - acx);
+          const ea = Math.atan2(ay - acy, ax - acx);
+          ctx.stroke(); ctx.beginPath();
+          ctx.arc(tx(acx), ty(acy), r * scale, -sa, -ea, isCW);
+        }
+        cx_ = ax; cy_ = ay;
+      }
+    }
+    if (started) ctx.stroke();
+  });
+}
+
+function updateOpsPreviewFromInputs() {
+  if (_opsData) updateOpsPreview(_opsData);
+}
+
+function renderMoves(op) {
+  if (!op.moves.length) return `<div style="font-size:12px;color:var(--text-muted);padding:4px 0 8px 0;">— hareket yok —</div>`;
+  let html = '';
+  op.moves.forEach((mv, i) => {
+    const icon = MOVE_ICONS[mv.move_type] || '?';
+    const color = MOVE_COLORS[mv.move_type] || '#fff';
+    const isArcIJ = mv.move_type === 'arc_cw' || mv.move_type === 'arc_ccw';
+    const isArcR  = mv.move_type === 'arc_cw_r' || mv.move_type === 'arc_ccw_r';
+    const is3p    = mv.move_type === 'arc_3p';
+    const coords = isArcIJ ? `X=${mv.x} Y=${mv.y} · Merkez(${mv.cx}, ${mv.cy})`
+                 : isArcR  ? `X=${mv.x} Y=${mv.y} · R=${mv.r}`
+                 : is3p    ? `X=${mv.x} Y=${mv.y} · Geçiş(${mv.cx}, ${mv.cy})`
+                 : `X=${mv.x} · Y=${mv.y}`;
+    html += `
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border);" id="moveRow_${mv.id}">
+      <span style="font-size:16px;color:${color};width:18px;text-align:center;flex-shrink:0;">${icon}</span>
+      <div style="flex:1;font-size:11px;font-family:monospace;color:var(--text-primary);">${coords}</div>
+      <div style="display:flex;gap:3px;">
+        <button class="btn btn-ghost btn-sm" onclick="editMoveInline(${op.id},${mv.id},'${mv.move_type}','${mv.x}','${mv.y}','${mv.cx}','${mv.cy}',${mv.seq},'${mv.r||'0'}')"
+          style="padding:2px 6px;font-size:10px;">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMove(${mv.id})"
+          style="padding:2px 6px;font-size:10px;">🗑</button>
+      </div>
+    </div>`;
+  });
+  return html;
+}
+
+function showMoveForm(opId, type, defaultX='0', defaultY='0', defaultCX='0', defaultCY='0', mvId=0, seq=0, defaultR='0') {
+  const isArcIJ = type === 'arc_cw' || type === 'arc_ccw';
+  const isArcR  = type === 'arc_cw_r' || type === 'arc_ccw_r';
+  const is3p    = type === 'arc_3p';
+  const icon = MOVE_ICONS[type] || '?';
+  const color = MOVE_COLORS[type] || '#fff';
+  const iStyle = 'width:80px;padding:4px 6px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text-primary);font-family:monospace;font-size:12px;';
+  let extraFields = '';
+  if (isArcIJ) {
+    extraFields = `
+    <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+      <span style="font-size:10px;color:var(--text-muted);width:70px;">Merkez X:</span>
+      <input id="mfCX_${opId}" type="text" value="${defaultCX}" style="${iStyle}" placeholder="0" />
+      <span style="font-size:10px;color:var(--text-muted);">Y:</span>
+      <input id="mfCY_${opId}" type="text" value="${defaultCY}" style="${iStyle}" placeholder="0" />
+    </div>`;
+  } else if (isArcR) {
+    extraFields = `
+    <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+      <span style="font-size:10px;color:var(--text-muted);width:70px;">Radius R:</span>
+      <input id="mfR_${opId}" type="text" value="${defaultR}" style="${iStyle}" placeholder="50" />
+      <span style="font-size:10px;color:var(--text-muted);">(– = büyük yay)</span>
+    </div>`;
+  } else if (is3p) {
+    extraFields = `
+    <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+      <span style="font-size:10px;color:var(--text-muted);width:70px;">Geçiş X:</span>
+      <input id="mfCX_${opId}" type="text" value="${defaultCX}" style="${iStyle}" placeholder="0" />
+      <span style="font-size:10px;color:var(--text-muted);">Y:</span>
+      <input id="mfCY_${opId}" type="text" value="${defaultCY}" style="${iStyle}" placeholder="0" />
+    </div>`;
+  }
+  document.getElementById(`moveForm_${opId}`).style.display = '';
+  document.getElementById(`moveForm_${opId}`).innerHTML = `
+    <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;color:${color};">${icon}</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--text-muted);">X:</span>
+          <input id="mfX_${opId}" type="text" value="${defaultX}" style="${iStyle}" placeholder="0" />
+          <span style="font-size:11px;color:var(--text-muted);">Y:</span>
+          <input id="mfY_${opId}" type="text" value="${defaultY}" style="${iStyle}" placeholder="0" />
+        </div>
+      </div>
+      ${extraFields}
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn btn-primary btn-sm" onclick="saveMove(${opId},'${type}',${mvId},${seq})">✓ Ekle</button>
+        <button class="btn btn-ghost btn-sm" onclick="hideMoveForm(${opId})">✗</button>
+      </div>
+    </div>`;
+}
+
+function editMoveInline(opId, mvId, type, x, y, cx, cy, seq, r) {
+  showMoveForm(opId, type, x, y, cx, cy, mvId, seq, r || '0');
+  document.querySelector(`#moveForm_${opId} .btn-primary`).textContent = '✓ Güncelle';
+}
+
+function hideMoveForm(opId) {
+  const el = document.getElementById(`moveForm_${opId}`);
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+}
+
+async function saveMove(opId, type, mvId, seq) {
+  const x  = document.getElementById(`mfX_${opId}`)?.value  || '0';
+  const y  = document.getElementById(`mfY_${opId}`)?.value  || '0';
+  const cx = document.getElementById(`mfCX_${opId}`)?.value || '0';
+  const cy = document.getElementById(`mfCY_${opId}`)?.value || '0';
+  const r  = document.getElementById(`mfR_${opId}`)?.value  || '0';
+  const nextSeq = mvId ? seq : (_opsData.find(o=>o.id===opId)?.moves.length||0)*10 + 10;
+  const fd = new FormData();
+  fd.append('id', mvId); fd.append('move_type', type);
+  fd.append('x', x); fd.append('y', y); fd.append('r', r);
+  fd.append('cx', cx); fd.append('cy', cy);
+  fd.append('seq', nextSeq);
+  const res = await fetch(`/membrane/caps/op/${opId}/move/save`, {method:'POST', body:fd});
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  await loadOps();
+}
+
+async function deleteMove(mvId) {
+  if (!confirm('Bu hareketi sil?')) return;
+  const fd = new FormData();
+  await fetch(`/membrane/caps/move/${mvId}/delete`, {method:'POST', body:fd});
+  await loadOps();
+}
+
+function openOpModal(opId) {
+  document.getElementById('opId').value = opId;
+  document.getElementById('opModalTitle').textContent = opId ? 'İşlem Düzenle' : 'Yeni İşlem';
+  if (!_tools.length) loadTools();
+  if (opId) {
+    const op = _opsData.find(o => o.id === opId);
+    if (op) {
+      document.getElementById('opName').value   = op.name || '';
+      document.getElementById('opTool').value   = op.tool_no || 1;
+      document.getElementById('opToolId').value = op.tool_id || 0;
+      document.getElementById('opDepth').value  = op.depth || '-LPZ';
+      document.getElementById('opFeed').value   = op.feed || '';
+      document.getElementById('opCompMode').value = op.comp_mode || 'none';
+      document.querySelectorAll('[name=opType]').forEach(r => r.checked = r.value === (op.op_type||'inner'));
+      setCorner(op.ref_corner || 'BL');
+      renderOpToolCards();
+    }
+  } else {
+    document.getElementById('opName').value   = '';
+    document.getElementById('opTool').value   = 1;
+    document.getElementById('opToolId').value = 0;
+    document.getElementById('opDepth').value  = '-LPZ';
+    document.getElementById('opFeed').value   = '';
+    document.getElementById('opCompMode').value = 'none';
+    document.querySelectorAll('[name=opType]').forEach(r => r.checked = r.value === 'inner');
+    setCorner(document.getElementById('ncRefCorner')?.value || 'BL');
+    renderOpToolCards();
+  }
+  openModal('opModal');
+}
+
+async function saveOp() {
+  const opId   = parseInt(document.getElementById('opId').value) || 0;
+  const ref    = document.getElementById('opRefCorner')?.value || 'BL';
+  const opType = document.querySelector('[name=opType]:checked')?.value || 'inner';
+  const seq    = opId ? (_opsData.find(o=>o.id===opId)?.seq||0) : _opsData.length * 10 + 10;
+  const fd = new FormData();
+  fd.append('id', opId);
+  fd.append('name', document.getElementById('opName').value);
+  fd.append('tool_no', document.getElementById('opTool').value);
+  fd.append('tool_id', document.getElementById('opToolId').value || 0);
+  fd.append('depth', document.getElementById('opDepth').value);
+  fd.append('feed', document.getElementById('opFeed').value);
+  fd.append('ref_corner', ref);
+  fd.append('op_type', opType);
+  fd.append('comp_mode', document.getElementById('opCompMode').value || 'none');
+  fd.append('offset_side', 'center');
+  fd.append('seq', seq);
+  const res = await fetch(`/membrane/caps/${MODEL_ID}/op/save`, {method:'POST', body:fd});
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  closeModal('opModal');
+  await loadOps();
+}
+
+async function deleteOp(opId) {
+  if (!confirm('Bu işlemi ve tüm hareketlerini sil?')) return;
+  const fd = new FormData();
+  await fetch(`/membrane/caps/op/${opId}/delete`, {method:'POST', body:fd});
+  await loadOps();
+}
+
+// ── Tab switcher ─────────────────────────────────────────────────────────
+function switchTab(t) {
+  const isGcode = t === 'gcode';
+  document.getElementById('panelGcode').style.display = isGcode ? '' : 'none';
+  document.getElementById('panelSim').style.display   = isGcode ? 'none' : '';
+  document.getElementById('tabGcode').style.borderBottomColor = isGcode ? 'var(--accent)' : 'transparent';
+  document.getElementById('tabGcode').style.color     = isGcode ? 'var(--accent)' : 'var(--text-muted)';
+  document.getElementById('tabSim').style.borderBottomColor   = isGcode ? 'transparent' : 'var(--accent)';
+  document.getElementById('tabSim').style.color       = isGcode ? 'var(--text-muted)' : 'var(--accent)';
+  if (!isGcode && simState.segments.length) simDrawStatic();
+}
+
+// ── NC Generator ──────────────────────────────────────────────────────────
+function getNCVars() {
+  const LPX = parseFloat(document.getElementById('ncLPX')?.value) || 0;
+  const LPY = parseFloat(document.getElementById('ncLPY')?.value) || 0;
+  const LPZ = parseFloat(document.getElementById('ncLPZ')?.value) || 18;
+  const extra = {};
+  for (const k of Object.keys(MODEL_CONSTS)) {
+    const el = document.getElementById('ncConst_' + k);
+    if (el) extra[k] = parseFloat(el.value) || 0;
+  }
+  return { LPX, LPY, LPZ, extra };
+}
+
+async function generateNC() {
+  if (!MODEL_ID) return;
+  const { LPX, LPY, LPZ, extra } = getNCVars();
+  const statusEl = document.getElementById('ncStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '⏳ Üretiliyor...';
+  try {
+    const fd = new FormData();
+    fd.append('W', LPX); fd.append('H', LPY); fd.append('T', LPZ);
+    fd.append('extra_json', JSON.stringify(extra));
+    const res  = await fetch('/membrane/caps/' + MODEL_ID + '/generate', { method:'POST', body:fd });
+    const data = await res.json();
+    if (data.error) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '⚠️ ' + data.error;
+      return;
+    }
+    document.getElementById('ncOutput').value = data.nc;
+    const lines = data.nc.split('\n').length;
+    statusEl.style.color = 'var(--success, #22c55e)';
+    statusEl.textContent = '✅ ' + lines + ' satır G-code üretildi — Simülasyon sekmesinden izleyin';
+    // Build simulation
+    if (data.sim) {
+      simBuild(data.sim.paths, data.LPX, data.LPY, data.sim.safe_z);
+      document.getElementById('simPlayBtn').disabled = false;
+    }
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '⚠️ Hata: ' + e.message;
+  }
+}
+
+function downloadNC() {
+  if (!MODEL_ID) return;
+  const { LPX, LPY, LPZ, extra } = getNCVars();
+  const p = new URLSearchParams({ W: LPX, H: LPY, T: LPZ, extra: JSON.stringify(extra) });
+  window.location.href = '/membrane/caps/' + MODEL_ID + '/download?' + p;
+}
+
+function copyNC() {
+  const val = document.getElementById('ncOutput')?.value;
+  if (!val) return;
+  navigator.clipboard.writeText(val).then(() => {
+    if (typeof showToast === 'function') showToast('Kopyalandı', 'success');
+  });
+}
+
+// ── Simulation Engine (smooth interpolation) ──────────────────────────────
+const SIM_COLORS = {
+  RAPID: '#94a3b8', LINE: '#3b82f6',
+  ARC_CW: '#a855f7', ARC_CCW: '#a855f7', POCKET: '#22c55e',
+};
+
+const simState = {
+  segments: [],   // pixel-space: {ax,ay,bx,by,len,color,isRapid}
+  totalLen: 0,
+  currentDist: 0, // how far along total path (pixels)
+  W: 0, H: 0,
+  animId: null,
+};
+
+// ── Build waypoints & convert to pixel segments ───────────────────────────
+function simBuild(paths, W, H, safe_z) {
+  simState.W = W; simState.H = H;
+  const wps = [];
+
+  const rapid = (x,y) => wps.push({type:'RAPID', x, y, color: SIM_COLORS.RAPID});
+  const cut   = (x,y,color) => wps.push({type:'CUT',   x, y, color});
+
+  rapid(0, 0);
+  for (const p of paths) {
+    const col = SIM_COLORS[p.type] || '#fff';
+    rapid(p.x1, p.y1);
+    cut(p.x1, p.y1, col); // plunge (same XY, just marks cut start)
+
+    if (p.type === 'LINE') {
+      cut(p.x2, p.y2, col);
+
+    } else if (p.type === 'ARC_CW' || p.type === 'ARC_CCW') {
+      const {cx, cy} = p;
+      const r = Math.hypot(cx - p.x1, cy - p.y1);
+      let sa = Math.atan2(p.y1 - cy, p.x1 - cx);
+      let ea = Math.atan2(p.y2 - cy, p.x2 - cx);
+      const steps = 64;
+      if (p.type === 'ARC_CW')  { if (ea > sa) sa += Math.PI*2; }
+      else                       { if (ea < sa) ea += Math.PI*2; }
+      for (let i = 1; i <= steps; i++) {
+        const a = sa + (ea - sa) * (i / steps);
+        cut(cx + r*Math.cos(a), cy + r*Math.sin(a), col);
+      }
+
+    } else if (p.type === 'POCKET') {
+      const td = p.tool_dia||8, so = p.step_over||0.5;
+      const step = td*so, r2 = td/2;
+      const lx = Math.min(p.x1,p.x2)+r2, rx = Math.max(p.x1,p.x2)-r2;
+      const by = Math.min(p.y1,p.y2)+r2, ty2 = Math.max(p.y1,p.y2)-r2;
+      let dir = 1;
+      for (let y = by; y <= ty2+0.001; y += step) {
+        rapid(dir===1?lx:rx, y);
+        cut(dir===1?lx:rx, y, col);
+        cut(dir===1?rx:lx, y, col);
+        dir *= -1;
+      }
+      rapid(lx, by);
+      cut(lx, by, col); cut(rx, by, col); cut(rx, ty2, col); cut(lx, ty2, col); cut(lx, by, col);
+    }
+    rapid(p.x2, p.y2);
+  }
+
+  // Convert to pixel-space segments for smooth interpolation
+  const {cw, ch} = simCtx();
+  const segs = [];
+  let totalLen = 0;
+  for (let i = 0; i < wps.length - 1; i++) {
+    const f = wps[i], t = wps[i+1];
+    const {tx:ax,ty:ay} = simTransform(f.x, f.y, W, H, cw, ch);
+    const {tx:bx,ty:by} = simTransform(t.x, t.y, W, H, cw, ch);
+    const len = Math.hypot(bx-ax, by-ay) || 0;
+    segs.push({ax,ay,bx,by,len,color:t.color,isRapid:t.type==='RAPID'});
+    totalLen += len;
+  }
+  simState.segments = segs;
+  simState.totalLen = totalLen;
+  simState.currentDist = 0;
+  simDrawStatic();
+  document.getElementById('simPlayBtn').disabled = false;
+  document.getElementById('simInfo').textContent = `${segs.length} segment — ▶ başlatın`;
+}
+
+// ── Canvas helpers ─────────────────────────────────────────────────────────
+function simCtx() {
+  const c = document.getElementById('simCanvas');
+  return { ctx: c.getContext('2d'), cw: c.width, ch: c.height };
+}
+
+function simTransform(x, y, W, H, cw, ch) {
+  const mg = 32;
+  const scale = Math.min((cw-2*mg)/(W||1), (ch-2*mg)/(H||1));
+  return { tx: mg + x*scale, ty: ch - mg - y*scale, scale };
+}
+
+function simDrawPlate(ctx, cw, ch, W, H) {
+  const mg = 32;
+  const scale = Math.min((cw-2*mg)/(W||1), (ch-2*mg)/(H||1));
+  const pw = W*scale, ph = H*scale;
+  const ox = mg, oy = ch - mg - ph;
+
+  // Wood/material texture fill
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(ox, oy, pw, ph);
+  // Subtle grain lines
+  ctx.strokeStyle = 'rgba(51,65,85,0.6)';
+  ctx.lineWidth = 1;
+  for (let gx = ox + scale*50; gx < ox+pw; gx += scale*(W>=500?100:50)) {
+    ctx.beginPath(); ctx.moveTo(gx,oy); ctx.lineTo(gx,oy+ph); ctx.stroke();
+  }
+  for (let gy = oy + scale*50; gy < oy+ph; gy += scale*(H>=500?100:50)) {
+    ctx.beginPath(); ctx.moveTo(ox,gy); ctx.lineTo(ox+pw,gy); ctx.stroke();
+  }
+  ctx.strokeStyle = '#475569'; ctx.lineWidth = 2;
+  ctx.strokeRect(ox, oy, pw, ph);
+
+  // Labels
+  ctx.fillStyle = '#64748b'; ctx.font = '11px monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`W=${W}mm`, ox+pw/2, oy-8);
+  ctx.save(); ctx.translate(ox-10, oy+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(`H=${H}mm`, 0, 0); ctx.restore();
+
+  // Origin marker
+  const {tx:ox2, ty:oy2} = simTransform(0,0,W,H,cw,ch);
+  ctx.strokeStyle = 'rgba(239,68,68,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(ox2-8,oy2); ctx.lineTo(ox2+8,oy2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox2,oy2-8); ctx.lineTo(ox2,oy2+8); ctx.stroke();
+}
+
+// ── Draw all segments faded (overview before play) ─────────────────────────
+function simDrawStatic() {
+  const {ctx, cw, ch} = simCtx();
+  const {W, H, segments} = simState;
+  ctx.clearRect(0, 0, cw, ch);
+  simDrawPlate(ctx, cw, ch, W, H);
+  for (const seg of segments) {
+    if (seg.len < 0.5) continue;
+    ctx.beginPath(); ctx.moveTo(seg.ax,seg.ay); ctx.lineTo(seg.bx,seg.by);
+    if (seg.isRapid) { ctx.strokeStyle='rgba(148,163,184,0.2)'; ctx.setLineDash([3,3]); ctx.lineWidth=1; }
+    else             { ctx.strokeStyle=seg.color+'40';          ctx.setLineDash([]);    ctx.lineWidth=2; }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  // Tool at origin
+  const {tx, ty} = simTransform(0, 0, W, H, cw, ch);
+  _drawTool(ctx, tx, ty);
+}
+
+// ── Core draw: interpolate tool position along path ────────────────────────
+function simDrawFrame() {
+  const {ctx, cw, ch} = simCtx();
+  const {W, H, segments, currentDist} = simState;
+  ctx.clearRect(0, 0, cw, ch);
+  simDrawPlate(ctx, cw, ch, W, H);
+
+  let remaining = currentDist;
+  let toolX = segments[0]?.ax ?? 0;
+  let toolY = segments[0]?.ay ?? 0;
+  let currentColor = SIM_COLORS.RAPID;
+  let isCurrentRapid = true;
+
+  for (const seg of segments) {
+    if (seg.len < 0.5) { remaining -= seg.len; continue; }
+    const draw = remaining > 0;
+    const partial = draw && remaining < seg.len;
+
+    let ex = seg.bx, ey = seg.by;
+    if (partial) {
+      const t = remaining / seg.len;
+      ex = seg.ax + (seg.bx - seg.ax) * t;
+      ey = seg.ay + (seg.by - seg.ay) * t;
+    }
+
+    if (draw) {
+      ctx.beginPath(); ctx.moveTo(seg.ax, seg.ay); ctx.lineTo(ex, ey);
+      if (seg.isRapid) {
+        ctx.strokeStyle = 'rgba(148,163,184,0.45)'; ctx.setLineDash([5,4]); ctx.lineWidth = 1.5;
+      } else {
+        ctx.strokeStyle = seg.color; ctx.setLineDash([]); ctx.lineWidth = 2.5;
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+      toolX = ex; toolY = ey;
+      currentColor = seg.color; isCurrentRapid = seg.isRapid;
+      if (partial) break;
+    }
+    remaining -= seg.len;
+  }
+
+  _drawTool(ctx, toolX, toolY, isCurrentRapid ? '#94a3b8' : currentColor);
+}
+
+function _drawTool(ctx, x, y, color='#ef4444') {
+  // Glow
+  const grad = ctx.createRadialGradient(x,y,0,x,y,14);
+  grad.addColorStop(0, color+'55');
+  grad.addColorStop(1, 'transparent');
+  ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2);
+  ctx.fillStyle = grad; ctx.fill();
+  // Body
+  ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2);
+  ctx.fillStyle = color; ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth=1.5; ctx.stroke();
+  // Crosshair
+  ctx.strokeStyle = color+'99'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x-13,y); ctx.lineTo(x+13,y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x,y-13); ctx.lineTo(x,y+13); ctx.stroke();
+}
+
+// ── Speed → pixels/second on canvas ───────────────────────────────────────
+// speed 0: ~40px/s, speed 3: ~200px/s, speed 7: ~1000px/s, speed 10: ~4000px/s
+function _pxPerSec(speed) {
+  return 40 * Math.pow(10, speed * 0.2);
+}
+
+function updateSpeedLabel() {
+  const s = parseInt(document.getElementById('simSpeed').value) || 0;
+  const labels = ['🐢', '×¼', '×½', '×1', '×2', '×4', '×8', '×16', '×32', '×64', '⚡'];
+  const el = document.getElementById('simSpeedLabel');
+  if (el) el.textContent = labels[s] ?? s;
+}
+
+// ── Animation loop ─────────────────────────────────────────────────────────
+let _animRunning = false;
+let _lastRafTime = 0;
+
+function simPlay() {
+  if (_animRunning) { simPause(); return; }
+  if (simState.currentDist >= simState.totalLen) { simState.currentDist = 0; }
+  _animRunning = true;
+  _lastRafTime = 0;
+  document.getElementById('simPlayBtn').textContent = '⏸ Durdur';
+  updateSpeedLabel();
+  requestAnimationFrame(_animStep);
+}
+
+function simPause() {
+  _animRunning = false;
+  if (simState.animId) cancelAnimationFrame(simState.animId);
+  document.getElementById('simPlayBtn').textContent = '▶ Devam';
+}
+
+function simReset() {
+  simPause();
+  simState.currentDist = 0;
+  simDrawStatic();
+  document.getElementById('simPlayBtn').textContent = '▶ Oynat';
+  document.getElementById('simInfo').textContent = `${simState.segments.length} segment — ▶ başlatın`;
+}
+
+function _animStep(ts) {
+  if (!_animRunning) return;
+  if (_lastRafTime === 0) _lastRafTime = ts;
+  const dt = Math.min((ts - _lastRafTime) / 1000, 0.1); // cap at 100ms (tab switch protection)
+  _lastRafTime = ts;
+
+  const speed = parseInt(document.getElementById('simSpeed').value) ?? 3;
+  const pxPerSec = _pxPerSec(speed);
+
+  simState.currentDist = Math.min(
+    simState.currentDist + pxPerSec * dt,
+    simState.totalLen
+  );
+
+  simDrawFrame();
+
+  const pct = simState.totalLen > 0
+    ? Math.round(simState.currentDist / simState.totalLen * 100) : 100;
+  document.getElementById('simInfo').textContent = `%${pct} tamamlandı`;
+
+  if (simState.currentDist >= simState.totalLen) {
+    _animRunning = false;
+    document.getElementById('simPlayBtn').textContent = '↺ Tekrar';
+    return;
+  }
+  simState.animId = requestAnimationFrame(_animStep);
+}
+
+// ── Tool Library ────────────────────────────────────────────────────────────
+let _tools = [];
+
+async function loadTools() {
+  try {
+    const res = await fetch('/membrane/caps/tools');
+    if (!res.ok) { console.error('loadTools error', res.status); _tools = []; }
+    else _tools = await res.json();
+  } catch(e) { console.error('loadTools fetch error', e); _tools = []; }
+  renderToolLib();
+  renderOpToolCards();
+}
+
+function renderToolLib() {
+  const list = document.getElementById('toolLibList');
+  if (!list) return;
+  if (!_tools.length) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px;">— Henüz takım yok —</div>';
+    return;
+  }
+  list.innerHTML = _tools.map(t => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);">
+      <div style="width:34px;height:34px;border-radius:50%;background:rgba(245,158,11,.15);color:#fbbf24;
+           display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">
+        T${t.tool_no}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:600;">${t.name}</div>
+        <div style="font-size:10px;color:var(--text-muted);">
+          Ø${t.diameter}mm &nbsp;·&nbsp; L=${t.length}mm &nbsp;·&nbsp; F=${t.feed_xy}mm/dk &nbsp;·&nbsp; Z=${t.feed_z}mm/dk
+        </div>
+        ${t.notes ? `<div style="font-size:10px;color:var(--text-muted);">${t.notes}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0;">
+        <button class="btn btn-ghost btn-sm" onclick="tlEdit(${t.id})" style="padding:3px 7px;font-size:10px;">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="tlDelete(${t.id})" style="padding:3px 7px;font-size:10px;">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderOpToolCards() {
+  const c = document.getElementById('opToolCards');
+  if (!c) return;
+  const selId = parseInt(document.getElementById('opToolId')?.value || 0);
+  if (!_tools.length) {
+    c.innerHTML = '<span style="font-size:11px;color:var(--text-muted);padding:4px;">— Kütüphane boş —</span>';
+    return;
+  }
+  c.innerHTML = _tools.map(t => {
+    const sel = t.id === selId;
+    return `<button type="button" onclick="selectTool(${t.id})"
+      style="padding:5px 9px;font-size:11px;border-radius:5px;cursor:pointer;white-space:nowrap;
+             border:1.5px solid ${sel ? 'var(--accent)' : 'var(--border)'};
+             background:${sel ? 'rgba(59,130,246,.15)' : 'var(--surface)'};
+             color:${sel ? 'var(--accent)' : 'var(--text-primary)'};">
+      <strong>T${t.tool_no}</strong> ${t.name} <span style="opacity:.65;">Ø${t.diameter}</span>
+    </button>`;
+  }).join('');
+}
+
+function selectTool(tid) {
+  const t = _tools.find(x => x.id === tid);
+  if (!t) return;
+  document.getElementById('opToolId').value = tid;
+  document.getElementById('opTool').value   = t.tool_no;
+  if (t.feed_xy) document.getElementById('opFeed').value = t.feed_xy;
+  renderOpToolCards();
+}
+
+function tlClear() {
+  ['tlId','tlName','tlNo','tlDia','tlLen','tlFeedXY','tlFeedZ','tlNotes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = {tlId:'0',tlNo:'1',tlDia:'6',tlLen:'0',tlFeedXY:'3000',tlFeedZ:'1000'}[id] ?? '';
+  });
+}
+
+function tlEdit(tid) {
+  const t = _tools.find(x => x.id === tid);
+  if (!t) return;
+  document.getElementById('tlId').value     = t.id;
+  document.getElementById('tlName').value   = t.name;
+  document.getElementById('tlNo').value     = t.tool_no;
+  document.getElementById('tlDia').value    = t.diameter;
+  document.getElementById('tlLen').value    = t.length;
+  document.getElementById('tlFeedXY').value = t.feed_xy;
+  document.getElementById('tlFeedZ').value  = t.feed_z;
+  document.getElementById('tlNotes').value  = t.notes || '';
+}
+
+async function tlSave() {
+  const name = document.getElementById('tlName').value.trim();
+  const nameInput = document.getElementById('tlName');
+  if (!name) {
+    nameInput.style.borderColor = '#ef4444';
+    nameInput.placeholder = '⚠ Takım adı zorunlu!';
+    nameInput.focus();
+    return;
+  }
+  nameInput.style.borderColor = '';
+  const fd = new FormData();
+  fd.append('id',      document.getElementById('tlId').value);
+  fd.append('name',    name);
+  fd.append('tool_no', document.getElementById('tlNo').value);
+  fd.append('diameter',document.getElementById('tlDia').value);
+  fd.append('length',  document.getElementById('tlLen').value);
+  fd.append('feed_xy', document.getElementById('tlFeedXY').value);
+  fd.append('feed_z',  document.getElementById('tlFeedZ').value);
+  fd.append('notes',   document.getElementById('tlNotes').value);
+  let saveRes;
+  try {
+    saveRes = await fetch('/membrane/caps/tools/save', {method:'POST', body:fd});
+  } catch(e) { alert('Bağlantı hatası: ' + e.message); return; }
+  if (!saveRes.ok) {
+    const txt = await saveRes.text().catch(() => saveRes.statusText);
+    alert('Kayıt hatası ' + saveRes.status + ':\n' + txt.substring(0, 300));
+    return;
+  }
+  const saveData = await saveRes.json().catch(() => null);
+  if (!saveData || !saveData.ok) { alert('Sunucu kayıt hatası: ' + JSON.stringify(saveData)); return; }
+  // Use the tools list returned directly in the save response (avoids a second DB read)
+  if (Array.isArray(saveData.tools)) {
+    _tools = saveData.tools;
+    renderToolLib();
+    renderOpToolCards();
+  } else {
+    await loadTools();
+  }
+  tlClear();
+}
+
+async function tlDelete(tid) {
+  if (!confirm('Takımı sil?')) return;
+  const fd = new FormData(); fd.append('id', tid);
+  await fetch('/membrane/caps/tools/delete', {method:'POST', body:fd});
+  await loadTools();
+}
+
+// ── Graphical Corner Picker ──────────────────────────────────────────────────
+function setCorner(val) {
+  const hid = document.getElementById('opRefCorner');
+  if (hid) hid.value = val;
+  ['TL','TR','BL','BR'].forEach(c => {
+    const btn = document.getElementById(`cpBtn${c}`);
+    if (!btn) return;
+    const sel = c === val;
+    btn.style.borderColor = sel ? 'var(--accent)' : 'var(--border)';
+    btn.style.background  = sel ? 'rgba(59,130,246,.18)' : 'var(--surface-2)';
+    const spans = btn.querySelectorAll('span');
+    spans[0].style.color = sel ? 'var(--accent)' : '';   // corner label
+    if (spans[1]) spans[1].style.color = sel ? 'rgba(99,155,255,.7)' : 'var(--text-muted)'; // arrows
+  });
+}
+
+function setNcCorner(val) {
+  const hid = document.getElementById('ncRefCorner');
+  if (hid) hid.value = val;
+  ['TL','TR','BL','BR'].forEach(c => {
+    const btn = document.getElementById(`ncCpBtn${c}`);
+    if (!btn) return;
+    const sel = c === val;
+    btn.style.borderColor = sel ? 'var(--accent)' : 'var(--border)';
+    btn.style.background  = sel ? 'rgba(59,130,246,.18)' : 'var(--surface-2)';
+    btn.style.color       = sel ? 'var(--accent)' : '';
+  });
+}
+
+// ── DXF Import ──────────────────────────────────────────────────────────────
+let _dxfParsed = null;
+
+function closeDxfModal() {
+  closeModal('dxfModal');
+  // reset for next use
+  document.getElementById('dxfStep2').style.display = 'none';
+  document.getElementById('dxfCreateBtn').style.display = 'none';
+  document.getElementById('dxfStatus').style.display = 'none';
+  document.getElementById('dxfFile').value = '';
+  _dxfParsed = null;
+}
+
+async function dxfLoad(inp) {
+  const f = inp.files[0];
+  if (!f) return;
+  const st = document.getElementById('dxfStatus');
+  st.style.display = 'block';
+  st.style.color = 'var(--text-muted)';
+  st.textContent = '⏳ Yükleniyor...';
+
+  const fd = new FormData();
+  fd.append('file', f);
+  try {
+    const res = await fetch('/membrane/caps/dxf_preview', {method: 'POST', body: fd});
+    const d = await res.json();
+    if (d.error) {
+      st.style.color = 'var(--danger, #ef4444)';
+      st.textContent = '❌ ' + d.error;
+      return;
+    }
+    st.style.display = 'none';
+    _dxfParsed = d;
+    _dxfShowStep2(d, f.name);
+  } catch(e) {
+    st.style.color = 'var(--danger, #ef4444)';
+    st.textContent = '❌ Hata: ' + e.message;
+  }
+}
+
+function _dxfShowStep2(d, fname) {
+  document.getElementById('dxfStep2').style.display = '';
+  document.getElementById('dxfCreateBtn').style.display = '';
+  document.getElementById('dxfModelName').value = fname.replace(/\.dxf$/i, '').replace(/[_-]/g, ' ');
+  document.getElementById('dxfDimText').textContent = `W = ${d.width} mm × H = ${d.height} mm`;
+  _dxfDraw(d);
+  _dxfBuildList(d);
+}
+
+const _DXF_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316','#ef4444'];
+
+function _dxfDraw(d) {
+  const cv = document.getElementById('dxfCanvas');
+  const ctx = cv.getContext('2d');
+  const cw = cv.width, ch = cv.height;
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, cw, ch);
+  if (!d.contours.length || d.width <= 0 || d.height <= 0) return;
+  const mg = 18;
+  const scale = Math.min((cw - 2*mg) / d.width, (ch - 2*mg) / d.height);
+  const ox = (cw - d.width * scale) / 2;
+  const oy = (ch - d.height * scale) / 2;
+  const tx = x => ox + x * scale;
+  const ty = y => ch - oy - y * scale;  // flip Y
+
+  d.contours.forEach((c, ci) => {
+    ctx.strokeStyle = _DXF_COLORS[ci % _DXF_COLORS.length];
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let cx_ = 0, cy_ = 0, started = false;
+    for (const m of c.moves) {
+      const mx = parseFloat(m.x || 0), my = parseFloat(m.y || 0);
+      if (m.move_type === 'start') {
+        ctx.moveTo(tx(mx), ty(my));
+        cx_ = mx; cy_ = my; started = true;
+      } else if (m.move_type === 'line' && started) {
+        ctx.lineTo(tx(mx), ty(my));
+        cx_ = mx; cy_ = my;
+      } else if ((m.move_type === 'arc_cw' || m.move_type === 'arc_ccw') && started) {
+        const ccx = parseFloat(m.cx || 0), ccy = parseFloat(m.cy || 0);
+        const r = Math.hypot(cx_ - ccx, cy_ - ccy);
+        const sa = Math.atan2(cy_ - ccy, cx_ - ccx);
+        const ea = Math.atan2(my - ccy, mx - ccx);
+        // canvas arc: anticlockwise=true means CCW in canvas coords (which is CW in our Y-up space)
+        const ccw_canvas = m.move_type === 'arc_cw';
+        ctx.arc(tx(ccx), ty(ccy), r * scale, -sa, -ea, ccw_canvas);
+        cx_ = mx; cy_ = my;
+      }
+    }
+    ctx.stroke();
+  });
+}
+
+function _dxfBuildList(d) {
+  const list = document.getElementById('dxfContourList');
+  list.innerHTML = '';
+  d.contours.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;';
+    div.innerHTML = `
+      <div style="width:12px;height:12px;border-radius:50%;background:${_DXF_COLORS[i%_DXF_COLORS.length]};margin-bottom:6px;flex-shrink:0;"></div>
+      <div class="form-group" style="margin:0;flex:2;min-width:100px;">
+        <label style="font-size:10px;color:var(--text-muted);">Ad (Layer: ${c.layer})</label>
+        <input type="text" id="dxf_name_${i}" class="form-control" value="${c.name}" style="height:28px;font-size:12px;" />
+      </div>
+      <div class="form-group" style="margin:0;width:70px;">
+        <label style="font-size:10px;color:var(--text-muted);">Takım No</label>
+        <input type="number" id="dxf_tool_${i}" class="form-control" value="1" min="1" style="height:28px;font-size:12px;" />
+      </div>
+      <div class="form-group" style="margin:0;width:80px;">
+        <label style="font-size:10px;color:var(--text-muted);">Derinlik</label>
+        <input type="text" id="dxf_depth_${i}" class="form-control" value="-LPZ" style="height:28px;font-size:12px;font-family:monospace;" />
+      </div>
+      <div class="form-group" style="margin:0;width:110px;">
+        <label style="font-size:10px;color:var(--text-muted);">Kesim Türü</label>
+        <select id="dxf_optype_${i}" class="form-control" style="height:28px;font-size:11px;padding:0 6px;">
+          <option value="inner" ${c.op_type==='inner'?'selected':''}>İç Kesim</option>
+          <option value="outer" ${c.op_type==='outer'?'selected':''}>Dış Kontur</option>
+        </select>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:7px;min-width:60px;">
+        ${c.moves.length} hamle<br>${c.closed?'✓ kapalı':'⚠ açık'}
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+async function dxfCreate() {
+  const name = document.getElementById('dxfModelName').value.trim();
+  if (!name) { alert('Model adı gerekli'); return; }
+  if (!_dxfParsed) return;
+
+  const ops = _dxfParsed.contours.map((c, i) => ({
+    name:      document.getElementById(`dxf_name_${i}`).value || `Op ${i+1}`,
+    tool_no:   parseInt(document.getElementById(`dxf_tool_${i}`).value) || 1,
+    depth:     document.getElementById(`dxf_depth_${i}`).value.trim() || '-LPZ',
+    feed:      '',
+    ref_corner: 'BL',
+    seq:       (i + 1) * 10,
+    op_type:   document.getElementById(`dxf_optype_${i}`).value,
+    moves:     c.moves,
+  }));
+
+  const fname = document.getElementById('dxfFile').files[0]?.name || '';
+  const body = {
+    name,
+    description: fname ? `DXF: ${fname}` : '',
+    tool_no:       1,
+    spindle_speed: parseInt(document.getElementById('dxfSpindle').value) || 18000,
+    feed_xy:       parseInt(document.getElementById('dxfFeedXY').value) || 3000,
+    feed_z:        parseInt(document.getElementById('dxfFeedZ').value) || 1000,
+    safe_z:        parseFloat(document.getElementById('dxfSafeZ').value) || 5,
+    constants_json: '{}',
+    ops,
+  };
+
+  const btn = document.getElementById('dxfCreateBtn');
+  btn.disabled = true; btn.textContent = '⏳ Oluşturuluyor...';
+  try {
+    const res = await fetch('/membrane/caps/dxf_create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await res.json();
+    if (d.ok) {
+      window.location.href = `/membrane/caps/${d.model_id}`;
+    } else {
+      alert('Hata: ' + JSON.stringify(d));
+      btn.disabled = false; btn.textContent = '✓ Modeli Oluştur';
+    }
+  } catch(e) {
+    alert('Hata: ' + e.message);
+    btn.disabled = false; btn.textContent = '✓ Modeli Oluştur';
+  }
+}
+</script>
+{% endblock %}

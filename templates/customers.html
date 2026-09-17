@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ T.customers_title }}{% endblock %}
+
+{% block content %}
+<div class="page-toolbar" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <input type="text" id="tableSearch" class="search-box" placeholder="{{ T.btn_search }}..." style="max-width:280px;" />
+  <button class="btn btn-primary" onclick="openModal('customerModal')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    {{ T.btn_new }} {{ T.customers_title }}
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>{{ T.customer_name }}</th>
+          <th>{{ T.customer_contact }}</th>
+          <th>{{ T.customer_email }}</th>
+          <th>{{ T.customer_phone }}</th>
+          <th></th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td><strong>{{ c.name }}</strong></td>
+          <td>{{ c.contact_person or '-' }}</td>
+          <td>{{ c.email or '-' }}</td>
+          <td>{{ c.phone or '-' }}</td>
+          <td>{{ c.city or '-' }}</td>
+          <td>
+            {% set bal = balances.get(c.id, 0) %}
+            <span style="color:{% if bal > 0 %}var(--danger){% elif bal < 0 %}var(--success){% else %}var(--text-muted){% endif %}">
+              {{ "%.2f"|format(bal) }} {{ c.currency or 'USD' }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-ghost btn-sm" onclick="editCustomer({{ c.id }}, '{{ c.name|e }}', '{{ c.contact_person|e }}', '{{ c.email|e }}', '{{ c.phone|e }}', '{{ c.address|e }}', '{{ c.city|e }}', '{{ c.country|e }}', '{{ c.currency|e }}', '{{ c.notes|e }}')">{{ T.btn_edit }}</button>
+              <a href="/ledger/customers/{{ c.id }}" class="btn btn-outline btn-sm">Cari</a>
+              <form method="post" action="/customers/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ c.name }}'?">
+                <input type="hidden" name="id" value="{{ c.id }}" />
+                <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">-</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add/Edit Customer Modal -->
+<div id="customerModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="customerModalTitle">{{ T.btn_new }} {{ T.customers_title }}</h3>
+      <button class="modal-close" onclick="closeModal('customerModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/customers/save" id="customerForm">
+        <input type="hidden" name="id" id="cid" value="0" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">{{ T.customer_name }} *</label>
+            <input type="text" name="name" id="cname" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.customer_contact }}</label>
+            <input type="text" name="contact_person" id="ccontact" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.customer_email }}</label>
+            <input type="email" name="email" id="cemail" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.customer_phone }}</label>
+            <input type="tel" name="phone" id="cphone" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.offer_currency }}</label>
+            <select name="currency" id="ccurrency" class="form-control">
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="TRY">TRY</option>
+              <option value="RMB">RMB</option>
+            </select>
+          </div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">Address</label>
+            <input type="text" name="address" id="caddress" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">City</label>
+            <input type="text" name="city" id="ccity" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Country</label>
+            <input type="text" name="country" id="ccountry" class="form-control" />
+          </div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">{{ T.offer_notes }}</label>
+            <textarea name="notes" id="cnotes" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('customerModal')">{{ T.btn_cancel }}</button>
+          <button type="submit" class="btn btn-primary">{{ T.btn_save }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editCustomer(id, name, contact, email, phone, address, city, country, currency, notes) {
+  document.getElementById('customerModalTitle').textContent = '{{ T.btn_edit }} {{ T.customers_title }}';
+  document.getElementById('cid').value = id;
+  document.getElementById('cname').value = name;
+  document.getElementById('ccontact').value = contact;
+  document.getElementById('cemail').value = email;
+  document.getElementById('cphone').value = phone;
+  document.getElementById('caddress').value = address;
+  document.getElementById('ccity').value = city;
+  document.getElementById('ccountry').value = country;
+  document.getElementById('ccurrency').value = currency;
+  document.getElementById('cnotes').value = notes;
+  openModal('customerModal');
+}
+document.addEventListener('DOMContentLoaded', function() {
+  initTableSearch('tableSearch', 'mainTable');
+});
+</script>
+{% endblock %}
