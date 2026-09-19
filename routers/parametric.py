@@ -70,19 +70,50 @@ def _load_result(jid):
         return ps.load_result(f.read())
 
 
+def _is_admin(user):
+    return user.get("role") == "admin"
+
+
+def _get_own_job(request, jid):
+    """Oturumdaki kullanıcı + sahibi olduğu iş. Değilse (user, None) döner.
+
+    Yönetici bütün işleri görebilir; diğer kullanıcılar yalnızca kendi
+    yükledikleri dosyalara erişir.
+    """
+    user = auth.require_user(request)
+    job = fdb.get_parametric_job(jid)
+    if not job:
+        return user, None
+    if not _is_admin(user) and job.get("user_id") != user["id"]:
+        return user, None          # başkasının işi — yokmuş gibi davran
+    return user, job
+
+
 # ── Liste + yükleme ───────────────────────────────────────────────────────────
 
 @router.get("")
 async def index(request: Request, msg: str = "", err: str = ""):
     user = auth.require_user(request)
-    jobs = fdb.get_parametric_jobs()
+    # Yönetici hepsini görür, diğer kullanıcılar yalnızca kendi işlerini
+    jobs = (fdb.get_parametric_jobs() if _is_admin(user)
+            else fdb.get_parametric_jobs(user["id"]))
+    owners = {}
+    if _is_admin(user):
+        try:
+            import db.users as udb
+            owners = {u["id"]: (u.get("company_name") or u.get("email") or "—")
+                      for u in udb.all_users()}
+        except Exception:
+            owners = {}
     for j in jobs:
         try:
             j["summary"] = json.loads(j.get("summary_json") or "{}")
         except Exception:
             j["summary"] = {}
+        j["owner_name"] = owners.get(j.get("user_id"), "")
     return templates.TemplateResponse(request, "parametric.html", {
         "user": user,
+        "is_admin": _is_admin(user),
         "jobs": jobs,
         "msg": msg,
         "err": err,
@@ -178,8 +209,7 @@ async def upload_image(request: Request,
 @router.get("/{jid}/image")
 async def source_image(request: Request, jid: int):
     """Yüklenen kaynak resmi gösterir (data/ klasörü web'e açık değil)."""
-    auth.require_user(request)
-    job = fdb.get_parametric_job(jid)
+    _user, job = _get_own_job(request, jid)
     if not job or job.get("src_kind") != "image":
         return Response(status_code=404)
     p = _src_path(job)
@@ -216,8 +246,7 @@ async def slice_image(request: Request, jid: int,
                       sheet_w: float = Form(2100.0),
                       sheet_h: float = Form(2800.0),
                       part_gap: float = Form(15.0)):
-    auth.require_user(request)
-    job = fdb.get_parametric_job(jid)
+    _user, job = _get_own_job(request, jid)
     if not job:
         return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
     if thickness <= 0:
@@ -279,8 +308,7 @@ async def slice_image(request: Request, jid: int,
 
 @router.get("/{jid}")
 async def detail(request: Request, jid: int, msg: str = "", err: str = ""):
-    user = auth.require_user(request)
-    job = fdb.get_parametric_job(jid)
+    user, job = _get_own_job(request, jid)
     if not job:
         return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
 
@@ -338,8 +366,7 @@ async def do_slice(request: Request, jid: int,
                    sheet_w: float = Form(2100.0),
                    sheet_h: float = Form(2800.0),
                    part_gap: float = Form(15.0)):
-    auth.require_user(request)
-    job = fdb.get_parametric_job(jid)
+    _user, job = _get_own_job(request, jid)
     if not job:
         return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
 
@@ -404,8 +431,7 @@ async def do_slice(request: Request, jid: int,
 
 @router.get("/{jid}/dxf")
 async def download_dxf(request: Request, jid: int):
-    auth.require_user(request)
-    job = fdb.get_parametric_job(jid)
+    _user, job = _get_own_job(request, jid)
     if not job:
         return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
     res = _load_result(jid)
@@ -421,8 +447,7 @@ async def download_dxf(request: Request, jid: int):
 
 @router.get("/{jid}/zip")
 async def download_zip(request: Request, jid: int):
-    auth.require_user(request)
-    job = fdb.get_parametric_job(jid)
+    _user, job = _get_own_job(request, jid)
     if not job:
         return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
     res = _load_result(jid)
@@ -438,24 +463,27 @@ async def download_zip(request: Request, jid: int):
 @router.get("/{jid}/3d")
 async def geometry_3d(request: Request, jid: int):
     """Fareyle döndürülebilir önizleme için katı geometri (JSON)."""
-    auth.require_user(request)
+    _user, job = _get_own_job(request, jid)
+    empty = {"parts": [], "bb": [0, 0, 0, 1, 1, 1]}
+    if not job:
+        return JSONResponse(empty, status_code=404)
     res = _load_result(jid)
     if not res:
-        return JSONResponse({"parts": [], "bb": [0, 0, 0, 1, 1, 1]})
+        return JSONResponse(empty)
     data = await run_in_threadpool(ps.export_3d, res)
     return JSONResponse(data)
 
 
 @router.post("/{jid}/delete")
 async def delete(request: Request, jid: int):
-    auth.require_user(request)
-    job = fdb.get_parametric_job(jid)
-    if job:
-        for p in (_src_path(job), _res_path(jid)):
-            try:
-                if p and os.path.exists(p):
-                    os.remove(p)
-            except OSError:
-                pass
-        fdb.del_parametric_job(jid)
+    _user, job = _get_own_job(request, jid)
+    if not job:
+        return RedirectResponse("/parametric?err=Kayıt bulunamadı.", 303)
+    for p in (_src_path(job), _res_path(jid)):
+        try:
+            if p and os.path.exists(p):
+                os.remove(p)
+        except OSError:
+            pass
+    fdb.del_parametric_job(jid)
     return RedirectResponse("/parametric?msg=Kayıt silindi.", 303)
