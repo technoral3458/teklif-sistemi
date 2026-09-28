@@ -815,6 +815,137 @@ async def offer_catalog_pdf(request: Request, offer_id: int):
                     headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
+@router.get("/{offer_id}/teknik-pdf")
+async def offer_tech_spec_pdf(request: Request, offer_id: int, fiyat: int = 1):
+    """Banka/leasing dosyaları için makine teknik özellikler belgesi (PDF).
+
+    fiyat=0 verilirse ticari bilgiler bölümü çıkarılır.
+    """
+    import asyncio
+    import unicodedata
+    from datetime import datetime
+
+    user = auth.require_user(request)
+    offer = fdb.get_offer(offer_id)
+    if not offer:
+        return RedirectResponse("/offers", 303)
+
+    model = fdb.get_model(offer["model_id"]) if offer.get("model_id") else None
+    if not model:
+        return Response("Bu teklifte makine tanımlı değil.", status_code=400,
+                        media_type="text/plain")
+
+    lang = user.get("lang") or "tr"
+    items = fdb.get_offer_items(offer_id)
+    opts = {o["id"]: o for o in fdb.get_options()}
+    for item in items:
+        _resolve_opt_fields(item, opts.get(item.get("option_id"), {}), lang)
+
+    specs = _filter_specs(_parse_specs(model, lang), items, opts)
+    display_image = _best_display_image(model, offer, items, opts)
+    customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
+    company = fdb.get_company() or {}
+    cat = {c["id"]: c for c in fdb.get_cats()}.get(model.get("category_id"), {})
+    delivery_term = (fdb.get_delivery_term(offer["delivery_term_id"])
+                     if offer.get("delivery_term_id") else None)
+
+    def _money(v):
+        try:
+            return f"{float(v or 0):,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+        except Exception:
+            return "0,00"
+
+    L = {
+        "tr": {
+            "title": "MAKİNE TEKNİK ÖZELLİKLER BELGESİ",
+            "doc_no": "Belge No", "date": "Düzenleme Tarihi",
+            "seller": "SATICI FİRMA", "buyer": "ALICI FİRMA",
+            "tax": "Vergi No", "addr": "Adres", "phone": "Telefon",
+            "email": "E-posta", "web": "Web", "contact": "Yetkili",
+            "ident": "MAKİNE TANIMI", "mname": "Makine Adı",
+            "mtype": "Model / Tip", "mcat": "Makine Grubu",
+            "mqty": "Adet", "mserial": "Seri Numarası", "mline": "Hat Yapısı",
+            "photo": "MAKİNE GÖRSELİ",
+            "specs": "TEKNİK ÖZELLİKLER", "feature": "Özellik", "value": "Değer",
+            "equip": "MAKİNE İLE BİRLİKTE VERİLEN DONANIM",
+            "eqname": "Donanım / Opsiyon", "eqqty": "Adet",
+            "comm": "TİCARİ BİLGİLER",
+            "unitp": "Birim Fiyat", "totalp": "Toplam Tutar",
+            "curr": "Para Birimi", "dtime": "Teslim Süresi",
+            "dterm": "Teslim Şekli", "dmethod": "Sevkiyat",
+            "decl": ("İşbu belge, yukarıda tanımlanan makinenin teknik "
+                     "özelliklerini göstermek üzere düzenlenmiştir. Belgede yer "
+                     "alan bilgiler firmamız taahhüdü altındadır."),
+            "sign": "Kaşe / İmza", "nospec": "Bu makine için teknik özellik girilmemiş.",
+        },
+        "en": {
+            "title": "MACHINE TECHNICAL SPECIFICATION DOCUMENT",
+            "doc_no": "Document No", "date": "Issue Date",
+            "seller": "SELLER", "buyer": "BUYER",
+            "tax": "Tax ID", "addr": "Address", "phone": "Phone",
+            "email": "E-mail", "web": "Web", "contact": "Contact",
+            "ident": "MACHINE IDENTIFICATION", "mname": "Machine Name",
+            "mtype": "Model / Type", "mcat": "Machine Group",
+            "mqty": "Quantity", "mserial": "Serial Number", "mline": "Line Configuration",
+            "photo": "MACHINE IMAGE",
+            "specs": "TECHNICAL SPECIFICATIONS", "feature": "Feature", "value": "Value",
+            "equip": "EQUIPMENT INCLUDED",
+            "eqname": "Equipment / Option", "eqqty": "Qty",
+            "comm": "COMMERCIAL INFORMATION",
+            "unitp": "Unit Price", "totalp": "Total Amount",
+            "curr": "Currency", "dtime": "Delivery Time",
+            "dterm": "Delivery Term", "dmethod": "Shipment",
+            "decl": ("This document has been issued to present the technical "
+                     "specifications of the machine identified above. The "
+                     "information herein is under the warranty of our company."),
+            "sign": "Stamp / Signature", "nospec": "No technical specifications entered.",
+        },
+    }
+    lbl = L.get(lang, L["tr"])
+
+    mcount = int(offer.get("machine_count") or 1)
+    total = float(offer.get("final_price") or offer.get("total_price") or 0)
+    ctx = {
+        "user": user,
+        "L": lbl,
+        "lang": lang,
+        "offer": offer,
+        "company": company,
+        "customer": customer,
+        "model": model,
+        "model_name": model.get(f"name_{lang}") or model.get("name") or "",
+        "category_name": cat.get(f"name_{lang}") or cat.get("name") or "",
+        "specs": specs,
+        "items": [i for i in items if i.get("option_id")],
+        "display_image": display_image,
+        "delivery_term": delivery_term,
+        "machine_count": mcount,
+        "is_line": bool(model.get("is_line")),
+        "show_price": bool(fiyat),
+        "total_str": _money(total),
+        "unit_str": _money(total / mcount if mcount else total),
+        "date_str": datetime.now().strftime("%d.%m.%Y"),
+        "base_url": str(request.base_url).rstrip("/"),
+    }
+
+    html_str = templates.get_template("tech_spec_pdf.html").render(**ctx)
+
+    def _render():
+        from weasyprint import HTML
+        return HTML(string=html_str, base_url=ctx["base_url"]).write_pdf()
+
+    try:
+        pdf = await asyncio.to_thread(_render)
+    except Exception as e:
+        return Response(f"PDF oluşturulamadı: {e}", status_code=500, media_type="text/plain")
+
+    safe = unicodedata.normalize("NFKD", ctx["model_name"])
+    safe = "".join(c for c in safe if ord(c) < 128).replace(" ", "_")[:30] or "makine"
+    fname = f"Teknik_Ozellikler_{safe}_{offer.get('offer_no') or offer_id}.pdf"
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
 @router.post("/{offer_id}/cancel-offer")
 async def cancel_offer(request: Request,
                        offer_id: int,
