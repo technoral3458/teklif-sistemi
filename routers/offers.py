@@ -816,10 +816,11 @@ async def offer_catalog_pdf(request: Request, offer_id: int):
 
 
 @router.get("/{offer_id}/teknik-pdf")
-async def offer_tech_spec_pdf(request: Request, offer_id: int, fiyat: int = 1):
-    """Banka/leasing dosyaları için makine teknik özellikler belgesi (PDF).
+async def offer_tech_spec_pdf(request: Request, offer_id: int):
+    """Makine teknik özellikler belgesi (PDF).
 
-    fiyat=0 verilirse ticari bilgiler bölümü çıkarılır.
+    Tarafsız bir teknik katalogdur: firma/müşteri kimliği ve ticari bilgi
+    içermez — yalnızca makinenin teknik verileri.
     """
     import asyncio
     import unicodedata
@@ -843,25 +844,12 @@ async def offer_tech_spec_pdf(request: Request, offer_id: int, fiyat: int = 1):
 
     specs = _filter_specs(_parse_specs(model, lang), items, opts)
     display_image = _best_display_image(model, offer, items, opts)
-    customer = fdb.get_customer(offer["customer_id"]) if offer.get("customer_id") else {}
-    company = fdb.get_company() or {}
     cat = {c["id"]: c for c in fdb.get_cats()}.get(model.get("category_id"), {})
-    delivery_term = (fdb.get_delivery_term(offer["delivery_term_id"])
-                     if offer.get("delivery_term_id") else None)
-
-    def _money(v):
-        try:
-            return f"{float(v or 0):,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
-        except Exception:
-            return "0,00"
 
     L = {
         "tr": {
-            "title": "MAKİNE TEKNİK ÖZELLİKLER BELGESİ",
-            "doc_no": "Belge No", "date": "Düzenleme Tarihi",
-            "seller": "SATICI FİRMA", "buyer": "ALICI FİRMA",
-            "tax": "Vergi No", "addr": "Adres", "phone": "Telefon",
-            "email": "E-posta", "web": "Web", "contact": "Yetkili",
+            "title": "Teknik Özellikler",
+            "doc_no": "Belge No", "date": "Tarih",
             "ident": "MAKİNE TANIMI", "mname": "Makine Adı",
             "mtype": "Model / Tip", "mcat": "Makine Grubu",
             "mqty": "Adet", "mserial": "Seri Numarası", "mline": "Hat Yapısı",
@@ -869,21 +857,11 @@ async def offer_tech_spec_pdf(request: Request, offer_id: int, fiyat: int = 1):
             "specs": "TEKNİK ÖZELLİKLER", "feature": "Özellik", "value": "Değer",
             "equip": "MAKİNE İLE BİRLİKTE VERİLEN DONANIM",
             "eqname": "Donanım / Opsiyon", "eqqty": "Adet",
-            "comm": "TİCARİ BİLGİLER",
-            "unitp": "Birim Fiyat", "totalp": "Toplam Tutar",
-            "curr": "Para Birimi", "dtime": "Teslim Süresi",
-            "dterm": "Teslim Şekli", "dmethod": "Sevkiyat",
-            "decl": ("İşbu belge, yukarıda tanımlanan makinenin teknik "
-                     "özelliklerini göstermek üzere düzenlenmiştir. Belgede yer "
-                     "alan bilgiler firmamız taahhüdü altındadır."),
-            "sign": "Kaşe / İmza", "nospec": "Bu makine için teknik özellik girilmemiş.",
+            "nospec": "Bu makine için teknik özellik girilmemiş.",
         },
         "en": {
-            "title": "MACHINE TECHNICAL SPECIFICATION DOCUMENT",
-            "doc_no": "Document No", "date": "Issue Date",
-            "seller": "SELLER", "buyer": "BUYER",
-            "tax": "Tax ID", "addr": "Address", "phone": "Phone",
-            "email": "E-mail", "web": "Web", "contact": "Contact",
+            "title": "Technical Specifications",
+            "doc_no": "Document No", "date": "Date",
             "ident": "MACHINE IDENTIFICATION", "mname": "Machine Name",
             "mtype": "Model / Type", "mcat": "Machine Group",
             "mqty": "Quantity", "mserial": "Serial Number", "mline": "Line Configuration",
@@ -891,39 +869,25 @@ async def offer_tech_spec_pdf(request: Request, offer_id: int, fiyat: int = 1):
             "specs": "TECHNICAL SPECIFICATIONS", "feature": "Feature", "value": "Value",
             "equip": "EQUIPMENT INCLUDED",
             "eqname": "Equipment / Option", "eqqty": "Qty",
-            "comm": "COMMERCIAL INFORMATION",
-            "unitp": "Unit Price", "totalp": "Total Amount",
-            "curr": "Currency", "dtime": "Delivery Time",
-            "dterm": "Delivery Term", "dmethod": "Shipment",
-            "decl": ("This document has been issued to present the technical "
-                     "specifications of the machine identified above. The "
-                     "information herein is under the warranty of our company."),
-            "sign": "Stamp / Signature", "nospec": "No technical specifications entered.",
+            "nospec": "No technical specifications entered.",
         },
     }
     lbl = L.get(lang, L["tr"])
 
     mcount = int(offer.get("machine_count") or 1)
-    total = float(offer.get("final_price") or offer.get("total_price") or 0)
     ctx = {
         "user": user,
         "L": lbl,
         "lang": lang,
         "offer": offer,
-        "company": company,
-        "customer": customer,
         "model": model,
         "model_name": model.get(f"name_{lang}") or model.get("name") or "",
         "category_name": cat.get(f"name_{lang}") or cat.get("name") or "",
         "specs": specs,
         "items": [i for i in items if i.get("option_id")],
         "display_image": display_image,
-        "delivery_term": delivery_term,
         "machine_count": mcount,
         "is_line": bool(model.get("is_line")),
-        "show_price": bool(fiyat),
-        "total_str": _money(total),
-        "unit_str": _money(total / mcount if mcount else total),
         "date_str": datetime.now().strftime("%d.%m.%Y"),
         "base_url": str(request.base_url).rstrip("/"),
     }

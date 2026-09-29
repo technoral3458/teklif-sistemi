@@ -6,32 +6,26 @@
 <style>
   @page {
     size: A4;
-    margin: 16mm 15mm 18mm 15mm;
+    margin: 18mm 15mm 16mm 15mm;
     @bottom-center {
-      content: "{{ company.company_name }}  ·  {{ L.doc_no }}: {{ offer.offer_no }}  ·  " counter(page) " / " counter(pages);
-      font-family: Arial, sans-serif; font-size: 7.5pt; color: #777;
+      content: counter(page) " / " counter(pages);
+      font-family: Arial, sans-serif; font-size: 8pt; color: #888;
     }
   }
   * { box-sizing: border-box; }
   body { font-family: Arial, "DejaVu Sans", sans-serif; font-size: 9.5pt;
          color: #1a1a1a; margin: 0; line-height: 1.45; }
 
-  /* ── Antet ── */
-  .letterhead { display: flex; align-items: flex-start; justify-content: space-between;
-                border-bottom: 2.5pt solid #1a3a5c; padding-bottom: 8pt; margin-bottom: 4pt; }
-  .lh-logo img { max-height: 58px; max-width: 200px; object-fit: contain; }
-  .lh-name { font-size: 14pt; font-weight: bold; color: #1a3a5c; margin: 0 0 2pt; }
-  .lh-meta { font-size: 8pt; color: #555; line-height: 1.5; }
-  .lh-right { text-align: right; font-size: 8pt; color: #555; line-height: 1.6; min-width: 46mm; }
-
   /* ── Başlık ── */
-  .doc-title { text-align: center; font-size: 13pt; font-weight: bold; letter-spacing: .6pt;
-               color: #1a3a5c; margin: 14pt 0 3pt; }
-  .doc-sub { text-align: center; font-size: 8.5pt; color: #666; margin-bottom: 14pt; }
+  .head { border-bottom: 2.5pt solid #1a3a5c; padding-bottom: 9pt; margin-bottom: 4pt; }
+  .head-lb { font-size: 8.5pt; letter-spacing: 1.4pt; color: #6b7c8f;
+             text-transform: uppercase; margin-bottom: 3pt; }
+  .head-name { font-size: 17pt; font-weight: bold; color: #1a3a5c; margin: 0; }
+  .head-meta { font-size: 8pt; color: #777; margin-top: 5pt; }
 
   /* ── Bölüm başlığı ── */
   .sec { background: #1a3a5c; color: #fff; font-size: 9pt; font-weight: bold;
-         letter-spacing: .5pt; padding: 4pt 8pt; margin: 13pt 0 0; }
+         letter-spacing: .5pt; padding: 4pt 8pt; margin: 14pt 0 0; }
 
   /* ── Tablolar ── */
   table { width: 100%; border-collapse: collapse; }
@@ -41,29 +35,10 @@
   .tbl td.k { background: #f7f9fb; font-weight: bold; width: 34%; color: #334; }
   .tbl tr { page-break-inside: avoid; }
 
-  /* ── Taraflar ── */
-  .parties { display: flex; gap: 6mm; margin-top: 4pt; }
-  .party { flex: 1; border: .6pt solid #bfcbd6; }
-  .party-h { background: #eef2f6; color: #1a3a5c; font-weight: bold; font-size: 8.5pt;
-             padding: 4pt 8pt; border-bottom: .6pt solid #bfcbd6; }
-  .party-b { padding: 6pt 8pt; font-size: 8.8pt; line-height: 1.6; }
-  .party-b .nm { font-weight: bold; font-size: 9.5pt; display: block; margin-bottom: 2pt; }
-  .party-b .lb { color: #667; }
-
   /* ── Görsel ── */
   .photo-box { border: .6pt solid #bfcbd6; border-top: none; padding: 8pt; text-align: center;
                page-break-inside: avoid; }
-  .photo-box img { max-width: 100%; max-height: 92mm; object-fit: contain; }
-
-  .decl { margin-top: 14pt; font-size: 8.5pt; color: #444; text-align: justify;
-          border-left: 2.5pt solid #1a3a5c; padding: 4pt 0 4pt 8pt; background: #f7f9fb; }
-
-  .sign-wrap { margin-top: 20pt; display: flex; justify-content: flex-end;
-               page-break-inside: avoid; }
-  .sign { width: 62mm; text-align: center; }
-  .sign-co { font-size: 9pt; font-weight: bold; color: #1a3a5c; margin-bottom: 2pt; }
-  .sign-line { border-bottom: .8pt solid #445; height: 26mm; }
-  .sign-lb { font-size: 8pt; color: #666; padding-top: 3pt; }
+  .photo-box img { max-width: 100%; max-height: 100mm; object-fit: contain; }
 
   .muted { color: #777; }
   .nowrap { white-space: nowrap; }
@@ -71,52 +46,13 @@
 </head>
 <body>
 
-<!-- ══ ANTET ══ -->
-<div class="letterhead">
-  <div>
-    {% if company.logo_path %}
-    <div class="lh-logo"><img src="{{ base_url }}/static/{{ company.logo_path }}" /></div>
-    {% else %}
-    <div class="lh-name">{{ company.company_name }}</div>
-    {% endif %}
-  </div>
-  <div class="lh-right">
-    {% if company.company_name and company.logo_path %}<strong>{{ company.company_name }}</strong><br>{% endif %}
-    {% if company.address %}{{ company.address }}<br>{% endif %}
-    {% if company.phone %}{{ L.phone }}: {{ company.phone }}<br>{% endif %}
-    {% if company.email %}{{ company.email }}<br>{% endif %}
-    {% if company.website %}{{ company.website }}{% endif %}
-  </div>
-</div>
-
-<div class="doc-title">{{ L.title }}</div>
-<div class="doc-sub">
-  {{ L.doc_no }}: <strong>{{ offer.offer_no }}</strong> &nbsp;·&nbsp;
-  {{ L.date }}: <strong>{{ date_str }}</strong>
-</div>
-
-<!-- ══ TARAFLAR ══ -->
-<div class="parties">
-  <div class="party">
-    <div class="party-h">{{ L.seller }}</div>
-    <div class="party-b">
-      <span class="nm">{{ company.company_name or '—' }}</span>
-      {% if company.tax_id %}<span class="lb">{{ L.tax }}:</span> {{ company.tax_id }}<br>{% endif %}
-      {% if company.address %}<span class="lb">{{ L.addr }}:</span> {{ company.address }}<br>{% endif %}
-      {% if company.phone %}<span class="lb">{{ L.phone }}:</span> {{ company.phone }}{% endif %}
-    </div>
-  </div>
-  <div class="party">
-    <div class="party-h">{{ L.buyer }}</div>
-    <div class="party-b">
-      <span class="nm">{{ customer.name or '—' }}</span>
-      {% if customer.contact_person %}<span class="lb">{{ L.contact }}:</span> {{ customer.contact_person }}<br>{% endif %}
-      {% if customer.address or customer.city %}
-        <span class="lb">{{ L.addr }}:</span>
-        {{ customer.address }}{% if customer.city %}{% if customer.address %} / {% endif %}{{ customer.city }}{% endif %}<br>
-      {% endif %}
-      {% if customer.phone %}<span class="lb">{{ L.phone }}:</span> {{ customer.phone }}{% endif %}
-    </div>
+<!-- ══ BAŞLIK ══ -->
+<div class="head">
+  <div class="head-lb">{{ L.title }}</div>
+  <div class="head-name">{{ model_name }}</div>
+  <div class="head-meta">
+    {% if category_name %}{{ category_name }} &nbsp;·&nbsp;{% endif %}
+    {{ L.doc_no }}: {{ offer.offer_no }} &nbsp;·&nbsp; {{ L.date }}: {{ date_str }}
   </div>
 </div>
 
@@ -187,33 +123,6 @@
   </tbody>
 </table>
 {% endif %}
-
-<!-- ══ TİCARİ BİLGİLER ══ -->
-{% if show_price %}
-<div class="sec">{{ L.comm }}</div>
-<table class="tbl">
-  {% if machine_count > 1 %}
-  <tr><td class="k">{{ L.unitp }}</td><td class="nowrap">{{ unit_str }} {{ offer.currency }}</td></tr>
-  {% endif %}
-  <tr>
-    <td class="k">{{ L.totalp }}</td>
-    <td class="nowrap"><strong style="font-size:11pt;">{{ total_str }} {{ offer.currency }}</strong></td>
-  </tr>
-  {% if offer.delivery_time %}<tr><td class="k">{{ L.dtime }}</td><td>{{ offer.delivery_time }}</td></tr>{% endif %}
-  {% if delivery_term %}<tr><td class="k">{{ L.dterm }}</td><td>{{ delivery_term.name }}</td></tr>{% endif %}
-  {% if offer.delivery_method %}<tr><td class="k">{{ L.dmethod }}</td><td>{{ offer.delivery_method }}</td></tr>{% endif %}
-</table>
-{% endif %}
-
-<div class="decl">{{ L.decl }}</div>
-
-<div class="sign-wrap">
-  <div class="sign">
-    <div class="sign-co">{{ company.company_name }}</div>
-    <div class="sign-line"></div>
-    <div class="sign-lb">{{ L.sign }}</div>
-  </div>
-</div>
 
 </body>
 </html>
