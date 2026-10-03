@@ -12,7 +12,16 @@ async def quote_page(request: Request):
     models = [m for m in fdb.get_models() if m.get("is_active", 1) != 0]
     categories = fdb.get_cats()
     company = fdb.get_company() or {}
+    cat_map = {c["id"]: c["name"] for c in categories}
     for m in models:
+        m["category_name"] = cat_map.get(m.get("category_id"), "")
+        compat = []
+        if m.get("compatible_options"):
+            try:
+                compat = json.loads(m["compatible_options"])
+            except Exception:
+                pass
+        m["compatible_options_list"] = compat
         m["line_images_map"] = {img["line_count"]: img for img in fdb.get_model_line_images(m["id"])}
     return templates.TemplateResponse(request, "public_quote.html", {
         "user": None,
@@ -78,7 +87,7 @@ async def get_options(request: Request, model_id: int = 0):
     compat_ids = set()
     if model:
         try:
-            compat_ids = set(json.loads(model.get("compatible_options_list") or "[]"))
+            compat_ids = set(json.loads(model.get("compatible_options") or "[]"))
         except Exception:
             pass
 
