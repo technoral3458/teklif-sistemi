@@ -16,8 +16,30 @@ router = APIRouter(prefix="/offers")
 from tmpl import templates
 
 
-def _filter_specs(specs, items, opts):
-    """Hide standard specs that are replaced by selected options with a conflict_group."""
+def is_line_offer(model, offer):
+    """Teklif gerçekten bir hat mı? (hat modeli + 2 ve üzeri makine)
+
+    1'li hat tek makine demek olduğundan standart sayılır.
+    """
+    if not model or not model.get("is_line"):
+        return False
+    try:
+        return int((offer or {}).get("machine_count") or 1) >= 2
+    except (TypeError, ValueError):
+        return False
+
+
+def _filter_specs(specs, items, opts, model=None, offer=None):
+    """Teklifte görünmeyecek teknik özellikleri ayıklar.
+
+    İki kural:
+      - Seçilen bir opsiyon (conflict_group) standart bir özelliği değiştiriyorsa
+        eski özellik gizlenir.
+      - 'line' işaretli özellikler yalnızca hat tekliflerinde görünür.
+    """
+    if not is_line_offer(model, offer):
+        specs = [s for s in specs if not s.get("line")]
+
     hidden = set()
     for item in items:
         opt = opts.get(item.get("option_id"), {})
@@ -372,7 +394,7 @@ async def offer_detail(request: Request, offer_id: int):
         opt = opts.get(item.get("option_id"), {})
         _resolve_opt_fields(item, opt, lang)
     display_image = _best_display_image(model, offer, items, opts)
-    specs = _filter_specs(_parse_specs(model, lang), items, opts)
+    specs = _filter_specs(_parse_specs(model, lang), items, opts, model, offer)
     delivery_term = fdb.get_delivery_term(offer["delivery_term_id"]) if offer.get("delivery_term_id") else None
     change_requests = fdb.get_change_requests(offer_id=offer_id)
     import db.users as udb
@@ -414,7 +436,7 @@ async def social_card(request: Request, offer_id: int):
     model   = fdb.get_model(offer["model_id"]) if offer.get("model_id") else {}
     items   = fdb.get_offer_items(offer_id)
     opts    = {o["id"]: o for o in fdb.get_options()}
-    specs   = _filter_specs(_parse_specs(model or {}, "tr"), items, opts)
+    specs   = _filter_specs(_parse_specs(model or {}, "tr"), items, opts, model, offer)
     display = _best_display_image(model or {}, offer, items, opts)
     company = fdb.get_company() or {}
 
@@ -629,7 +651,7 @@ async def offer_print(request: Request, offer_id: int):
         _resolve_opt_fields(item, opt, lang)
     display_image = _best_display_image(model, offer, items, opts)
 
-    specs = _filter_specs(_parse_specs(model, lang), items, opts)
+    specs = _filter_specs(_parse_specs(model, lang), items, opts, model, offer)
 
     return templates.TemplateResponse(request, "offer_print.html", {
         "user": user,
@@ -673,7 +695,7 @@ async def offer_pdf(request: Request, offer_id: int, dl: int = 0):
         _resolve_opt_fields(item, opt, lang)
     display_image = _best_display_image(model, offer, items, opts)
 
-    specs = _filter_specs(_parse_specs(model, lang), items, opts)
+    specs = _filter_specs(_parse_specs(model, lang), items, opts, model, offer)
 
     company = fdb.get_company() or {}
     delivery_term = fdb.get_delivery_term(offer["delivery_term_id"]) if offer.get("delivery_term_id") else None
@@ -726,6 +748,9 @@ async def offer_catalog_pdf(request: Request, offer_id: int):
         specs = json.loads(raw) if isinstance(raw, str) else raw
     except Exception:
         specs = []
+    # Hat özellikleri yalnızca hat tekliflerinde
+    if not is_line_offer(m, offer):
+        specs = [s for s in specs if not (isinstance(s, dict) and s.get("line"))]
 
     # Only include options selected in this offer
     items = fdb.get_offer_items(offer_id)
@@ -845,7 +870,7 @@ async def offer_tech_spec_pdf(request: Request, offer_id: int):
     for item in items:
         _resolve_opt_fields(item, opts.get(item.get("option_id"), {}), lang)
 
-    specs = _filter_specs(_parse_specs(model, lang), items, opts)
+    specs = _filter_specs(_parse_specs(model, lang), items, opts, model, offer)
     display_image = _best_display_image(model, offer, items, opts)
     cat = {c["id"]: c for c in fdb.get_cats()}.get(model.get("category_id"), {})
 

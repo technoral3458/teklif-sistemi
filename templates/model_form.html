@@ -331,12 +331,13 @@ function calcTotalCost() {
 function _esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function _escQ(s) { return (s||'').replace(/"/g,'&quot;'); }
 
-function addSpecRow(title, desc, imgPath, descEn, descZh) {
+function addSpecRow(title, desc, imgPath, descEn, descZh, isLine) {
   title   = title   || '';
   desc    = desc    || '';
   imgPath = imgPath || '';
   descEn  = descEn  || '';
   descZh  = descZh  || '';
+  isLine  = !!isLine;
   const container = document.getElementById('specsRows');
   const row = document.createElement('div');
   row.className = 'spec-row';
@@ -362,6 +363,11 @@ function addSpecRow(title, desc, imgPath, descEn, descZh) {
       <textarea class="spec-desc    form-control" rows="1" placeholder="🇹🇷 Açıklama (TR)" style="font-size:12px;">${_esc(desc)}</textarea>
       <textarea class="spec-desc-en form-control" rows="1" placeholder="🇬🇧 Description (EN)" style="font-size:12px;">${_esc(descEn)}</textarea>
       <textarea class="spec-desc-zh form-control" rows="1" placeholder="🇨🇳 说明 (ZH)" style="font-size:12px;">${_esc(descZh)}</textarea>
+      <label class="spec-line-lb" style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:var(--text-muted);margin-top:2px;"
+             title="İşaretlenirse bu özellik yalnızca 2'li ve üzeri hat tekliflerinde görünür. Tek makinelik tekliflerde gizlenir.">
+        <input type="checkbox" class="spec-line" ${isLine ? 'checked' : ''} style="width:15px;height:15px;" />
+        <span>🔗 Sadece hat teklifinde göster</span>
+      </label>
     </div>
     <button type="button" onclick="removeSpecRow(this)" class="btn btn-danger btn-sm" style="flex-shrink:0;margin-top:2px;" title="Sil">✕</button>
   `;
@@ -408,9 +414,10 @@ function serializeSpecs() {
     const descEn = row.querySelector('.spec-desc-en').value.trim();
     const descZh = row.querySelector('.spec-desc-zh').value.trim();
     const img    = row.querySelector('.spec-img-path').value;
-    specs.push({title, desc, img});
-    specsEn.push({title, desc: descEn, img});
-    specsZh.push({title, desc: descZh, img});
+    const line   = row.querySelector('.spec-line').checked;
+    specs.push({title, desc, img, line});
+    specsEn.push({title, desc: descEn, img, line});
+    specsZh.push({title, desc: descZh, img, line});
   });
   document.getElementById('specsData').value    = JSON.stringify(specs);
   document.getElementById('specsData_en').value = JSON.stringify(specsEn);
@@ -430,7 +437,7 @@ function _parseSpecsRaw(raw) {
   if (raw.includes('|')) {
     return raw.split('||').map(s => {
       const p = s.trim().split('|').map(x => x.trim());
-      return {title:p[0]||'', desc:p[1]||'', img:p[2]||''};
+      return {title:p[0]||'', desc:p[1]||'', img:p[2]||'', line:false};
     }).filter(s => s.title || s.desc);
   }
   return [];
@@ -446,7 +453,8 @@ function loadSpecs(rawTr, rawEn, rawZh) {
       s.desc  || '',
       s.img   || '',
       (specsEn[i] || {}).desc || '',
-      (specsZh[i] || {}).desc || ''
+      (specsZh[i] || {}).desc || '',
+      s.line
     );
   });
 }

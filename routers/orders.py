@@ -149,7 +149,7 @@ async def production_pdf(request: Request, oid: int, dl: int = 0):
 
     from routers.offers import _best_display_image, _parse_specs, _filter_specs
     display_image = _best_display_image(model, offer, items, opts)
-    specs = _filter_specs(_parse_specs(model, lang), items, opts)
+    specs = _filter_specs(_parse_specs(model, lang), items, opts, model, offer)
 
     company = fdb.get_company() or {}
     mfr_map = {u["id"]: u for u in udb.all_manufacturers()}
