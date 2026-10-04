@@ -230,9 +230,6 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
       <td>Teslim Şekli:</td>
       <td class="terms-delivery-val">
         {{ delivery_term.name }}
-        {% if delivery_term.discount_pct > 0 %}
-        <span style="font-weight:400;font-size:8.5pt;color:#888;"> (%{{ "%.1f"|format(delivery_term.discount_pct) }} iskonto dahil)</span>
-        {% endif %}
       </td>
     </tr>
     {% elif offer.delivery_method %}
@@ -268,48 +265,12 @@ body { font-family: Arial, "WenQuanYi Zen Hei", Helvetica, sans-serif; font-size
     </div>
     <div style="padding:14px;">
 
-      {% set _td  = (offer.delivery_term_discount|default(0)|float) %}
-      {% set _md  = (offer.discount_pct|default(0)|float) %}
-      {% set base_total = (offer.base_price|default(0)|float) * (offer.machine_count|default(1)|int) %}
-      {% set opts_total = (offer.options_total|default(0)|float) %}
-      {% set subtotal   = base_total + opts_total %}
-
-      <!-- Fiyat Özeti -->
+      <!-- Fiyat — yalnızca nihai tutar gösterilir (kırılım/iskonto yazılmaz) -->
       <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #ddd;">
-        <div style="font-size:8.5pt;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Fiyat Özeti</div>
         <table style="width:100%;border-collapse:collapse;font-size:9pt;">
           <tr>
-            <td style="color:#666;padding:2px 0;">Makine Baz Fiyatı ({{ offer.machine_count }} adet)</td>
-            <td style="text-align:right;padding:2px 0;">{{ "%.2f"|format(base_total) }} {{ offer.currency }}</td>
-          </tr>
-          {% if opts_total > 0 %}
-          <tr>
-            <td style="color:#666;padding:2px 0;">Opsiyonlar Toplamı</td>
-            <td style="text-align:right;padding:2px 0;">{{ "%.2f"|format(opts_total) }} {{ offer.currency }}</td>
-          </tr>
-          {% endif %}
-          {% if _td > 0 or _md > 0 %}
-          <tr><td colspan="2" style="border-top:1px solid #ddd;padding:2px 0;"></td></tr>
-          <tr>
-            <td style="color:#666;padding:2px 0;">Ara Toplam</td>
-            <td style="text-align:right;padding:2px 0;font-weight:600;">{{ "%.2f"|format(subtotal) }} {{ offer.currency }}</td>
-          </tr>
-          {% if _td > 0 %}
-          <tr>
-            <td style="color:#e67e22;font-size:8pt;padding:2px 0;">Teslim İskontosu (%{{ "%.1f"|format(_td) }})</td>
-            <td style="text-align:right;color:#e67e22;font-size:8pt;padding:2px 0;">-{{ "%.2f"|format(subtotal*_td/100) }} {{ offer.currency }}</td>
-          </tr>
-          {% endif %}
-          {% if _md > 0 %}
-          <tr>
-            <td style="color:#e67e22;font-size:8pt;padding:2px 0;">Ek İskonto (%{{ "%.1f"|format(_md) }})</td>
-            <td style="text-align:right;color:#e67e22;font-size:8pt;padding:2px 0;">-{{ "%.2f"|format(subtotal*(1-_td/100)*_md/100) }} {{ offer.currency }}</td>
-          </tr>
-          {% endif %}
-          {% endif %}
-          <tr style="border-top:2px solid #1e2b4a;">
-            <td style="padding:5px 0 2px;font-weight:800;font-size:10pt;">NET FİYAT <span style="font-size:7.5pt;font-weight:400;color:#888;">(KDV Hariç)</span></td>
-            <td style="text-align:right;padding:5px 0 2px;font-weight:800;font-size:10.5pt;color:#e67e22;">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</td>
+            <td style="padding:4px 0 2px;font-weight:800;font-size:11pt;">NET FİYAT <span style="font-size:7.5pt;font-weight:400;color:#888;">(KDV Hariç)</span></td>
+            <td style="text-align:right;padding:4px 0 2px;font-weight:800;font-size:13pt;color:#e67e22;">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</td>
           </tr>
         </table>
       </div>

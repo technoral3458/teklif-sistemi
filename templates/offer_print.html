@@ -175,18 +175,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:10pt; color:#1a1a1a;
 
 <!-- ════ FİYAT + KOŞULLAR ════ -->
 <div class="page-break">
-  {% set disc = (offer.discount_pct|default(0)|float) %}
-  {% set base_total = (offer.base_price|default(0)|float) * (offer.machine_count|default(1)|int) %}
-  {% set opts_total = (offer.options_total|default(0)|float) %}
-  {% set subtotal   = base_total + opts_total %}
   <div class="price-wrap">
-    <div class="price-row"><span>Makine Baz Fiyatı:</span><span>{{ "%.2f"|format(base_total*(1-disc/100)) }} {{ offer.currency }}</span></div>
-    {% if opts_total > 0 %}
-    <div class="price-row"><span>Opsiyonlar Toplamı:</span><span>{{ "%.2f"|format(opts_total*(1-disc/100)) }} {{ offer.currency }}</span></div>
-    {% endif %}
-    {% if disc > 0 %}
-    <div class="price-row disc-val" style="font-size:9pt;border-top:1px solid #eee;padding-top:5px;margin-top:3px;"><span>Uygulanan İskonto: %{{ "%.0f"|format(disc) }}</span><span></span></div>
-    {% endif %}
     <span class="net-label">NET FİYAT (KDV Hariç)</span>
     <div class="net-amount">{{ "%.2f"|format(offer.total_price|default(0)|float) }} {{ offer.currency }}</div>
   </div>
