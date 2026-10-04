@@ -104,7 +104,9 @@ async def offers_list(request: Request, status: str = "", q: str = ""):
     customers = {c["id"]: c for c in fdb.get_customers(dealer_id=_dl)}
     models = {m["id"]: m for m in fdb.get_models()}
     for o in offers:
-        o["customer_name"] = customers.get(o.get("customer_id"), {}).get("name", "-")
+        _c = customers.get(o.get("customer_id"), {})
+        o["customer_name"] = _c.get("name", "-")
+        o["customer_city"] = _c.get("city", "") or ""
         o["model_name"] = models.get(o.get("model_id"), {}).get("name", "-")
     if q:
         ql = q.lower()
@@ -112,6 +114,7 @@ async def offers_list(request: Request, status: str = "", q: str = ""):
             o for o in offers
             if ql in (o.get("offer_no") or "").lower()
             or ql in (o.get("customer_name") or "").lower()
+            or ql in (o.get("customer_city") or "").lower()
         ]
     return templates.TemplateResponse(request, "offers.html", {
         "user": user,

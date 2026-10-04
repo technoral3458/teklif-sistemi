@@ -27,6 +27,7 @@
         <tr>
           <th>{{ T.offer_no }}</th>
           <th>{{ T.offer_customer }}</th>
+          <th>{{ T.customer_city }}</th>
           <th>{{ T.offer_model }}</th>
           <th>{{ T.offer_count }}</th>
           <th>{{ T.offer_total }}</th>
@@ -63,6 +64,7 @@
         <tr>
           <td><code>{{ o.offer_no }}</code></td>
           <td>{{ o.customer_name }}</td>
+          <td>{{ o.customer_city or '-' }}</td>
           <td>{{ o.model_name }}</td>
           <td>{{ o.machine_count }}</td>
           <td><strong>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</strong></td>
@@ -79,7 +81,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px">-</td></tr>
+        <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:32px">-</td></tr>
         {% endfor %}
       </tbody>
     </table>
