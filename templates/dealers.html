@@ -65,7 +65,7 @@
               onclick="editDealer({{ d.id }}, '{{ d.email|e }}', '{{ d.company_name|e }}', '{{ d.role }}',
                 {{ d.is_approved }}, {{ d.is_active }}, {{ d.can_view_costs or 0 }},
                 '{{ d.allowed_menus or '' }}', '{{ d.allowed_categories or '' }}',
-                {{ d.parent_id or 0 }}, '{{ d.allowed_actions or '' }}')">
+                {{ d.parent_id or 0 }}, '{{ d.allowed_actions or '' }}', {{ d.senior_mode or 0 }})">
               ✏️ <span class="btn-text">{{ T.btn_edit }}</span>
             </button>
             <form method="post" action="/admin/impersonate/{{ d.id }}" style="display:inline;">
@@ -203,6 +203,11 @@
               <span style="font-size:13px;">💰 {{ T.costs_title }}</span>
             </label>
             <input type="hidden" name="can_view_costs" id="decostsHidden" value="0" />
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="senior_mode_chk" id="deseniorChk" onchange="document.getElementById('deseniorHidden').value=this.checked?1:0" />
+              <span style="font-size:13px;">🔍 Dede Modu (büyüteç)</span>
+            </label>
+            <input type="hidden" name="senior_mode" id="deseniorHidden" value="0" />
           </div>
         </div>
 
@@ -268,7 +273,9 @@
 
 {% block scripts %}
 <script>
-function editDealer(id, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions) {
+function editDealer(id, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions, senior) {
+  var _sc = document.getElementById('deseniorChk');
+  if (_sc) { _sc.checked = !!senior; document.getElementById('deseniorHidden').value = senior ? 1 : 0; }
   document.getElementById('deid').value = id;
   document.getElementById('deModalEmail').textContent = email + (company ? ' — ' + company : '');
   document.getElementById('decompany').value = company;

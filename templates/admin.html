@@ -127,7 +127,7 @@
                 onclick="openUserModal({{ u.id }}, '{{ u.email|e }}', '{{ u.company_name|e }}', '{{ u.role }}',
                   {{ u.is_approved }}, {{ u.is_active }}, {{ u.can_view_costs }},
                   '{{ u.allowed_menus or '' }}', '{{ u.allowed_categories or '' }}', {{ u.parent_id or 0 }},
-                  '{{ u.allowed_actions or '' }}', {{ u.is_manufacturer or 0 }})">
+                  '{{ u.allowed_actions or '' }}', {{ u.is_manufacturer or 0 }}, {{ u.senior_mode or 0 }})">
                 ✏️ {{ T.btn_edit }}
               </button>
               <form method="post" action="/admin/impersonate/{{ u.id }}" style="margin:0;">
@@ -312,6 +312,11 @@
               <span style="font-size:13px;">🏭 Aynı zamanda üretici</span>
             </label>
             <input type="hidden" name="is_manufacturer" id="uModalIsMfrHidden" value="0" />
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);">
+              <input type="checkbox" name="senior_mode_chk" id="uModalSenior" onchange="document.getElementById('uModalSeniorHidden').value=this.checked?1:0" />
+              <span style="font-size:13px;">🔍 Dede Modu (büyüteç)</span>
+            </label>
+            <input type="hidden" name="senior_mode" id="uModalSeniorHidden" value="0" />
           </div>
         </div>
 
@@ -379,7 +384,7 @@
 
 {% block scripts %}
 <script>
-function openUserModal(uid, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions, isMfr) {
+function openUserModal(uid, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions, isMfr, senior) {
   document.getElementById('uModalUid').value = uid;
   document.getElementById('uModalEmail').textContent = email + (company ? ' — ' + company : '');
   document.getElementById('uModalRole').value = role;
@@ -394,6 +399,10 @@ function openUserModal(uid, email, company, role, approved, active, costs, allow
   mfrChk.checked = !!isMfr;
   document.getElementById('uModalIsMfrHidden').value = isMfr ? 1 : 0;
   mfrChk.onchange = () => document.getElementById('uModalIsMfrHidden').value = mfrChk.checked ? 1 : 0;
+  const srChk = document.getElementById('uModalSenior');
+  srChk.checked = !!senior;
+  document.getElementById('uModalSeniorHidden').value = senior ? 1 : 0;
+  srChk.onchange = () => document.getElementById('uModalSeniorHidden').value = srChk.checked ? 1 : 0;
 
   // Menus
   const menuList = allowedMenus ? allowedMenus.split(',') : [];
