@@ -74,8 +74,9 @@ async def update_user(request: Request,
                       can_view_costs: int = Form(0),
                       senior_mode: int = Form(0),
                       is_manufacturer: int = Form(0),
+                      is_admin: int = Form(0),
                       parent_id: int = Form(0)):
-    auth.require_admin(request)
+    acting = auth.require_admin(request)
     form = await request.form()
     allowed_menus = ",".join(form.getlist("allowed_menus"))
     allowed_categories = ",".join(form.getlist("allowed_categories"))
@@ -92,6 +93,10 @@ async def update_user(request: Request,
         parent_id=parent_id if parent_id else None,
         allowed_actions=allowed_actions,
     )
+    # Yetki devri yalnızca gerçek yöneticiye ait — yönetici modu verilmiş bir
+    # kullanıcı başkasına yönetici modu veremez.
+    if auth.is_true_admin(acting):
+        udb.update_admin(uid, is_admin=is_admin)
     return RedirectResponse("/admin?tab=users", 303)
 
 
@@ -110,7 +115,7 @@ async def exit_impersonation(request: Request):
 async def impersonate_user(request: Request, uid: int):
     auth.require_admin(request)
     target = udb.by_id(uid)
-    if not target or target["role"] == "admin":
+    if not target or target["role"] == "admin" or target.get("is_admin"):
         return RedirectResponse("/admin?tab=users", 303)
     current_token = request.cookies.get("session")
     resp = RedirectResponse("/", 303)

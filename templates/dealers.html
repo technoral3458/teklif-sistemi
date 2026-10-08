@@ -52,6 +52,7 @@
         <td>
           {% if d.is_approved and d.is_active %}
             <span class="badge badge-green">{{ T.status_active }}</span>
+            {% if d.is_admin %}<span class="badge badge-red" style="font-size:10px;" title="Yönetici modu açık">🛡</span>{% endif %}
           {% elif not d.is_approved %}
             <span class="badge badge-amber">{{ T.status_waiting }}</span>
           {% else %}
@@ -65,7 +66,7 @@
               onclick="editDealer({{ d.id }}, '{{ d.email|e }}', '{{ d.company_name|e }}', '{{ d.role }}',
                 {{ d.is_approved }}, {{ d.is_active }}, {{ d.can_view_costs or 0 }},
                 '{{ d.allowed_menus or '' }}', '{{ d.allowed_categories or '' }}',
-                {{ d.parent_id or 0 }}, '{{ d.allowed_actions or '' }}', {{ d.senior_mode or 0 }})">
+                {{ d.parent_id or 0 }}, '{{ d.allowed_actions or '' }}', {{ d.senior_mode or 0 }}, {{ d.is_admin or 0 }})">
               ✏️ <span class="btn-text">{{ T.btn_edit }}</span>
             </button>
             <form method="post" action="/admin/impersonate/{{ d.id }}" style="display:inline;">
@@ -208,6 +209,11 @@
               <span style="font-size:13px;">🔍 Dede Modu (büyüteç)</span>
             </label>
             <input type="hidden" name="senior_mode" id="deseniorHidden" value="0" />
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:rgba(239,68,68,.10);border-radius:6px;border:1px solid rgba(239,68,68,.45);">
+              <input type="checkbox" name="is_admin_chk" id="deIsAdminChk" onchange="document.getElementById('deIsAdminHidden').value=this.checked?1:0" />
+              <span style="font-size:13px;font-weight:600;">🛡 Yönetici Modu</span>
+            </label>
+            <input type="hidden" name="is_admin" id="deIsAdminHidden" value="0" />
           </div>
         </div>
 
@@ -273,7 +279,9 @@
 
 {% block scripts %}
 <script>
-function editDealer(id, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions, senior) {
+function editDealer(id, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions, senior, isAdmin) {
+  var _ac = document.getElementById('deIsAdminChk');
+  if (_ac) { _ac.checked = !!isAdmin; document.getElementById('deIsAdminHidden').value = isAdmin ? 1 : 0; }
   var _sc = document.getElementById('deseniorChk');
   if (_sc) { _sc.checked = !!senior; document.getElementById('deseniorHidden').value = senior ? 1 : 0; }
   document.getElementById('deid').value = id;

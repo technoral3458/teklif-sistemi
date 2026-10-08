@@ -60,11 +60,12 @@ async def save_dealer(request: Request,
                       company_name: str = Form(""),
                       can_view_costs: int = Form(0),
                       senior_mode: int = Form(0),
+                      is_admin: int = Form(0),
                       role: str = Form("dealer"),
                       is_approved: int = Form(0),
                       is_active: int = Form(0),
                       parent_id: int = Form(0)):
-    auth.require_admin(request)
+    acting = auth.require_admin(request)
     form = await request.form()
     allowed_menus = ",".join(form.getlist("allowed_menus"))
     allowed_categories = ",".join(form.getlist("allowed_categories"))
@@ -82,6 +83,9 @@ async def save_dealer(request: Request,
         parent_id=parent_id if parent_id else None,
         allowed_actions=allowed_actions,
     )
+    # Yetki devri yalnızca gerçek yöneticiye ait
+    if auth.is_true_admin(acting):
+        udb.update_admin(id, is_admin=is_admin)
     if role == "manufacturer" and not parent_id:
         return RedirectResponse("/manufacturers?msg=Kullanıcı+üretici+olarak+taşındı&msg_type=info", 303)
     return RedirectResponse("/dealers", 303)

@@ -50,6 +50,7 @@ def init():
             ("allowed_models","TEXT DEFAULT ''"),
             ("is_manufacturer","INTEGER DEFAULT 0"),
             ("senior_mode","INTEGER DEFAULT 0"),
+            ("is_admin","INTEGER DEFAULT 0"),
         ]:
             _acol(c.cursor(),"users",col,typ)
         existing = c.execute("SELECT id FROM users WHERE role='admin' LIMIT 1").fetchone()
@@ -68,10 +69,10 @@ def init():
 def _row(r):
     if not r: return None
     keys=["id","email","password","company_name","role","is_approved","is_active",
-          "phone","logo_path","website","address","allowed_categories","can_view_costs","lang","theme","allowed_menus","created_at","parent_id","allowed_actions","allowed_models","is_manufacturer","senior_mode"]
+          "phone","logo_path","website","address","allowed_categories","can_view_costs","lang","theme","allowed_menus","created_at","parent_id","allowed_actions","allowed_models","is_manufacturer","senior_mode","is_admin"]
     return dict(zip(keys,r))
 
-_SEL = "id,email,password,company_name,role,is_approved,is_active,phone,logo_path,website,address,allowed_categories,can_view_costs,lang,theme,allowed_menus,created_at,parent_id,allowed_actions,allowed_models,is_manufacturer,senior_mode"
+_SEL = "id,email,password,company_name,role,is_approved,is_active,phone,logo_path,website,address,allowed_categories,can_view_costs,lang,theme,allowed_menus,created_at,parent_id,allowed_actions,allowed_models,is_manufacturer,senior_mode,is_admin"
 
 def by_email(email):
     with _c() as c:
@@ -160,7 +161,7 @@ def has_action(user, action_key):
     return action_key in allowed
 
 def update_admin(uid,**kw):
-    allowed=["is_approved","is_active","role","allowed_categories","can_view_costs","company_name","allowed_menus","parent_id","allowed_actions","allowed_models","is_manufacturer","senior_mode"]
+    allowed=["is_approved","is_active","role","allowed_categories","can_view_costs","company_name","allowed_menus","parent_id","allowed_actions","allowed_models","is_manufacturer","senior_mode","is_admin"]
     f={k:v for k,v in kw.items() if k in allowed}
     if not f: return
     sets=",".join(f"{k}=?" for k in f)

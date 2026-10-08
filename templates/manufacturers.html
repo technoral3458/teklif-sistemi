@@ -49,6 +49,7 @@
         <td>
           {% if m.is_approved and m.is_active %}
             <span class="badge badge-green">{{ T.status_active }}</span>
+            {% if m.is_admin %}<span class="badge badge-red" style="font-size:10px;" title="Yönetici modu açık">🛡</span>{% endif %}
           {% elif not m.is_approved %}
             <span class="badge badge-amber">{{ T.status_waiting }}</span>
           {% else %}
@@ -63,7 +64,7 @@
                 {{ m.is_approved }}, {{ m.is_active }}, {{ m.can_view_costs or 0 }},
                 '{{ m.allowed_menus or '' }}', '{{ m.allowed_categories or '' }}',
                 {{ m.parent_id or 0 }}, '{{ m.allowed_actions or '' }}',
-                '{{ m.allowed_models or '' }}', {{ m.senior_mode or 0 }})">
+                '{{ m.allowed_models or '' }}', {{ m.senior_mode or 0 }}, {{ m.is_admin or 0 }})">
               ✏️ <span class="btn-text">{{ T.btn_edit }}</span>
             </button>
             <form method="post" action="/admin/impersonate/{{ m.id }}" style="display:inline;">
@@ -207,6 +208,11 @@
               <span style="font-size:13px;">🔍 Dede Modu (büyüteç)</span>
             </label>
             <input type="hidden" name="senior_mode" id="meseniorHidden" value="0" />
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:rgba(239,68,68,.10);border-radius:6px;border:1px solid rgba(239,68,68,.45);">
+              <input type="checkbox" name="is_admin_chk" id="meIsAdminChk" onchange="document.getElementById('meIsAdminHidden').value=this.checked?1:0" />
+              <span style="font-size:13px;font-weight:600;">🛡 Yönetici Modu</span>
+            </label>
+            <input type="hidden" name="is_admin" id="meIsAdminHidden" value="0" />
           </div>
         </div>
 
@@ -290,7 +296,9 @@
 
 {% block scripts %}
 <script>
-function editMfr(id, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions, allowedModels, senior) {
+function editMfr(id, email, company, role, approved, active, costs, allowedMenus, allowedCats, parentId, allowedActions, allowedModels, senior, isAdmin) {
+  var _ac = document.getElementById('meIsAdminChk');
+  if (_ac) { _ac.checked = !!isAdmin; document.getElementById('meIsAdminHidden').value = isAdmin ? 1 : 0; }
   var _sc = document.getElementById('meseniorChk');
   if (_sc) { _sc.checked = !!senior; document.getElementById('meseniorHidden').value = senior ? 1 : 0; }
   document.getElementById('meid').value = id;
