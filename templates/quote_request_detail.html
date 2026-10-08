@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}Teklif Talebi – {{ req.ref_no }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+  <a href="/admin/teklif-talepleri" class="btn btn-ghost btn-sm">← Geri</a>
+  <form method="post" action="/admin/teklif-talepleri/{{ req.id }}/convert" style="display:inline;">
+    <button type="submit" class="btn btn-primary btn-sm">✏️ Teklif Oluştur</button>
+  </form>
+  <form method="post" action="/admin/teklif-talepleri/{{ req.id }}/delete" onsubmit="return confirm('Talebi sil?')" style="display:inline;">
+    <button type="submit" class="btn btn-danger btn-sm">🗑 Sil</button>
+  </form>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+  <!-- Müşteri bilgileri -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">👤 Müşteri Bilgileri</h3></div>
+    <div class="card-body">
+      <table style="width:100%;font-size:14px;border-collapse:collapse;">
+        {% for label, val in [
+          ('Referans No', req.ref_no),
+          ('Ad Soyad', req.customer_name),
+          ('Firma', req.company_name or '—'),
+          ('E-posta', req.email),
+          ('Telefon', req.phone or '—'),
+          ('Tarih', req.created_at[:16] if req.created_at else '—'),
+        ] %}
+        <tr>
+          <td style="padding:7px 0;color:var(--text-muted);width:110px;vertical-align:top;">{{ label }}</td>
+          <td style="padding:7px 0;font-weight:500;">
+            {% if label == 'E-posta' %}<a href="mailto:{{ val }}" style="color:var(--accent);">{{ val }}</a>
+            {% elif label == 'Telefon' and val != '—' %}<a href="tel:{{ val }}" style="color:var(--accent);">{{ val }}</a>
+            {% else %}{{ val }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% if req.note %}
+      <div style="margin-top:12px;padding:10px;background:var(--surface-2);border-radius:8px;font-size:13px;">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Not</div>
+        {{ req.note }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Makine konfigürasyonu -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">⚙️ Makine Konfigürasyonu</h3></div>
+    <div class="card-body">
+      <div style="font-size:18px;font-weight:700;margin-bottom:8px;">{{ req.model_name or '—' }}</div>
+      {% if req.machine_count > 1 %}
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">{{ req.machine_count }}'li Hat</div>
+      {% endif %}
+      {% if req.options_list %}
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;font-weight:600;">Seçilen Seçenekler</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        {% for o in req.options_list %}
+        <div style="background:var(--surface-2);border-radius:6px;padding:8px 12px;font-size:13px;">
+          ✓ {{ o.name }}{% if o.qty and o.qty > 1 %} <span style="color:var(--text-muted);">× {{ o.qty }}</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="color:var(--text-muted);font-size:13px;">Ek seçenek seçilmemiş.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Durum güncelle -->
+<div class="card" style="margin-top:20px;">
+  <div class="card-header"><h3 class="card-title">📋 Durum</h3></div>
+  <div class="card-body">
+    <form method="post" action="/admin/teklif-talepleri/{{ req.id }}/status" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <select name="status" class="form-control" style="max-width:240px;">
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if req.status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-outline btn-sm">Güncelle</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Talebiniz Alındı | {{ company.company_name or 'B2B Teklif Sistemi' }}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+    .tk-wrap { width:100%; max-width:520px; text-align:center; }
+    .tk-card { background:var(--surface); border:1px solid var(--border);
+               border-radius:12px; padding:36px 28px; }
+    .tk-logo { max-height:64px; max-width:200px; object-fit:contain; margin-bottom:18px; }
+    .tk-ref { font-size:26px; font-weight:800; letter-spacing:1px; color:var(--accent);
+              background:var(--surface-2); border-radius:10px; padding:14px; margin:18px 0; }
+  </style>
+</head>
+<body>
+  <div class="tk-wrap">
+    <div class="tk-card">
+      {% if company.logo %}<img class="tk-logo" src="/static/{{ company.logo }}" alt="{{ company.company_name }}" />{% endif %}
+      <div style="font-size:46px;line-height:1;">✅</div>
+      <h1 style="font-size:21px;margin:14px 0 8px;">Servis talebiniz alındı</h1>
+      <p style="color:var(--text-muted);font-size:14px;line-height:1.7;margin:0;">
+        Talebiniz teknik ekibimize iletildi. En kısa sürede
+        verdiğiniz telefon numarasından size dönüş yapılacaktır.
+      </p>
+
+      {% if ref %}
+      <div style="font-size:11px;color:var(--text-muted);margin-top:22px;">TAKİP NUMARANIZ</div>
+      <div class="tk-ref">{{ ref }}</div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0;">
+        Bizimle görüşürken bu numarayı belirtirseniz kaydınıza daha hızlı ulaşırız.
+      </p>
+      {% endif %}
+
+      {% if company.phone %}
+      <p style="font-size:13px;margin-top:20px;">
+        Acil durumlar için: <strong style="color:var(--accent);">{{ company.phone }}</strong>
+      </p>
+      {% endif %}
+
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:24px;flex-wrap:wrap;">
+        <a href="/servis-talebi" class="btn btn-outline btn-sm">Yeni Talep Oluştur</a>
+        <a href="/login" class="btn btn-primary btn-sm">Giriş Ekranına Dön</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

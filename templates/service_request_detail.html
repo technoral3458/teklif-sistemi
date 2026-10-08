@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block page_title %}Servis Talebi – {{ req.ref_no }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+  <a href="/admin/requests" class="btn btn-ghost btn-sm">← Talepler</a>
+  <span style="font-weight:700;font-size:16px;">🛠 {{ req.ref_no }}</span>
+  {% set _c = {'Yeni':'amber','İnceleniyor':'blue','Servis Planlandı':'blue',
+               'Çözüldü':'green','İptal':'red'} %}
+  <span class="badge badge-{{ _c.get(req.status,'gray') }}">{{ req.status }}</span>
+  <span style="color:var(--text-muted);font-size:12px;">
+    {{ req.created_at[:16] if req.created_at else '' }}
+  </span>
+  <form method="post" action="/admin/requests/servis/{{ req.id }}/delete"
+        onsubmit="return confirm('{{ req.ref_no }} talebi silinsin mi? Fotoğraflar da silinir.')"
+        style="margin-left:auto;">
+    <button type="submit" class="btn btn-danger btn-sm">🗑 Sil</button>
+  </form>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;" class="sv-grid">
+
+  <!-- Müşteri -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">👤 Müşteri</h3></div>
+    <div class="card-body">
+      <table style="width:100%;font-size:14px;border-collapse:collapse;">
+        {% for label, val in [
+          ('Ad Soyad', (req.first_name ~ ' ' ~ req.last_name)|trim),
+          ('Telefon', req.phone),
+          ('E-posta', req.email or '—'),
+          ('Firma', req.company_name or '—'),
+        ] %}
+        <tr>
+          <td style="padding:7px 0;color:var(--text-muted);width:96px;vertical-align:top;">{{ label }}</td>
+          <td style="padding:7px 0;font-weight:500;">
+            {% if label == 'Telefon' %}<a href="tel:{{ val }}" style="color:var(--accent);">{{ val }}</a>
+            {% elif label == 'E-posta' and val != '—' %}<a href="mailto:{{ val }}" style="color:var(--accent);">{{ val }}</a>
+            {% else %}{{ val }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+
+  <!-- Makine -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">⚙️ Makine</h3></div>
+    <div class="card-body">
+      <div style="font-size:11px;color:var(--text-muted);">SERİ NUMARASI</div>
+      <div style="font-size:20px;font-weight:800;letter-spacing:.5px;margin:2px 0 14px;">
+        {{ req.serial_no or '—' }}
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);">MODEL</div>
+      <div style="font-size:15px;font-weight:600;margin-top:2px;">{{ req.model_name or '—' }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Arıza -->
+<div class="card" style="margin-top:20px;">
+  <div class="card-header"><h3 class="card-title">⚠️ Arıza Açıklaması</h3></div>
+  <div class="card-body">
+    <div style="white-space:pre-wrap;font-size:14px;line-height:1.75;">{{ req.fault_desc }}</div>
+  </div>
+</div>
+
+<!-- Fotoğraflar -->
+{% if req.images %}
+<div class="card" style="margin-top:20px;">
+  <div class="card-header">
+    <h3 class="card-title">📷 Arıza Fotoğrafları</h3>
+    <span style="color:var(--text-muted);font-size:12px;">{{ req.images|length }} adet · büyütmek için tıklayın</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;">
+      {% for i in range(1, req.images|length + 1) %}
+      <a href="/admin/requests/servis/{{ req.id }}/resim/{{ i }}" target="_blank"
+         style="display:block;width:190px;height:150px;border-radius:8px;overflow:hidden;
+                border:1px solid var(--border);background:var(--surface-2);">
+        <img src="/admin/requests/servis/{{ req.id }}/resim/{{ i }}" alt="Arıza {{ i }}"
+             style="width:100%;height:100%;object-fit:cover;display:block;" />
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Durum -->
+<div class="card" style="margin-top:20px;">
+  <div class="card-header"><h3 class="card-title">📋 Durum ve Servis Notu</h3></div>
+  <div class="card-body">
+    <form method="post" action="/admin/requests/servis/{{ req.id }}/status">
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
+        <div class="form-group" style="margin:0;max-width:240px;flex:1;">
+          <label class="form-label">Durum</label>
+          <select name="status" class="form-control">
+            {% for s in statuses %}
+            <option value="{{ s }}" {% if req.status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Servis Notu (yalnız panelde görünür)</label>
+        <textarea name="admin_note" class="form-control" rows="4"
+                  placeholder="Yapılan görüşme, tespit, planlanan servis tarihi…">{{ req.admin_note }}</textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Kaydet</button>
+    </form>
+  </div>
+</div>
+
+<style>
+@media (max-width: 860px) { .sv-grid { grid-template-columns:1fr !important; } }
+</style>
+{% endblock %}
