@@ -119,7 +119,7 @@ def _parse_specs(model, lang):
 
 
 @router.get("")
-async def offers_list(request: Request, status: str = "", q: str = ""):
+async def offers_list(request: Request, status: str = "", q: str = "", sort: str = ""):
     user = auth.require_user(request)
     _dl = None if user["role"] == "admin" else user["id"]
     offers = fdb.get_offers(status=status or None, dealer_id=_dl)
@@ -138,12 +138,30 @@ async def offers_list(request: Request, status: str = "", q: str = ""):
             or ql in (o.get("customer_name") or "").lower()
             or ql in (o.get("customer_city") or "").lower()
         ]
+
+    # Sıralama — varsayılan sıra (en yeni önce) dokunulmadan korunur
+    _amt = lambda o: float(o.get("final_price") or o.get("total_price") or 0)
+    _sorts = {
+        "price_desc":    (lambda o: -_amt(o),                       False),
+        "price_asc":     (lambda o: _amt(o),                        False),
+        "date_asc":      (lambda o: str(o.get("created_at") or ""), False),
+        "date_desc":     (lambda o: str(o.get("created_at") or ""), True),
+        "customer":      (lambda o: (o.get("customer_name") or "").lower(), False),
+        "city":          (lambda o: ((o.get("customer_city") or "~").lower(),
+                                     (o.get("customer_name") or "").lower()), False),
+        "status":        (lambda o: (o.get("status") or "").lower(), False),
+    }
+    if sort in _sorts:
+        keyf, rev = _sorts[sort]
+        offers = sorted(offers, key=keyf, reverse=rev)
+
     return templates.TemplateResponse(request, "offers.html", {
         "user": user,
         "offers": offers,
         "statuses": OFFER_STATUSES,
         "selected_status": status,
         "q": q,
+        "sort": sort,
         "active_page": "offers",
     })
 

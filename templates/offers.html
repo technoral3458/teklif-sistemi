@@ -12,8 +12,23 @@
       {% endfor %}
     </select>
     <input type="text" name="q" class="search-box" placeholder="{{ T.btn_search }}..." value="{{ q }}" style="max-width:220px;" />
+    <select name="sort" class="form-control" style="max-width:195px;" onchange="this.form.submit()">
+      {% for val, lbl in [
+        ('',           '↕ Sırala: En yeni'),
+        ('date_asc',   '📅 En eski'),
+        ('price_desc', '💰 Fiyat: yüksek → düşük'),
+        ('price_asc',  '💰 Fiyat: düşük → yüksek'),
+        ('customer',   '🏢 Firma adı (A-Z)'),
+        ('city',       '📍 Şehir (A-Z)'),
+        ('status',     '🏷 Durum')] %}
+      <option value="{{ val }}" {% if sort == val %}selected{% endif %}>{{ lbl }}</option>
+      {% endfor %}
+    </select>
     <button type="submit" class="btn btn-ghost btn-sm">{{ T.btn_filter }}</button>
   </form>
+  {% if user.role == 'admin' %}
+  <a href="/raporlar" class="btn btn-outline btn-sm" style="border-color:#8b5cf6;color:#8b5cf6;">📊 Raporlar</a>
+  {% endif %}
   <a href="/offers/new" class="btn btn-primary" style="margin-left:auto;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     {{ T.offer_new }}
