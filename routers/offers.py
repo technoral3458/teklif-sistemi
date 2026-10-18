@@ -1069,7 +1069,13 @@ async def update_status(request: Request,
 
 
 @router.post("/delete")
-async def delete_offer(request: Request, id: int = Form(...)):
+async def delete_offer(request: Request, id: int = Form(...),
+                       q: str = Form(""), status: str = Form(""),
+                       sort: str = Form("")):
     auth.require_user(request)
     fdb.del_offer(id)
-    return RedirectResponse("/offers", 303)
+    # Silme sonrası listeye aynı filtre/arama/sıralama ile dön — kullanıcı
+    # aynı firmanın diğer tekliflerini de silebilsin.
+    from urllib.parse import urlencode
+    qs = urlencode({k: v for k, v in (("q", q), ("status", status), ("sort", sort)) if v})
+    return RedirectResponse("/offers" + (f"?{qs}" if qs else ""), 303)

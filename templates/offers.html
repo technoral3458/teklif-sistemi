@@ -90,6 +90,9 @@
               <a href="/offers/{{ o.id }}" class="btn btn-ghost btn-sm">{{ T.btn_edit }}</a>
               <form method="post" action="/offers/delete" onsubmit="return confirmDelete(this)" data-confirm="Bu teklifi silmek istiyor musunuz?">
                 <input type="hidden" name="id" value="{{ o.id }}" />
+                <input type="hidden" name="q" value="{{ q }}" />
+                <input type="hidden" name="status" value="{{ selected_status }}" />
+                <input type="hidden" name="sort" value="{{ sort }}" />
                 <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
               </form>
             </div>
