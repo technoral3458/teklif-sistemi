@@ -10,6 +10,7 @@ from typing import Optional
 
 import db.factory as fdb
 import auth
+from translations import get_T
 from config import OFFER_STATUSES, CURRENCIES, BASE_DIR, CONTRACTS_DIR
 
 router = APIRouter(prefix="/offers")
@@ -154,6 +155,31 @@ async def offers_list(request: Request, status: str = "", q: str = "", sort: str
     if sort in _sorts:
         keyf, rev = _sorts[sort]
         offers = sorted(offers, key=keyf, reverse=rev)
+
+    # Durum etiketi + rengi tek yerde hesaplanır; tablo ve mobil kart aynısını kullanır
+    _T = get_T(user.get("lang") or "tr")
+    _COLOR = {"Beklemede": "amber", "Onaylandı": "green", "Reddedildi": "red",
+              "Sipariş Verildi": "blue", "Admin Onaylı": "green", "Üretimde": "blue",
+              "Tamamlandı": "green", "Teslim Edildi": "green", "İptal": "gray"}
+    _DEALER = {"Sipariş Verildi": ("offer_status_waiting_admin", "blue"),
+               "Onaylandı":       ("offer_status_waiting_admin", "blue"),
+               "Admin Onaylı":    ("offer_status_waiting_mfr", "amber"),
+               "İptal":           ("offer_status_cancelled_lbl", "gray"),
+               "Reddedildi":      ("offer_status_rejected_lbl", "red")}
+    _LABEL = {"Beklemede": "status_pending", "Onaylandı": "status_approved",
+              "Reddedildi": "status_rejected", "Sipariş Verildi": "status_ordered",
+              "İptal": "status_cancelled", "Admin Onaylı": "status_admin_approved",
+              "Üretimde": "status_in_production", "Tamamlandı": "status_completed",
+              "Teslim Edildi": "status_delivered"}
+    for o in offers:
+        st = o.get("status") or ""
+        if user["role"] == "dealer" and st in _DEALER:
+            key, color = _DEALER[st]
+            o["disp_status"] = _T.get(key, st)
+            o["disp_color"] = color
+        else:
+            o["disp_status"] = _T.get(_LABEL.get(st, ""), st)
+            o["disp_color"] = _COLOR.get(st, "gray")
 
     return templates.TemplateResponse(request, "offers.html", {
         "user": user,
