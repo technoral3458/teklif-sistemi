@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Servis Talebi | {{ company.company_name or 'B2B Teklif Sistemi' }}</title>
+  <title data-i18n="sr_page_title">Servis Talebi</title>
   <link rel="stylesheet" href="/static/css/style.css" />
   <style>
     body { min-height:100vh; padding:24px 16px 60px; }
@@ -35,18 +35,22 @@
   </style>
 </head>
 <body>
+  <div style="position:fixed;top:14px;right:14px;z-index:10;display:flex;gap:4px;">
+    <button type="button" class="lang-btn" data-lang="tr" onclick="srSetLang('tr')">🇹🇷 TR</button>
+    <button type="button" class="lang-btn" data-lang="en" onclick="srSetLang('en')">🇬🇧 EN</button>
+    <button type="button" class="lang-btn" data-lang="zh" onclick="srSetLang('zh')">🇨🇳 中文</button>
+  </div>
   <div class="sv-back">
-    <a href="/login" class="btn btn-ghost btn-sm">← Giriş Ekranı</a>
+    <a href="/login" class="btn btn-ghost btn-sm" data-i18n="sr_back_login">← Giriş Ekranı</a>
   </div>
 
   <div class="sv-wrap">
     <div class="sv-head">
       {% if company.logo %}<img src="/static/{{ company.logo }}" alt="{{ company.company_name }}" />{% endif %}
-      <h1>🛠 Servis Talebi</h1>
+      <h1>🛠 <span data-i18n="sr_title">Servis Talebi</span></h1>
       <p>
-        Makinenizde bir arıza varsa aşağıdaki formu doldurun.
-        Ekibimiz en kısa sürede sizinle iletişime geçecektir.<br>
-        <strong>Üye olmanıza gerek yoktur.</strong>
+        <span data-i18n="sr_intro">Makinenizde bir arıza varsa aşağıdaki formu doldurun.</span><br>
+        <strong data-i18n="sr_no_account">Üye olmanıza gerek yoktur.</strong>
       </p>
     </div>
 
@@ -59,21 +63,22 @@
 
     <form method="post" action="/servis-talebi/gonder" enctype="multipart/form-data"
           id="svForm" class="sv-card">
+      <input type="hidden" name="lang" id="svLang" value="tr" />
 
-      <div class="sv-sec">MAKİNE BİLGİLERİ</div>
+      <div class="sv-sec" data-i18n="sr_sec_machine">MAKİNE BİLGİLERİ</div>
       <div class="sv-row">
         <div class="form-group">
-          <label class="form-label req">Seri Numarası</label>
+          <label class="form-label req" data-i18n="sr_serial">Seri Numarası</label>
           <input type="text" name="serial_no" class="form-control" required
-                 placeholder="ör. 2024-0731" />
+                 data-i18n-ph="sr_serial_ph" placeholder="ör. 2024-0731" />
           <small style="color:var(--text-muted);font-size:11px;">
-            Makinenin üzerindeki etikette yazar.
+            <span data-i18n="sr_serial_hint">Makinenin üzerindeki etikette yazar.</span>
           </small>
         </div>
         <div class="form-group">
-          <label class="form-label">Model</label>
+          <label class="form-label" data-i18n="sr_model">Model</label>
           <input type="text" name="model_name" class="form-control" list="modelList"
-                 placeholder="Makine modeli" />
+                 data-i18n-ph="sr_model_ph" placeholder="Makine modeli" />
           <datalist id="modelList">
             {% for m in models %}<option value="{{ m }}"></option>{% endfor %}
           </datalist>
@@ -81,65 +86,101 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label req">Arıza Açıklaması</label>
+        <label class="form-label req" data-i18n="sr_fault">Arıza Açıklaması</label>
         <textarea name="fault_desc" class="form-control" rows="5" required minlength="10"
-                  placeholder="Makine ne zaman, hangi işlemde arıza veriyor? Ekranda bir hata kodu çıkıyor mu? Ses, koku, titreşim var mı?"></textarea>
+                  data-i18n-ph="sr_fault_ph" placeholder="Makine ne zaman, hangi işlemde arıza veriyor?"></textarea>
         <small style="color:var(--text-muted);font-size:11px;">
-          Ne kadar ayrıntı yazarsanız, ekibimiz o kadar hızlı çözüm üretir.
+          <span data-i18n="sr_fault_hint">Ne kadar ayrıntı yazarsanız, ekibimiz o kadar hızlı çözüm üretir.</span>
         </small>
       </div>
 
-      <div class="sv-sec">ARIZA FOTOĞRAFLARI</div>
+      <div class="sv-sec" data-i18n="sr_sec_photos">ARIZA FOTOĞRAFLARI</div>
       <div class="sv-drop" onclick="document.getElementById('svPhotos').click()">
         <div style="font-size:26px;margin-bottom:4px;">📷</div>
-        <div style="font-size:14px;font-weight:600;">Fotoğraf eklemek için tıklayın</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
-          En fazla {{ max_images }} fotoğraf · dosya başına {{ max_mb }} MB · JPG, PNG, WEBP
-        </div>
+        <div style="font-size:14px;font-weight:600;" data-i18n="sr_photo_click">Fotoğraf eklemek için tıklayın</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="svPhotoHint"></div>
       </div>
       <input type="file" name="photos" id="svPhotos" accept="image/*" multiple
              style="display:none;" onchange="svPreview()" />
       <div class="sv-thumbs" id="svThumbs"></div>
 
-      <div class="sv-sec">İLETİŞİM BİLGİLERİ</div>
+      <div class="sv-sec" data-i18n="sr_sec_contact">İLETİŞİM BİLGİLERİ</div>
       <div class="sv-row">
         <div class="form-group">
-          <label class="form-label req">Ad</label>
+          <label class="form-label req" data-i18n="sr_first">Ad</label>
           <input type="text" name="first_name" class="form-control" required />
         </div>
         <div class="form-group">
-          <label class="form-label req">Soyad</label>
+          <label class="form-label req" data-i18n="sr_last">Soyad</label>
           <input type="text" name="last_name" class="form-control" required />
         </div>
       </div>
       <div class="sv-row">
         <div class="form-group">
-          <label class="form-label req">Telefon</label>
+          <label class="form-label req" data-i18n="sr_phone">Telefon</label>
           <input type="tel" name="phone" id="svPhone" class="form-control" required
-                 placeholder="0555 111 22 33" />
+                 data-i18n-ph="sr_phone_ph" placeholder="0555 111 22 33" />
         </div>
         <div class="form-group">
-          <label class="form-label">E-posta</label>
-          <input type="email" name="email" class="form-control" placeholder="ornek@firma.com" />
+          <label class="form-label" data-i18n="sr_email">E-posta</label>
+          <input type="email" name="email" class="form-control" data-i18n-ph="sr_email_ph" placeholder="ornek@firma.com" />
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Firma Adı</label>
+        <label class="form-label" data-i18n="sr_company">Firma Adı</label>
         <input type="text" name="company_name" class="form-control" />
       </div>
 
       <button type="submit" class="btn btn-primary" id="svBtn"
               style="width:100%;margin-top:14px;padding:12px;font-size:15px;">
-        Servis Talebini Gönder
+        <span data-i18n="sr_submit">Servis Talebini Gönder</span>
       </button>
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:12px 0 0;">
-        <span style="color:#ef4444;">*</span> işaretli alanlar zorunludur.
-        {% if company.phone %}Acil durumlarda: <strong>{{ company.phone }}</strong>{% endif %}
+        <span style="color:#ef4444;">*</span> <span data-i18n="sr_required_note">işaretli alanlar zorunludur.</span>
+        {% if company.phone %}<span data-i18n="sr_urgent">Acil durumlarda:</span> <strong>{{ company.phone }}</strong>{% endif %}
       </p>
     </form>
   </div>
 
 <script>
+// ── Dil ───────────────────────────────────────────────────────────────
+var SR_I18N = {{ i18n|tojson }};
+var srLang = 'tr';
+function srT(k) {
+  var d = SR_I18N[srLang] || SR_I18N.tr || {};
+  return (d[k] !== undefined ? d[k] : k)
+           .replace('{n}', {{ max_images }}).replace('{m}', {{ max_mb }});
+}
+function srApply(lang) {
+  srLang = (SR_I18N[lang] ? lang : 'tr');
+  document.querySelectorAll('[data-i18n]').forEach(function (el) {
+    var v = srT(el.getAttribute('data-i18n'));
+    if (v) el.textContent = v;
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(function (el) {
+    var v = srT(el.getAttribute('data-i18n-ph'));
+    if (v) el.placeholder = v;
+  });
+  var h = document.getElementById('svPhotoHint');
+  if (h) h.textContent = srT('sr_photo_hint');
+  document.querySelectorAll('.lang-btn').forEach(function (b) {
+    b.classList.toggle('active', b.dataset.lang === srLang);
+  });
+  var lf = document.getElementById('svLang');
+  if (lf) lf.value = srLang;
+  document.documentElement.lang = srLang === 'zh' ? 'zh-CN' : srLang;
+  try { document.title = srT('sr_page_title'); } catch (e) {}
+}
+function srSetLang(lang) {
+  try { localStorage.setItem('lang', lang); } catch (e) {}
+  srApply(lang);
+}
+(function () {
+  var l = 'tr';
+  try { l = localStorage.getItem('lang') || 'tr'; } catch (e) {}
+  srApply(l);
+})();
+
 var svFiles = [];
 var MAXN = {{ max_images }}, MAXB = {{ max_mb }} * 1024 * 1024;
 
@@ -147,8 +188,8 @@ function svPreview() {
   var inp = document.getElementById('svPhotos');
   var incoming = Array.prototype.slice.call(inp.files);
   for (var i = 0; i < incoming.length; i++) {
-    if (svFiles.length >= MAXN) { alert('En fazla ' + MAXN + ' fotoğraf ekleyebilirsiniz.'); break; }
-    if (incoming[i].size > MAXB) { alert(incoming[i].name + ' çok büyük (üst sınır ' + {{ max_mb }} + ' MB).'); continue; }
+    if (svFiles.length >= MAXN) { alert(srT('sr_alert_max')); break; }
+    if (incoming[i].size > MAXB) { alert(incoming[i].name + ' ' + srT('sr_alert_big')); continue; }
     svFiles.push(incoming[i]);
   }
   svSync();
@@ -181,11 +222,11 @@ document.getElementById('svForm').addEventListener('submit', function (e) {
   var p = document.getElementById('svPhone').value.replace(/\D/g, '');
   if (p.length < 10) {
     e.preventDefault();
-    alert('Lütfen geçerli bir telefon numarası girin (en az 10 hane).');
+    alert(srT('sr_alert_phone'));
     return;
   }
   var b = document.getElementById('svBtn');
-  b.disabled = true; b.textContent = 'Gönderiliyor…';
+  b.disabled = true; b.textContent = srT('sr_submitting');
 });
 </script>
 </body>

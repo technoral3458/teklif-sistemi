@@ -2,6 +2,7 @@
 {% block page_title %}Silme Talepleri{% endblock %}
 
 {% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
 {% set msg = request.query_params.get('msg','') %}
 {% set msg_type = request.query_params.get('msg_type','info') %}
 {% if msg %}
@@ -20,10 +21,10 @@
 <!-- ── Servis (arıza) talepleri ── -->
 <div style="margin-bottom:24px;">
   <h3 style="font-size:15px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-    🛠 Servis Talepleri
-    {% if service_pending > 0 %}<span class="badge badge-amber">{{ service_pending }} açık</span>{% endif %}
+    🛠 {{ T.sr_admin_section }}
+    {% if service_pending > 0 %}<span class="badge badge-amber">{{ service_pending }} {{ T.sr_open }}</span>{% endif %}
     <span style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:auto;">
-      Müşteriler giriş ekranındaki “Servis Talebi” butonundan oluşturur
+      {{ T.sr_admin_hint }}
     </span>
   </h3>
   <div class="card">
@@ -33,12 +34,12 @@
         <thead>
           <tr>
             <th>Tarih</th>
-            <th>Referans</th>
-            <th>Müşteri</th>
-            <th>Telefon</th>
-            <th>Seri No / Model</th>
-            <th>Arıza</th>
-            <th>Foto</th>
+            <th>{{ T.sr_ref }}</th>
+            <th>{{ T.sr_customer }}</th>
+            <th>{{ T.customer_phone }}</th>
+            <th>{{ T.sr_serial_model }}</th>
+            <th>{{ T.sr_fault_short }}</th>
+            <th>{{ T.sr_photo }}</th>
             <th>Durum</th>
             <th style="text-align:center;">İşlem</th>
           </tr>
@@ -65,10 +66,10 @@
             <td>
               {% set _c = {'Yeni':'amber','İnceleniyor':'blue','Servis Planlandı':'blue',
                            'Çözüldü':'green','İptal':'red'} %}
-              <span class="badge badge-{{ _c.get(r.status,'gray') }}">{{ r.status }}</span>
+              <span class="badge badge-{{ _c.get(r.status,'gray') }}">{{ T.get('sr_st_' ~ r.status, r.status) }}</span>
             </td>
             <td style="text-align:center;white-space:nowrap;">
-              <a href="/admin/requests/servis/{{ r.id }}" class="btn btn-outline btn-sm">Aç</a>
+              <a href="/admin/requests/servis/{{ r.id }}" class="btn btn-outline btn-sm">{{ T.btn_edit }}</a>
             </td>
           </tr>
           {% endfor %}
@@ -77,7 +78,7 @@
     </div>
     {% else %}
     <div class="card-body" style="text-align:center;padding:32px 20px;color:var(--text-muted);font-size:13px;">
-      Henüz servis talebi yok.
+      {{ T.sr_none_yet }}
     </div>
     {% endif %}
   </div>

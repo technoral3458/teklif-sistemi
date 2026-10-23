@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Talebiniz Alındı | {{ company.company_name or 'B2B Teklif Sistemi' }}</title>
+  <title data-i18n="sr_thanks_title">Talebiniz Alındı</title>
   <link rel="stylesheet" href="/static/css/style.css" />
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
@@ -20,31 +20,43 @@
     <div class="tk-card">
       {% if company.logo %}<img class="tk-logo" src="/static/{{ company.logo }}" alt="{{ company.company_name }}" />{% endif %}
       <div style="font-size:46px;line-height:1;">✅</div>
-      <h1 style="font-size:21px;margin:14px 0 8px;">Servis talebiniz alındı</h1>
-      <p style="color:var(--text-muted);font-size:14px;line-height:1.7;margin:0;">
-        Talebiniz teknik ekibimize iletildi. En kısa sürede
-        verdiğiniz telefon numarasından size dönüş yapılacaktır.
-      </p>
+      <h1 style="font-size:21px;margin:14px 0 8px;" data-i18n="sr_thanks_head">Servis talebiniz alındı</h1>
+      <p style="color:var(--text-muted);font-size:14px;line-height:1.7;margin:0;"
+         data-i18n="sr_thanks_body">Talebiniz teknik ekibimize iletildi.</p>
 
       {% if ref %}
-      <div style="font-size:11px;color:var(--text-muted);margin-top:22px;">TAKİP NUMARANIZ</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:22px;" data-i18n="sr_ref_label">TAKİP NUMARANIZ</div>
       <div class="tk-ref">{{ ref }}</div>
-      <p style="font-size:12px;color:var(--text-muted);margin:0;">
-        Bizimle görüşürken bu numarayı belirtirseniz kaydınıza daha hızlı ulaşırız.
-      </p>
+      <p style="font-size:12px;color:var(--text-muted);margin:0;"
+         data-i18n="sr_ref_note">Bizimle görüşürken bu numarayı belirtirseniz kaydınıza daha hızlı ulaşırız.</p>
       {% endif %}
 
       {% if company.phone %}
       <p style="font-size:13px;margin-top:20px;">
-        Acil durumlar için: <strong style="color:var(--accent);">{{ company.phone }}</strong>
+        <span data-i18n="sr_urgent">Acil durumlar için:</span>
+        <strong style="color:var(--accent);">{{ company.phone }}</strong>
       </p>
       {% endif %}
 
       <div style="display:flex;gap:8px;justify-content:center;margin-top:24px;flex-wrap:wrap;">
-        <a href="/servis-talebi" class="btn btn-outline btn-sm">Yeni Talep Oluştur</a>
-        <a href="/login" class="btn btn-primary btn-sm">Giriş Ekranına Dön</a>
+        <a href="/servis-talebi" class="btn btn-outline btn-sm" data-i18n="sr_new_request">Yeni Talep Oluştur</a>
+        <a href="/login" class="btn btn-primary btn-sm" data-i18n="sr_back_login_btn">Giriş Ekranına Dön</a>
       </div>
     </div>
   </div>
+<script>
+var SR_I18N = {{ i18n|tojson }};
+(function () {
+  var l = 'tr';
+  try { l = localStorage.getItem('lang') || 'tr'; } catch (e) {}
+  var d = SR_I18N[l] || SR_I18N.tr || {};
+  document.querySelectorAll('[data-i18n]').forEach(function (el) {
+    var v = d[el.getAttribute('data-i18n')];
+    if (v) el.textContent = v;
+  });
+  document.documentElement.lang = l === 'zh' ? 'zh-CN' : l;
+  try { document.title = d.sr_thanks_title || document.title; } catch (e) {}
+})();
+</script>
 </body>
 </html>

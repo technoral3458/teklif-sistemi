@@ -13,6 +13,7 @@ import auth
 import db.factory as fdb
 from config import DATA_DIR
 from tmpl import templates
+from translations import TRANSLATIONS
 
 router = APIRouter()
 
@@ -24,6 +25,21 @@ MAX_IMAGE_MB = 12
 MAX_SIDE = 2000          # telefon fotoğrafları diski şişirmesin
 IMAGE_EXTS = {"png", "jpg", "jpeg", "webp", "bmp", "gif"}
 
+
+
+LANGS = ("tr", "en", "zh")
+
+
+def _sr_i18n():
+    """Servis talebi anahtarlarını üç dilde döndürür (genel sayfalara gömülür)."""
+    return {lg: {k: v for k, v in TRANSLATIONS.get(lg, {}).items()
+                 if k.startswith("sr_")} for lg in LANGS}
+
+
+def _msg(lang, key):
+    """Dile göre mesaj; bilinmeyen dilde Türkçeye düşer."""
+    lang = lang if lang in LANGS else "tr"
+    return TRANSLATIONS[lang].get(key) or TRANSLATIONS["tr"].get(key, key)
 
 def _digits(s):
     return re.sub(r"\D", "", s or "")
@@ -71,6 +87,7 @@ async def service_form(request: Request, err: str = ""):
         "err": err,
         "max_images": MAX_IMAGES,
         "max_mb": MAX_IMAGE_MB,
+        "i18n": _sr_i18n(),
     })
 
 
@@ -85,6 +102,7 @@ async def service_submit(
     phone: str = Form(""),
     email: str = Form(""),
     company_name: str = Form(""),
+    lang: str = Form("tr"),
     photos: list[UploadFile] = File(default=[]),
 ):
     first_name = (first_name or "").strip()
@@ -96,15 +114,13 @@ async def service_submit(
 
     # Zorunlu alanlar
     if not first_name or not last_name:
-        return RedirectResponse("/servis-talebi?err=Ad ve soyad zorunludur.", 303)
+        return RedirectResponse(f"/servis-talebi?err={_msg(lang, 'sr_err_name')}", 303)
     if len(_digits(phone)) < 10:
-        return RedirectResponse(
-            "/servis-talebi?err=Geçerli bir telefon numarası girin (en az 10 hane).", 303)
+        return RedirectResponse(f"/servis-talebi?err={_msg(lang, 'sr_err_phone')}", 303)
     if not serial_no:
-        return RedirectResponse("/servis-talebi?err=Makine seri numarası zorunludur.", 303)
+        return RedirectResponse(f"/servis-talebi?err={_msg(lang, 'sr_err_serial')}", 303)
     if len(fault_desc) < 10:
-        return RedirectResponse(
-            "/servis-talebi?err=Lütfen arızayı biraz daha ayrıntılı açıklayın.", 303)
+        return RedirectResponse(f"/servis-talebi?err={_msg(lang, 'sr_err_fault')}", 303)
 
     # Kayıt önce açılır ki resim adları id ile eşleşsin
     rid, ref = fdb.add_service_request(
@@ -159,6 +175,7 @@ async def service_thanks(request: Request, ref: str = ""):
         "user": None,
         "company": company,
         "ref": ref,
+        "i18n": _sr_i18n(),
     })
 
 
