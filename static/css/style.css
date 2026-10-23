@@ -222,8 +222,11 @@ a:hover { color: var(--accent-h); }
 .card-title { font-size: .95rem; font-weight: 600; }
 
 /* ── Stat Cards ──────────────────────────────────────────────────── */
-.stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
+/* auto-fit: her genişlikte kendiliğinden satır atlar, sabit 4 sütunda taşma olmaz */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+              gap: 16px; margin-bottom: 24px; }
 .stat-card {
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -775,4 +778,51 @@ input.search-box:focus { outline: none; border-color: var(--accent); }
   /* Search + action row: stack on mobile */
   .page-toolbar { flex-direction: column; align-items: stretch !important; }
   .page-toolbar .search-box { max-width: 100% !important; }
+}
+
+/* ── Duyarlı liste kartları ───────────────────────────────────────
+   Dar ekranda geniş tablolar yan yana sığmadığı için satırlar karta
+   dönüşür; buton ve bilgiler ekran içinde kalır.                    */
+.rc-list { display: none; flex-direction: column; gap: 10px; }
+.rc {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 13px 14px;
+}
+.rc-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 6px;
+}
+.rc-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; color: var(--text-muted); letter-spacing: -.2px;
+}
+.rc-title { font-size: 15.5px; font-weight: 700; line-height: 1.3; }
+.rc-meta { font-size: 12.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.6; }
+.rc-meta a { color: var(--accent); text-decoration: none; }
+.rc-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 10px; font-size: 13.5px; margin-top: 7px;
+}
+.rc-row .k { color: var(--text-muted); font-size: 12.5px; }
+.rc-amount {
+  font-size: 18px; font-weight: 800; color: var(--accent);
+  margin-top: 6px; letter-spacing: -.3px;
+}
+.rc-actions {
+  display: flex; gap: 8px; margin-top: 12px; padding-top: 11px;
+  border-top: 1px solid var(--border);
+}
+.rc-actions > * { flex: 1; }
+.rc-actions .btn {
+  width: 100%; justify-content: center; min-height: 40px;
+  display: inline-flex; align-items: center; font-size: 14px;
+}
+.rc-actions form { margin: 0; }
+.rc-empty { text-align: center; color: var(--text-muted); padding: 34px 10px; }
+
+/* Kenar menü ~260px yer kapladığından bu tablolar ancak ~1000px üstünde
+   tam sığıyor; altında kart görünümüne geçilir. */
+@media (max-width: 1000px) {
+  .rc-list { display: flex; }
+  .rc-table { display: none; }
 }

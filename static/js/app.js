@@ -294,6 +294,11 @@ function initTableSearch(inputId, tableId) {
         const text = row.textContent.toLowerCase();
         row.style.display = text.includes(query) ? "" : "none";
       });
+      // Dar ekrandaki kart görünümü de aynı aramayla süzülsün
+      document.querySelectorAll(".rc-list .rc").forEach(function (card) {
+        const text = card.textContent.toLowerCase();
+        card.style.display = text.includes(query) ? "" : "none";
+      });
     }, 200)
   );
 }

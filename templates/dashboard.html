@@ -70,7 +70,9 @@
     <h3 class="card-title">{% if is_mfr %}{{ T.dash_recent_orders }}{% else %}{{ T.dash_recent_offers }}{% endif %}</h3>
     <a href="{% if is_mfr %}/orders{% else %}/offers{% endif %}" class="btn btn-ghost btn-sm">{{ T.dash_view_all }}</a>
   </div>
-  <div class="table-wrap">
+  {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray','Admin Onaylı':'amber','Üretimde':'blue','Tamamlandı':'green','Teslim Edildi':'green'} %}
+  {% set sl = {'Beklemede':T.status_pending,'Onaylandı':T.status_approved,'Reddedildi':T.status_rejected,'Sipariş Verildi':T.status_ordered,'İptal':T.status_cancelled,'Admin Onaylı':T.status_admin_approved,'Üretimde':T.status_in_production,'Tamamlandı':T.status_completed,'Teslim Edildi':T.status_delivered} %}
+  <div class="table-wrap rc-table">
     <table id="mainTable">
       <thead>
         <tr>
@@ -91,8 +93,6 @@
           <td>{{ o.model_name }}</td>
           {% if not is_mfr %}<td>{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</td>{% endif %}
           <td>
-            {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red','Sipariş Verildi':'blue','İptal':'gray','Admin Onaylı':'amber','Üretimde':'blue','Tamamlandı':'green','Teslim Edildi':'green'} %}
-            {% set sl = {'Beklemede':T.status_pending,'Onaylandı':T.status_approved,'Reddedildi':T.status_rejected,'Sipariş Verildi':T.status_ordered,'İptal':T.status_cancelled,'Admin Onaylı':T.status_admin_approved,'Üretimde':T.status_in_production,'Tamamlandı':T.status_completed,'Teslim Edildi':T.status_delivered} %}
             <span class="badge badge-{{ sc.get(o.status, 'gray') }}">{{ sl.get(o.status, o.status) }}</span>
           </td>
           <td>{{ o.created_at[:10] if o.created_at else '-' }}</td>
@@ -103,6 +103,30 @@
         {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  <!-- Dar ekran: kart görünümü -->
+  <div class="rc-list" style="padding:0 14px 14px;">
+    {% for o in recent_offers %}
+    <div class="rc">
+      <div class="rc-top">
+        <span class="rc-code">{{ o.offer_no }}</span>
+        <span class="badge badge-{{ sc.get(o.status, 'gray') }}">{{ sl.get(o.status, o.status) }}</span>
+      </div>
+      {% if not is_mfr %}<div class="rc-title">{{ o.customer_name }}</div>{% endif %}
+      <div class="rc-meta">{{ o.created_at[:10] if o.created_at else '-' }}</div>
+      <div class="rc-row"><span>{{ o.model_name }}</span></div>
+      {% if not is_mfr %}
+      <div class="rc-amount">{{ "%.2f"|format(o.total_price|default(0)|float) }} {{ o.currency }}</div>
+      {% endif %}
+      <div class="rc-actions">
+        <a href="{% if is_mfr %}/orders/{{ o.id }}{% else %}/offers/{{ o.id }}{% endif %}"
+           class="btn btn-primary btn-sm">{{ T.dash_view }}</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="rc-empty">{{ T.dash_no_offers }}</div>
+    {% endfor %}
   </div>
 </div>
 {% endblock %}

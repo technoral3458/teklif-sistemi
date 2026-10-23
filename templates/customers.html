@@ -12,7 +12,7 @@
 </div>
 
 <div class="card">
-  <div class="table-wrap">
+  <div class="table-wrap rc-table">
     <table id="mainTable">
       <thead>
         <tr>
@@ -55,6 +55,38 @@
         {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  <!-- Dar ekran: kart görünümü -->
+  <div class="rc-list" style="padding:0 14px 14px;">
+    {% for c in customers %}
+    {% set bal = balances.get(c.id, 0) %}
+    <div class="rc">
+      <div class="rc-title">{{ c.name }}</div>
+      <div class="rc-meta">
+        {% if c.contact_person %}{{ c.contact_person }}<br>{% endif %}
+        {% if c.city %}📍 {{ c.city }}<br>{% endif %}
+        {% if c.phone %}📞 <a href="tel:{{ c.phone }}">{{ c.phone }}</a><br>{% endif %}
+        {% if c.email %}✉ <a href="mailto:{{ c.email }}">{{ c.email }}</a>{% endif %}
+      </div>
+      <div class="rc-row">
+        <span class="k">{{ T.customer_balance }}</span>
+        <strong style="color:{% if bal > 0 %}var(--danger){% elif bal < 0 %}var(--success){% else %}var(--text-muted){% endif %};">
+          {{ "%.2f"|format(bal) }} {{ c.currency or 'USD' }}
+        </strong>
+      </div>
+      <div class="rc-actions">
+        <button class="btn btn-outline btn-sm" onclick="editCustomer({{ c.id }}, '{{ c.name|e }}', '{{ c.contact_person|e }}', '{{ c.email|e }}', '{{ c.phone|e }}', '{{ c.address|e }}', '{{ c.city|e }}', '{{ c.country|e }}', '{{ c.currency|e }}', '{{ c.notes|e }}')">{{ T.btn_edit }}</button>
+        <a href="/ledger/customers/{{ c.id }}" class="btn btn-outline btn-sm">Cari</a>
+        <form method="post" action="/customers/delete" onsubmit="return confirmDelete(this)" data-confirm="'{{ c.name }}'?">
+          <input type="hidden" name="id" value="{{ c.id }}" />
+          <button type="submit" class="btn btn-danger btn-sm">{{ T.btn_delete }}</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="rc-empty">—</div>
+    {% endfor %}
   </div>
 </div>
 
