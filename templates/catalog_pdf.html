@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+@page { size: A4; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; background: #fff; }
+
+/* ══════════════════ COVER — FULL BLEED ══════════════════ */
+.cover {
+  width: 210mm; height: 297mm;
+  position: relative; overflow: hidden;
+  background: #0A1628;
+  page-break-after: always;
+}
+/* Full-page image */
+.cov-img-abs {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+}
+.cov-img-abs img { width: 100%; height: 100%; object-fit: contain; object-position: center center; }
+
+/* Gradient overlay — only darken bottom for text readability */
+.cov-grad {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(10,22,40,0.30) 0%,
+    rgba(10,22,40,0.05) 30%,
+    rgba(10,22,40,0.08) 52%,
+    rgba(10,22,40,0.70) 72%,
+    rgba(10,22,40,0.92) 100%
+  );
+}
+
+/* Header (top of cover) */
+.cov-header {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: 8mm 12mm 6mm;
+  display: flex; align-items: flex-start; justify-content: space-between;
+}
+.cov-logo     { height: 13mm; max-width: 50mm; object-fit: contain; }
+.cov-co-name  { color: #fff; font-size: 12pt; font-weight: 700; }
+.cov-top-right { text-align: right; }
+.cov-cat-pill {
+  display: inline-block;
+  border: 0.5mm solid #C9961A;
+  color: #C9961A; background: rgba(0,0,0,0.3);
+  font-size: 7pt; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; padding: 1.2mm 3.5mm; margin-bottom: 1.5mm;
+}
+.cov-date { color: rgba(255,255,255,0.55); font-size: 7.5pt; }
+
+/* Bottom content area */
+.cov-bottom {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 0 12mm 6mm;
+}
+.cov-gold-bar { width: 14mm; height: 1mm; background: #C9961A; margin-bottom: 4mm; }
+.cov-name {
+  font-size: 26pt; font-weight: 700; color: #fff;
+  line-height: 1.08; letter-spacing: -0.5px; margin-bottom: 3mm;
+}
+.cov-headline {
+  font-size: 10.5pt; color: rgba(255,255,255,0.78);
+  line-height: 1.6; max-width: 160mm; margin-bottom: 6mm;
+}
+/* 3-spec row */
+.cov-specs-row {
+  display: table; width: 100%;
+  border-top: 0.3mm solid rgba(201,150,26,0.4);
+  margin-bottom: 5mm;
+}
+.cov-spec-cell {
+  display: table-cell; width: 33.3%;
+  padding: 3mm 0 3mm 0;
+  border-right: 0.3mm solid rgba(255,255,255,0.15);
+  padding-left: 4mm;
+  vertical-align: middle;
+}
+.cov-spec-cell:first-child { padding-left: 0; }
+.cov-spec-cell:last-child  { border-right: none; }
+.cov-spec-lbl { font-size: 6.5pt; color: #C9961A; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1mm; }
+.cov-spec-val { font-size: 8.5pt; font-weight: 700; color: #fff; line-height: 1.3; }
+
+/* Footer bar */
+.cov-foot-bar {
+  border-top: 0.3mm solid rgba(201,150,26,0.35);
+  padding: 4mm 0 0;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.cov-foot-label { color: #C9961A; font-size: 7.5pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.cov-foot-contact { color: rgba(255,255,255,0.55); font-size: 7.5pt; text-align: right; line-height: 1.6; }
+
+/* ══════════════════ CONTENT PAGES ══════════════════ */
+.page {
+  width: 210mm;
+  padding: 12mm 13mm 23mm;
+  page-break-after: always;
+  position: relative;
+}
+.rhdr {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6mm; padding-bottom: 3mm;
+  border-bottom: 0.5mm solid #0A1628;
+}
+.rhdr-sec  { font-size: 7pt; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1.5px; }
+.rhdr-name { font-size: 7pt; font-weight: 700; color: #C9961A;  text-transform: uppercase; letter-spacing: 1px; }
+
+.stitle {
+  font-size: 14pt; font-weight: 700; color: #0A1628;
+  margin-bottom: 4mm; padding-bottom: 2.5mm;
+  border-bottom: 0.25mm solid #E5E7EB; position: relative;
+}
+.stitle::after {
+  content: ""; position: absolute;
+  bottom: -0.25mm; left: 0; width: 10mm; height: 0.7mm; background: #C9961A;
+}
+
+.intro-p { font-size: 10pt; line-height: 1.78; color: #374151; text-align: justify; margin-bottom: 3mm; }
+
+.hl-box {
+  background: #FAFBFC; border: 0.25mm solid #E5E7EB;
+  border-left: 1.5mm solid #C9961A; padding: 4mm 5mm; margin-bottom: 5mm;
+}
+.hl-lbl { font-size: 7pt; font-weight: 700; color: #0A1628; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3.5mm; }
+.hl-tbl { width: 100%; border-collapse: collapse; }
+.hl-td  { width: 50%; padding: 1.5mm 0 1.5mm 5mm; font-size: 9.5pt; color: #1E3A5F; line-height: 1.4; vertical-align: top; position: relative; }
+.hl-td::before { content: "▸"; position: absolute; left: 0; top: 1.5mm; color: #C9961A; font-size: 8pt; }
+
+.ob-box {
+  background: #EFF6FF; border: 0.25mm solid #BFDBFE;
+  border-left: 1.5mm solid #3B82F6; padding: 4mm 5mm; margin-bottom: 5mm;
+}
+.ob-lbl { font-size: 7pt; font-weight: 700; color: #1D4ED8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3mm; }
+.ob-row { font-size: 9.5pt; color: #1E3A5F; line-height: 1.55; padding: 1mm 0 1mm 5.5mm; position: relative; }
+.ob-row::before { content: "✓"; position: absolute; left: 0; top: 1mm; color: #3B82F6; font-size: 8.5pt; font-weight: 700; }
+
+.sp-intro { font-size: 8.5pt; color: #6B7280; font-style: italic; margin-bottom: 3.5mm; }
+.sp-tbl { width: 100%; border-collapse: collapse; font-size: 9pt; }
+.sp-tbl tbody tr { border-bottom: 0.3mm solid #E9ECEF; break-inside: avoid; }
+.sp-tbl tbody tr:nth-child(even) { background: #F8F9FB; }
+/* Image column — left */
+.sp-td-img {
+  width: 42mm; padding: 3mm 2mm 3mm 0;
+  vertical-align: middle; text-align: center;
+  border-right: 0.25mm solid #E9ECEF;
+}
+.sp-thumb {
+  width: 40mm; height: 30mm;
+  object-fit: contain; display: block; margin: 0 auto;
+  background: #fff;
+}
+.sp-no-img {
+  width: 40mm; height: 30mm;
+  background: #F3F4F6;
+  display: block;
+}
+/* Content column — right: title on top, desc below */
+.sp-td-content { padding: 3mm 4mm; vertical-align: top; }
+.sp-title { font-size: 9.5pt; font-weight: 700; color: #0A1628; margin-bottom: 1.5mm; }
+.sp-desc  { font-size: 9pt; color: #374151; line-height: 1.6; }
+
+/* ══════════════════ OPTIONS ══════════════════ */
+.opt-outer { width: 100%; border-collapse: separate; border-spacing: 3.5mm 4mm; }
+.opt-outer td { width: 50%; vertical-align: top; padding: 0; }
+.opt-card { border: 0.3mm solid #E5E7EB; background: #fff; break-inside: avoid; }
+.opt-img-box {
+  width: 100%; height: 44mm; overflow: hidden;
+  background: #F3F4F6; border-bottom: 0.9mm solid #C9961A;
+}
+.opt-img-box img { width: 100%; height: 100%; object-fit: cover; }
+.opt-no-img { width: 100%; height: 100%; text-align: center; padding-top: 15mm; color: #D1D5DB; font-size: 26pt; }
+.opt-body { padding: 3mm 3.5mm 4mm; }
+.opt-name { font-size: 9.5pt; font-weight: 700; color: #0A1628; margin-bottom: 2mm; }
+.opt-desc { font-size: 8.5pt; color: #4B5563; line-height: 1.5; }
+
+/* Page footer */
+.pgfoot {
+  position: absolute; bottom: 7mm; left: 13mm; right: 13mm;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 7pt; color: #9CA3AF;
+  border-top: 0.25mm solid #E5E7EB; padding-top: 2.5mm;
+}
+.pgfoot-co  { color: #C9961A; font-weight: 700; }
+.pgfoot-num { background: #0A1628; color: #fff; font-size: 7pt; font-weight: 700; padding: 1mm 2.5mm; }
+
+/* ══════════════════ BACK COVER ══════════════════ */
+.back {
+  width: 210mm; height: 297mm;
+  background: #0A1628; position: relative; overflow: hidden;
+  page-break-before: always;
+}
+.back-gold-line { height: 2mm; background: #C9961A; }
+.back-body { padding: 32mm 18mm; text-align: center; }
+.back-eyebrow { color: #C9961A; font-size: 7.5pt; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 5mm; }
+.back-co  { color: #fff; font-size: 22pt; font-weight: 700; margin-bottom: 3mm; }
+.back-bar { width: 12mm; height: 0.8mm; background: #C9961A; margin: 0 auto 7mm; }
+.back-cta { color: #94A3B8; font-size: 10.5pt; line-height: 1.7; max-width: 130mm; margin: 0 auto 16mm; }
+.back-tbl  { display: table; margin: 0 auto; border-spacing: 0 2.5mm; }
+.back-row  { display: table-row; }
+.back-lbl  { display: table-cell; color: #C9961A; font-size: 8.5pt; font-weight: 700; padding: 1.5mm 5mm 1.5mm 0; text-align: right; vertical-align: top; }
+.back-val  { display: table-cell; color: #E2E8F0; font-size: 8.5pt; padding: 1.5mm 0; line-height: 1.5; }
+.back-foot { position: absolute; bottom: 0; left: 0; right: 0; border-top: 0.5mm solid #1E3A5F; padding: 4mm 18mm; display: flex; justify-content: space-between; }
+.back-foot-model { color: #C9961A; font-size: 8pt; font-weight: 700; }
+.back-foot-date  { color: #4B5563; font-size: 8pt; }
+
+.nb { break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════ COVER ════════════════════════════════════ -->
+<div class="cover">
+  <!-- Full-bleed background image -->
+  <div class="cov-img-abs">
+    {% set cover_img = display_image if display_image else model.image_path %}
+    {% if cover_img %}
+    <img src="{{ base_url }}/static/{{ cover_img }}" />
+    {% endif %}
+  </div>
+  <!-- Gradient overlay -->
+  <div class="cov-grad"></div>
+
+  <!-- Top header -->
+  <div class="cov-header">
+    <div></div>
+    <div class="cov-top-right">
+      <div class="cov-cat-pill">{{ category_name }}</div>
+      <div class="cov-date">{{ date_str }}</div>
+    </div>
+  </div>
+
+  <!-- Bottom content -->
+  <div class="cov-bottom">
+    <div class="cov-gold-bar"></div>
+    <div class="cov-name">{{ model_name }}</div>
+    {% if ai.headline %}
+    <div class="cov-headline">{{ ai.headline }}</div>
+    {% endif %}
+
+    {% if specs %}
+    <div class="cov-specs-row">
+      {% for s in specs[:3] %}
+      <div class="cov-spec-cell">
+        <div class="cov-spec-lbl">{{ s.title }}</div>
+        <div class="cov-spec-val">{% set d = s.get('desc_'+lang) or s.get('desc') or '' %}{{ d[:45] }}{% if d|length > 45 %}…{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="cov-foot-bar">
+      <span class="cov-foot-label">{{ label_product_catalog }}</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ OVERVIEW ═════════════════════════════════ -->
+<div class="page">
+  <div class="rhdr">
+    <span class="rhdr-sec">{{ label_overview }}</span>
+    <span class="rhdr-name">{{ model_name }}</span>
+  </div>
+  <div class="stitle">{{ label_overview }}</div>
+
+  {% if ai.intro %}
+  <p class="intro-p">{{ ai.intro }}</p>
+  {% endif %}
+
+  {% if ai.highlights %}
+  <div class="hl-box nb">
+    <div class="hl-lbl">{{ label_highlights }}</div>
+    <table class="hl-tbl">
+      {% set hl = ai.highlights %}
+      {% for i in range(0, hl|length, 2) %}
+      <tr>
+        <td class="hl-td">{{ hl[i] }}</td>
+        <td class="hl-td">{% if i+1 < hl|length %}{{ hl[i+1] }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  {% if ai.option_benefits and options %}
+  <div class="ob-box nb">
+    <div class="ob-lbl">{{ label_option_benefits }}</div>
+    {% for b in ai.option_benefits %}
+    <div class="ob-row">{{ b }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="pgfoot">
+    <span class="pgfoot-co">{{ model_name }}</span>
+    <span>{{ model_name }}</span>
+    <span class="pgfoot-num">02</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════ SPECS ════════════════════════════════════ -->
+{% if specs %}
+<div class="page">
+  <div class="rhdr">
+    <span class="rhdr-sec">{{ label_specs }}</span>
+    <span class="rhdr-name">{{ model_name }}</span>
+  </div>
+  <div class="stitle">{{ label_specs }}</div>
+  {% if ai.specs_intro %}<p class="sp-intro">{{ ai.specs_intro }}</p>{% endif %}
+  <table class="sp-tbl">
+    <tbody>
+    {% for s in specs %}
+    {% set d = s.get('desc_'+lang) or s.get('desc') or '' %}
+    <tr>
+      <td class="sp-td-img">
+        {% if s.get('img') %}
+        <img class="sp-thumb" src="{{ base_url }}/static/{{ s.img }}" />
+        {% else %}
+        <div class="sp-no-img"></div>
+        {% endif %}
+      </td>
+      <td class="sp-td-content">
+        <div class="sp-title">{{ s.title }}</div>
+        {% if d %}<div class="sp-desc">{{ d }}</div>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="pgfoot">
+    <span class="pgfoot-co">{{ model_name }}</span>
+    <span>{{ model_name }}</span>
+    <span class="pgfoot-num">03</span>
+  </div>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════ OPTIONS ══════════════════════════════════ -->
+{% if options %}
+{% for page_start in range(0, options|length, 4) %}
+{% set page_opts = options[page_start:page_start+4] %}
+{% set pg_num = (4 if specs else 3) + loop.index0 %}
+<div class="page">
+  <div class="rhdr">
+    <span class="rhdr-sec">{{ label_options }}</span>
+    <span class="rhdr-name">{{ model_name }}</span>
+  </div>
+  <div class="stitle">{{ label_options }}</div>
+  <table class="opt-outer">
+    {% for i in range(0, page_opts|length, 2) %}
+    <tr>
+      {% for j in [i, i+1] %}
+      <td>
+        {% if j < page_opts|length %}
+        {% set o = page_opts[j] %}
+        {% set oname = o.get('name_'+lang) or o.get('name','') %}
+        {% set ai_text = ai.option_texts.get(oname) or ai.option_texts.get(o.get('name','')) or (o.get('description_'+lang) or o.get('description') or '') %}
+        <div class="opt-card nb">
+          <div class="opt-img-box">
+            {% if o.get('image_path') %}<img src="{{ base_url }}/static/{{ o.image_path }}" />
+            {% else %}<div class="opt-no-img">⚙</div>{% endif %}
+          </div>
+          <div class="opt-body">
+            <div class="opt-name">{{ oname }}</div>
+            {% if ai_text %}<div class="opt-desc">{{ ai_text }}</div>{% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="pgfoot">
+    <span class="pgfoot-co">{{ model_name }}</span>
+    <span>{{ model_name }}</span>
+    <span class="pgfoot-num">{{ '%02d'|format(pg_num) }}</span>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- ══════════════════════════ BACK COVER ═══════════════════════════════ -->
+<div class="back">
+  <div class="back-gold-line"></div>
+  <div class="back-body">
+    {% if ai.cta %}<div class="back-cta">{{ ai.cta }}</div>{% endif %}
+  </div>
+  <div class="back-foot">
+    <span class="back-foot-model">{{ model_name }}</span>
+    <span class="back-foot-date">{{ date_str }}</span>
+  </div>
+</div>
+
+</body>
+</html>

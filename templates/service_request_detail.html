@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{{ T.sr_title }} – {{ req.ref_no }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+  <a href="/admin/requests" class="btn btn-ghost btn-sm">{{ T.sr_d_back }}</a>
+  <span style="font-weight:700;font-size:16px;">🛠 {{ req.ref_no }}</span>
+  {% set _c = {'Yeni':'amber','İnceleniyor':'blue','Servis Planlandı':'blue',
+               'Çözüldü':'green','İptal':'red'} %}
+  <span class="badge badge-{{ _c.get(req.status,'gray') }}">{{ T.get('sr_st_' ~ req.status, req.status) }}</span>
+  <span style="color:var(--text-muted);font-size:12px;">
+    {{ req.created_at[:16] if req.created_at else '' }}
+  </span>
+  <form method="post" action="/admin/requests/servis/{{ req.id }}/delete"
+        onsubmit="return confirm('{{ req.ref_no }} — {{ T.sr_d_delete_confirm }}')"
+        style="margin-left:auto;">
+    <button type="submit" class="btn btn-danger btn-sm">🗑 {{ T.btn_delete }}</button>
+  </form>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;" class="sv-grid">
+
+  <!-- Müşteri -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">👤 {{ T.sr_d_customer }}</h3></div>
+    <div class="card-body">
+      <table style="width:100%;font-size:14px;border-collapse:collapse;">
+        {% for label, val in [
+          (T.sr_first ~ ' / ' ~ T.sr_last, (req.first_name ~ ' ' ~ req.last_name)|trim),
+          (T.customer_phone, req.phone),
+          (T.customer_email, req.email or '—'),
+          (T.customer_name, req.company_name or '—'),
+        ] %}
+        <tr>
+          <td style="padding:7px 0;color:var(--text-muted);width:96px;vertical-align:top;">{{ label }}</td>
+          <td style="padding:7px 0;font-weight:500;">
+            {% if loop.index == 2 %}<a href="tel:{{ val }}" style="color:var(--accent);">{{ val }}</a>
+            {% elif loop.index == 3 and val != '—' %}<a href="mailto:{{ val }}" style="color:var(--accent);">{{ val }}</a>
+            {% else %}{{ val }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+
+  <!-- Makine -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">⚙️ {{ T.sr_d_machine }}</h3></div>
+    <div class="card-body">
+      <div style="font-size:11px;color:var(--text-muted);">{{ T.sr_d_serial }}</div>
+      <div style="font-size:20px;font-weight:800;letter-spacing:.5px;margin:2px 0 14px;">
+        {{ req.serial_no or '—' }}
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);">{{ T.sr_d_model }}</div>
+      <div style="font-size:15px;font-weight:600;margin-top:2px;">{{ req.model_name or '—' }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Arıza -->
+<div class="card" style="margin-top:20px;">
+  <div class="card-header"><h3 class="card-title">⚠️ {{ T.sr_d_fault }}</h3></div>
+  <div class="card-body">
+    <div style="white-space:pre-wrap;font-size:14px;line-height:1.75;">{{ req.fault_desc }}</div>
+  </div>
+</div>
+
+<!-- Fotoğraflar -->
+{% if req.images %}
+<div class="card" style="margin-top:20px;">
+  <div class="card-header">
+    <h3 class="card-title">📷 {{ T.sr_d_photos }}</h3>
+    <span style="color:var(--text-muted);font-size:12px;">{{ req.images|length }} {{ T.sr_d_photos_hint }}</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;">
+      {% for i in range(1, req.images|length + 1) %}
+      <a href="/admin/requests/servis/{{ req.id }}/resim/{{ i }}" target="_blank"
+         style="display:block;width:190px;height:150px;border-radius:8px;overflow:hidden;
+                border:1px solid var(--border);background:var(--surface-2);">
+        <img src="/admin/requests/servis/{{ req.id }}/resim/{{ i }}" alt="Arıza {{ i }}"
+             style="width:100%;height:100%;object-fit:cover;display:block;" />
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Durum -->
+<div class="card" style="margin-top:20px;">
+  <div class="card-header"><h3 class="card-title">📋 {{ T.sr_d_status }}</h3></div>
+  <div class="card-body">
+    <form method="post" action="/admin/requests/servis/{{ req.id }}/status">
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
+        <div class="form-group" style="margin:0;max-width:240px;flex:1;">
+          <label class="form-label">{{ T.offer_status }}</label>
+          <select name="status" class="form-control">
+            {% for s in statuses %}
+            <option value="{{ s }}" {% if req.status == s %}selected{% endif %}>{{ T.get('sr_st_' ~ s, s) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">{{ T.sr_d_note }}</label>
+        <textarea name="admin_note" class="form-control" rows="4"
+                  placeholder="{{ T.sr_d_note_ph }}">{{ req.admin_note }}</textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">{{ T.btn_save }}</button>
+    </form>
+  </div>
+</div>
+
+<style>
+@media (max-width: 860px) { .sv-grid { grid-template-columns:1fr !important; } }
+</style>
+{% endblock %}
