@@ -57,7 +57,6 @@ from routers.quote_requests import router as quote_requests_router
 from routers.parametric import router as parametric_router
 from routers.service_requests import router as service_requests_router
 from routers.reports import router as reports_router
-from routers.petition import router as petition_router
 
 for r in [
     auth_router,
@@ -84,7 +83,6 @@ for r in [
     parametric_router,
     service_requests_router,
     reports_router,
-    petition_router,
 ]:
     app.include_router(r)
 
