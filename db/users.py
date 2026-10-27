@@ -51,6 +51,8 @@ def init():
             ("is_manufacturer","INTEGER DEFAULT 0"),
             ("senior_mode","INTEGER DEFAULT 0"),
             ("is_admin","INTEGER DEFAULT 0"),
+            ("reg_ip","TEXT DEFAULT ''"),
+            ("last_login","TEXT DEFAULT ''"),
         ]:
             _acol(c.cursor(),"users",col,typ)
         existing = c.execute("SELECT id FROM users WHERE role='admin' LIMIT 1").fetchone()
@@ -69,10 +71,10 @@ def init():
 def _row(r):
     if not r: return None
     keys=["id","email","password","company_name","role","is_approved","is_active",
-          "phone","logo_path","website","address","allowed_categories","can_view_costs","lang","theme","allowed_menus","created_at","parent_id","allowed_actions","allowed_models","is_manufacturer","senior_mode","is_admin"]
+          "phone","logo_path","website","address","allowed_categories","can_view_costs","lang","theme","allowed_menus","created_at","parent_id","allowed_actions","allowed_models","is_manufacturer","senior_mode","is_admin","reg_ip","last_login"]
     return dict(zip(keys,r))
 
-_SEL = "id,email,password,company_name,role,is_approved,is_active,phone,logo_path,website,address,allowed_categories,can_view_costs,lang,theme,allowed_menus,created_at,parent_id,allowed_actions,allowed_models,is_manufacturer,senior_mode,is_admin"
+_SEL = "id,email,password,company_name,role,is_approved,is_active,phone,logo_path,website,address,allowed_categories,can_view_costs,lang,theme,allowed_menus,created_at,parent_id,allowed_actions,allowed_models,is_manufacturer,senior_mode,is_admin,reg_ip,last_login"
 
 def by_email(email):
     with _c() as c:
@@ -93,15 +95,31 @@ def check_pw(plain,hashed):
 def hash_pw(plain):
     return bcrypt.hashpw(plain.encode(),bcrypt.gensalt()).decode()
 
-def register(email,password,company_name,user_type="dealer",phone=""):
+def register(email,password,company_name,user_type="dealer",phone="",reg_ip=""):
     if by_email(email): return False,"email_in_use"
     role = "dealer" if user_type=="dealer" else "manufacturer"
     try:
         with _c() as c:
-            c.execute("INSERT INTO users(email,password,company_name,role,user_type,phone) VALUES(?,?,?,?,?,?)",
-                      (email,hash_pw(password),company_name,role,user_type,phone))
+            c.execute("INSERT INTO users(email,password,company_name,role,user_type,phone,reg_ip) VALUES(?,?,?,?,?,?,?)",
+                      (email,hash_pw(password),company_name,role,user_type,phone,reg_ip))
         return True,"ok"
     except: return False,"email_in_use"
+
+
+def touch_login(uid):
+    """Başarılı girişi işaretler — hiç giriş yapmamış hesapları ayıklamak için."""
+    with _c() as c:
+        c.execute("UPDATE users SET last_login=datetime('now') WHERE id=?",(uid,))
+
+
+def reg_ip_counts():
+    """{IP: o IP'den kaç kayıt} — aynı kaynaktan gelen kayıt yığınını yakalar."""
+    with _c() as c:
+        rows=c.execute(
+            "SELECT reg_ip,COUNT(*) FROM users"
+            " WHERE reg_ip IS NOT NULL AND reg_ip NOT IN ('','-')"
+            " GROUP BY reg_ip").fetchall()
+    return {r[0]: r[1] for r in rows}
 
 def reset_token(email):
     u = by_email(email)
@@ -198,4 +216,49 @@ def get_manufacturer_group_ids(user):
 
 def delete_user(uid):
     with _c() as c:
-        c.execute("DELETE FROM users WHERE id=?",(uid,))
+        c.execute("DELETE FROM users WHERE id=? AND role!='admin'",(uid,))
+
+
+def _safe_ids(ids, protect_id=None):
+    """Toplu işlem için kimlikleri süzer.
+
+    Listeye hiçbir koşulda girmeyenler: admin rolündeki hesaplar, yönetici
+    modu verilmiş hesaplar ve işlemi yapanın kendisi. Yanlışlıkla "tümünü
+    seç" yapılması yetkili bir hesabı silmemeli; tekil silme düğmesi
+    (bilinçli bir işlem) bu hesaplar için çalışmaya devam eder."""
+    want = {int(i) for i in ids if str(i).strip().isdigit()}
+    want.discard(int(protect_id) if protect_id else -1)
+    if not want:
+        return []
+    q = ",".join("?" * len(want))
+    with _c() as c:
+        rows = c.execute(
+            f"SELECT id FROM users WHERE id IN ({q})"
+            " AND role!='admin' AND COALESCE(is_admin,0)=0",
+            list(want)).fetchall()
+    return [r[0] for r in rows]
+
+
+def bulk_delete(ids, protect_id=None) -> int:
+    safe = _safe_ids(ids, protect_id)
+    if not safe:
+        return 0
+    q = ",".join("?" * len(safe))
+    with _c() as c:
+        c.execute(f"DELETE FROM users WHERE id IN ({q})", safe)
+    return len(safe)
+
+
+def bulk_set(ids, protect_id=None, **kw) -> int:
+    """Seçilenlerin onay/aktiflik durumunu topluca değiştirir."""
+    allowed = ["is_approved","is_active"]
+    f = {k:v for k,v in kw.items() if k in allowed}
+    safe = _safe_ids(ids, protect_id)
+    if not f or not safe:
+        return 0
+    sets = ",".join(f"{k}=?" for k in f)
+    q = ",".join("?" * len(safe))
+    with _c() as c:
+        c.execute(f"UPDATE users SET {sets} WHERE id IN ({q})",
+                  list(f.values()) + safe)
+    return len(safe)

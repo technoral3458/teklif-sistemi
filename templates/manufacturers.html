@@ -18,6 +18,10 @@
       {% if pcount > 0 %}<span class="badge badge-amber" style="margin-left:6px">{{ pcount }}</span>{% endif %}
     </button>
     <button class="tab-btn" data-tab="tab-approved" onclick="switchTab('tab-approved')">{{ T.manufacturer_approved }}</button>
+    <button class="tab-btn" data-tab="tab-spam" onclick="switchTab('tab-spam')">
+      ⚠ Şüpheli
+      {% if suspicious|length > 0 %}<span class="badge badge-red" style="margin-left:6px">{{ suspicious|length }}</span>{% endif %}
+    </button>
     <button class="tab-btn active" data-tab="tab-all" onclick="switchTab('tab-all')">{{ T.manufacturer_all }}</button>
   </div>
   <div style="display:flex;gap:8px;">
@@ -26,11 +30,30 @@
   </div>
 </div>
 
-{% macro mfr_table(mfr_list) %}
+{% macro mfr_table(mfr_list, pane, show_score=false) %}
+<form method="post" action="/manufacturers/bulk" id="bulkForm-{{ pane }}">
+  <input type="hidden" name="action" id="bulkAction-{{ pane }}" value="" />
+</form>
+
+<div class="bulk-bar" id="bulkBar-{{ pane }}">
+  <span class="bulk-count"><strong id="bulkNum-{{ pane }}">0</strong> kayıt seçildi</span>
+  <div class="bulk-btns">
+    <button type="button" class="btn btn-success btn-sm" onclick="bulkDo('{{ pane }}','approve')">✅ Onayla</button>
+    <button type="button" class="btn btn-outline btn-sm" onclick="bulkDo('{{ pane }}','deactivate')">⏸ Pasife Al</button>
+    <button type="button" class="btn btn-danger btn-sm" onclick="bulkDo('{{ pane }}','delete')">🗑 Seçilenleri Sil</button>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="bulkAll('{{ pane }}',false)">Seçimi Temizle</button>
+  </div>
+</div>
+
 <div class="table-wrap">
   <table>
     <thead>
       <tr>
+        <th style="width:34px;text-align:center;">
+          <input type="checkbox" class="bulk-master" id="bulkMaster-{{ pane }}"
+                 onchange="bulkAll('{{ pane }}', this.checked)" title="Tümünü seç" />
+        </th>
+        {% if show_score %}<th style="width:72px;">Şüphe</th>{% endif %}
         <th>{{ T.manufacturer_company }}</th>
         <th class="col-hide-sm">{{ T.manufacturer_email }}</th>
         <th>{{ T.manufacturer_status }}</th>
@@ -41,6 +64,17 @@
     <tbody>
       {% for m in mfr_list %}
       <tr>
+        <td style="text-align:center;">
+          <input type="checkbox" name="ids" value="{{ m.id }}" class="bulk-chk"
+                 form="bulkForm-{{ pane }}" data-pane="{{ pane }}"
+                 onchange="bulkSync('{{ pane }}')" aria-label="Seç" />
+        </td>
+        {% if show_score %}
+        <td>
+          <span class="badge {{ 'badge-red' if m.spam_score >= 6 else 'badge-amber' }}"
+                title="{{ m.spam_reasons|join(' • ') }}">{{ m.spam_score }} puan</span>
+        </td>
+        {% endif %}
         <td>
           <strong>{{ m.company_name or m.email }}</strong>
           <div class="col-show-sm" style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ m.email }}</div>
@@ -56,7 +90,16 @@
             <span class="badge badge-red">{{ T.status_inactive }}</span>
           {% endif %}
         </td>
-        <td class="col-hide-sm">{{ m.created_at[:10] if m.created_at else '-' }}</td>
+        <td class="col-hide-sm">
+          {{ m.created_at[:10] if m.created_at else '-' }}
+          {% if m.reg_ip %}<div style="font-size:10px;color:var(--text-muted);">IP {{ m.reg_ip }}</div>{% endif %}
+          {% if not m.last_login %}<div style="font-size:10px;color:var(--text-muted);">hiç giriş yapmadı</div>{% endif %}
+          {% if show_score and m.spam_reasons %}
+          <div style="font-size:10px;color:#f87171;max-width:200px;line-height:1.4;margin-top:3px;">
+            {{ m.spam_reasons|join(' • ') }}
+          </div>
+          {% endif %}
+        </td>
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
             <button class="btn btn-outline btn-sm"
@@ -90,7 +133,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">{{ T.manufacturer_no_records }}</td></tr>
+      <tr><td colspan="{{ 7 if show_score else 6 }}" style="text-align:center;color:var(--text-muted);padding:24px">{{ T.manufacturer_no_records }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -98,13 +141,21 @@
 {% endmacro %}
 
 <div id="tab-pending" class="tab-pane card" style="display:none;">
-  {{ mfr_table(manufacturers|selectattr('is_approved','eq',0)|list) }}
+  {{ mfr_table(manufacturers|selectattr('is_approved','eq',0)|list, 'pending') }}
 </div>
 <div id="tab-approved" class="tab-pane card" style="display:none;">
-  {{ mfr_table(manufacturers|selectattr('is_approved','eq',1)|list) }}
+  {{ mfr_table(manufacturers|selectattr('is_approved','eq',1)|list, 'approved') }}
+</div>
+<div id="tab-spam" class="tab-pane card" style="display:none;">
+  <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-muted);">
+    Bot kaydı olma şüphesi taşıyan hesaplar — puan yükseldikçe şüphe artar.
+    Nedenler satırın yanında yazılıdır. <strong>Silmeden önce listeyi gözden geçirin;</strong>
+    bu bir tahmindir, gerçek bir üretici de listeye düşebilir.
+  </div>
+  {{ mfr_table(suspicious, 'spam', show_score=true) }}
 </div>
 <div id="tab-all" class="tab-pane card">
-  {{ mfr_table(manufacturers) }}
+  {{ mfr_table(manufacturers, 'all') }}
 </div>
 
 <!-- Add Manufacturer Modal -->

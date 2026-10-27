@@ -1,30 +1,83 @@
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse
 import db.users as udb
 import db.factory as fdb
 import auth
+import security
 
 router = APIRouter(prefix="/dealers")
 from tmpl import templates
+
+# Bu puandan itibaren kayıt "şüpheli" sekmesinde listelenir.
+SPAM_THRESHOLD = 3
 
 
 @router.get("")
 async def dealers_list(request: Request):
     user = auth.require_admin(request)
-    dealers = [u for u in udb.all_users() if u["role"] in ("dealer", "manufacturer") and u["role"] != "admin"]
-    # show dealers + manufacturer sub-accounts (those with parent_id)
-    dealers = [u for u in udb.all_users() if u["role"] == "dealer" or (u["role"] == "manufacturer" and u.get("parent_id"))]
+    # bayiler + üreticinin alt hesapları
+    dealers = [u for u in udb.all_users()
+               if u["role"] == "dealer" or (u["role"] == "manufacturer" and u.get("parent_id"))]
+
+    # Bot kaydı şüphesi — aynı IP'den gelen yığın kayıtları da yakalar
+    ip_counts = udb.reg_ip_counts()
+    for d in dealers:
+        d["spam_score"], d["spam_reasons"] = security.spam_score(d, ip_counts)
+    suspicious = sorted(
+        (d for d in dealers if d["spam_score"] >= SPAM_THRESHOLD),
+        key=lambda d: -d["spam_score"],
+    )
+
     manufacturers = udb.all_manufacturers()
     cats = fdb.get_cats()
     return templates.TemplateResponse(request, "dealers.html", {
         "user": user,
         "dealers": dealers,
+        "suspicious": suspicious,
         "manufacturers": manufacturers,
         "categories": cats,
         "active_page": "dealers",
         "msg": request.query_params.get("msg"),
         "msg_type": request.query_params.get("msg_type", "info"),
     })
+
+
+@router.post("/bulk")
+async def bulk_dealers(request: Request):
+    """Seçili hesapları topluca sil / onayla / pasife al.
+
+    Her işlem db katmanında yeniden süzülür: yönetici rolündeki hesaplar ve
+    işlemi yapanın kendisi, formdan ne gelirse gelsin listeye girmez.
+    """
+    acting = auth.require_admin(request)
+    form = await request.form()
+    ids = form.getlist("ids")
+    action = (form.get("action") or "").strip()
+
+    if not ids:
+        return RedirectResponse(
+            "/dealers?" + urlencode({"msg": "Hiç kayıt seçilmedi.", "msg_type": "warning"}), 303)
+
+    if action == "delete":
+        n = udb.bulk_delete(ids, protect_id=acting["id"])
+        msg = f"{n} hesap silindi."
+    elif action == "approve":
+        n = udb.bulk_set(ids, protect_id=acting["id"], is_approved=1, is_active=1)
+        msg = f"{n} hesap onaylandı."
+    elif action == "deactivate":
+        n = udb.bulk_set(ids, protect_id=acting["id"], is_approved=0, is_active=0)
+        msg = f"{n} hesap pasife alındı."
+    else:
+        return RedirectResponse(
+            "/dealers?" + urlencode({"msg": "Geçersiz işlem.", "msg_type": "error"}), 303)
+
+    skipped = len(ids) - n
+    if skipped > 0:
+        msg += f" ({skipped} hesap korumalı olduğu için atlandı.)"
+    return RedirectResponse(
+        "/dealers?" + urlencode({"msg": msg, "msg_type": "success" if n else "warning"}), 303)
 
 
 @router.post("/add")

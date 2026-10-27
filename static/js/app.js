@@ -307,3 +307,42 @@ document.addEventListener("DOMContentLoaded", function () {
   // Auto-init table search if elements exist
   initTableSearch("tableSearch", "mainTable");
 });
+
+
+// ── Toplu seçim ───────────────────────────────────────────────
+// Onay kutuları tabloda ama HTML5 form="" ile dışarıdaki toplu forma bağlı;
+// satır içindeki onayla/sil formları bozulmasın diye tablo forma sarılmıyor.
+function _bulkBoxes(pane) {
+  return Array.from(document.querySelectorAll('.bulk-chk[data-pane="' + pane + '"]'));
+}
+
+function bulkSync(pane) {
+  const boxes = _bulkBoxes(pane);
+  const sel = boxes.filter(b => b.checked).length;
+  document.getElementById('bulkNum-' + pane).textContent = sel;
+  document.getElementById('bulkBar-' + pane).classList.toggle('on', sel > 0);
+  const master = document.getElementById('bulkMaster-' + pane);
+  if (master) {
+    master.checked = sel > 0 && sel === boxes.length;
+    master.indeterminate = sel > 0 && sel < boxes.length;
+  }
+}
+
+function bulkAll(pane, state) {
+  _bulkBoxes(pane).forEach(b => b.checked = state);
+  bulkSync(pane);
+}
+
+function bulkDo(pane, action) {
+  const n = _bulkBoxes(pane).filter(b => b.checked).length;
+  if (!n) { alert('Önce kayıt seçin.'); return; }
+  const q = {
+    delete: n + ' hesabı KALICI olarak silmek istediğinize emin misiniz?\n' +
+            'Bu işlem geri alınamaz.',
+    approve: n + ' hesabı onaylamak istediğinize emin misiniz?',
+    deactivate: n + ' hesabı pasife almak istediğinize emin misiniz?'
+  }[action];
+  if (!window.confirm(q)) return;
+  document.getElementById('bulkAction-' + pane).value = action;
+  document.getElementById('bulkForm-' + pane).submit();
+}

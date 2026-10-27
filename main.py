@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 import db.users as udb
 import db.factory as fdb
 import auth
+import security
 from config import BASE_DIR
 
 # Raise Starlette's default 1 MB per-part limit to 20 MB so large image uploads work
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
     os.makedirs(os.path.join(BASE_DIR, "static", "docs"), exist_ok=True)
     udb.init()
     fdb.init()
+    security.init()
     yield
 
 

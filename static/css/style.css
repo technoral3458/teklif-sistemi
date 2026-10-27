@@ -826,3 +826,21 @@ input.search-box:focus { outline: none; border-color: var(--accent); }
   .rc-list { display: flex; }
   .rc-table { display: none; }
 }
+
+
+/* ── Toplu seçim çubuğu (Bayiler / Üreticiler) ───────────── */
+/* Seçim yapılmadan görünmez */
+.bulk-bar {
+  display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px; background: rgba(239, 68, 68, .08);
+  border-bottom: 1px solid var(--border);
+}
+.bulk-bar.on { display: flex; }
+.bulk-count { font-size: 13px; }
+.bulk-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.bulk-chk, .bulk-master {
+  width: 17px; height: 17px; cursor: pointer; accent-color: var(--accent);
+}
+@media (max-width: 700px) {
+  .bulk-btns { margin-left: 0; width: 100%; }
+}
