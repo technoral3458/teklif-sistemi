@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ company.company_name or 'B2B' }} – Makine Konfigüratörü</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    body { min-height:100vh; background:var(--bg); }
+    .pq-wrap { max-width:960px; margin:0 auto; padding:24px 16px 60px; }
+
+    /* Top bar */
+    .pq-topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; gap:12px; flex-wrap:wrap; }
+    .pq-logo img { max-height:56px; max-width:180px; object-fit:contain; }
+    .pq-logo h1 { font-size:20px; font-weight:700; color:var(--accent); margin:0; }
+    .pq-steps { display:flex; gap:6px; align-items:center; font-size:13px; color:var(--text-muted); }
+    .pq-step { padding:4px 14px; border-radius:20px; font-weight:600; }
+    .pq-step.active { background:var(--accent); color:#fff; }
+    .pq-step.done   { background:var(--success,#22c55e); color:#fff; }
+
+    /* Step panels */
+    .pq-panel { display:none; }
+    .pq-panel.active { display:block; }
+
+    /* Model grid */
+    .pq-models { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
+    .pq-model-card {
+      border:2px solid var(--border); border-radius:12px; overflow:hidden;
+      cursor:pointer; transition:border-color .15s, box-shadow .15s;
+      background:var(--surface);
+    }
+    .pq-model-card:hover { border-color:var(--accent); box-shadow:0 0 0 3px rgba(59,130,246,.15); }
+    .pq-model-card.selected { border-color:var(--accent); background:rgba(59,130,246,.06); box-shadow:0 0 0 3px rgba(59,130,246,.2); }
+    .pq-model-card img { width:100%; height:140px; object-fit:cover; display:block; }
+    .pq-model-card .pq-mc-body { padding:10px 12px; }
+    .pq-model-card .pq-mc-name { font-weight:700; font-size:14px; margin-bottom:3px; }
+    .pq-model-card .pq-mc-cat  { font-size:11px; color:var(--text-muted); }
+
+    /* Line selector */
+    .line-btns { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 20px; }
+
+    /* Options */
+    .pq-opt-group { margin-bottom:24px; }
+    .pq-opt-group-title { font-size:13px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; }
+    .pq-opt-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+    .pq-opt-card {
+      border:2px solid var(--border); border-radius:10px; padding:12px 14px;
+      cursor:pointer; transition:border-color .15s; background:var(--surface);
+    }
+    .pq-opt-card:hover { border-color:var(--accent); }
+    .pq-opt-card.selected { border-color:var(--accent); background:rgba(59,130,246,.07); }
+    .pq-opt-card .poc-name { font-weight:600; font-size:13px; margin-bottom:3px; }
+    .pq-opt-card .poc-desc { font-size:11px; color:var(--text-muted); }
+    .pq-opt-card img { width:100%; max-height:100px; object-fit:cover; border-radius:6px; margin-bottom:8px; }
+
+    /* Summary */
+    .pq-summary { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:24px; }
+    .pq-summary-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:14px; }
+    .pq-summary-row:last-child { border-bottom:none; font-weight:700; }
+
+    /* Contact form */
+    .pq-contact { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; }
+    .pq-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media(max-width:600px){ .pq-form-grid{ grid-template-columns:1fr; } }
+
+    /* Nav */
+    .pq-nav { display:flex; gap:10px; margin-top:24px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+<div class="pq-wrap">
+
+  <!-- Top bar -->
+  <div class="pq-topbar">
+    <div class="pq-logo">
+      {% if company.logo_path %}
+      <img src="/static/{{ company.logo_path }}" alt="{{ company.company_name }}" />
+      {% else %}
+      <h1>{{ company.company_name or 'Makine Konfigüratörü' }}</h1>
+      {% endif %}
+    </div>
+    <div class="pq-steps">
+      <div class="pq-step active" id="step-lbl-1">1. Makine</div>
+      <div style="color:var(--border)">›</div>
+      <div class="pq-step" id="step-lbl-2">2. Seçenekler</div>
+      <div style="color:var(--border)">›</div>
+      <div class="pq-step" id="step-lbl-3">3. Teklif İste</div>
+    </div>
+  </div>
+
+  {% if request.query_params.get('err') %}
+  <div class="alert alert-danger" style="margin-bottom:16px;">Ad ve e-posta alanları zorunludur.</div>
+  {% endif %}
+
+  <!-- STEP 1: Model seç -->
+  <div class="pq-panel active" id="pq-step-1">
+    <h2 style="margin-bottom:16px;font-size:18px;">Makineyi seçin</h2>
+
+    <!-- Category filter -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+      <button class="btn btn-outline btn-sm" onclick="filterCat(0)">Tümü</button>
+      {% for cat in categories %}
+      <button class="btn btn-outline btn-sm" onclick="filterCat({{ cat.id }})">{{ cat.name }}</button>
+      {% endfor %}
+    </div>
+
+    <div class="pq-models" id="pqModelGrid">
+      {% for m in models %}
+      <div class="pq-model-card" data-id="{{ m.id }}" data-cat="{{ m.category_id or 0 }}"
+           data-name="{{ m.name|e }}"
+           data-is-line="{{ m.is_line or 0 }}"
+           data-line-configs="{{ m.line_configs or '1,2,3,4' }}"
+           data-line-images='{{ m.line_images_map|tojson }}'
+           data-compat='{{ m.compatible_options_list|tojson }}'
+           onclick="pqSelectModel(this)">
+        {% if m.image_path %}
+        <img src="/static/{{ m.image_path }}" alt="{{ m.name }}" />
+        {% else %}
+        <div style="height:140px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        {% endif %}
+        <div class="pq-mc-body">
+          <div class="pq-mc-name">{{ m.name }}</div>
+          {% if m.category_name %}<div class="pq-mc-cat">{{ m.category_name }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Line selector (shown when line model selected) -->
+    <div id="pqLineSection" style="display:none;margin-top:20px;">
+      <div style="font-weight:600;margin-bottom:8px;">Hat konfigürasyonu seçin:</div>
+      <div class="line-btns" id="pqLineBtns"></div>
+    </div>
+
+    <div class="pq-nav">
+      <button class="btn btn-primary" onclick="pqGoStep2()" id="pqStep1Next" disabled>Devam Et →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Seçenekler -->
+  <div class="pq-panel" id="pq-step-2">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <div id="pqSelModelImg" style="width:60px;height:60px;border-radius:8px;overflow:hidden;background:var(--surface-2);flex-shrink:0;"></div>
+      <div>
+        <div style="font-size:18px;font-weight:700;" id="pqSelModelName">—</div>
+        <div style="font-size:13px;color:var(--text-muted);" id="pqSelLineLbl"></div>
+      </div>
+    </div>
+
+    <div id="pqOptionsArea">
+      <div style="color:var(--text-muted);padding:24px 0;">Seçenekler yükleniyor…</div>
+    </div>
+
+    <div class="pq-nav">
+      <button class="btn btn-ghost" onclick="pqGoStep(1)">← Geri</button>
+      <button class="btn btn-primary" onclick="pqGoStep3()">Teklif Formuna Geç →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: İletişim -->
+  <div class="pq-panel" id="pq-step-3">
+    <h2 style="font-size:18px;margin-bottom:20px;">Seçiminizin özeti</h2>
+
+    <div class="pq-summary" id="pqSummaryBox"></div>
+
+    <h2 style="font-size:18px;margin-bottom:16px;">İletişim bilgileriniz</h2>
+    <form method="post" action="/teklif-al/submit" class="pq-contact">
+      <input type="hidden" name="model_id"      id="fModelId" value="" />
+      <input type="hidden" name="model_name"    id="fModelName" value="" />
+      <input type="hidden" name="machine_count" id="fMachineCount" value="1" />
+      <input type="hidden" name="options_json"  id="fOptionsJson" value="[]" />
+
+      <div class="pq-form-grid">
+        <div class="form-group">
+          <label class="form-label">Ad Soyad *</label>
+          <input type="text" name="customer_name" class="form-control" required placeholder="Adınız" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Firma Adı</label>
+          <input type="text" name="company_name" class="form-control" placeholder="Firma adınız" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-posta *</label>
+          <input type="email" name="email" class="form-control" required placeholder="ornek@firma.com" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefon</label>
+          <input type="tel" name="phone" class="form-control" placeholder="+90 5xx xxx xx xx" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">Notunuz (opsiyonel)</label>
+          <textarea name="note" class="form-control" rows="3" placeholder="Özel istekleriniz, sorularınız…"></textarea>
+        </div>
+      </div>
+
+      <div style="margin-top:4px;font-size:12px;color:var(--text-muted);">
+        Bilgileriniz yalnızca teklif hazırlamak amacıyla kullanılacaktır.
+      </div>
+      <div class="pq-nav" style="margin-top:20px;">
+        <button type="button" class="btn btn-ghost" onclick="pqGoStep(2)">← Geri</button>
+        <button type="submit" class="btn btn-primary" style="font-size:16px;padding:12px 32px;">
+          📩 Teklif Talep Et
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div><!-- /pq-wrap -->
+
+<script>
+const ALL_MODELS = {{ models|tojson }};
+const ALL_OPTIONS = {{ options|tojson if options is defined else '[]' }};
+
+let pqState = { modelId:null, modelName:'', lineCount:1, isLine:false, selectedOpts:{}, imageMap:{}, compatIds:[] };
+
+// ── Category filter ───────────────────────────────────────────────────────────
+function filterCat(catId) {
+  document.querySelectorAll('.pq-model-card').forEach(c => {
+    c.style.display = (!catId || parseInt(c.dataset.cat) === catId) ? '' : 'none';
+  });
+}
+
+// ── Model selection ───────────────────────────────────────────────────────────
+function pqSelectModel(card) {
+  document.querySelectorAll('.pq-model-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  pqState.modelId   = parseInt(card.dataset.id);
+  pqState.modelName = card.dataset.name;
+  pqState.isLine    = parseInt(card.dataset.isLine || '0') === 1;
+  pqState.imageMap  = {};
+  pqState.selectedOpts = {};
+  pqState.lineCount = 1;
+  try { pqState.imageMap = JSON.parse(card.dataset.lineImages || '{}'); } catch(e){}
+  try { pqState.compatIds = JSON.parse(card.dataset.compat || '[]'); } catch(e){}
+
+  const lineSection = document.getElementById('pqLineSection');
+  if (pqState.isLine) {
+    const configs = (card.dataset.lineConfigs || '1,2,3,4').split(',').map(s=>parseInt(s.trim())).filter(n=>n>0);
+    const _sfx = n => ({1:"'li",2:"'li",3:"'lü",4:"'lü",5:"'li",6:"'lı",7:"'li",8:"'li"}[n]||"'li");
+    document.getElementById('pqLineBtns').innerHTML = configs.map(lc =>
+      `<button class="btn btn-outline btn-sm pq-line-btn" data-lc="${lc}" onclick="pqSelectLine(${lc})">${lc}${_sfx(lc)} Hat</button>`
+    ).join('');
+    pqSelectLine(configs[0]);
+    lineSection.style.display = '';
+    document.getElementById('pqStep1Next').disabled = false;
+  } else {
+    lineSection.style.display = 'none';
+    document.getElementById('pqStep1Next').disabled = false;
+  }
+}
+
+function pqSelectLine(lc) {
+  pqState.lineCount = lc;
+  document.querySelectorAll('.pq-line-btn').forEach(b => {
+    const sel = parseInt(b.dataset.lc) === lc;
+    b.style.background = sel ? 'var(--accent)' : '';
+    b.style.color = sel ? '#fff' : '';
+    b.style.borderColor = sel ? 'var(--accent)' : '';
+  });
+}
+
+// ── Load options from server ──────────────────────────────────────────────────
+async function loadOptions(modelId, compatIds) {
+  try {
+    const r = await fetch(`/teklif-al/options?model_id=${modelId}`);
+    if (!r.ok) return [];
+    return await r.json();
+  } catch(e) { return []; }
+}
+
+// ── Step 2 ────────────────────────────────────────────────────────────────────
+async function pqGoStep2() {
+  if (!pqState.modelId) return;
+  pqGoStep(2);
+
+  // Update header
+  document.getElementById('pqSelModelName').textContent = pqState.modelName;
+  const lineLbl = document.getElementById('pqSelLineLbl');
+  lineLbl.textContent = pqState.isLine ? `${pqState.lineCount}'li Hat` : '';
+
+  // Model image in header
+  const imgBox = document.getElementById('pqSelModelImg');
+  const card = document.querySelector(`.pq-model-card[data-id="${pqState.modelId}"]`);
+  const cardImg = card?.querySelector('img');
+  imgBox.innerHTML = cardImg
+    ? `<img src="${cardImg.src}" style="width:60px;height:60px;object-fit:cover;" />`
+    : '';
+
+  // Load options
+  const opts = await loadOptions(pqState.modelId, pqState.compatIds);
+  renderOptions(opts);
+}
+
+function renderOptions(opts) {
+  const area = document.getElementById('pqOptionsArea');
+  if (!opts.length) {
+    area.innerHTML = '<p style="color:var(--text-muted);padding:12px 0;">Bu makine için ek seçenek bulunmuyor.</p>';
+    return;
+  }
+
+  // Group by group_name
+  const groups = {};
+  opts.forEach(o => {
+    const g = o.group_name || 'Seçenekler';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(o);
+  });
+
+  let html = '';
+  for (const [gname, gopts] of Object.entries(groups)) {
+    html += `<div class="pq-opt-group"><div class="pq-opt-group-title">${gname}</div><div class="pq-opt-cards">`;
+    gopts.forEach(o => {
+      html += `<div class="pq-opt-card" data-id="${o.id}" data-group="${o.conflict_group||''}" onclick="pqToggleOpt(this,${JSON.stringify(o)})">`;
+      if (o.image_path) html += `<img src="/static/${o.image_path}" alt="${o.name}" />`;
+      html += `<div class="poc-name">${o.name}</div>`;
+      if (o.description) html += `<div class="poc-desc">${o.description}</div>`;
+      html += `</div>`;
+    });
+    html += `</div></div>`;
+  }
+  area.innerHTML = html;
+}
+
+function pqToggleOpt(card, opt) {
+  const id = opt.id;
+  const group = opt.conflict_group || '';
+
+  // Conflict group: deselect others in same group (if group set)
+  if (group) {
+    document.querySelectorAll(`.pq-opt-card[data-group="${CSS.escape(group)}"]`).forEach(c => {
+      if (c !== card) {
+        c.classList.remove('selected');
+        const cid = parseInt(c.dataset.id);
+        delete pqState.selectedOpts[cid];
+      }
+    });
+  }
+
+  if (card.classList.toggle('selected')) {
+    pqState.selectedOpts[id] = { id, name: opt.name, qty: pqState.isLine ? pqState.lineCount : 1 };
+  } else {
+    delete pqState.selectedOpts[id];
+  }
+}
+
+// ── Step 3 ────────────────────────────────────────────────────────────────────
+function pqGoStep3() {
+  // Fill hidden form fields
+  document.getElementById('fModelId').value      = pqState.modelId || '';
+  document.getElementById('fModelName').value    = pqState.modelName;
+  document.getElementById('fMachineCount').value = pqState.lineCount;
+  document.getElementById('fOptionsJson').value  = JSON.stringify(Object.values(pqState.selectedOpts));
+
+  // Build summary
+  const opts = Object.values(pqState.selectedOpts);
+  let sumHtml = `<div class="pq-summary-row"><span>Makine</span><span style="font-weight:600;">${pqState.modelName}</span></div>`;
+  if (pqState.isLine) sumHtml += `<div class="pq-summary-row"><span>Hat</span><span>${pqState.lineCount}'li Hat</span></div>`;
+  opts.forEach(o => {
+    sumHtml += `<div class="pq-summary-row"><span style="color:var(--text-muted);">${o.name}</span><span style="color:var(--success,#22c55e);">✓ Seçildi</span></div>`;
+  });
+  if (!opts.length) sumHtml += `<div style="font-size:13px;color:var(--text-muted);padding:8px 0;">Ek seçenek seçilmedi</div>`;
+  document.getElementById('pqSummaryBox').innerHTML = sumHtml;
+
+  pqGoStep(3);
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function pqGoStep(n) {
+  document.querySelectorAll('.pq-panel').forEach((p,i) => p.classList.toggle('active', i+1===n));
+  ['step-lbl-1','step-lbl-2','step-lbl-3'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    if (i+1 < n) el.classList.add('done');
+    else if (i+1 === n) el.classList.add('active');
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>

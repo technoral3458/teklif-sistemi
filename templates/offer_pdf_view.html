@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teklif {{ offer.offer_no }}</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { height:100%; overflow:hidden; }
+    body { font-family: Arial, sans-serif; background:#f1f5f9; display:flex; flex-direction:column; }
+
+    /* ── Top bar ── */
+    .top-bar {
+      flex-shrink:0;
+      background:#1e2b4a;
+      padding:10px 14px;
+      display:flex; align-items:center; gap:10px;
+      box-shadow:0 2px 8px rgba(0,0,0,.35);
+      z-index:10;
+    }
+    .top-bar .offer-info { flex:1; min-width:0; }
+    .top-bar .offer-info .no  { font-size:13px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .top-bar .offer-info .sub { font-size:11px; color:#94a3b8; }
+    .top-bar .actions { display:flex; gap:8px; flex-shrink:0; }
+
+    .btn-dl {
+      display:flex; align-items:center; gap:5px;
+      padding:8px 16px; border-radius:8px; border:none; cursor:pointer;
+      font-size:14px; font-weight:600; text-decoration:none;
+      background:#3b82f6; color:#fff;
+    }
+    .btn-catalog {
+      display:flex; align-items:center; gap:5px;
+      padding:8px 16px; border-radius:8px; border:2px solid #C9961A; cursor:pointer;
+      font-size:14px; font-weight:600; text-decoration:none;
+      background:transparent; color:#C9961A;
+    }
+    .btn-share {
+      display:flex; align-items:center; gap:5px;
+      padding:8px 16px; border-radius:8px; border:2px solid #3b82f6; cursor:pointer;
+      font-size:14px; font-weight:600; background:transparent; color:#fff;
+    }
+    .back-link { color:#94a3b8; font-size:13px; text-decoration:none; white-space:nowrap; }
+
+    /* ── Preview frame ── */
+    .preview-wrap {
+      flex:1; overflow:hidden; position:relative;
+    }
+    .preview-wrap iframe {
+      width:100%; height:100%; border:none; display:block;
+      background:#fff;
+    }
+
+    /* Mobile: scale iframe content to fit narrow screen */
+    @media (max-width:768px) {
+      .preview-wrap iframe {
+        /* render at 900px wide then scale down to device width */
+        width: 900px;
+        transform-origin: top left;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/offers/{{ offer.id }}" class="back-link">← Geri</a>
+  <div class="offer-info">
+    <div class="no">{{ offer.offer_no }}</div>
+    <div class="sub">{{ customer.name or '' }}</div>
+  </div>
+  <div class="actions">
+    <a class="btn-dl" href="/offers/{{ offer.id }}/pdf?dl=1" download="Teklif_{{ offer.offer_no }}.pdf">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      İndir
+    </a>
+    <a class="btn-catalog" href="/offers/{{ offer.id }}/catalog-pdf" target="_blank">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+      Katalog
+    </a>
+    <button class="btn-share" onclick="sharePdf()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      Paylaş
+    </button>
+  </div>
+</div>
+
+<div class="preview-wrap" id="previewWrap">
+  <iframe id="previewFrame" title="Teklif Önizleme"></iframe>
+</div>
+
+<script>
+  // Desktop → real PDF, Mobile → HTML print view (PDF can't be iframed on mobile Chrome)
+  const isMobile = window.innerWidth <= 768;
+  const frame = document.getElementById('previewFrame');
+  const wrap  = document.getElementById('previewWrap');
+
+  if (isMobile) {
+    frame.src = '/offers/{{ offer.id }}/print';
+    // Scale 900px-wide iframe down to actual screen width
+    const scale = window.innerWidth / 900;
+    frame.style.transform = `scale(${scale})`;
+    frame.style.height = (window.innerHeight / scale) + 'px';
+    wrap.style.overflow = 'hidden';
+  } else {
+    frame.src = '/offers/{{ offer.id }}/pdf';
+  }
+
+  async function sharePdf() {
+    const fname = "Teklif_{{ offer.offer_no }}.pdf";
+    const url   = "/offers/{{ offer.id }}/pdf?dl=1";
+    if (navigator.share) {
+      try {
+        const res  = await fetch(url);
+        const blob = await res.blob();
+        const file = new File([blob], fname, { type: "application/pdf" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: fname });
+          return;
+        }
+        await navigator.share({ title: fname, url: window.location.href });
+      } catch(e) {
+        if (e.name !== "AbortError") triggerDownload(url, fname);
+      }
+    } else {
+      triggerDownload(url, fname);
+    }
+  }
+
+  function triggerDownload(url, fname) {
+    const a = document.createElement('a');
+    a.href = url; a.download = fname; a.click();
+  }
+</script>
+</body>
+</html>

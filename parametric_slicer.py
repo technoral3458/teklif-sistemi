@@ -1,0 +1,1513 @@
+"""Parametrik dilimleme: 3B katı model (STL/OBJ) → panel kesitleri → CNC için DXF.
+
+Kullanım akışı:
+    tris  = load_mesh(data, filename)
+    info  = mesh_info(tris)
+    res   = build_panels(tris, axis='z', thickness=18, gap=0, scale=1.0)
+    dxf   = export_dxf(res, sheet_w=2100, sheet_h=2800)
+    svg   = export_svg(res)
+
+Harici bağımlılık yok (DXF çıktısı için sadece ezdxf — zaten kurulu).
+"""
+
+import io
+import math
+import struct
+import zipfile
+from bisect import bisect_left, bisect_right
+
+# Eksen → 2B izdüşüm indeksleri (dilimleme ekseni atılır)
+_AXIS_IDX = {"x": 0, "y": 1, "z": 2}
+_PROJ = {"x": (1, 2), "y": (0, 2), "z": (0, 1)}
+
+MAX_TRIANGLES = 900_000
+MAX_PANELS = 400
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  1) Mesh okuma
+# ══════════════════════════════════════════════════════════════════════════
+
+def _load_stl_binary(data: bytes):
+    if len(data) < 84:
+        raise ValueError("STL dosyası çok kısa.")
+    n = struct.unpack_from("<I", data, 80)[0]
+    if 84 + n * 50 != len(data):
+        raise ValueError("binary değil")
+    if n > MAX_TRIANGLES:
+        raise ValueError(f"Model çok büyük ({n:,} üçgen). En fazla {MAX_TRIANGLES:,} desteklenir.")
+    tris = []
+    add = tris.append
+    up = struct.unpack_from
+    off = 84
+    for _ in range(n):
+        v = up("<12f", data, off)
+        add(((v[3], v[4], v[5]), (v[6], v[7], v[8]), (v[9], v[10], v[11])))
+        off += 50
+    return tris
+
+
+def _load_stl_ascii(text: str):
+    tris = []
+    cur = []
+    for line in text.splitlines():
+        s = line.strip()
+        if s[:6] == "vertex" or s[:6] == "VERTEX":
+            p = s.split()
+            if len(p) >= 4:
+                cur.append((float(p[1]), float(p[2]), float(p[3])))
+                if len(cur) == 3:
+                    tris.append((cur[0], cur[1], cur[2]))
+                    cur = []
+        elif s[:8] == "endfacet":
+            cur = []
+        if len(tris) > MAX_TRIANGLES:
+            raise ValueError(f"Model çok büyük. En fazla {MAX_TRIANGLES:,} üçgen desteklenir.")
+    if not tris:
+        raise ValueError("ASCII STL içinde üçgen bulunamadı.")
+    return tris
+
+
+def _load_obj(text: str):
+    verts = []
+    tris = []
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s[0] == "#":
+            continue
+        if s[0] == "v" and s[1:2] in (" ", "\t"):
+            p = s.split()
+            if len(p) >= 4:
+                verts.append((float(p[1]), float(p[2]), float(p[3])))
+        elif s[0] == "f" and s[1:2] in (" ", "\t"):
+            idx = []
+            for tok in s.split()[1:]:
+                raw = tok.split("/")[0]
+                if not raw:
+                    continue
+                i = int(raw)
+                idx.append(verts[i - 1] if i > 0 else verts[i])
+            # fan triangulation
+            for k in range(1, len(idx) - 1):
+                tris.append((idx[0], idx[k], idx[k + 1]))
+            if len(tris) > MAX_TRIANGLES:
+                raise ValueError(f"Model çok büyük. En fazla {MAX_TRIANGLES:,} üçgen desteklenir.")
+    if not tris:
+        raise ValueError("OBJ içinde yüzey (f) bulunamadı.")
+    return tris
+
+
+def load_mesh(data: bytes, filename: str = ""):
+    """Dosya içeriğinden üçgen listesi üretir. Desteklenen: STL (binary/ASCII), OBJ."""
+    ext = (filename.rsplit(".", 1)[-1] if "." in filename else "").lower()
+
+    if ext == "obj":
+        return _load_obj(data.decode("utf-8", "ignore"))
+
+    if ext == "stl" or not ext:
+        # Binary mi ASCII mi?
+        try:
+            return _load_stl_binary(data)
+        except ValueError as e:
+            if "çok büyük" in str(e):
+                raise
+        try:
+            return _load_stl_ascii(data.decode("utf-8", "ignore"))
+        except ValueError:
+            raise ValueError(
+                "STL dosyası okunamadı. Dosya bozuk olabilir veya desteklenmeyen bir biçimde."
+            )
+
+    raise ValueError(
+        f"'.{ext}' uzantısı desteklenmiyor. CAD programınızdan STL veya OBJ olarak dışa aktarın."
+    )
+
+
+def mesh_info(tris):
+    """Model sınırlarını ve üçgen sayısını döndürür."""
+    xs_min = ys_min = zs_min = float("inf")
+    xs_max = ys_max = zs_max = float("-inf")
+    for t in tris:
+        for v in t:
+            x, y, z = v
+            if x < xs_min: xs_min = x
+            if x > xs_max: xs_max = x
+            if y < ys_min: ys_min = y
+            if y > ys_max: ys_max = y
+            if z < zs_min: zs_min = z
+            if z > zs_max: zs_max = z
+    return {
+        "tri_count": len(tris),
+        "min": (xs_min, ys_min, zs_min),
+        "max": (xs_max, ys_max, zs_max),
+        "size": (xs_max - xs_min, ys_max - ys_min, zs_max - zs_min),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  2) Dilimleme
+# ══════════════════════════════════════════════════════════════════════════
+
+class _Welder:
+    """Kayan nokta hatalarına dayanıklı nokta birleştirici (spatial hash)."""
+
+    __slots__ = ("tol", "cell", "buckets", "pts")
+
+    def __init__(self, tol):
+        self.tol = tol
+        self.cell = tol * 4.0
+        self.buckets = {}
+        self.pts = []
+
+    def add(self, x, y):
+        c = self.cell
+        cx, cy = int(math.floor(x / c)), int(math.floor(y / c))
+        tol2 = self.tol * self.tol
+        b = self.buckets
+        pts = self.pts
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                lst = b.get((cx + dx, cy + dy))
+                if not lst:
+                    continue
+                for pid in lst:
+                    px, py = pts[pid]
+                    if (px - x) ** 2 + (py - y) ** 2 <= tol2:
+                        return pid
+        pid = len(pts)
+        pts.append((x, y))
+        b.setdefault((cx, cy), []).append(pid)
+        return pid
+
+
+def _chain_loops(segments, tol):
+    """(p1,p2) segment listesini kapalı konturlara (loop) zincirler."""
+    w = _Welder(tol)
+    edges = []
+    for (x1, y1), (x2, y2) in segments:
+        a = w.add(x1, y1)
+        b = w.add(x2, y2)
+        if a != b:
+            edges.append((a, b))
+    if not edges:
+        return [], 0
+
+    adj = {}
+    for i, (a, b) in enumerate(edges):
+        adj.setdefault(a, []).append(i)
+        adj.setdefault(b, []).append(i)
+
+    used = bytearray(len(edges))
+    pts = w.pts
+    loops = []
+    open_count = 0
+
+    for start_edge in range(len(edges)):
+        if used[start_edge]:
+            continue
+        used[start_edge] = 1
+        a, b = edges[start_edge]
+        chain = [a, b]
+        cur = b
+        closed = False
+        while True:
+            nxt = -1
+            for ei in adj.get(cur, ()):
+                if used[ei]:
+                    continue
+                p, q = edges[ei]
+                other = q if p == cur else p
+                used[ei] = 1
+                nxt = other
+                break
+            if nxt < 0:
+                break
+            if nxt == chain[0]:
+                closed = True
+                break
+            chain.append(nxt)
+            cur = nxt
+
+        if len(chain) < 3:
+            continue
+        if not closed:
+            open_count += 1
+        loops.append([pts[i] for i in chain])
+
+    return loops, open_count
+
+
+def _tri_plane_segment(tri, ai, plane, pu, pv):
+    """Üçgen–düzlem kesişimi → 2B segment (yoksa None)."""
+    d0 = tri[0][ai] - plane
+    d1 = tri[1][ai] - plane
+    d2 = tri[2][ai] - plane
+    if d0 == 0.0: d0 = 1e-12
+    if d1 == 0.0: d1 = 1e-12
+    if d2 == 0.0: d2 = 1e-12
+
+    out = []
+    ds = (d0, d1, d2)
+    for i in range(3):
+        j = (i + 1) % 3
+        a, b = ds[i], ds[j]
+        if (a > 0.0) != (b > 0.0):
+            t = a / (a - b)
+            va, vb = tri[i], tri[j]
+            out.append((va[pu] + t * (vb[pu] - va[pu]),
+                        va[pv] + t * (vb[pv] - va[pv])))
+            if len(out) == 2:
+                break
+    return out if len(out) == 2 else None
+
+
+def _simplify(pts, tol):
+    """Douglas-Peucker ile nokta sayısını azaltır."""
+    if tol <= 0 or len(pts) < 4:
+        return pts
+    n = len(pts)
+    keep = bytearray(n)
+    keep[0] = keep[n - 1] = 1
+    stack = [(0, n - 1)]
+    tol2 = tol * tol
+    while stack:
+        i0, i1 = stack.pop()
+        if i1 <= i0 + 1:
+            continue
+        x0, y0 = pts[i0]
+        x1, y1 = pts[i1]
+        dx, dy = x1 - x0, y1 - y0
+        den = dx * dx + dy * dy
+        best_d, best_i = -1.0, -1
+        for k in range(i0 + 1, i1):
+            px, py = pts[k]
+            if den <= 0.0:
+                d = (px - x0) ** 2 + (py - y0) ** 2
+            else:
+                t = ((px - x0) * dx + (py - y0) * dy) / den
+                t = 0.0 if t < 0.0 else (1.0 if t > 1.0 else t)
+                d = (px - (x0 + t * dx)) ** 2 + (py - (y0 + t * dy)) ** 2
+            if d > best_d:
+                best_d, best_i = d, k
+        if best_d > tol2:
+            keep[best_i] = 1
+            stack.append((i0, best_i))
+            stack.append((best_i, i1))
+    return [pts[i] for i in range(n) if keep[i]]
+
+
+def plan_positions(amin, amax, thickness, gap):
+    """Panel merkez konumlarını hesaplar. Panel i: [s+i*pitch, s+i*pitch+thickness]."""
+    span = amax - amin
+    pitch = thickness + gap
+    if pitch <= 0:
+        raise ValueError("Panel kalınlığı sıfırdan büyük olmalı.")
+    if span < thickness:
+        return [amin + span / 2.0], pitch
+    n = int(math.floor((span - thickness) / pitch + 1e-9)) + 1
+    n = max(1, n)
+    if n > MAX_PANELS:
+        raise ValueError(
+            f"{n} panel oluşuyor — çok fazla. Panel kalınlığını artırın, "
+            f"aralık ekleyin veya ölçeği küçültün (üst sınır {MAX_PANELS})."
+        )
+    used = (n - 1) * pitch + thickness
+    start = amin + (span - used) / 2.0
+    return [start + i * pitch + thickness / 2.0 for i in range(n)], pitch
+
+
+def build_panels(tris, axis="z", thickness=18.0, gap=0.0, scale=1.0,
+                 simplify_tol=0.15, hole_count=0, hole_dia=10.0, hole_margin=6.0):
+    """Modeli dilimleyip panel kesitlerini üretir.
+
+    Dönüş: {'panels': [...], 'pitch':, 'axis':, 'warnings': [...], 'info': {...}}
+    Her panel: {'no', 'pos', 'loops', 'bbox', 'area_approx'}
+    """
+    axis = (axis or "z").lower()
+    if axis not in _AXIS_IDX:
+        axis = "z"
+    ai = _AXIS_IDX[axis]
+    pu, pv = _PROJ[axis]
+
+    scale = float(scale or 1.0)
+    if scale <= 0:
+        scale = 1.0
+    if scale != 1.0:
+        tris = [tuple((v[0] * scale, v[1] * scale, v[2] * scale) for v in t) for t in tris]
+
+    info = mesh_info(tris)
+    amin, amax = info["min"][ai], info["max"][ai]
+    positions, pitch = plan_positions(amin, amax, thickness, gap)
+
+    # Düzlemler tam köşeye denk gelmesin diye mikro kaydırma
+    eps = max((amax - amin), 1.0) * 1e-9
+    planes = [p + eps for p in positions]
+
+    # Üçgenleri eksen boyunca min değerine göre sırala → düzlem başına
+    # sadece o düzlemi kesen üçgenlere bakılır.
+    buckets = [[] for _ in planes]
+    np_ = len(planes)
+    for t in tris:
+        a0 = t[0][ai]; a1 = t[1][ai]; a2 = t[2][ai]
+        lo = a0 if a0 < a1 else a1
+        if a2 < lo: lo = a2
+        hi = a0 if a0 > a1 else a1
+        if a2 > hi: hi = a2
+        i0 = bisect_left(planes, lo)
+        i1 = bisect_right(planes, hi)
+        for pi in range(i0, i1):
+            buckets[pi].append(t)
+
+    tol = max((amax - amin), 1.0) * 1e-7
+    warnings = []
+    panels = []
+    total_open = 0
+
+    for pi, plane in enumerate(planes):
+        segs = []
+        for t in buckets[pi]:
+            s = _tri_plane_segment(t, ai, plane, pu, pv)
+            if s:
+                segs.append(s)
+        loops, open_n = _chain_loops(segs, tol)
+        total_open += open_n
+
+        clean = []
+        for lp in loops:
+            lp = _simplify(lp, simplify_tol)
+            if len(lp) >= 3 and _polygon_area(lp) > 1e-6:
+                clean.append(lp)
+        if not clean:
+            continue
+
+        xs = [p[0] for lp in clean for p in lp]
+        ys = [p[1] for lp in clean for p in lp]
+        panels.append({
+            "no": len(panels) + 1,
+            "pos": positions[pi],
+            "loops": clean,
+            "bbox": (min(xs), min(ys), max(xs), max(ys)),
+        })
+
+    if not panels:
+        raise ValueError(
+            "Modelden hiç kesit çıkarılamadı. Dilimleme eksenini değiştirmeyi "
+            "veya modelin kapalı (watertight) olduğundan emin olmayı deneyin."
+        )
+
+    if total_open:
+        warnings.append(
+            f"{total_open} adet açık kontur bulundu — model tam kapalı (watertight) değil. "
+            "Kesim öncesi DXF'i kontrol edin."
+        )
+
+    skipped = len(positions) - len(panels)
+    if skipped > 0:
+        warnings.append(f"{skipped} dilim boş çıktığı için atlandı.")
+
+    holes = []
+    if hole_count > 0:
+        holes, hw = find_assembly_holes(panels, hole_count, hole_dia, hole_margin)
+        if hw:
+            warnings.append(hw)
+        if holes:
+            r = hole_dia / 2.0
+            for p in panels:
+                p["holes"] = [(hx, hy, r) for hx, hy in holes]
+
+    return {
+        "panels": panels,
+        "positions": positions,
+        "pitch": pitch,
+        "axis": axis,
+        "thickness": thickness,
+        "gap": gap,
+        "scale": scale,
+        "holes": holes,
+        "hole_dia": hole_dia,
+        "info": info,
+        "warnings": warnings,
+    }
+
+
+def _polygon_area(pts):
+    s = 0.0
+    n = len(pts)
+    for i in range(n):
+        x1, y1 = pts[i]
+        x2, y2 = pts[(i + 1) % n]
+        s += x1 * y2 - x2 * y1
+    return abs(s) * 0.5
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  3) Montaj (mil) deliği bulma — tüm panellerde ortak dolu bölge
+# ══════════════════════════════════════════════════════════════════════════
+
+def _inside_grid(loops, x0, y0, cell, nx, ny):
+    """Panel malzemesinin içinde kalan grid hücrelerini scanline ile işaretler."""
+    g = bytearray(nx * ny)
+    for j in range(ny):
+        y = y0 + (j + 0.5) * cell
+        xs = []
+        for lp in loops:
+            n = len(lp)
+            for i in range(n):
+                xa, ya = lp[i]
+                xb, yb = lp[(i + 1) % n]
+                if (ya > y) != (yb > y):
+                    xs.append(xa + (y - ya) / (yb - ya) * (xb - xa))
+        if len(xs) < 2:
+            continue
+        xs.sort()
+        row = j * nx
+        for k in range(0, len(xs) - 1, 2):
+            i0 = int(math.ceil((xs[k] - x0) / cell - 0.5))
+            i1 = int(math.floor((xs[k + 1] - x0) / cell - 0.5))
+            if i0 < 0: i0 = 0
+            if i1 > nx - 1: i1 = nx - 1
+            for i in range(i0, i1 + 1):
+                g[row + i] = 1
+    return g
+
+
+def find_assembly_holes(panels, count, dia, margin=6.0):
+    """Bütün panellerde ortak olan dolu bölgede montaj mili delikleri konumlandırır."""
+    if count <= 0 or not panels:
+        return [], ""
+
+    # Tüm panellerin ortak sınır kutusu
+    x0 = max(p["bbox"][0] for p in panels)
+    y0 = max(p["bbox"][1] for p in panels)
+    x1 = min(p["bbox"][2] for p in panels)
+    y1 = min(p["bbox"][3] for p in panels)
+    need = dia / 2.0 + margin
+    if x1 - x0 < 2 * need or y1 - y0 < 2 * need:
+        return [], "Paneller için ortak montaj deliği bölgesi bulunamadı — delik eklenmedi."
+
+    w, h = x1 - x0, y1 - y0
+    cell = max(min(w, h) / 60.0, 0.5)
+    nx = max(4, int(w / cell))
+    ny = max(4, int(h / cell))
+    if nx * ny > 90_000:
+        cell = math.sqrt(w * h / 90_000.0)
+        nx = max(4, int(w / cell))
+        ny = max(4, int(h / cell))
+
+    acc = None
+    for p in panels:
+        g = _inside_grid(p["loops"], x0, y0, cell, nx, ny)
+        if acc is None:
+            acc = g
+        else:
+            for i in range(nx * ny):
+                if acc[i] and not g[i]:
+                    acc[i] = 0
+        if not any(acc):
+            return [], "Paneller için ortak montaj deliği bölgesi bulunamadı — delik eklenmedi."
+
+    # Gerekli yarıçap kadar aşındır (erosion)
+    k = int(math.ceil(need / cell))
+    cand = []
+    k2 = k * k
+    for j in range(ny):
+        for i in range(nx):
+            if not acc[j * nx + i]:
+                continue
+            ok = True
+            for dj in range(-k, k + 1):
+                jj = j + dj
+                if jj < 0 or jj >= ny:
+                    ok = False
+                    break
+                base = jj * nx
+                for di in range(-k, k + 1):
+                    if di * di + dj * dj > k2:
+                        continue
+                    ii = i + di
+                    if ii < 0 or ii >= nx or not acc[base + ii]:
+                        ok = False
+                        break
+                if not ok:
+                    break
+            if ok:
+                cand.append((x0 + (i + 0.5) * cell, y0 + (j + 0.5) * cell))
+
+    if not cand:
+        return [], (f"Ø{dia:g} mm montaj deliği için tüm panellerde ortak yeterli alan yok — "
+                    "delik eklenmedi. Delik çapını veya kenar payını küçültmeyi deneyin.")
+
+    # 1. delik: aday kümesinin ağırlık merkezine en yakın nokta
+    cx = sum(p[0] for p in cand) / len(cand)
+    cy = sum(p[1] for p in cand) / len(cand)
+    picked = [min(cand, key=lambda p: (p[0] - cx) ** 2 + (p[1] - cy) ** 2)]
+    # Sonraki delikler: mevcutlardan en uzak nokta (farthest point sampling)
+    while len(picked) < count:
+        best, bestd = None, -1.0
+        for p in cand:
+            d = min((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 for q in picked)
+            if d > bestd:
+                bestd, best = d, p
+        if best is None or bestd < (dia * dia):
+            break
+        picked.append(best)
+
+    warn = ""
+    if len(picked) < count:
+        warn = (f"{count} delik istendi, ortak alanda yalnızca {len(picked)} tanesi "
+                "birbirinden yeterince uzağa yerleştirilebildi.")
+    return picked, warn
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  4) Yerleşim (nesting)
+# ══════════════════════════════════════════════════════════════════════════
+
+def nest(panels, sheet_w=2100.0, sheet_h=2800.0, part_gap=15.0, margin=15.0):
+    """Panelleri plakalara raf (shelf) yöntemiyle yerleştirir.
+
+    Dönüş: [{'sheet':0,'no':1,'dx':..,'dy':..,'w':..,'h':..}, ...]
+    """
+    place = []
+    sheet = 0
+    cur_x = margin
+    cur_y = margin
+    row_h = 0.0
+    oversize = []
+
+    for p in panels:
+        bx0, by0, bx1, by1 = p["bbox"]
+        w = bx1 - bx0
+        h = by1 - by0
+
+        if w > sheet_w - 2 * margin or h > sheet_h - 2 * margin:
+            oversize.append(p["no"])
+
+        if cur_x + w > sheet_w - margin and cur_x > margin:
+            cur_x = margin
+            cur_y += row_h + part_gap
+            row_h = 0.0
+        if cur_y + h > sheet_h - margin and (cur_y > margin or row_h > 0):
+            sheet += 1
+            cur_x = margin
+            cur_y = margin
+            row_h = 0.0
+
+        place.append({
+            "sheet": sheet, "no": p["no"], "kind": p.get("kind", "panel"),
+            "dx": cur_x - bx0, "dy": cur_y - by0,
+            "w": w, "h": h,
+            "x": cur_x, "y": cur_y,
+        })
+        cur_x += w + part_gap
+        if h > row_h:
+            row_h = h
+
+    return place, sheet + 1, oversize
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  5) DXF çıktısı
+# ══════════════════════════════════════════════════════════════════════════
+
+L_OUT = "KESIM_DIS"
+L_IN = "KESIM_IC"
+L_HOLE = "DELIK"
+L_TEXT = "YAZI"
+L_SHEET = "PLAKA"
+
+
+def _point_in_poly(x, y, poly):
+    inside = False
+    n = len(poly)
+    j = n - 1
+    for i in range(n):
+        xi, yi = poly[i]
+        xj, yj = poly[j]
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
+            inside = not inside
+        j = i
+    return inside
+
+
+def _classify_loops(loops):
+    """Her konturun iç mi dış mı olduğunu belirler (even-odd yuvalama)."""
+    out = []
+    for i, lp in enumerate(loops):
+        px, py = lp[0]
+        depth = 0
+        for k, other in enumerate(loops):
+            if k == i:
+                continue
+            if _point_in_poly(px, py, other):
+                depth += 1
+        out.append((lp, depth % 2 == 1))  # True → iç kontur (delik)
+    return out
+
+
+def _new_doc():
+    import ezdxf
+    doc = ezdxf.new("R2010", setup=True)
+    doc.header["$INSUNITS"] = 4  # milimetre
+    for name, color in ((L_OUT, 1), (L_IN, 3), (L_HOLE, 5), (L_TEXT, 2), (L_SHEET, 8)):
+        if name not in doc.layers:
+            doc.layers.add(name, color=color)
+    return doc
+
+
+def _add_text(msp, s, x, y, height, layer):
+    t = msp.add_text(s, height=height, dxfattribs={"layer": layer})
+    try:
+        from ezdxf.enums import TextEntityAlignment
+        t.set_placement((x, y), align=TextEntityAlignment.MIDDLE_CENTER)
+    except Exception:
+        try:
+            t.dxf.insert = (x, y)
+        except Exception:
+            pass
+    return t
+
+
+def _part_label(p):
+    return p.get("label") or f"{p['no']:02d}"
+
+
+def _draw_panel(msp, panel, dx, dy, label=None, label_h=12.0):
+    for lp, is_hole in _classify_loops(panel["loops"]):
+        pts = [(x + dx, y + dy) for x, y in lp]
+        msp.add_lwpolyline(pts, close=True,
+                           dxfattribs={"layer": L_IN if is_hole else L_OUT})
+    for hx, hy, r in panel.get("holes", ()):
+        msp.add_circle((hx + dx, hy + dy), r, dxfattribs={"layer": L_HOLE})
+    if label:
+        bx0, by0, bx1, by1 = panel["bbox"]
+        _add_text(msp, label, (bx0 + bx1) / 2 + dx, (by0 + by1) / 2 + dy, label_h, L_TEXT)
+
+
+def export_dxf(result, sheet_w=2100.0, sheet_h=2800.0, part_gap=15.0,
+               label=True, draw_sheets=True, job_name=""):
+    """Tüm parçaları (panel + kayıt) plakalara yerleştirip tek bir DXF üretir."""
+    parts = all_parts(result)
+    places, sheet_count, oversize = nest(parts, sheet_w, sheet_h, part_gap)
+    by_key = {(p.get("kind", "panel"), p["no"]): p for p in parts}
+
+    doc = _new_doc()
+    msp = doc.modelspace()
+    gutter = 250.0
+    label_h = max(8.0, min(sheet_w, sheet_h) / 120.0)
+
+    if draw_sheets:
+        for s in range(sheet_count):
+            ox = s * (sheet_w + gutter)
+            msp.add_lwpolyline(
+                [(ox, 0), (ox + sheet_w, 0), (ox + sheet_w, sheet_h), (ox, sheet_h)],
+                close=True, dxfattribs={"layer": L_SHEET})
+            _add_text(msp, f"PLAKA {s + 1}/{sheet_count}  {sheet_w:g}x{sheet_h:g}",
+                      ox + sheet_w / 2, sheet_h + label_h * 2, label_h * 1.6, L_TEXT)
+
+    for pl in places:
+        ox = pl["sheet"] * (sheet_w + gutter)
+        p = by_key[(pl.get("kind", "panel"), pl["no"])]
+        _draw_panel(msp, p, pl["dx"] + ox, pl["dy"],
+                    label=_part_label(p) if label else None, label_h=label_h)
+
+    buf = io.StringIO()
+    doc.write(buf)
+    return buf.getvalue().encode("utf-8"), sheet_count, oversize
+
+
+def export_zip(result, label=True, job_name="panel"):
+    """Her parça için ayrı DXF içeren ZIP üretir."""
+    parts = all_parts(result)
+    safe = "".join(c for c in (job_name or "panel") if c.isalnum() or c in "-_") or "panel"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in parts:
+            doc = _new_doc()
+            msp = doc.modelspace()
+            bx0, by0, _, _ = p["bbox"]
+            label_h = max(6.0, (p["bbox"][2] - bx0) / 12.0)
+            _draw_panel(msp, p, -bx0, -by0,
+                        label=_part_label(p) if label else None, label_h=label_h)
+            s = io.StringIO()
+            doc.write(s)
+            pre = "KAYIT" if p.get("kind") == "frame" else "PANEL"
+            z.writestr(f"{safe}_{pre}_{p['no']:03d}.dxf", s.getvalue())
+    return buf.getvalue()
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  6) SVG önizleme
+# ══════════════════════════════════════════════════════════════════════════
+
+def _esc(s):
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def export_svg(result, cols=None, cell=190, pad=10, max_w=1140):
+    """Panel kesitlerini ızgara halinde gösteren SVG önizleme üretir.
+
+    Hücre oranı panellerin biçimine uydurulur: ince-uzun paneller dar hücrelere
+    girer, böylece bir satıra daha çok panel sığar ve önizleme okunaklı kalır.
+    """
+    panels = result["panels"]
+    n = len(panels)
+
+    # Paneller birbiriyle kıyaslanabilsin diye tek ortak ölçek kullanılır
+    gw = max((p["bbox"][2] - p["bbox"][0]) for p in panels)
+    gh = max((p["bbox"][3] - p["bbox"][1]) for p in panels)
+    aspect = max(gw, 1e-6) / max(gh, 1e-6)
+
+    label_h = 14
+    if aspect >= 1.0:
+        inner_w = cell
+        inner_h = max(38.0, cell / aspect)
+    else:
+        inner_h = cell
+        inner_w = max(30.0, cell * aspect)
+    cell_w = inner_w + 2 * pad
+    cell_h = inner_h + 2 * pad + label_h
+
+    if cols is None:
+        cols = max(1, min(n, int(max_w // cell_w)))
+    cols = max(1, min(int(cols), n))
+    rows = int(math.ceil(n / cols))
+    W = cols * cell_w
+    H = rows * cell_h
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W:.0f} {H:.0f}" '
+        f'width="100%" style="max-width:{W:.0f}px;height:auto;">'
+    ]
+
+    s = min(inner_w / max(gw, 1e-6), inner_h / max(gh, 1e-6))
+
+    for i, p in enumerate(panels):
+        cx = (i % cols) * cell_w
+        cy = (i // cols) * cell_h
+        bx0, by0, bx1, by1 = p["bbox"]
+        w = max(bx1 - bx0, 1e-6)
+        h = max(by1 - by0, 1e-6)
+        ox = cx + (cell_w - w * s) / 2
+        oy = cy + pad + (inner_h - h * s) / 2
+
+        # SVG'de Y aşağı doğru → kesiti dikey çevir
+        def tx(x, y):
+            return (ox + (x - bx0) * s, oy + (by1 - y) * s)
+
+        d = []
+        for lp in p["loops"]:
+            x, y = tx(*lp[0])
+            d.append(f"M{x:.1f} {y:.1f}")
+            for pt in lp[1:]:
+                x, y = tx(*pt)
+                d.append(f"L{x:.1f} {y:.1f}")
+            d.append("Z")
+        parts.append(
+            f'<path d="{" ".join(d)}" fill="#c8a165" fill-rule="evenodd" '
+            f'stroke="#6b4f2a" stroke-width="1" stroke-linejoin="round"/>'
+        )
+        for hx, hy, r in p.get("holes", ()):
+            x, y = tx(hx, hy)
+            parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{max(r * s, 1.2):.1f}" '
+                         f'fill="#1b1b1b" opacity="0.75"/>')
+        parts.append(
+            f'<text x="{cx + cell_w / 2:.0f}" y="{cy + cell_h - 4:.0f}" text-anchor="middle" '
+            f'font-family="system-ui,sans-serif" font-size="11" fill="#8b949e">'
+            f'{p["no"]:02d}</text>'
+        )
+
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def summary(result, sheet_count=None):
+    """Sonuç özeti (şablonda gösterim için)."""
+    panels = result["panels"]
+    axis = result["axis"]
+    info = result["info"]
+    ai = _AXIS_IDX[axis]
+    span = info["size"][ai]
+    pu, pv = _PROJ[axis]
+    xs0 = min(p["bbox"][0] for p in panels)
+    ys0 = min(p["bbox"][1] for p in panels)
+    xs1 = max(p["bbox"][2] for p in panels)
+    ys1 = max(p["bbox"][3] for p in panels)
+    total_len = sum(_loop_len(lp) for p in panels for lp in p["loops"])
+    frames = result.get("frames", [])
+    total_len += sum(_loop_len(lp) for f in frames for lp in f["loops"])
+    return {
+        "panel_count": len(panels),
+        "axis": axis,
+        "thickness": result["thickness"],
+        "gap": result["gap"],
+        "pitch": result["pitch"],
+        "stack_len": (len(panels) - 1) * result["pitch"] + result["thickness"],
+        "model_span": span,
+        "profile_w": xs1 - xs0,
+        "profile_h": ys1 - ys0,
+        "cut_len_m": total_len / 1000.0,
+        "hole_count": len(result.get("holes") or []),
+        "hole_dia": result.get("hole_dia", 0),
+        "sheet_count": sheet_count,
+        "frame_count": len(frames),
+        "frame_t": result.get("frame_t", 0),
+        "frame_h": result.get("frame_h", 0),
+        "frame_len": (frames[0]["bbox"][2] - frames[0]["bbox"][0]) if frames else 0,
+        "warnings": result.get("warnings", []),
+    }
+
+
+def _loop_len(pts):
+    s = 0.0
+    n = len(pts)
+    for i in range(n):
+        x1, y1 = pts[i]
+        x2, y2 = pts[(i + 1) % n]
+        s += math.hypot(x2 - x1, y2 - y1)
+    return s
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  7) Sonucu diske yazma / okuma (indirmede yeniden dilimlememek için)
+# ══════════════════════════════════════════════════════════════════════════
+
+def dump_result(result) -> bytes:
+    """Dilimleme sonucunu sıkıştırılmış JSON olarak paketler."""
+    import gzip, json
+    r3 = lambda v: round(float(v), 3)
+    data = {
+        "axis": result["axis"],
+        "thickness": result["thickness"],
+        "gap": result["gap"],
+        "scale": result["scale"],
+        "pitch": result["pitch"],
+        "hole_dia": result.get("hole_dia", 0),
+        "holes": [[r3(x), r3(y)] for x, y in (result.get("holes") or [])],
+        "info": {k: (list(v) if isinstance(v, tuple) else v)
+                 for k, v in result["info"].items()},
+        "warnings": result.get("warnings", []),
+        "panels": [{
+            "no": p["no"],
+            "pos": r3(p["pos"]),
+            "bbox": [r3(v) for v in p["bbox"]],
+            "loops": [[[r3(x), r3(y)] for x, y in lp] for lp in p["loops"]],
+            "holes": [[r3(x), r3(y), r3(r)] for x, y, r in p.get("holes", ())],
+        } for p in result["panels"]],
+        "frame_t": result.get("frame_t", 0),
+        "frame_h": result.get("frame_h", 0),
+        "frames": [{
+            "no": f["no"],
+            "kind": "frame",
+            "label": f.get("label", ""),
+            "pos": r3(f["pos"]),
+            "thk": r3(f.get("thk", 0)),
+            "bbox": [r3(v) for v in f["bbox"]],
+            "loops": [[[r3(x), r3(y)] for x, y in lp] for lp in f["loops"]],
+        } for f in result.get("frames", [])],
+    }
+    return gzip.compress(json.dumps(data, separators=(",", ":")).encode("utf-8"), 6)
+
+
+def load_result(blob: bytes):
+    """dump_result çıktısını geri yükler."""
+    import gzip, json
+    d = json.loads(gzip.decompress(blob).decode("utf-8"))
+    for p in d["panels"]:
+        p["bbox"] = tuple(p["bbox"])
+        p["loops"] = [[tuple(pt) for pt in lp] for lp in p["loops"]]
+        p["holes"] = [tuple(h) for h in p.get("holes", [])]
+    for f in d.get("frames", []):
+        f["bbox"] = tuple(f["bbox"])
+        f["loops"] = [[tuple(pt) for pt in lp] for lp in f["loops"]]
+    d.setdefault("frames", [])
+    d["holes"] = [tuple(h) for h in d.get("holes", [])]
+    d["info"]["size"] = tuple(d["info"]["size"])
+    d["info"]["min"] = tuple(d["info"]["min"])
+    d["info"]["max"] = tuple(d["info"]["max"])
+    return d
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  8) Resimden kabartma (relief) → panel kesitleri
+#
+#  Resmin parlaklığı derinliğe çevrilir: her panel, resmin bir sütununa
+#  (ya da satırına) karşılık gelen dalgalı bir tahtadır. Ara mesh üretmeye
+#  gerek yoktur — kesit doğrudan resimden hesaplanır, böylece hem hızlı
+#  hem de temiz kontur elde edilir.
+# ══════════════════════════════════════════════════════════════════════════
+
+MAX_IMAGE_PX = 4000
+
+
+def _gray_grid(img, nx, ny, smooth=1.0, normalize=True, invert=False):
+    """Resmi nx×ny gri ızgaraya indirger; 0..1 arası değer listesi döndürür.
+
+    Dönüş: rows[y][x] — y=0 resmin üst satırı.
+    """
+    from PIL import Image, ImageFilter
+
+    if img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGBA")
+        bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        img = Image.alpha_composite(bg, img)
+    img = img.convert("L")
+
+    # Çok büyük resimlerde önce makul bir boyuta indir (alan ortalamalı)
+    if max(img.size) > MAX_IMAGE_PX:
+        r = MAX_IMAGE_PX / max(img.size)
+        img = img.resize((max(1, int(img.width * r)), max(1, int(img.height * r))),
+                         Image.BOX)
+
+    # Hedef ızgaraya alan ortalamasıyla indir → gürültü kendiliğinden azalır
+    img = img.resize((max(1, nx), max(1, ny)), Image.BOX)
+
+    if smooth and smooth > 0:
+        img = img.filter(ImageFilter.GaussianBlur(radius=float(smooth)))
+
+    px = list(img.getdata())
+    vals = [v / 255.0 for v in px]
+
+    if invert:
+        vals = [1.0 - v for v in vals]
+
+    if normalize:
+        lo, hi = min(vals), max(vals)
+        if hi - lo > 1e-6:
+            k = 1.0 / (hi - lo)
+            vals = [(v - lo) * k for v in vals]
+        else:
+            vals = [0.5] * len(vals)
+
+    return [vals[y * nx:(y + 1) * nx] for y in range(ny)]
+
+
+def build_panels_from_image(img, width, height, depth, min_depth=25.0,
+                            thickness=18.0, gap=0.0, orient="v",
+                            invert=False, smooth=1.0, normalize=True,
+                            shape="single", samples=260, simplify_tol=0.3,
+                            hole_count=0, hole_dia=10.0, hole_margin=6.0):
+    """Resmi kabartma katı modele çevirip panel kesitlerini üretir.
+
+    width   : işin eni (paneller bu yön boyunca dizilir)
+    height  : işin yüksekliği (panel profilinin uzun kenarı)
+    depth   : en derin noktadaki panel derinliği
+    min_depth: en sığ noktadaki derinlik — panelin kopmaması için taban payı
+    orient  : 'v' paneller dikey (resmin sütunları) · 'h' yatay (satırları)
+    shape   : 'single' arkası düz (duvar paneli) · 'double' simetrik (ayaklı)
+    """
+    width = float(width)
+    height = float(height)
+    depth = float(depth)
+    min_depth = max(0.0, float(min_depth))
+
+    if width <= 0 or height <= 0:
+        raise ValueError("En ve yükseklik sıfırdan büyük olmalı.")
+    if depth <= 0:
+        raise ValueError("Derinlik sıfırdan büyük olmalı.")
+    if min_depth >= depth:
+        raise ValueError(
+            f"Taban derinliği ({min_depth:g} mm) toplam derinlikten ({depth:g} mm) "
+            "küçük olmalı."
+        )
+
+    positions, pitch = plan_positions(0.0, width, thickness, gap)
+    n = len(positions)
+    S = max(24, min(int(samples), 1200))
+
+    # orient='v' → panel = resmin sütunu · orient='h' → panel = resmin satırı
+    if orient == "h":
+        grid = _gray_grid(img, S, n, smooth, normalize, invert)
+        rows = [grid[i] for i in range(n)]            # panel i → tek satır
+    else:
+        grid = _gray_grid(img, n, S, smooth, normalize, invert)
+        rows = [[grid[j][i] for j in range(S)] for i in range(n)]
+
+    span = depth - min_depth
+    step = height / (S - 1)
+    panels = []
+
+    for i in range(n):
+        col = rows[i]
+        # j=0 altta olacak şekilde ters çevir (resimde 0. satır üsttedir)
+        ds = [min_depth + span * col[S - 1 - j] for j in range(S)]
+
+        if shape == "double":
+            front = [(d / 2.0, j * step) for j, d in enumerate(ds)]
+            back = [(-d / 2.0, j * step) for j, d in reversed(list(enumerate(ds)))]
+            loop = _simplify(front, simplify_tol) + _simplify(back, simplify_tol)
+        else:
+            front = _simplify([(d, j * step) for j, d in enumerate(ds)], simplify_tol)
+            loop = front + [(0.0, height), (0.0, 0.0)]
+
+        if len(loop) < 3:
+            continue
+        xs = [p[0] for p in loop]
+        ys = [p[1] for p in loop]
+        panels.append({
+            "no": len(panels) + 1,
+            "pos": positions[i],
+            "loops": [loop],
+            "bbox": (min(xs), min(ys), max(xs), max(ys)),
+        })
+
+    if not panels:
+        raise ValueError("Resimden panel üretilemedi.")
+
+    warnings = []
+    holes = []
+    if hole_count > 0:
+        holes, hw = find_assembly_holes(panels, hole_count, hole_dia, hole_margin)
+        if hw:
+            warnings.append(hw)
+        if holes:
+            r = hole_dia / 2.0
+            for p in panels:
+                p["holes"] = [(hx, hy, r) for hx, hy in holes]
+
+    return {
+        "panels": panels,
+        "positions": positions,
+        "pitch": pitch,
+        "axis": "x",
+        "thickness": thickness,
+        "gap": gap,
+        "scale": 1.0,
+        "holes": holes,
+        "hole_dia": hole_dia,
+        "info": {
+            "tri_count": 0,
+            "min": (0.0, 0.0, 0.0),
+            "max": (width, depth, height),
+            "size": (width, depth, height),
+        },
+        "warnings": warnings,
+    }
+
+
+def export_assembly_svg(result, target_w=980, skew=0.55, rise=0.14):
+    """Panellerin monte edilmiş hâlini eğik (oblik) görünümle gösterir.
+
+    Kesim öncesi 'ne çıkacak' sorusunu yanıtlar — paneller gerçek aralıklarıyla
+    arkadan öne doğru çizilir.
+    """
+    panels = result["panels"]
+    if not panels:
+        return ""
+
+    umin = min(p["bbox"][0] for p in panels)
+    umax = max(p["bbox"][2] for p in panels)
+    vmin = min(p["bbox"][1] for p in panels)
+    vmax = max(p["bbox"][3] for p in panels)
+    wmin = min(p["pos"] for p in panels)
+    wmax = max(p["pos"] for p in panels)
+    du, dv, dw = max(umax - umin, 1e-6), max(vmax - vmin, 1e-6), max(wmax - wmin, 1e-6)
+
+    pad = 14
+    s = (target_w - 2 * pad) / (du + dw * skew)
+    W = target_w
+    H = (dv + dw * rise) * s + 2 * pad
+    base = H - pad
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W:.0f} {H:.0f}" '
+        f'width="100%" style="max-width:{W}px;height:auto;">'
+    ]
+
+    n = len(panels)
+    # Arkadan öne: son panel en arkada kalsın, öndekiler üstünü örtsün
+    for rank, p in enumerate(sorted(panels, key=lambda q: -q["pos"])):
+        k = (p["pos"] - wmin) / dw
+        ox = pad + k * dw * skew * s
+        oy = k * dw * rise * s
+        t = 1.0 - (rank / max(1, n - 1))          # önde = açık, arkada = koyu
+        r_ = int(96 + 106 * t); g_ = int(72 + 84 * t); b_ = int(44 + 54 * t)
+        d = []
+        for lp in p["loops"]:
+            x, y = ox + (lp[0][0] - umin) * s, base - oy - (lp[0][1] - vmin) * s
+            d.append(f"M{x:.1f} {y:.1f}")
+            for ux, vy in lp[1:]:
+                d.append(f"L{ox + (ux - umin) * s:.1f} {base - oy - (vy - vmin) * s:.1f}")
+            d.append("Z")
+        parts.append(
+            f'<path d="{" ".join(d)}" fill="rgb({r_},{g_},{b_})" fill-rule="evenodd" '
+            f'stroke="rgba(0,0,0,0.45)" stroke-width="0.7"/>'
+        )
+
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  9) Geçme (slot-fit) çerçeve sistemi
+#
+#  Panellerin altına, yukarıdan aşağı geçen kayıtlar (cross member) eklenir.
+#  Klasik yarım-bindirme: kayıt üstten, panel alttan kanallanır; panel
+#  yukarıdan indirilip kayıda oturur. Mil/çubuk gerekmez, iş kendi kendine
+#  kare kalır.
+# ══════════════════════════════════════════════════════════════════════════
+
+class _V:
+    __slots__ = ("x", "y", "nxt", "prv", "nbr", "isect", "flag", "alpha", "used")
+
+    def __init__(self, x, y, isect=False, alpha=0.0):
+        self.x = x; self.y = y
+        self.nxt = None; self.prv = None; self.nbr = None
+        self.isect = isect; self.flag = False; self.alpha = alpha; self.used = False
+
+
+def _ring(pts):
+    vs = [_V(x, y) for x, y in pts]
+    n = len(vs)
+    for i, v in enumerate(vs):
+        v.nxt = vs[(i + 1) % n]
+        v.prv = vs[(i - 1) % n]
+    return vs[0]
+
+
+def _walk(start):
+    v = start
+    while True:
+        yield v
+        v = v.nxt
+        if v is start:
+            break
+
+
+def _signed_area(pts):
+    s = 0.0
+    n = len(pts)
+    for i in range(n):
+        x1, y1 = pts[i]
+        x2, y2 = pts[(i + 1) % n]
+        s += x1 * y2 - x2 * y1
+    return s / 2.0
+
+
+def _seg_x(a, b, c, d):
+    x1, y1, x2, y2 = a.x, a.y, b.x, b.y
+    x3, y3, x4, y4 = c.x, c.y, d.x, d.y
+    den = (x2 - x1) * (y4 - y3) - (y2 - y1) * (x4 - x3)
+    if abs(den) < 1e-14:
+        return None
+    t = ((x3 - x1) * (y4 - y3) - (y3 - y1) * (x4 - x3)) / den
+    u = ((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1)) / den
+    if t <= 1e-12 or t >= 1 - 1e-12 or u <= 1e-12 or u >= 1 - 1e-12:
+        return None
+    return t, u, x1 + t * (x2 - x1), y1 + t * (y2 - y1)
+
+
+def _insert_sorted(v0, v1, node):
+    cur = v0
+    while cur.nxt is not v1 and cur.nxt.isect and cur.nxt.alpha < node.alpha:
+        cur = cur.nxt
+    node.nxt = cur.nxt
+    node.prv = cur
+    cur.nxt.prv = node
+    cur.nxt = node
+
+
+def subtract_rect(loop, x0, x1, y0, y1, eps=1e-7):
+    """Basit çokgenden eksen-hizalı dikdörtgeni çıkarır (Greiner-Hormann).
+
+    Dönüş: kapalı çokgen listesi (boş olabilir, birden çok parçaya bölünebilir).
+    """
+    subj = [(float(x), float(y)) for x, y in loop]
+    if len(subj) < 3:
+        return [list(loop)]
+    if _signed_area(subj) < 0:
+        subj = subj[::-1]
+
+    # Köşe–kenar çakışması olmasın diye dikdörtgeni mikro kaydır
+    for _ in range(64):
+        if not any(abs(x - x0) < eps or abs(x - x1) < eps or
+                   abs(y - y0) < eps or abs(y - y1) < eps for x, y in subj):
+            break
+        x0 += eps * 3; x1 += eps * 3; y0 += eps * 3; y1 += eps * 3
+
+    clip_pts = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    S = _ring(subj)
+    C = _ring(clip_pts)
+
+    for a in list(_walk(S)):
+        b = a.nxt
+        while b.isect:
+            b = b.nxt
+        for c in list(_walk(C)):
+            d = c.nxt
+            while d.isect:
+                d = d.nxt
+            r = _seg_x(a, b, c, d)
+            if r is None:
+                continue
+            t, u, px, py = r
+            n1 = _V(px, py, True, t)
+            n2 = _V(px, py, True, u)
+            n1.nbr = n2
+            n2.nbr = n1
+            _insert_sorted(a, b, n1)
+            _insert_sorted(c, d, n2)
+
+    if not any(v.isect for v in _walk(S)):
+        return [] if _point_in_poly(subj[0][0], subj[0][1], clip_pts) else [subj]
+
+    # A − B  →  subject bayrağı = NOT(giriş) ,  clip bayrağı = giriş
+    start = S
+    while start.isect:
+        start = start.nxt
+    inside = _point_in_poly(start.x, start.y, clip_pts)
+    for v in _walk(start):
+        if v.isect:
+            v.flag = inside
+            inside = not inside
+
+    inside = _point_in_poly(C.x, C.y, subj)
+    for v in _walk(C):
+        if v.isect:
+            v.flag = not inside
+            inside = not inside
+
+    out = []
+    for v0 in _walk(S):
+        if not (v0.isect and not v0.used):
+            continue
+        cur = v0
+        poly = []
+        guard = 0
+        while True:
+            cur.used = True
+            if cur.nbr:
+                cur.nbr.used = True
+            fwd = cur.flag
+            while True:
+                cur = cur.nxt if fwd else cur.prv
+                poly.append((cur.x, cur.y))
+                guard += 1
+                if cur.isect or guard > 200000:
+                    break
+            if guard > 200000:
+                return [list(loop)]
+            cur.used = True
+            if cur.nbr:
+                cur.nbr.used = True
+            cur = cur.nbr
+            if cur is None or cur is v0 or cur.nbr is v0:
+                break
+        if len(poly) >= 3:
+            out.append(poly)
+    return out
+
+
+def find_frame_positions(panels, count, slot_w, band_h, margin=12.0):
+    """Tüm panellerde, tabandan band_h yüksekliğe kadar dolu olan ortak u aralıkları.
+
+    Kayıt buralara yerleşir; böylece geçme kanalı her panelde sağlam ete denk gelir.
+    """
+    if count <= 0 or not panels:
+        return [], ""
+
+    u0 = max(p["bbox"][0] for p in panels)
+    u1 = min(p["bbox"][2] for p in panels)
+    v_base = min(p["bbox"][1] for p in panels)
+    need = slot_w + 2 * margin
+    if u1 - u0 < need:
+        return [], ("Kayıt için tüm panellerde ortak yeterli alan yok — "
+                    "geçme çerçeve eklenmedi.")
+
+    cell = max(min((u1 - u0) / 220.0, band_h / 12.0), 0.4)
+    nx = max(4, int((u1 - u0) / cell))
+    ny = max(3, int(band_h / cell))
+
+    valid = None
+    for p in panels:
+        g = _inside_grid(p["loops"], u0, v_base, cell, nx, ny)
+        col = bytearray(nx)
+        for i in range(nx):
+            col[i] = 1 if all(g[j * nx + i] for j in range(ny)) else 0
+        if valid is None:
+            valid = col
+        else:
+            for i in range(nx):
+                if not col[i]:
+                    valid[i] = 0
+        if not any(valid):
+            return [], ("Kayıt için tüm panellerde ortak dolu bölge bulunamadı — "
+                        "geçme çerçeve eklenmedi. Kayıt yüksekliğini azaltmayı deneyin.")
+
+    # slot_w + 2*margin genişliğinde tam dolu pencere arayan tarama
+    win = max(1, int(round(need / cell)))
+    ok = []
+    run = 0
+    for i in range(nx):
+        run = run + 1 if valid[i] else 0
+        if run >= win:
+            ok.append(u0 + (i - win / 2.0 + 0.5) * cell)   # pencere ortası
+
+    if not ok:
+        return [], (f"Kayıt ({slot_w:g} mm kanal + kenar payı) için tüm panellerde "
+                    "ortak yeterli genişlik yok — geçme çerçeve eklenmedi.")
+
+    picked = [ok[len(ok) // 2]]
+    while len(picked) < count:
+        best, bd = None, -1.0
+        for u in ok:
+            d = min(abs(u - q) for q in picked)
+            if d > bd:
+                bd, best = d, u
+        if best is None or bd < slot_w * 2:
+            break
+        picked.append(best)
+    picked.sort()
+
+    warn = ""
+    if len(picked) < count:
+        warn = (f"{count} kayıt istendi, ortak alana yalnızca {len(picked)} tanesi "
+                "yeterli aralıkla yerleştirilebildi.")
+    return picked, warn
+
+
+def _frame_profile(w_lo, w_hi, v_base, frame_h, notches, engage):
+    """Kayıt profili: alt kenar düz, üstten her panel için kanal açılmış strip."""
+    top = v_base + frame_h
+    cut = v_base + engage          # kanal dibi
+    pts = [(w_lo, v_base), (w_hi, v_base), (w_hi, top)]
+    for a, b in sorted(notches, reverse=True):     # sağdan sola
+        pts.append((b, top))
+        pts.append((b, cut))
+        pts.append((a, cut))
+        pts.append((a, top))
+    pts.append((w_lo, top))
+    return pts
+
+
+def add_frames(result, count=2, frame_t=18.0, frame_h=120.0, fit=0.2,
+               margin=12.0, overhang=0.0):
+    """Panellere geçme kanalı açar ve kayıtları (çerçeve parçaları) üretir."""
+    panels = result["panels"]
+    if not panels or count <= 0:
+        result["frames"] = []
+        return result
+
+    engage = frame_h / 2.0
+    slot_w = frame_t + fit                 # panelde açılan kanal
+    v_base = min(p["bbox"][1] for p in panels)
+    v_lo = v_base - max(10.0, frame_h)     # kanal alttan açık olsun
+
+    us, warn = find_frame_positions(panels, count, slot_w, frame_h, margin)
+    if warn:
+        result.setdefault("warnings", []).append(warn)
+    if not us:
+        result["frames"] = []
+        return result
+
+    # ── 1) Panellere kanal aç ──
+    split = 0
+    for p in panels:
+        loops = p["loops"]
+        for u in us:
+            new = []
+            for lp in loops:
+                new.extend(subtract_rect(lp, u - slot_w / 2.0, u + slot_w / 2.0,
+                                         v_lo, v_base + engage))
+            loops = new
+        if len(loops) > len(p["loops"]):
+            split += 1
+        p["loops"] = loops
+        xs = [q[0] for lp in loops for q in lp]
+        ys = [q[1] for lp in loops for q in lp]
+        if xs:
+            p["bbox"] = (min(xs), min(ys), max(xs), max(ys))
+
+    if split:
+        result.setdefault("warnings", []).append(
+            f"{split} panel geçme kanalı yüzünden birden fazla parçaya ayrıldı. "
+            "Kayıt konumunu/yüksekliğini değiştirin veya kayıt sayısını azaltın.")
+
+    # ── 2) Kayıtları üret ──
+    thk = result["thickness"]
+    w_lo = min(p["pos"] for p in panels) - thk / 2.0 - overhang
+    w_hi = max(p["pos"] for p in panels) + thk / 2.0 + overhang
+    notches = [(p["pos"] - (thk + fit) / 2.0, p["pos"] + (thk + fit) / 2.0)
+               for p in panels]
+
+    frames = []
+    for i, u in enumerate(us):
+        pts = _frame_profile(w_lo, w_hi, v_base, frame_h, notches, engage)
+        xs = [q[0] for q in pts]
+        ys = [q[1] for q in pts]
+        frames.append({
+            "no": i + 1,
+            "kind": "frame",
+            "label": f"K{i + 1}",
+            "pos": u,
+            "thk": frame_t,
+            "loops": [pts],
+            "bbox": (min(xs), min(ys), max(xs), max(ys)),
+        })
+
+    result["frames"] = frames
+    result["frame_t"] = frame_t
+    result["frame_h"] = frame_h
+    result["frame_us"] = us
+    return result
+
+
+def all_parts(result):
+    """Kesilecek bütün parçalar: paneller + kayıtlar."""
+    return list(result.get("panels", [])) + list(result.get("frames", []))
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  10) Tarayıcıda döndürülebilir 3B görünüm için geometri
+# ══════════════════════════════════════════════════════════════════════════
+
+def export_3d(result, budget=70):
+    """Fareyle döndürülebilir önizleme için sadeleştirilmiş katı geometri.
+
+    Her parça bir "ekstrüzyon": düzlemdeki kapalı kontur + kalınlık.
+      o=0 → panel  : kontur (u,v), x ekseni boyunca ekstrüde
+      o=1 → kayıt  : kontur (w,v), y ekseni boyunca ekstrüde
+    """
+    panels = result.get("panels", [])
+    frames = result.get("frames", [])
+    if not panels:
+        return {"parts": [], "bb": [0, 0, 0, 1, 1, 1]}
+
+    span = max(result["info"]["size"]) or 1.0
+    tol = span / 900.0          # ekranda görünmeyecek kadar ince sadeleştirme
+
+    def pack(loops):
+        out = []
+        for lp in loops:
+            q = _simplify(list(lp), tol)
+            if len(q) > budget:                 # eşit aralıkla seyrelt
+                step = len(q) / float(budget)
+                q = [q[int(i * step)] for i in range(budget)]
+            if len(q) >= 3:
+                out.append([[round(x, 2), round(y, 2)] for x, y in q])
+        return out
+
+    parts = []
+    thk = float(result["thickness"])
+    for p in panels:
+        lp = pack(p["loops"])
+        if lp:
+            parts.append({"o": 0, "p": round(p["pos"] - thk / 2.0, 2),
+                          "t": round(thk, 2), "l": lp})
+
+    ft = float(result.get("frame_t", 0) or 0)
+    for f in frames:
+        lp = pack(f["loops"])
+        if lp:
+            parts.append({"o": 1, "p": round(f["pos"] - ft / 2.0, 2),
+                          "t": round(ft, 2), "l": lp})
+
+    xs0 = min(p["pos"] for p in panels) - thk
+    xs1 = max(p["pos"] for p in panels) + thk
+    ys0 = min(p["bbox"][0] for p in panels)
+    ys1 = max(p["bbox"][2] for p in panels)
+    zs0 = min(p["bbox"][1] for p in panels)
+    zs1 = max(p["bbox"][3] for p in panels)
+    return {"parts": parts,
+            "bb": [round(v, 1) for v in (xs0, ys0, zs0, xs1, ys1, zs1)],
+            "np": len(panels), "nf": len(frames)}

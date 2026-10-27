@@ -1,0 +1,799 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}{% if edit_offer %}{{ T.offer_no }} {{ edit_offer.offer_no }}{% else %}{{ T.offer_new }}{% endif %}{% endblock %}
+
+{% block content %}
+{% macro tr(obj, field) %}{{ obj.get(field+'_'+user.lang, '') or obj.get(field, '') if user.lang != 'tr' else obj.get(field, '') }}{% endmacro %}
+<!-- Wizard Steps Indicator -->
+<div class="wizard-steps" style="margin-bottom:32px;">
+  <div class="step-item active" id="si1">
+    <div class="step-circle">1</div>
+    <div class="step-label">{{ T.wiz_step1 }}</div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" id="si2">
+    <div class="step-circle">2</div>
+    <div class="step-label">{{ T.wiz_step2 }}</div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" id="si3">
+    <div class="step-circle">3</div>
+    <div class="step-label">{{ T.wiz_step3 }}</div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" id="si4">
+    <div class="step-circle">4</div>
+    <div class="step-label">{{ T.wiz_step4 }}</div>
+  </div>
+</div>
+
+<form method="post" action="{% if edit_offer %}/offers/{{ edit_offer.id }}/update{% else %}/offers/create{% endif %}" id="wizardForm">
+  <input type="hidden" name="model_id" id="wModelId" value="" />
+  <input type="hidden" name="options_json" id="wOptionsJson" value="[]" />
+
+  <!-- Step 1: Customer -->
+  <div class="wizard-step-content card" id="wstep1">
+    <div class="card-header"><h3 class="card-title">{{ T.wiz_select_customer }}</h3></div>
+    <div class="card-body">
+      <div class="tabs" style="margin-bottom:20px;">
+        <button type="button" class="tab-btn active" data-tab="existing-cust" onclick="switchTab('existing-cust')">{{ T.wiz_select_customer }}</button>
+        <button type="button" class="tab-btn" data-tab="new-cust" onclick="switchTab('new-cust')">{{ T.wiz_new_customer }}</button>
+      </div>
+      <div id="existing-cust" class="tab-pane active">
+        <div class="form-group">
+          <label class="form-label">{{ T.wiz_select_customer }}</label>
+          <select name="customer_id" id="wCustomerId" class="form-control" style="max-width:400px;">
+            <option value="">-- {{ T.wiz_select_customer }} --</option>
+            {% for c in customers %}
+            <option value="{{ c.id }}" {% if edit_offer and edit_offer.customer_id == c.id %}selected{% endif %}>{{ c.name }} {% if c.city %}({{ c.city }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div id="new-cust" class="tab-pane" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:600px;">
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">{{ T.wiz_company }} *</label>
+            <input type="text" name="new_customer_name" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.wiz_contact }}</label>
+            <input type="text" name="new_customer_contact" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.wiz_email }}</label>
+            <input type="email" name="new_customer_email" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.wiz_phone }}</label>
+            <input type="tel" name="new_customer_phone" class="form-control" />
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:400px;margin-top:16px;">
+        <div class="form-group">
+          <label class="form-label">{{ T.wiz_qty }}</label>
+          <input type="number" name="machine_count" id="wMachineCount" class="form-control" value="{{ edit_offer.machine_count if edit_offer else 1 }}" min="1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.offer_currency }}</label>
+          <select name="currency" id="wCurrency" class="form-control">
+            {% for cur in currencies %}
+            <option value="{{ cur }}" {% if edit_offer and edit_offer.currency == cur %}selected{% endif %}>{{ cur }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;justify-content:flex-end;padding:16px;">
+      <button type="button" class="btn btn-primary" onclick="wizardNext()">{{ T.wiz_next }}</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Model -->
+  <div class="wizard-step-content card" id="wstep2" style="display:none;">
+    <div class="card-header"><h3 class="card-title">{{ T.wiz_step2 }}</h3></div>
+    <div class="card-body">
+      <!-- Category filter -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat(0)">{{ T.wiz_all_categories }}</button>
+        {% for cat in categories %}
+        <button type="button" class="btn btn-outline btn-sm" onclick="filterModelCat({{ cat.id }})">{{ tr(cat, 'name') }}</button>
+        {% endfor %}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+        {% for m in models %}
+        <div class="model-card" data-id="{{ m.id }}" data-cat="{{ m.category_id or 0 }}"
+             data-compat="{{ m.compatible_options_list|tojson }}"
+             data-is-line="{{ m.is_line or 0 }}"
+             data-line-configs="{{ m.line_configs or '2,3,4' }}"
+             data-line-images='{{ m.line_images_map|tojson }}'
+             onclick='wizardSelectModel({{ m.id }}, {{ (m.get("name_"+user.lang) or m.name if user.lang != "tr" else m.name)|tojson }}, {{ m.base_price|default(0) }}, {{ m.currency|tojson }})'
+             style="cursor:pointer;display:flex;flex-direction:column;border-radius:12px;border:2px solid var(--border);overflow:hidden;transition:border-color .15s,box-shadow .15s;background:var(--surface);">
+          <div style="position:relative;height:150px;background:var(--surface-2);flex-shrink:0;">
+            {% if m.image_path %}
+            <img src="/static/{{ m.image_path }}" alt="{{ m.name }}" style="width:100%;height:100%;object-fit:cover;display:block;" />
+            {% else %}
+            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            </div>
+            {% endif %}
+            {% if m.category_name %}
+            <div style="position:absolute;bottom:7px;left:7px;background:rgba(0,0,0,.52);color:#fff;font-size:10px;font-weight:500;padding:3px 8px;border-radius:20px;letter-spacing:.3px;">{{ m.category_name }}</div>
+            {% endif %}
+          </div>
+          <div style="padding:11px 12px 13px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:5px;line-height:1.3;">{{ tr(m, 'name') }}</div>
+            <div style="color:var(--accent);font-size:15px;font-weight:700;letter-spacing:.3px;">{{ "%.2f"|format(m.base_price|default(0)|float) }} {{ m.currency }}</div>
+          </div>
+        </div>
+        {% else %}
+        <p style="color:var(--text-muted)">Henüz model eklenmedi</p>
+        {% endfor %}
+      </div>
+      <div id="selectedModelInfo" style="display:none;margin-top:20px;padding:16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--accent);">
+        <strong>{{ T.wiz_selected }}: </strong><span class="sel-model-name"></span> — <span class="sel-model-price" style="color:var(--accent);"></span>
+      </div>
+
+      <!-- Hat Konfigürasyonu -->
+      <div id="lineConfigSection" style="display:none;margin-top:16px;padding:16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-weight:700;margin-bottom:10px;">🔗 Hat Konfigürasyonu</div>
+        <div id="lineConfigBtns" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
+      <button type="button" class="btn btn-ghost" onclick="wizardBack()">{{ T.wiz_prev }}</button>
+      <button type="button" class="btn btn-primary" onclick="wizardNext()">{{ T.wiz_next }}</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Options -->
+  <div class="wizard-step-content card" id="wstep3" style="display:none;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 class="card-title">{{ T.wiz_options_title }}</h3>
+      <div id="wVariationImageBox" style="display:none;text-align:center;">
+        <img id="wVariationImage" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:2px solid var(--accent);" />
+        <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Aktif varyasyon</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="conflictWarning" class="alert alert-danger" style="display:none;">
+        ⚠️ Seçilen bazı opsiyonlar birbiriyle çakışıyor! Lütfen kontrol edin.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        {% for o in options %}
+        <div class="option-row" data-opt-id="{{ o.id }}" data-conflict="{{ o.conflict_group or '' }}"
+             data-cats="{{ (o.category_ids or '')|e }}"
+             data-varimg="{{ (o.variation_image_path or '')|e }}"
+             data-priority="{{ o.image_priority or 0 }}"
+             data-imgpath="{{ (o.image_path or '')|e }}"
+             data-qty-type="{{ o.qty_type or 'MANUAL' }}"
+             data-requires="{{ (o.requires_option_ids or '')|e }}"
+             data-price="{{ o.price|default(0) }}"
+             data-name="{{ (o.get('name_'+user.lang) or o.name if user.lang != 'tr' else o.name)|e }}"
+             data-currency="{{ o.currency|e }}"
+             style="padding:12px 16px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <input type="checkbox" id="opt_{{ o.id }}"
+                   onchange='wizardToggleOption({{ o.id }}, {{ o.price|default(0) }}, {{ (o.get("name_"+user.lang) or o.name if user.lang != "tr" else o.name)|tojson }}, {{ o.currency|tojson }})' />
+            <label for="opt_{{ o.id }}" style="flex:1;cursor:pointer;display:flex;align-items:center;gap:8px;">
+              {% if o.image_path %}
+              <img src="/static/{{ o.image_path }}" style="width:32px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0;" />
+              {% endif %}
+              <span>
+                <strong>{{ tr(o, 'name') }}</strong>
+                {% if o.description %}<br><small style="color:var(--text-muted)">{{ tr(o, 'description') }}</small>{% endif %}
+              </span>
+              {% if o.variation_image_path %}
+              <span title="Varyasyon resmi var" style="font-size:10px;color:var(--accent);background:var(--surface);padding:2px 5px;border-radius:4px;border:1px solid var(--accent);">Var.Resim</span>
+              {% endif %}
+            </label>
+            {% if o.qty_type == 'MANUAL' %}
+            <div style="display:flex;align-items:center;gap:6px;">
+              <label style="font-size:12px;color:var(--text-muted);">{{ T.wiz_qty }}:</label>
+              <input type="number" id="optqty_{{ o.id }}" value="1" min="1" max="99" class="form-control" style="width:70px;"
+                     onchange='wizardQtyChange({{ o.id }}, {{ o.price|default(0) }}, {{ (o.get("name_"+user.lang) or o.name if user.lang != "tr" else o.name)|tojson }}, {{ o.currency|tojson }})' />
+            </div>
+            {% elif o.qty_type == 'PER_MACHINE' %}
+            <span class="per-machine-qty" style="font-size:12px;color:var(--accent);font-weight:600;white-space:nowrap;">hat sayısı kadar</span>
+            {% elif o.qty_type == 'FIXED_1' %}
+            <span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">1 adet</span>
+            {% endif %}
+            <span style="font-weight:600;color:var(--accent);white-space:nowrap;">{{ "%.2f"|format(o.price|default(0)|float) }} {{ o.currency }}</span>
+            {% if o.video_url %}
+            <button type="button" class="btn btn-ghost btn-sm" style="color:#e67e22;border-color:#e67e22;padding:3px 10px;"
+                    onclick='openVideoModal({{ o.video_url|tojson }})'>▶ Video</button>
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+        <p style="color:var(--text-muted)">-</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:16px;">
+      <button type="button" class="btn btn-ghost" onclick="wizardBack()">{{ T.wiz_prev }}</button>
+      <button type="button" class="btn btn-primary" onclick="wizardNext()">{{ T.wiz_next }}</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Summary -->
+  <div class="wizard-step-content card" id="wstep4" style="display:none;">
+    <div class="card-header"><h3 class="card-title">{{ T.wiz_step4 }}</h3></div>
+    <div class="card-body" style="padding:12px;">
+      <div id="wizardSummary" style="margin-bottom:16px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">{{ T.wiz_discount }}</label>
+          <input type="number" name="discount_pct" id="wDiscount" class="form-control" value="{{ edit_offer.discount_pct if edit_offer else 0 }}" min="0" max="100" step="0.5" oninput="wizardBuildSummary()" />
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">{{ T.offer_validity }}</label>
+          <input type="date" name="validity_date" class="form-control" value="{{ edit_offer.validity_date if edit_offer else '' }}" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1;margin-bottom:0;padding:10px;background:var(--surface-2);border-radius:8px;border:2px dashed var(--accent);">
+          <label class="form-label" style="color:var(--accent);font-weight:700;">💰 Nihai Tutar (Manuel Override)</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="number" name="final_price" id="wFinalPrice" class="form-control" style="max-width:200px;"
+              value="{{ edit_offer.final_price if edit_offer and edit_offer.final_price is not none and edit_offer.final_price != 0 else '' }}"
+              min="0" step="0.01" placeholder="Otomatik hesaplanır"
+              oninput="wizardBuildSummary()" />
+            <span style="font-size:12px;color:var(--text-muted);">Girilirse hesaplanan fiyatın üzerine yazar. Boş bırakılırsa otomatik hesaplanır.</span>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label">{{ T.offer_notes }}</label>
+          <textarea name="notes" class="form-control" rows="2" placeholder="...">{{ edit_offer.notes if edit_offer else '' }}</textarea>
+        </div>
+      </div>
+
+      <!-- Teslim Şekli -->
+      {% if delivery_terms %}
+      <div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--accent);">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">🚢 Teslim Şekli</div>
+        <div class="form-group" style="margin-bottom:0;">
+          <select name="delivery_term_id" id="wDeliveryTermId" class="form-control" onchange="wizardOnDeliveryTermChange()">
+            <option value="0">-- Teslim Şekli Seçin --</option>
+            {% for dt in delivery_terms %}
+            <option value="{{ dt.id }}" data-disc="{{ dt.discount_pct }}"
+              {% if edit_offer and edit_offer.delivery_term_id == dt.id %}selected{% endif %}>
+              {{ dt.name }}{% if dt.discount_pct > 0 %} (-%{{ "%.1f"|format(dt.discount_pct) }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <div id="wDeliveryTermInfo" style="margin-top:6px;font-size:12px;color:var(--text-muted);"></div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Delivery / Payment terms -->
+      <div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">{{ T.offer_delivery }} / {{ T.offer_payment }}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">{{ T.offer_delivery }}</label>
+            <input type="text" name="delivery_method" id="wDeliveryMethod" class="form-control" value="{{ edit_offer.delivery_method if edit_offer else '' }}" />
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">{{ T.offer_delivery_time }}</label>
+            <input type="text" name="delivery_time" id="wDeliveryTime" class="form-control" value="{{ edit_offer.delivery_time if edit_offer else '' }}" />
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">{{ T.offer_logistics }}</label>
+            <input type="text" name="logistics" id="wLogistics" class="form-control" value="{{ edit_offer.logistics if edit_offer else '' }}" />
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">{{ T.offer_payment }}</label>
+            <textarea name="payment_notes" id="wPaymentNotes" class="form-control" rows="2" placeholder="...">{{ edit_offer.payment_notes if edit_offer else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:12px;">
+      <button type="button" class="btn btn-ghost" onclick="wizardBack()">{{ T.wiz_prev }}</button>
+      <button type="submit" class="btn btn-success" onclick="wizardBuildSummary()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><polyline points="20 6 9 17 4 12"/></svg>
+        {% if edit_offer %}{{ T.wiz_update }}{% else %}{{ T.wiz_create }}{% endif %}
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let wizardCurrentStep = 1;
+let wizardSelectedModel = null;
+let wizardSelectedOptions = {};
+
+function wizardShowStep(n) {
+  document.querySelectorAll('.wizard-step-content').forEach(s => s.style.display = 'none');
+  const step = document.getElementById('wstep' + n);
+  if (step) step.style.display = 'block';
+  wizardCurrentStep = n;
+  document.querySelectorAll('.step-item').forEach((item, i) => {
+    item.classList.toggle('active', i + 1 === n);
+    item.classList.toggle('done', i + 1 < n);
+  });
+}
+
+function wizardNext() {
+  if (wizardCurrentStep === 2 && !wizardSelectedModel) {
+    showToast('{{ T.wiz_step2 }}', 'warning'); return;
+  }
+  wizardShowStep(wizardCurrentStep + 1);
+  if (wizardCurrentStep === 3) wizardLoadOptions();
+  if (wizardCurrentStep === 4) wizardBuildSummary();
+}
+
+function wizardBack() { wizardShowStep(wizardCurrentStep - 1); }
+
+let wizardLineCount = 0;
+
+function wizardSelectModel(modelId, modelName, basePrice, currency) {
+  wizardSelectedModel = { id: modelId, name: modelName, price: parseFloat(basePrice) || 0, currency };
+  document.querySelectorAll('.model-card').forEach(c => { c.style.borderColor = 'var(--border)'; c.style.background = 'var(--surface)'; c.style.boxShadow = ''; });
+  const card = document.querySelector('.model-card[data-id="' + modelId + '"]');
+  if (card) { card.style.borderColor = 'var(--accent)'; card.style.background = 'rgba(59,130,246,.06)'; card.style.boxShadow = '0 0 0 3px rgba(59,130,246,.15)'; }
+  document.getElementById('wModelId').value = modelId;
+  const info = document.getElementById('selectedModelInfo');
+  if (info) {
+    info.style.display = 'block';
+    info.querySelector('.sel-model-name').textContent = modelName;
+    info.querySelector('.sel-model-price').textContent = basePrice + ' ' + currency;
+  }
+
+  // Hat konfigürasyonu
+  const lineSection = document.getElementById('lineConfigSection');
+  const isLine = parseInt(card?.dataset.isLine || '0');
+  wizardLineCount = 0;
+  if (isLine && card) {
+    const configs = (card.dataset.lineConfigs || '1,2,3,4').split(',').map(s => parseInt(s.trim())).filter(n => n > 0);
+    const btns = document.getElementById('lineConfigBtns');
+    const _hatSuffix = n => ({1:'\'li',2:'\'li',3:'\'lü',4:'\'lü',5:'\'li',6:'\'lı',7:'\'li',8:'\'li'}[n] || '\'li');
+    btns.innerHTML = configs.map(lc =>
+      `<button type="button" class="btn btn-outline btn-sm line-cfg-btn" data-lc="${lc}" onclick="wizardSelectLine(${lc})">${lc}${_hatSuffix(lc)} Hat</button>`
+    ).join('');
+    lineSection.style.display = '';
+  } else {
+    lineSection.style.display = 'none';
+    document.getElementById('wMachineCount').value = 1;
+  }
+}
+
+function wizardSelectLine(lc) {
+  wizardLineCount = lc;
+  document.querySelectorAll('.line-cfg-btn').forEach(b => {
+    b.style.background = parseInt(b.dataset.lc) === lc ? 'var(--accent)' : '';
+    b.style.color = parseInt(b.dataset.lc) === lc ? '#fff' : '';
+    b.style.borderColor = parseInt(b.dataset.lc) === lc ? 'var(--accent)' : '';
+  });
+  document.getElementById('wMachineCount').value = lc;
+
+  // Hat resmi varsa göster
+  const card = document.querySelector('.model-card[data-id="' + wizardSelectedModel?.id + '"]');
+  let lineImages = {};
+  try { lineImages = JSON.parse(card?.dataset.lineImages || '{}'); } catch(e) {}
+  const li = lineImages[lc];
+  if (li?.image_path) {
+    const box = document.getElementById('wVariationImageBox');
+    const img = document.getElementById('wVariationImage');
+    img.src = '/static/' + li.image_path;
+    box.style.display = 'block';
+  }
+
+  // PER_MACHINE opsiyonlarını güncelle
+  document.querySelectorAll('.option-row').forEach(row => {
+    const qtyInput = row.querySelector('.per-machine-qty');
+    if (qtyInput) {
+      qtyInput.textContent = lc + ' adet';
+      const optId = parseInt(row.dataset.optId);
+      if (wizardSelectedOptions[optId]) {
+        wizardSelectedOptions[optId].qty = lc;
+        wizardSelectedOptions[optId].line_total = wizardSelectedOptions[optId].price * lc;
+      }
+    }
+  });
+  wizardBuildSummary();
+}
+
+function filterModelCat(catId) {
+  document.querySelectorAll('.model-card').forEach(card => {
+    card.style.display = (catId === 0 || parseInt(card.dataset.cat) === catId) ? 'flex' : 'none';
+  });
+}
+
+function wizardLoadOptions() {
+  if (!wizardSelectedModel) return;
+  const card = document.querySelector('.model-card[data-id="' + wizardSelectedModel.id + '"]');
+  let compat = [];
+  if (card) { try { compat = JSON.parse(card.dataset.compat || '[]'); } catch(e) {} }
+  const modelCatId = card ? card.dataset.cat : '0';
+  const machineQty = wizardLineCount || parseInt(document.getElementById('wMachineCount')?.value) || 1;
+  document.querySelectorAll('.option-row').forEach(row => {
+    const optId = parseInt(row.dataset.optId);
+    const catIds = (row.dataset.cats || '').split(',').map(s => s.trim()).filter(Boolean);
+    // If model has a compat whitelist, only those options show.
+    // If no whitelist, fall back to category matching (global options always pass).
+    const show = compat.length > 0
+      ? compat.includes(optId)
+      : (catIds.length === 0 || catIds.includes(modelCatId));
+    row.style.display = show ? '' : 'none';
+    // PER_MACHINE etiketini güncelle
+    const pmLabel = row.querySelector('.per-machine-qty');
+    if (pmLabel) pmLabel.textContent = machineQty + ' adet';
+  });
+}
+
+function _wizardOptQty(row, optId) {
+  const qtyType = row?.dataset.qtyType || 'MANUAL';
+  const machineQty = wizardLineCount || parseInt(document.getElementById('wMachineCount')?.value) || 1;
+  if (qtyType === 'PER_MACHINE') return machineQty;
+  if (qtyType === 'FIXED_1') return 1;
+  const qtyEl = document.getElementById('optqty_' + optId);
+  return qtyEl ? parseInt(qtyEl.value) || 1 : 1;
+}
+
+function _wizardAutoSelectRequired(startOptId) {
+  const queue = [startOptId];
+  const visited = new Set([startOptId]);
+  const autoAdded = [];
+  while (queue.length > 0) {
+    const curId = queue.shift();
+    const curRow = document.querySelector(`.option-row[data-opt-id="${curId}"]`);
+    if (!curRow || curRow.style.display === 'none') continue;
+    const reqIds = (curRow.dataset.requires || '').split(',').map(s => parseInt(s.trim())).filter(n => n > 0);
+    reqIds.forEach(reqId => {
+      if (visited.has(reqId)) return;
+      visited.add(reqId);
+      const reqCb = document.getElementById('opt_' + reqId);
+      const reqRow = document.querySelector(`.option-row[data-opt-id="${reqId}"]`);
+      if (reqCb && !reqCb.checked && reqRow && reqRow.style.display !== 'none') {
+        const reqName = reqRow.dataset.name || ('Opsiyon ' + reqId);
+        const reqPrice = parseFloat(reqRow.dataset.price) || 0;
+        const reqCurrency = reqRow.dataset.currency || 'USD';
+        reqCb.checked = true;
+        const qty = _wizardOptQty(reqRow, reqId);
+        wizardSelectedOptions[reqId] = { id: reqId, name: reqName, price: reqPrice, qty, currency: reqCurrency, line_total: reqPrice * qty };
+        autoAdded.push(reqName);
+        queue.push(reqId);
+      }
+    });
+  }
+  return autoAdded;
+}
+
+function wizardToggleOption(optId, price, name, currency) {
+  const cb = document.getElementById('opt_' + optId);
+  if (cb.checked) {
+    const row = document.querySelector(`.option-row[data-opt-id="${optId}"]`);
+    const qty = _wizardOptQty(row, optId);
+    wizardSelectedOptions[optId] = { id: optId, name, price: parseFloat(price), qty, currency, line_total: parseFloat(price) * qty };
+
+    // Auto-deselect other options in the same conflict group
+    const cg = row ? row.dataset.conflict : '';
+    if (cg) {
+      document.querySelectorAll(`.option-row[data-conflict="${cg}"]`).forEach(r => {
+        const otherId = parseInt(r.dataset.optId);
+        if (otherId !== optId) {
+          const otherCb = document.getElementById('opt_' + otherId);
+          if (otherCb && otherCb.checked) {
+            otherCb.checked = false;
+            delete wizardSelectedOptions[otherId];
+          }
+        }
+      });
+    }
+
+    // Auto-select required options
+    const autoAdded = _wizardAutoSelectRequired(optId);
+    if (autoAdded.length > 0) {
+      showToast('Bu opsiyon ile şunlar da eklendi: ' + autoAdded.join(', '), 'info');
+    }
+  } else {
+    delete wizardSelectedOptions[optId];
+  }
+  wizardCheckConflicts();
+  wizardUpdateVariationImage();
+}
+
+function wizardUpdateVariationImage() {
+  // Find selected option with highest priority variation image
+  let bestImg = null, bestPrio = -1;
+  document.querySelectorAll('.option-row').forEach(row => {
+    const optId = parseInt(row.dataset.optId);
+    if (!wizardSelectedOptions[optId]) return;
+    const varImg = row.dataset.varimg;
+    const prio = parseInt(row.dataset.priority) || 0;
+    if (varImg && prio > bestPrio) { bestImg = varImg; bestPrio = prio; }
+  });
+  // Hat resmi varsa öncelik yarışmasına dahil et
+  if (wizardLineCount) {
+    const card = wizardSelectedModel ? document.querySelector('.model-card[data-id="' + wizardSelectedModel.id + '"]') : null;
+    let lineImages = {};
+    try { lineImages = JSON.parse(card?.dataset.lineImages || '{}'); } catch(e) {}
+    const li = lineImages[wizardLineCount];
+    if (li?.image_path && (li.priority || 0) > bestPrio) {
+      bestImg = li.image_path;
+      bestPrio = li.priority || 0;
+    }
+  }
+  // Fall back to model image if no variation image
+  if (!bestImg) {
+    const modelCard = wizardSelectedModel ? document.querySelector('.model-card[data-id="' + wizardSelectedModel.id + '"]') : null;
+    const modelImg = modelCard ? modelCard.querySelector('img') : null;
+    if (modelImg) bestImg = modelImg.getAttribute('src').replace('/static/', '');
+  }
+  const box = document.getElementById('wVariationImageBox');
+  const img = document.getElementById('wVariationImage');
+  if (bestImg && box && img) {
+    img.src = '/static/' + bestImg;
+    box.style.display = 'block';
+  } else if (box) {
+    box.style.display = 'none';
+  }
+}
+
+function wizardQtyChange(optId, price, name, currency) {
+  if (wizardSelectedOptions[optId]) {
+    const qty = parseInt(document.getElementById('optqty_' + optId)?.value) || 1;
+    wizardSelectedOptions[optId].qty = qty;
+    wizardSelectedOptions[optId].line_total = parseFloat(price) * qty;
+  }
+}
+
+function wizardCheckConflicts() {
+  const groups = {};
+  document.querySelectorAll('.option-row[data-conflict]').forEach(row => {
+    const cg = row.dataset.conflict;
+    const optId = parseInt(row.dataset.optId);
+    if (cg && wizardSelectedOptions[optId]) groups[cg] = (groups[cg] || 0) + 1;
+  });
+  const warn = document.getElementById('conflictWarning');
+  if (warn) warn.style.display = Object.values(groups).some(v => v > 1) ? 'block' : 'none';
+}
+
+function _wizardDeliveryTermDisc() {
+  const sel = document.getElementById('wDeliveryTermId');
+  if (!sel || !sel.value || sel.value === '0') return 0;
+  return parseFloat(sel.options[sel.selectedIndex]?.dataset.disc || '0') || 0;
+}
+
+function wizardOnDeliveryTermChange() {
+  const termDisc = _wizardDeliveryTermDisc();
+  const info = document.getElementById('wDeliveryTermInfo');
+  if (info) {
+    if (termDisc > 0) {
+      info.textContent = `Bu teslim şekli %${termDisc.toFixed(1)} otomatik iskonto uygular.`;
+      info.style.color = 'var(--success)';
+    } else {
+      info.textContent = '';
+    }
+  }
+  wizardBuildSummary();
+}
+
+function wizardBuildSummary() {
+  if (!wizardSelectedModel) return;
+  const qty      = parseInt(document.getElementById('wMachineCount')?.value) || 1;
+  const disc     = parseFloat(document.getElementById('wDiscount')?.value) || 0;
+  const termDisc = _wizardDeliveryTermDisc();
+  const baseTotal = wizardSelectedModel.price * qty;
+  let optTotal = 0, optRows = '';
+
+  Object.values(wizardSelectedOptions).forEach(o => {
+    const lt = o.price * (o.qty || 1);
+    optTotal += lt;
+    const optRow  = document.querySelector(`.option-row[data-opt-id="${o.id}"]`);
+    const imgPath = optRow ? optRow.dataset.imgpath : '';
+    const imgHtml = imgPath
+      ? `<img src="/static/${imgPath}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;flex-shrink:0;" />`
+      : '';
+    optRows += `<tr>
+      <td style="padding:8px;display:flex;align-items:center;">${imgHtml}<span>${o.name}</span></td>
+      <td style="padding:8px;text-align:center;">${o.qty||1}</td>
+      <td style="padding:8px;text-align:right;">${o.price.toFixed(2)}</td>
+      <td style="padding:8px;text-align:right;">${lt.toFixed(2)}</td>
+    </tr>`;
+  });
+
+  const subtotal = baseTotal + optTotal;
+  const total    = subtotal * (1 - termDisc / 100) * (1 - disc / 100);
+  const cur      = wizardSelectedModel.currency;
+
+  // Get machine image
+  const modelCard = document.querySelector(`.model-card[data-id="${wizardSelectedModel.id}"]`);
+  const modelImg  = modelCard ? modelCard.querySelector('img') : null;
+  const modelImgHtml = modelImg
+    ? `<img src="${modelImg.src}" style="width:200px;height:140px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0;" />`
+    : '';
+
+  const summaryEl = document.getElementById('wizardSummary');
+  if (!summaryEl) return;
+
+  const isMobile = window.innerWidth <= 600;
+
+  // Model info header
+  let html = `<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+    ${modelImgHtml ? modelImgHtml.replace('width:200px;height:140px;', 'width:72px;height:54px;') : ''}
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${wizardSelectedModel.name}</div>
+      <div style="font-size:12px;color:var(--text-muted);">{{ T.offer_count }}: <strong>${qty}</strong> &nbsp;|&nbsp; ${cur}</div>
+    </div>
+  </div>`;
+
+  // Item rows as cards on mobile, table on desktop
+  if (isMobile) {
+    html += `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">`;
+    // Machine row
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:13px;">${wizardSelectedModel.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${qty} adet × ${wizardSelectedModel.price.toFixed(2)}</div>
+      </div>
+      <div style="font-weight:700;font-size:13px;color:var(--accent);flex-shrink:0;margin-left:8px;">${baseTotal.toFixed(2)}</div>
+    </div>`;
+    // Option rows
+    Object.values(wizardSelectedOptions).forEach(o => {
+      const lt = o.price * (o.qty || 1);
+      const imgPath = document.querySelector(`.option-row[data-opt-id="${o.id}"]`)?.dataset.imgpath || '';
+      const imgHtml = imgPath ? `<img src="/static/${imgPath}" style="width:28px;height:28px;object-fit:cover;border-radius:4px;flex-shrink:0;" />` : '';
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+          ${imgHtml}
+          <div style="min-width:0;">
+            <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.name}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${o.qty||1} adet × ${o.price.toFixed(2)}</div>
+          </div>
+        </div>
+        <div style="font-weight:700;font-size:13px;color:var(--accent);flex-shrink:0;margin-left:8px;">${lt.toFixed(2)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <thead style="background:var(--surface-2);">
+        <tr>
+          <th style="padding:10px;text-align:left;">{{ T.offer_item }}</th>
+          <th style="padding:10px;text-align:center;">{{ T.offer_count }}</th>
+          <th style="padding:10px;text-align:right;">{{ T.offer_unit_price }}</th>
+          <th style="padding:10px;text-align:right;">{{ T.offer_total }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:var(--surface);">
+          <td style="padding:8px;"><strong>${wizardSelectedModel.name}</strong></td>
+          <td style="padding:8px;text-align:center;">${qty}</td>
+          <td style="padding:8px;text-align:right;">${wizardSelectedModel.price.toFixed(2)}</td>
+          <td style="padding:8px;text-align:right;">${baseTotal.toFixed(2)}</td>
+        </tr>
+        ${optRows}
+      </tbody>
+    </table>`;
+  }
+
+  const termSel = document.getElementById('wDeliveryTermId');
+  const termName = (termSel && termSel.value !== '0') ? termSel.options[termSel.selectedIndex]?.text || '' : '';
+
+  const finalPriceInput = parseFloat(document.getElementById('wFinalPrice')?.value) || 0;
+  const displayTotal = finalPriceInput > 0 ? finalPriceInput : total;
+
+  html += `<div style="padding:10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);margin-top:8px;">
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+      <span style="color:var(--text-muted);">{{ T.offer_subtotal }}</span>
+      <strong>${subtotal.toFixed(2)} ${cur}</strong>
+    </div>
+    ${termDisc>0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:var(--success);">
+      <span>🚢 ${termName} (${termDisc}%)</span>
+      <span>-${(subtotal*termDisc/100).toFixed(2)} ${cur}</span>
+    </div>` : ''}
+    ${disc>0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:var(--success);">
+      <span>{{ T.offer_discount }} (${disc}%)</span>
+      <span>-${(subtotal*(1-termDisc/100)*disc/100).toFixed(2)} ${cur}</span>
+    </div>` : ''}
+    ${finalPriceInput > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:var(--text-muted);">
+      <span>✏️ Nihai Tutar (Manuel)</span>
+      <span>${finalPriceInput.toFixed(2)} ${cur}</span>
+    </div>` : ''}
+    <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:800;color:var(--accent);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
+      <span>{{ T.wiz_net_total }}</span>
+      <span>${displayTotal.toFixed(2)} ${cur}</span>
+    </div>
+  </div>`;
+
+  summaryEl.innerHTML = html;
+
+  document.getElementById('wOptionsJson').value = JSON.stringify(
+    Object.values(wizardSelectedOptions).map(o => ({id:o.id, qty:o.qty||1, price:o.price, line_total:o.price*(o.qty||1)}))
+  );
+}
+
+// Model card selection style
+document.querySelectorAll('.model-card').forEach(card => {
+  card.addEventListener('mouseenter', function() {
+    if (card.style.borderColor !== 'var(--accent)') card.style.boxShadow = '0 4px 16px rgba(0,0,0,.12)';
+  });
+  card.addEventListener('mouseleave', function() {
+    card.style.boxShadow = '';
+  });
+  card.addEventListener('click', function() {
+    document.querySelectorAll('.model-card').forEach(c => {
+      c.style.borderColor = 'var(--border)';
+      c.style.background = 'var(--surface)';
+      c.style.boxShadow = '';
+    });
+    card.style.borderColor = 'var(--accent)';
+    card.style.background = 'rgba(59,130,246,.06)';
+    card.style.boxShadow = '0 0 0 3px rgba(59,130,246,.15)';
+  });
+});
+
+{% if edit_offer %}
+const _editModelMap = {
+  {% for m in models %}{{ m.id }}: { name: {{ (m.get('name_'+user.lang) or m.name if user.lang != 'tr' else m.name)|tojson }}, price: {{ m.base_price|default(0) }}, currency: {{ m.currency|tojson }} },
+  {% endfor %}
+};
+const _editOptNames = {
+  {% for o in options %}{{ o.id }}: {{ (o.get('name_'+user.lang) or o.name if user.lang != 'tr' else o.name)|tojson }},
+  {% endfor %}
+};
+document.addEventListener('DOMContentLoaded', function() {
+  const md = _editModelMap[{{ edit_offer.model_id }}];
+  if (md) wizardSelectModel({{ edit_offer.model_id }}, md.name, md.price, md.currency);
+  {% for item in edit_items %}
+  (function(){
+    const cb = document.getElementById('opt_{{ item.option_id }}');
+    if (cb) {
+      cb.checked = true;
+      const qEl = document.getElementById('optqty_{{ item.option_id }}');
+      if (qEl) qEl.value = {{ item.qty }};
+      wizardSelectedOptions[{{ item.option_id }}] = {
+        id: {{ item.option_id }},
+        name: _editOptNames[{{ item.option_id }}] || '',
+        price: {{ item.unit_price }},
+        qty: {{ item.qty }},
+        currency: {{ edit_offer.currency|tojson }},
+        line_total: {{ item.line_total }}
+      };
+    }
+  })();
+  {% endfor %}
+});
+{% endif %}
+
+function _toEmbedUrl(url) {
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (ytMatch) return 'https://www.youtube.com/embed/' + ytMatch[1] + '?autoplay=1';
+  const vmMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vmMatch) return 'https://player.vimeo.com/video/' + vmMatch[1] + '?autoplay=1';
+  return null;
+}
+function openVideoModal(url) {
+  const embed = _toEmbedUrl(url);
+  if (embed) {
+    document.getElementById('wizVideoFrame').src = embed;
+    openModal('wizVideoModal');
+  } else {
+    window.open(url, '_blank');
+  }
+}
+function closeVideoModal() {
+  document.getElementById('wizVideoFrame').src = '';
+  closeModal('wizVideoModal');
+}
+</script>
+
+<!-- Video Modal -->
+<div id="wizVideoModal" class="modal-overlay" onclick="if(event.target===this)closeVideoModal()">
+  <div class="modal-box" style="max-width:760px;padding:0;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);">
+      <span style="font-weight:600;">▶ Video</span>
+      <button class="modal-close" onclick="closeVideoModal()">&times;</button>
+    </div>
+    <div style="position:relative;padding-bottom:56.25%;height:0;background:#000;">
+      <iframe id="wizVideoFrame" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+    </div>
+  </div>
+</div>
+{% endblock %}

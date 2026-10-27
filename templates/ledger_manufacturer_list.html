@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block page_title %}{{ _T(user.lang if user else 'tr').ledger_mfr_title }}{% endblock %}
+
+{% block content %}
+{% set T = _T(user.lang if user else 'tr') %}
+<div style="margin-bottom:20px;display:flex;gap:12px;align-items:center;">
+  <button class="btn btn-primary" onclick="openModal('newMfrModal')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    {{ T.ledger_mfr_new }}
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ T.manufacturers_title }}</th>
+          <th>{{ T.ledger_mfr_total_purchase }}</th>
+          <th>{{ T.ledger_mfr_total_payment }}</th>
+          <th>{{ T.ledger_balance }}</th>
+          <th>{{ T.ledger_action }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mfr in manufacturers %}
+        {% set mfr_txns = all_txns|selectattr('manufacturer_name','eq',mfr)|list %}
+        {% set alim = mfr_txns|selectattr('txn_type','eq','purchase')|map(attribute='amount')|list|sum %}
+        {% set odeme = mfr_txns|selectattr('txn_type','eq','payment')|map(attribute='amount')|list|sum %}
+        <tr>
+          <td><strong>{{ mfr }}</strong></td>
+          <td>{{ "%.2f"|format(alim) }}</td>
+          <td>{{ "%.2f"|format(odeme) }}</td>
+          <td>
+            {% set bal = balances.get(mfr, 0) %}
+            <strong style="color:{% if bal > 0 %}var(--danger){% elif bal < 0 %}var(--success){% else %}var(--text-muted){% endif %}">
+              {{ "%.2f"|format(bal) }}
+            </strong>
+          </td>
+          <td><a href="/ledger/manufacturers/{{ mfr }}" class="btn btn-primary btn-sm">{{ T.ledger_view }}</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">{{ T.ledger_no_mfr }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="newMfrModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ T.ledger_mfr_new }}</h3>
+      <button class="modal-close" onclick="closeModal('newMfrModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="post" action="/ledger/manufacturers/__new__/add" id="newMfrForm">
+        <div class="form-group">
+          <label class="form-label">{{ T.ledger_mfr_name }}</label>
+          <input type="text" id="mfrNameInput" class="form-control" placeholder="Üretici firma adı" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.ledger_txn_type }}</label>
+          <select name="txn_type" class="form-control">
+            <option value="purchase">{{ T.ledger_mfr_purchase_txn }}</option>
+            <option value="payment">{{ T.ledger_mfr_payment_txn }}</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">{{ T.ledger_amount }} *</label>
+            <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ T.ledger_currency }}</label>
+            <select name="currency" class="form-control">
+              <option>USD</option><option>EUR</option><option>TRY</option><option>RMB</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.ledger_date }}</label>
+          <input type="date" name="txn_date" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ T.ledger_desc }}</label>
+          <textarea name="description" class="form-control" rows="2"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('newMfrModal')">{{ T.btn_cancel }}</button>
+          <button type="button" class="btn btn-primary" onclick="submitMfrForm()">{{ T.btn_save }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function submitMfrForm() {
+  const name = document.getElementById('mfrNameInput').value.trim();
+  if (!name) { showToast('Üretici adı giriniz.', 'warning'); return; }
+  document.getElementById('newMfrForm').action = '/ledger/manufacturers/' + encodeURIComponent(name) + '/add';
+  document.getElementById('newMfrForm').submit();
+}
+</script>
+{% endblock %}

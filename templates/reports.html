@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% set T = _T(user.lang if user else 'tr') %}
+{% block page_title %}Teklif Raporları{% endblock %}
+
+{% block content %}
+<style>
+  .rp-kpi { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:18px; }
+  .rp-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+  .rp-card .lb { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; }
+  .rp-card .vl { font-size:24px; font-weight:800; margin-top:3px; line-height:1.15; }
+  .rp-card .sub { font-size:12px; color:var(--text-muted); margin-top:4px; }
+  .rp-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+  .rp-bar { height:7px; border-radius:4px; background:var(--surface-2); overflow:hidden; }
+  .rp-bar i { display:block; height:100%; background:var(--accent); border-radius:4px; }
+  .rp-filters { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px; }
+  .rp-chip { padding:6px 13px; border-radius:999px; border:1px solid var(--border);
+             background:var(--surface-2); color:var(--text); font-size:13px; text-decoration:none; }
+  .rp-chip.on { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  .rp-sub { background:var(--surface-2); }
+  .rp-sub td { font-size:12px; padding:6px 10px !important; }
+  .rp-toggle { cursor:pointer; user-select:none; }
+  @media (max-width:980px) { .rp-grid { grid-template-columns:1fr; } }
+</style>
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+  <h2 style="margin:0;font-size:20px;">📊 Teklif Raporları</h2>
+  <a href="/raporlar/excel?days={{ days }}&status={{ status }}&city={{ city }}"
+     class="btn btn-outline btn-sm" style="border-color:#16a34a;color:#16a34a;">
+    ⬇ Excel İndir
+  </a>
+</div>
+
+<!-- ── Filtreler ── -->
+<div class="rp-filters">
+  {% for val, lbl in presets %}
+  <a class="rp-chip {% if days|string == val %}on{% endif %}"
+     href="/raporlar?days={{ val }}&status={{ status }}&city={{ city }}&sort={{ sort }}">{{ lbl }}</a>
+  {% endfor %}
+  <form method="get" action="/raporlar" style="display:flex;gap:8px;align-items:flex-end;margin-left:auto;flex-wrap:wrap;">
+    <input type="hidden" name="days" value="{{ days }}" />
+    <input type="hidden" name="sort" value="{{ sort }}" />
+    <div class="form-group" style="margin:0;">
+      <label class="form-label" style="font-size:11px;">Durum</label>
+      <select name="status" class="form-control" style="min-width:150px;" onchange="this.form.submit()">
+        <option value="">Tümü</option>
+        {% for s in statuses %}<option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin:0;">
+      <label class="form-label" style="font-size:11px;">Şehir</label>
+      <select name="city" class="form-control" style="min-width:150px;" onchange="this.form.submit()">
+        <option value="">Tümü</option>
+        {% for c in all_cities %}<option value="{{ c }}" {% if city == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+  </form>
+</div>
+
+<!-- ── Özet ── -->
+<div class="rp-kpi">
+  <div class="rp-card">
+    <div class="lb">Toplam Teklif</div>
+    <div class="vl">{{ total.n }}</div>
+    <div class="sub">{{ total.text() }}</div>
+  </div>
+  <div class="rp-card">
+    <div class="lb">Kazanılan</div>
+    <div class="vl" style="color:#22c55e;">{{ won.n }}</div>
+    <div class="sub">{{ won.text() }}</div>
+  </div>
+  <div class="rp-card">
+    <div class="lb">Bekleyen</div>
+    <div class="vl" style="color:#f59e0b;">{{ open.n }}</div>
+    <div class="sub">{{ open.text() }}</div>
+  </div>
+  <div class="rp-card">
+    <div class="lb">Kaybedilen</div>
+    <div class="vl" style="color:#ef4444;">{{ lost.n }}</div>
+    <div class="sub">{{ lost.text() }}</div>
+  </div>
+  <div class="rp-card">
+    <div class="lb">Dönüşüm Oranı</div>
+    <div class="vl" style="color:var(--accent);">%{{ "%.0f"|format(conv) }}</div>
+    <div class="sub">{{ won.n }} / {{ total.n }} teklif</div>
+  </div>
+</div>
+
+{% if total.n == 0 %}
+<div class="card"><div class="card-body" style="text-align:center;padding:40px;color:var(--text-muted);">
+  Seçilen aralıkta teklif bulunamadı.
+</div></div>
+{% else %}
+
+<!-- ── Tekrar teklif alan müşteriler ── -->
+<div class="card" style="margin-bottom:18px;">
+  <div class="card-header">
+    <h3 class="card-title">🔁 Birden Fazla Teklif Alan Müşteriler</h3>
+    <span style="color:var(--text-muted);font-size:12px;">
+      {{ repeat_rows|length }} firma · satıra tıklayınca teklifleri açılır
+    </span>
+  </div>
+  <div class="card-body" style="padding:0;">
+    {% if repeat_rows %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Firma</th><th>Şehir</th><th style="text-align:center;">Teklif</th>
+            <th style="text-align:center;">Kazanılan</th><th>Toplam Tutar</th>
+            <th>Teklif Verilen Modeller</th><th>Son Teklif</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in repeat_rows %}
+          <tr class="rp-toggle" onclick="rpToggle('rc{{ r.id }}')">
+            <td><strong>{{ r.name }}</strong>{% if r.contact %}<br><small style="color:var(--text-muted);">{{ r.contact }}</small>{% endif %}</td>
+            <td>{{ r.city }}</td>
+            <td style="text-align:center;"><span class="badge badge-blue">{{ r.n }}</span></td>
+            <td style="text-align:center;">{% if r.won %}<span class="badge badge-green">{{ r.won }}</span>{% else %}—{% endif %}</td>
+            <td style="white-space:nowrap;">{{ r.total }}</td>
+            <td style="font-size:12px;color:var(--text-muted);">{{ r.models|join(' · ') }}</td>
+            <td style="white-space:nowrap;">{{ r.last.strftime('%d.%m.%Y') if r.last else '—' }}</td>
+          </tr>
+          <tr id="rc{{ r.id }}" style="display:none;">
+            <td colspan="7" style="padding:0;">
+              <table style="width:100%;" class="rp-sub">
+                <thead>
+                  <tr>
+                    <th style="width:150px;">Teklif No</th><th style="width:100px;">Tarih</th>
+                    <th>Model</th><th style="width:70px;text-align:center;">Adet</th>
+                    <th style="width:150px;">Tutar</th><th style="width:130px;">Durum</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for o in r.offers %}
+                  <tr>
+                    <td><code>{{ o.offer_no }}</code></td>
+                    <td>{{ o.date.strftime('%d.%m.%Y') if o.date else '—' }}</td>
+                    <td>{{ o.model_disp }}</td>
+                    <td style="text-align:center;">{{ o.machine_count }}</td>
+                    <td style="white-space:nowrap;font-weight:600;">
+                      {{ "%.2f"|format(o.amount) }} {{ o.currency }}
+                    </td>
+                    <td>{{ o.status }}</td>
+                    <td style="text-align:right;">
+                      <a href="/offers/{{ o.id }}" class="btn btn-ghost btn-sm">Aç</a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px;">
+      Bu aralıkta aynı firmadan birden fazla teklif yok.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="rp-grid" style="margin-bottom:18px;">
+  <!-- ── Model kırılımı ── -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">🏭 Modele Göre</h3></div>
+    <div class="card-body" style="padding:0;">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Model</th><th style="text-align:center;">Teklif</th><th>Tutar</th></tr></thead>
+          <tbody>
+            {% for m in model_rows %}
+            <tr>
+              <td>{{ m.name }}</td>
+              <td style="text-align:center;"><strong>{{ m.n }}</strong></td>
+              <td style="white-space:nowrap;font-size:13px;">{{ m.total }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Şehir kırılımı ── -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">📍 Şehre Göre</h3></div>
+    <div class="card-body" style="padding:0;">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Şehir</th><th style="text-align:center;">Teklif</th><th>Tutar</th></tr></thead>
+          <tbody>
+            {% for c in city_rows %}
+            <tr>
+              <td>{{ c.name }}</td>
+              <td style="text-align:center;"><strong>{{ c.n }}</strong></td>
+              <td style="white-space:nowrap;font-size:13px;">{{ c.total }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="rp-grid" style="margin-bottom:18px;">
+  <!-- ── Aylık seyir ── -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">📈 Aylık Teklif Sayısı</h3></div>
+    <div class="card-body">
+      {% for m in month_rows %}
+      <div style="margin-bottom:11px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+          <span>{{ m.label }}</span>
+          <span style="color:var(--text-muted);">{{ m.n }} teklif · {{ m.total }}</span>
+        </div>
+        <div class="rp-bar"><i style="width:{{ m.pct }}%;"></i></div>
+      </div>
+      {% else %}
+      <div style="color:var(--text-muted);font-size:13px;">Veri yok.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Durum dağılımı ── -->
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">🏷 Duruma Göre</h3></div>
+    <div class="card-body" style="padding:0;">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Durum</th><th style="text-align:center;">Adet</th><th>Tutar</th></tr></thead>
+          <tbody>
+            {% set sc = {'Beklemede':'amber','Onaylandı':'green','Reddedildi':'red',
+                         'Sipariş Verildi':'blue','İptal':'gray'} %}
+            {% for s, b in status_rows %}
+            <tr>
+              <td><span class="badge badge-{{ sc.get(s,'gray') }}">{{ s }}</span></td>
+              <td style="text-align:center;"><strong>{{ b.n }}</strong></td>
+              <td style="white-space:nowrap;font-size:13px;">{{ b.text() }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tüm müşteriler ── -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">👥 Müşteri Bazında Tüm Teklifler</h3>
+    <div style="display:flex;gap:6px;">
+      {% for val, lbl in [('count','Teklif sayısı'), ('amount','Tutar'), ('name','İsim')] %}
+      <a class="rp-chip {% if sort == val %}on{% endif %}" style="font-size:12px;padding:4px 10px;"
+         href="/raporlar?days={{ days }}&status={{ status }}&city={{ city }}&sort={{ val }}">{{ lbl }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card-body" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Firma</th><th>Şehir</th><th style="text-align:center;">Teklif</th>
+            <th style="text-align:center;">Kazanılan</th><th>Toplam Tutar</th><th>Son Teklif</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in cust_rows %}
+          <tr>
+            <td><strong>{{ r.name }}</strong>{% if r.n >= 2 %} <span class="badge badge-blue" style="font-size:10px;">🔁 {{ r.n }}</span>{% endif %}</td>
+            <td>{{ r.city }}</td>
+            <td style="text-align:center;">{{ r.n }}</td>
+            <td style="text-align:center;">{{ r.won or '—' }}</td>
+            <td style="white-space:nowrap;">{{ r.total }}</td>
+            <td style="white-space:nowrap;">{{ r.last.strftime('%d.%m.%Y') if r.last else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function rpToggle(id) {
+  var r = document.getElementById(id);
+  if (r) r.style.display = (r.style.display === 'none' || !r.style.display) ? 'table-row' : 'none';
+}
+</script>
+{% endblock %}
